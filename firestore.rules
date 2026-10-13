@@ -1,33 +1,113 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Regras para a coleção principal de Restaurantes
+
+    // ───────────────────────────── Helpers ─────────────────────────────
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Dono = uid do Firebase Auth gravado em restaurantes/{id}.ownerId.
+    // Usuários anônimos (clientes) nunca casam com ownerId.
+    function isOwner(restauranteId) {
+      return isSignedIn()
+        && get(/databases/$(database)/documents/restaurantes/$(restauranteId)).data.ownerId == request.auth.uid;
+    }
+
+    // Campos permitidos numa ComandaCliente (ver src/types/index.ts)
+    function comandaKeys() {
+      return ['id', 'nomeCliente', 'criadoEm', 'itens', 'subtotal', 'status'];
+    }
+
+    function isValidComanda(d) {
+      return d.keys().hasAll(comandaKeys())
+        && d.keys().hasOnly(comandaKeys())
+        && d.nomeCliente is string && d.nomeCliente.size() > 0 && d.nomeCliente.size() <= 60
+        && d.itens is list && d.itens.size() <= 100
+        && d.subtotal is number && d.subtotal >= 0
+        && d.criadoEm is timestamp
+        && d.status in ['pedindo', 'aguardando_pratos', 'conta_pedida', 'pago'];
+    }
+
+    // Transições de status que o CLIENTE pode fazer na própria comanda.
+    // 'pago' e qualquer outra transição são exclusivas do lojista.
+    function isAllowedClientStatus(antes, depois) {
+      return depois == antes
+        || (antes == 'pedindo' && depois == 'aguardando_pratos')                    // enviou o pedido
+        || (antes in ['pedindo', 'aguardando_pratos'] && depois == 'conta_pedida'); // pediu a conta
+    }
+
+    // ─────────────────────────── Restaurantes ───────────────────────────
+
     match /restaurantes/{restauranteId} {
-      // Leitura pública (para o PWA do cliente)
+      // Leitura pública (PWA do cliente / rotas ISR)
       allow read: if true;
-      // Apenas o dono logado (Auth) pode alterar as configs do seu restaurante
-      allow write: if request.auth != null && request.auth.uid == resource.data.ownerId;
-      
-      // Subcoleção: Cardápio
+
+      // Onboarding: na criação ainda não existe `resource`, então valida o
+      // documento que está chegando (request.resource).
+      allow create: if isSignedIn()
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.slug is string
+        && request.resource.data.nome is string;
+
+      // Só o dono altera, e não pode transferir a propriedade.
+      allow update: if isSignedIn()
+        && resource.data.ownerId == request.auth.uid
+        && request.resource.data.ownerId == resource.data.ownerId;
+
+      allow delete: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+
+      // ─────────────────────────── Cardápio ───────────────────────────
       match /cardapio/{itemId} {
         allow read: if true; // Clientes podem ver os pratos
-        // Apenas o dono do restaurante pode adicionar/editar pratos
-        allow write: if request.auth != null && request.auth.uid == get(/databases/$(database)/documents/restaurantes/$(restauranteId)).data.ownerId;
+        allow write: if isOwner(restauranteId);
       }
-      
-      // Subcoleção: Mesas e Comandas (O coração do nosso Aditivo 07)
+
+      // ──────────────────────────── Mesas ────────────────────────────
       match /mesas/{numeroMesa} {
         allow read: if true;
-        
-        // Nó Filho: A comanda individual do cliente na mesa
+        allow write: if isOwner(restauranteId);
+
+        // Nó Filho: a comanda individual do cliente na mesa.
+        // clienteId == uid do login anônimo do cliente (Firebase Auth).
         match /comandas_abertas/{clienteId} {
-           // Clientes podem criar seus carrinhos e adicionar itens sem precisar de login
-           allow create, update: if true; 
-           // Apenas o restaurante (garçom/caixa logado) pode fechar/deletar a conta
-           allow delete: if request.auth != null;
+
+          // Cliente lê a própria comanda; lojista (garçom/KDS/caixa) lê todas.
+          allow read: if isSignedIn()
+            && (request.auth.uid == clienteId || isOwner(restauranteId));
+
+          // Cliente cria a própria comanda, sempre começando em 'pedindo'.
+          // Lojista também pode criar (contingência: QR Code lido pelo garçom).
+          allow create: if isValidComanda(request.resource.data)
+            && request.resource.data.id == clienteId
+            && (
+              (isSignedIn() && request.auth.uid == clienteId
+                && request.resource.data.status == 'pedindo'
+                && request.resource.data.criadoEm == request.time)
+              || isOwner(restauranteId)
+            );
+
+          // Cliente: só a própria comanda, sem trocar id/criadoEm, e apenas
+          // as transições de status liberadas. Após 'conta_pedida' a comanda
+          // fica congelada para o cliente (não dá para incluir itens).
+          // Lojista: qualquer alteração válida (inclusive status 'pago').
+          allow update: if isValidComanda(request.resource.data)
+            && request.resource.data.id == resource.data.id
+            && request.resource.data.criadoEm == resource.data.criadoEm
+            && (
+              (isSignedIn() && request.auth.uid == clienteId
+                && resource.data.status in ['pedindo', 'aguardando_pratos']
+                && isAllowedClientStatus(resource.data.status, request.resource.data.status))
+              || isOwner(restauranteId)
+            );
+
+          // Apenas o lojista fecha/exclui a conta.
+          allow delete: if isOwner(restauranteId);
         }
       }
     }
+
+    // Qualquer outro caminho é negado por padrão.
   }
 }
