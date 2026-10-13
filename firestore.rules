@@ -1,0 +1,33 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Regras para a coleção principal de Restaurantes
+    match /restaurantes/{restauranteId} {
+      // Leitura pública (para o PWA do cliente)
+      allow read: if true;
+      // Apenas o dono logado (Auth) pode alterar as configs do seu restaurante
+      allow write: if request.auth != null && request.auth.uid == resource.data.ownerId;
+      
+      // Subcoleção: Cardápio
+      match /cardapio/{itemId} {
+        allow read: if true; // Clientes podem ver os pratos
+        // Apenas o dono do restaurante pode adicionar/editar pratos
+        allow write: if request.auth != null && request.auth.uid == get(/databases/$(database)/documents/restaurantes/$(restauranteId)).data.ownerId;
+      }
+      
+      // Subcoleção: Mesas e Comandas (O coração do nosso Aditivo 07)
+      match /mesas/{numeroMesa} {
+        allow read: if true;
+        
+        // Nó Filho: A comanda individual do cliente na mesa
+        match /comandas_abertas/{clienteId} {
+           // Clientes podem criar seus carrinhos e adicionar itens sem precisar de login
+           allow create, update: if true; 
+           // Apenas o restaurante (garçom/caixa logado) pode fechar/deletar a conta
+           allow delete: if request.auth != null;
+        }
+      }
+    }
+  }
+}
