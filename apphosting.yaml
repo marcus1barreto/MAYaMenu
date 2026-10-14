@@ -1,0 +1,18 @@
+# Firebase App Hosting configuration
+# Documentation: https://firebase.google.com/docs/app-hosting/configure
+
+env:
+  - variable: NEXT_PUBLIC_FIREBASE_API_KEY
+    value: "AIzaSyC67XScjNAQyO4982btL4xcxam9Y85w4us"
+  - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+    value: "mayaranas-8ad9f.firebaseapp.com"
+  - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
+    value: "mayaranas-8ad9f"
+  - variable: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+    value: "mayaranas-8ad9f.firebasestorage.app"
+  - variable: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+    value: "666839403683"
+  - variable: NEXT_PUBLIC_FIREBASE_APP_ID
+    value: "1:666839403683:web:380c0dfff44eb955ce4316"
+  - variable: NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
+    value: "G-9QGRPGGPDW"
