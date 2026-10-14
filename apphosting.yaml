@@ -16,3 +16,5 @@ env:
     value: "1:666839403683:web:380c0dfff44eb955ce4316"
   - variable: NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
     value: "G-9QGRPGGPDW"
+  - variable: NEXT_PUBLIC_FIREBASE_DATABASE_ID
+    value: "mayamenu-bd"

@@ -27,19 +27,25 @@ const isBrowser = typeof window !== "undefined";
 
 export const app: FirebaseApp = getApps().length ? getApp() : initializeApp(firebaseConfig);
 
+const FIRESTORE_DATABASE_ID = process.env.NEXT_PUBLIC_FIREBASE_DATABASE_ID || "mayamenu-bd";
+
 /**
  * Firestore:
  * - No navegador: cache persistente em IndexedDB com suporte a várias abas.
  * - No servidor (ISR/SSR): cache em memória padrão.
  */
 function createFirestore(): Firestore {
-  if (!isBrowser) return getFirestore(app);
+  if (!isBrowser) return getFirestore(app, FIRESTORE_DATABASE_ID);
   try {
-    return initializeFirestore(app, {
-      localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
-    });
+    return initializeFirestore(
+      app,
+      {
+        localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+      },
+      FIRESTORE_DATABASE_ID
+    );
   } catch {
-    return getFirestore(app);
+    return getFirestore(app, FIRESTORE_DATABASE_ID);
   }
 }
 
