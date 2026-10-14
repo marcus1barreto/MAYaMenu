@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>MAYaMenu - Manual de Operação e Referência de Links</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 1.8cm 1.5cm;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color: #1f2937;
+      line-height: 1.5;
+      font-size: 11pt;
+      margin: 0;
+      padding: 0;
+    }
+    .header {
+      border-bottom: 2px solid #e11d48;
+      padding-bottom: 15px;
+      margin-bottom: 25px;
+    }
+    .header h1 {
+      margin: 0;
+      color: #0f172a;
+      font-size: 24pt;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+    }
+    .header .subtitle {
+      color: #e11d48;
+      font-size: 12pt;
+      font-weight: 600;
+      margin-top: 5px;
+    }
+    .badge {
+      display: inline-block;
+      background: #ffe4e6;
+      color: #be123c;
+      padding: 3px 10px;
+      border-radius: 9999px;
+      font-size: 8.5pt;
+      font-weight: 700;
+      text-transform: uppercase;
+      margin-top: 6px;
+    }
+    h2 {
+      color: #0f172a;
+      font-size: 14pt;
+      border-bottom: 1px solid #e2e8f0;
+      padding-bottom: 5px;
+      margin-top: 25px;
+      margin-bottom: 12px;
+    }
+    h3 {
+      color: #334155;
+      font-size: 11.5pt;
+      margin-top: 15px;
+      margin-bottom: 6px;
+    }
+    p {
+      margin: 0 0 10px 0;
+    }
+    .link-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 15px 0 20px 0;
+    }
+    .link-table th, .link-table td {
+      border: 1px solid #cbd5e1;
+      padding: 8px 12px;
+      text-align: left;
+      font-size: 10pt;
+    }
+    .link-table th {
+      background-color: #f8fafc;
+      color: #334155;
+      font-weight: 700;
+    }
+    .link-url {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      color: #e11d48;
+      word-break: break-all;
+      font-size: 9pt;
+      font-weight: 600;
+    }
+    .card {
+      background-color: #f8fafc;
+      border-left: 4px solid #e11d48;
+      padding: 12px 16px;
+      border-radius: 0 8px 8px 0;
+      margin: 15px 0;
+    }
+    .card-title {
+      font-weight: 700;
+      color: #0f172a;
+      margin-bottom: 4px;
+    }
+    .footer {
+      margin-top: 35px;
+      border-top: 1px solid #e2e8f0;
+      padding-top: 12px;
+      text-align: center;
+      font-size: 8.5pt;
+      color: #64748b;
+    }
+    ul, ol {
+      margin: 0 0 12px 0;
+      padding-left: 20px;
+    }
+    li {
+      margin-bottom: 5px;
+    }
+    .page-break {
+      page-break-before: always;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <h1>MAYaMenu — Manual de Operação</h1>
+    <div class="subtitle">Cardápio Digital PWA de Alta Performance • MAYaRAnas Sistemas</div>
+    <div class="badge">Versão Alpha MVP • Produção Ativa</div>
+  </div>
+
+  <h2>1. Links Oficiais em Produção</h2>
+  <p>Aplicação hospedada com Server-Side Rendering (SSR) no <strong>Firebase App Hosting (Google Cloud Run)</strong> integrada à CDN global.</p>
+
+  <table class="link-table">
+    <thead>
+      <tr>
+        <th style="width: 25%;">Módulo</th>
+        <th style="width: 20%;">Público-Alvo</th>
+        <th>Link Oficial de Acesso</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Página Inicial</strong></td>
+        <td>Geral / Visitantes</td>
+        <td class="link-url">https://mayamenu--mayaranas-8ad9f.us-east4.hosted.app/</td>
+      </tr>
+      <tr>
+        <td><strong>PWA do Cliente (Mesa 12)</strong></td>
+        <td>Clientes na Mesa</td>
+        <td class="link-url">https://mayamenu--mayaranas-8ad9f.us-east4.hosted.app/r/demo?mesa=12</td>
+      </tr>
+      <tr>
+        <td><strong>KDS da Cozinha</strong></td>
+        <td>Cozinheiros / Bar</td>
+        <td class="link-url">https://mayamenu--mayaranas-8ad9f.us-east4.hosted.app/cozinha</td>
+      </tr>
+      <tr>
+        <td><strong>Terminal do Garçom</strong></td>
+        <td>Garçons / Salão</td>
+        <td class="link-url">https://mayamenu--mayaranas-8ad9f.us-east4.hosted.app/garcom</td>
+      </tr>
+      <tr>
+        <td><strong>Painel de Gestão</strong></td>
+        <td>Gerentes / Donos</td>
+        <td class="link-url">https://mayamenu--mayaranas-8ad9f.us-east4.hosted.app/admin</td>
+      </tr>
+      <tr>
+        <td><strong>Login Administrativo</strong></td>
+        <td>Staff</td>
+        <td class="link-url">https://mayamenu--mayaranas-8ad9f.us-east4.hosted.app/login</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="card">
+    <div class="card-title">Credenciais de Demonstração / Acesso Administrativo</div>
+    <div><strong>E-mail:</strong> admin@mayamenu.com &nbsp;|&nbsp; <strong>Senha:</strong> 123456</div>
+    <div style="font-size: 9pt; color: #64748b; margin-top: 4px;">* A tela de login dispõe de um botão de 1 clique ("Preencher") para login ágil em tablets e celulares de serviço.</div>
+  </div>
+
+  <h2>2. Arquitetura e Filosofia ("O Menos é Mais")</h2>
+  <ul>
+    <li><strong>Zero Instalação:</strong> O cliente não precisa baixar apps na Google Play ou App Store. O leitor nativo da câmera do smartphone lê o QR Code da mesa e abre instantaneamente o PWA.</li>
+    <li><strong>Anti-Concorrência e Comanda Individual:</strong> Cada smartphone conectado à mesma mesa possui sua própria comanda com identificador anônimo único. Amigos na mesma mesa podem pedir separadamente ou ratear a conta sem conflito de gravação no banco.</li>
+    <li><strong>Resiliência Offline-First (Modo Contingência):</strong> Caso o salão sofra instabilidade de Wi-Fi ou sinal 4G, o sistema compila o pedido completo num <em>Ticket Digital (QR Code compacto)</em> no celular do cliente. O garçom utiliza a câmera de contingência do seu terminal para ler o QR Code e despachar o pedido.</li>
+  </ul>
+
+  <div class="page-break"></div>
+
+  <h2>3. Manual Operacional dos Módulos</h2>
+
+  <h3>3.1. Visão do Cliente (/r/demo?mesa=X)</h3>
+  <ol>
+    <li>O cliente aponta a câmera para a mesa física ou acessa o link da mesa correspondente.</li>
+    <li>Navega pelas categorias (Lanches, Pizzas, Bebidas), filtra por busca e seleciona os pratos.</li>
+    <li>No modal de personalização (Fat-Finger Friendly), seleciona pontos da carne, bordas ou adicionais.</li>
+    <li>Abre a sacola (carrinho flutuante), digita seu nome e clica em <strong>"Enviar Pedido para a Cozinha"</strong>.</li>
+    <li>O pedido é salvo na comanda da mesa e o comprovante digital com QR Code é gerado.</li>
+  </ol>
+
+  <h3>3.2. Visão da Cozinha - KDS (/cozinha)</h3>
+  <ol>
+    <li>Tela otimizada para tablets ou monitores touch screen na área de preparo (fundo escuro de alto contraste).</li>
+    <li>Separação automática em duas colunas: <strong>"A Fazer"</strong> e <strong>"Pronto"</strong>.</li>
+    <li>Os modificadores e observações do cliente (ex.: <em>"Sem cebola"</em>, <em>"Ponto da Carne: Ao Ponto"</em>) aparecem com destaque em vermelho vivo para evitar erros no preparo.</li>
+    <li>Botão tátil único <strong>"MARCHAR"</strong> para avançar o estado do prato até a entrega.</li>
+  </ol>
+
+  <h3>3.3. Visão do Garçom (/garcom)</h3>
+  <ol>
+    <li>Mapa interativo de mesas do salão em tempo real.</li>
+    <li>Indicadores visuais instantâneos: <em>Livre</em> (verde), <em>Ocupada</em> (laranja), <em>Pediu Conta</em> (vermelho pulsante).</li>
+    <li>Ao selecionar a mesa, o garçom vê o subtotal discriminado por cliente (quem consumiu o quê) facilitando o fechamento de contas divididas.</li>
+    <li>Botão <strong>"Escanear Ticket do Cliente"</strong> aciona a câmera do dispositivo do garçom para ler QR Codes de contingência em caso de queda de internet.</li>
+  </ol>
+
+  <h3>3.4. Visão Administrativa (/admin)</h3>
+  <ol>
+    <li><strong>Gestão Rápida de Cardápio:</strong> Chaves liga/desliga (switches) para pausar pratos esgotados imediatamente, sem burocracia.</li>
+    <li><strong>Gerador de Links de Mesas:</strong> Permite consultar e gerar a URL e QR Code de qualquer mesa física do salão.</li>
+    <li><strong>Identidade Visual:</strong> Configuração rápida da cor primária da marca e dados do estabelecimento.</li>
+  </ol>
+
+  <h2>4. Infraestrutura em Nuvem (Google Cloud & Firebase)</h2>
+  <table class="link-table">
+    <thead>
+      <tr>
+        <th>Serviço</th>
+        <th>Recurso Conectado</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>App Hosting</strong></td>
+        <td>mayamenu (Região us-east4)</td>
+        <td>Ativo (CI/CD Automático via GitHub)</td>
+      </tr>
+      <tr>
+        <td><strong>Firestore</strong></td>
+        <td>mayamenu-bd (Named Database)</td>
+        <td>Ativo com regras de isolamento por mesa</td>
+      </tr>
+      <tr>
+        <td><strong>Authentication</strong></td>
+        <td>E-mail/Senha + Anônimo com auto-cleanup</td>
+        <td>Ativo</td>
+      </tr>
+      <tr>
+        <td><strong>Storage</strong></td>
+        <td>mayaranas-8ad9f.firebasestorage.app</td>
+        <td>Ativo para fotos dos pratos</td>
+      </tr>
+      <tr>
+        <td><strong>Código Fonte</strong></td>
+        <td>github.com/marcus1barreto/MAYaMenu</td>
+        <td>Branch main sincronizada</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="footer">
+    Documento emitido por MAYaRAnas Sistemas • MAYaMenu Alpha MVP • 2026
+  </div>
+
+</body>
+</html>
