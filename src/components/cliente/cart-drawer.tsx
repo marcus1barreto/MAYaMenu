@@ -119,20 +119,28 @@ export function CartDrawer({
           status: "pedindo" as const,
         };
 
-        await setDoc(comandaRef, dadosComanda, { merge: true });
+        // Timeout de segurança na chamada do Firestore (4 segundos)
+        const savePromise = setDoc(comandaRef, dadosComanda, { merge: true });
+        const timeoutSave = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("Timeout Firestore")), 4000)
+        );
+
+        await Promise.race([savePromise, timeoutSave]);
         setUsouOffline(false);
       } catch (firestoreErr) {
-        console.warn("Falha ao sincronizar com Firestore imediatamente (salvo no Ticket QR):", firestoreErr);
+        console.warn("Firestore offline ou rejeitado (salvo no Ticket QR):", firestoreErr);
         setUsouOffline(true);
       }
 
       // Dispara celebração visual
       try {
-        confetti({
-          particleCount: 80,
-          spread: 60,
-          origin: { y: 0.7 },
-        });
+        if (typeof window !== "undefined") {
+          confetti({
+            particleCount: 80,
+            spread: 60,
+            origin: { y: 0.7 },
+          });
+        }
       } catch {
         // Ignora
       }
@@ -140,8 +148,11 @@ export function CartDrawer({
       setPedidoConcluido(true);
       limparCarrinho();
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "Erro desconhecido";
-      setErro(`Não foi possível gerar o pedido: ${msg}`);
+      console.error("Erro inesperado no envio:", e);
+      // Mesmo com erro inesperado, se tiver itens gera o ticket
+      setUsouOffline(true);
+      setPedidoConcluido(true);
+      limparCarrinho();
     } finally {
       setEnviando(false);
     }

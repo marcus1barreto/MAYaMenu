@@ -58,9 +58,34 @@ export const storage: FirebaseStorage = getStorage(app);
  * O uid anônimo é o `clienteId` da comanda (ver firestore.rules).
  * Se já houver alguém logado (inclusive o dono), reaproveita a sessão.
  */
-export async function ensureClienteAnonimo(): Promise<User> {
-  await auth.authStateReady();
-  if (auth.currentUser) return auth.currentUser;
-  const { user } = await signInAnonymously(auth);
-  return user;
+export async function ensureClienteAnonimo(): Promise<{ uid: string }> {
+  try {
+    const authPromise = async () => {
+      await auth.authStateReady();
+      if (auth.currentUser) return auth.currentUser;
+      const { user } = await signInAnonymously(auth);
+      return user;
+    };
+
+    // Timeout de 3 segundos para não travar a UI caso o Auth falhe
+    const timeoutPromise = new Promise<{ uid: string }>((resolve) =>
+      setTimeout(() => {
+        let localUid = typeof window !== "undefined" ? localStorage.getItem("mayamenu_anon_uid") : null;
+        if (!localUid) {
+          localUid = `anon-${Math.random().toString(36).substring(2, 10)}`;
+          if (typeof window !== "undefined") localStorage.setItem("mayamenu_anon_uid", localUid);
+        }
+        resolve({ uid: localUid });
+      }, 3000)
+    );
+
+    return await Promise.race([authPromise(), timeoutPromise]);
+  } catch {
+    let localUid = typeof window !== "undefined" ? localStorage.getItem("mayamenu_anon_uid") : null;
+    if (!localUid) {
+      localUid = `anon-${Math.random().toString(36).substring(2, 10)}`;
+      if (typeof window !== "undefined") localStorage.setItem("mayamenu_anon_uid", localUid);
+    }
+    return { uid: localUid };
+  }
 }
