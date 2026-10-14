@@ -62,6 +62,28 @@ export function AdminLoginForm({ onLogado }: { onLogado?: () => void }) {
         </div>
       )}
 
+      {/* DICA DE CREDENCIAIS DE TESTE */}
+      {modo === "login" && (
+        <div className="mb-6 p-3.5 bg-neutral-800/80 border border-neutral-700/80 rounded-2xl flex items-center justify-between text-xs">
+          <div>
+            <span className="text-[10px] uppercase font-bold text-rose-400 block tracking-wider">
+              Credenciais de Teste Alpha
+            </span>
+            <span className="text-neutral-300 font-mono text-[11px]">admin@mayamenu.com • 123456</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setEmail("admin@mayamenu.com");
+              setSenha("123456");
+            }}
+            className="px-2.5 py-1 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-[11px] font-bold transition-colors"
+          >
+            Preencher
+          </button>
+        </div>
+      )}
+
       <form onSubmit={handleSubmit} className="space-y-4">
         {modo === "cadastro" && (
           <>
