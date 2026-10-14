@@ -23,6 +23,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { MesaDetalheModal } from "@/components/admin/mesa-detalhe-modal";
 
 export interface ComandaGarcom {
   id: string; // clienteId
@@ -322,123 +323,98 @@ export function GarcomView({ nomeRestaurante = "MAYaMenu" }: { nomeRestaurante?:
         </div>
       </main>
 
-      {/* MODAL DE DETALHES DA MESA E FECHAMENTO FRACIONADO */}
-      <Dialog open={!!mesaSelecionada} onOpenChange={(open) => !open && setMesaSelecionada(null)}>
-        <DialogContent className="max-w-lg p-6 bg-neutral-900 text-white rounded-3xl border border-neutral-800 shadow-2xl">
-          {mesaSelecionada && (
-            <>
-              <DialogHeader className="border-b border-neutral-800 pb-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <DialogTitle className="text-2xl font-black text-white">
-                      Mesa {mesaSelecionada.numero}
-                    </DialogTitle>
-                    <p className="text-xs text-neutral-400 mt-0.5">
-                      Contas e comandas fracionadas por pessoa na mesa física
-                    </p>
-                  </div>
-                  <Badge
-                    variant="outline"
-                    className="border-rose-500 text-rose-400 text-xs font-bold"
-                  >
-                    Total:{" "}
-                    {mesaSelecionada.comandas
-                      .reduce((acc, c) => acc + c.subtotal, 0)
-                      .toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
-                  </Badge>
-                </div>
-              </DialogHeader>
-
-              <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto">
-                {mesaSelecionada.comandas.map((comanda) => {
-                  const jaPago = comanda.status === "pago";
-
-                  return (
-                    <div
-                      key={comanda.id}
-                      className={`p-4 rounded-2xl border transition-all ${
-                        jaPago
-                          ? "bg-neutral-950 border-neutral-800 opacity-50"
-                          : "bg-neutral-800/60 border-neutral-700"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between mb-3">
-                        <div>
-                          <h4 className="text-base font-black text-white">{comanda.nomeCliente}</h4>
-                          <span className="text-[11px] text-neutral-400 font-medium">
-                            {comanda.itens.length} {comanda.itens.length === 1 ? "item" : "itens"}
-                          </span>
-                        </div>
-                        <div className="text-right">
-                          <span className="text-lg font-black text-white block">
-                            {comanda.subtotal.toLocaleString("pt-BR", {
-                              style: "currency",
-                              currency: "BRL",
-                            })}
-                          </span>
-                          <span
-                            className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full inline-block ${
-                              jaPago
-                                ? "bg-emerald-500/20 text-emerald-400"
-                                : comanda.status === "conta_pedida"
-                                ? "bg-rose-500/20 text-rose-400"
-                                : "bg-amber-500/20 text-amber-400"
-                            }`}
-                          >
-                            {jaPago
-                              ? "Pago"
-                              : comanda.status === "conta_pedida"
-                              ? "Pediu Conta"
-                              : "Consumindo"}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Lista resumida de pratos consumidos */}
-                      <div className="space-y-1 mb-4 text-xs text-neutral-300 border-t border-neutral-700/40 pt-2">
-                        {comanda.itens.map((it, idx) => (
-                          <div key={idx} className="flex justify-between">
-                            <span>
-                              {it.quantidade}x {it.nome}
-                            </span>
-                            <span className="font-semibold text-neutral-400">
-                              {(it.precoFinal * it.quantidade).toLocaleString("pt-BR", {
-                                style: "currency",
-                                currency: "BRL",
-                              })}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-
-                      {/* Botão de Fechamento Individual na Maquininha */}
-                      {!jaPago && (
-                        <Button
-                          type="button"
-                          onClick={() =>
-                            handleMarcarComoPago(mesaSelecionada.numero, comanda.id)
-                          }
-                          className="w-full h-11 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-md"
-                        >
-                          <DollarSign className="w-4 h-4" />
-                          <span>
-                            Cobrar na Maquininha (
-                            {comanda.subtotal.toLocaleString("pt-BR", {
-                              style: "currency",
-                              currency: "BRL",
-                            })}
-                            )
-                          </span>
-                        </Button>
-                      )}
-                    </div>
+      {/* MODAL OPERACIONAL DE CONTROLE DA MESA */}
+      <MesaDetalheModal
+        mesa={mesaSelecionada}
+        isOpen={!!mesaSelecionada}
+        onClose={() => setMesaSelecionada(null)}
+        slug="demo"
+        onMarcarPago={handleMarcarComoPago}
+        onLiberarMesa={(num) => {
+          setMesas((prev) =>
+            prev.map((m) => (m.numero === num ? { ...m, status: "livre", comandas: [] } : m))
+          );
+          setMesaSelecionada(null);
+        }}
+        onLancarItem={(num, nome, item, qtd) => {
+          const valor = item.precoBase * qtd;
+          setMesas((prev) =>
+            prev.map((m) => {
+              if (m.numero === num) {
+                const comandaExistente = m.comandas.find(
+                  (c) => c.nomeCliente.toLowerCase() === nome.toLowerCase()
+                );
+                let novasComandas: ComandaGarcom[];
+                if (comandaExistente) {
+                  novasComandas = m.comandas.map((c) =>
+                    c.id === comandaExistente.id
+                      ? {
+                          ...c,
+                          subtotal: c.subtotal + valor,
+                          itens: [
+                            ...c.itens,
+                            { nome: item.nome, quantidade: qtd, precoFinal: item.precoBase },
+                          ],
+                        }
+                      : c
                   );
-                })}
-              </div>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
+                } else {
+                  novasComandas = [
+                    ...m.comandas,
+                    {
+                      id: `cli-${Date.now().toString(36)}`,
+                      nomeCliente: nome,
+                      subtotal: valor,
+                      status: "aguardando_pratos",
+                      itens: [{ nome: item.nome, quantidade: qtd, precoFinal: item.precoBase }],
+                    },
+                  ];
+                }
+                return { ...m, status: "ocupada", comandas: novasComandas };
+              }
+              return m;
+            })
+          );
+          setMesaSelecionada((prev) => {
+            if (!prev || prev.numero !== num) return prev;
+            const comandaExistente = prev.comandas.find(
+              (c) => c.nomeCliente.toLowerCase() === nome.toLowerCase()
+            );
+            if (comandaExistente) {
+              return {
+                ...prev,
+                status: "ocupada",
+                comandas: prev.comandas.map((c) =>
+                  c.id === comandaExistente.id
+                    ? {
+                        ...c,
+                        subtotal: c.subtotal + valor,
+                        itens: [
+                          ...c.itens,
+                          { nome: item.nome, quantidade: qtd, precoFinal: item.precoBase },
+                        ],
+                      }
+                    : c
+                ),
+              };
+            }
+            return {
+              ...prev,
+              status: "ocupada",
+              comandas: [
+                ...prev.comandas,
+                {
+                  id: `cli-${Date.now().toString(36)}`,
+                  nomeCliente: nome,
+                  subtotal: valor,
+                  status: "aguardando_pratos",
+                  itens: [{ nome: item.nome, quantidade: qtd, precoFinal: item.precoBase }],
+                },
+              ],
+            };
+          });
+        }}
+      />
 
       {/* MODAL SCANNER DE QR CODE DE CONTINGÊNCIA */}
       <QrScannerModal
