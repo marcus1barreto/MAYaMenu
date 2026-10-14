@@ -6,7 +6,8 @@ import type { MenuItem, Restaurante } from "@/types";
 import { useCart } from "@/context/cart-context";
 import { ItemModal } from "./item-modal";
 import { CartDrawer } from "./cart-drawer";
-import { ShoppingBag, Sparkles, MapPin, Search } from "lucide-react";
+import { HistoricoVisitasModal } from "./historico-visitas-modal";
+import { ShoppingBag, Sparkles, MapPin, Search, Receipt } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
@@ -20,6 +21,7 @@ export function MenuView({ restaurante, cardapio, numeroMesa = 1 }: MenuViewProp
   const { totalItens, subtotal } = useCart();
   const [itemSelecionado, setItemSelecionado] = useState<MenuItem | null>(null);
   const [carrinhoAberto, setCarrinhoAberto] = useState(false);
+  const [historicoAberto, setHistoricoAberto] = useState(false);
   const [busca, setBusca] = useState("");
 
   const corPrimaria = restaurante.configuracoes?.corPrimaria || "#E11D48";
@@ -64,6 +66,16 @@ export function MenuView({ restaurante, cardapio, numeroMesa = 1 }: MenuViewProp
             >
               Cardápio Digital PWA
             </Badge>
+
+            {/* BOTÃO DA CARTEIRA / HISTÓRICO DE VISITAS */}
+            <button
+              type="button"
+              onClick={() => setHistoricoAberto(true)}
+              className="ml-auto bg-white/15 hover:bg-white/25 backdrop-blur-md text-white text-[11px] font-bold px-2.5 py-0.5 rounded-full transition-colors flex items-center gap-1.5 shadow-sm"
+            >
+              <Receipt className="w-3 h-3 text-rose-300" />
+              <span>Meus Comprovantes</span>
+            </button>
           </div>
 
           <h1 className="text-2xl sm:text-4xl font-black text-white tracking-tight drop-shadow-md">
@@ -203,6 +215,12 @@ export function MenuView({ restaurante, cardapio, numeroMesa = 1 }: MenuViewProp
         onClose={() => setCarrinhoAberto(false)}
         restauranteId={restaurante.id}
         corPrimaria={corPrimaria}
+      />
+
+      {/* MODAL DE HISTÓRICO / COMPROVANTES DO CLIENTE */}
+      <HistoricoVisitasModal
+        isOpen={historicoAberto}
+        onClose={() => setHistoricoAberto(false)}
       />
     </div>
   );

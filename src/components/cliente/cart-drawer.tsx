@@ -21,6 +21,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import confetti from "canvas-confetti";
+import { salvarVisitaLocal, gerarComprovanteHash } from "@/lib/historico-cliente";
 
 interface CartDrawerProps {
   isOpen: boolean;
@@ -130,6 +131,34 @@ export function CartDrawer({
       } catch (firestoreErr) {
         console.warn("Firestore offline ou rejeitado (salvo no Ticket QR):", firestoreErr);
         setUsouOffline(true);
+      }
+
+      // 4. Salva o comprovante na Memória Local do Aparelho do Cliente
+      try {
+        salvarVisitaLocal({
+          id: `vis-${Date.now()}-${mesa}`,
+          restaurante: {
+            nome: "MAYaBurger & Co.",
+            slug: "demo",
+          },
+          mesa,
+          clienteNome: nomeCliente.trim(),
+          clienteId: uid,
+          dataHora: new Date().toISOString(),
+          itens: itens.map((it) => ({
+            nome: it.nome,
+            quantidade: it.quantidade,
+            precoFinal: it.precoFinal,
+            modificadores: it.modificadores.map((m) => ({ grupo: m.grupo, opcao: m.opcao })),
+            observacoes: it.observacoes,
+          })),
+          subtotal,
+          totalPago: subtotal,
+          status: "ativo",
+          comprovanteHash: gerarComprovanteHash("demo", mesa),
+        });
+      } catch (histErr) {
+        console.warn("Falha ao salvar visita no histórico local:", histErr);
       }
 
       // Dispara celebração visual

@@ -3,6 +3,8 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import type { MenuItem } from "@/types";
 
+import { obterUltimoNomeCliente } from "@/lib/historico-cliente";
+
 export interface ItemCarrinho {
   idUnico: string; // identificador único do item configurado
   menuItemId: string;
@@ -50,8 +52,16 @@ export function CartProvider({
       if (salvo) {
         const parsed = JSON.parse(salvo);
         if (Array.isArray(parsed.itens)) setItens(parsed.itens);
-        if (parsed.nomeCliente) setNomeClienteState(parsed.nomeCliente);
+        if (parsed.nomeCliente) {
+          setNomeClienteState(parsed.nomeCliente);
+        } else {
+          const ultimoNome = obterUltimoNomeCliente();
+          if (ultimoNome) setNomeClienteState(ultimoNome);
+        }
         if (parsed.mesa) setMesaState(parsed.mesa);
+      } else {
+        const ultimoNome = obterUltimoNomeCliente();
+        if (ultimoNome) setNomeClienteState(ultimoNome);
       }
     } catch {
       // Ignora erro de storage
