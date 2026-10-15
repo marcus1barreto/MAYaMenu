@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { QRCodeSVG } from "qrcode.react";
 import { buildTicketPayload, encodeTicket } from "@/lib/ticket";
 import { ensureClienteAnonimo, db } from "@/lib/firebase";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { doc, setDoc, serverTimestamp, increment, collection } from "firebase/firestore";
 import {
   Trash2,
   Plus,
@@ -27,6 +27,8 @@ interface CartDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   restauranteId: string;
+  slug?: string;
+  restauranteNome?: string;
   corPrimaria?: string;
 }
 
@@ -34,6 +36,8 @@ export function CartDrawer({
   isOpen,
   onClose,
   restauranteId,
+  slug = "demo",
+  restauranteNome = "MAYaMenu",
   corPrimaria = "#E11D48",
 }: CartDrawerProps) {
   const {
@@ -91,8 +95,9 @@ export function CartDrawer({
       const qrString = encodeTicket(ticket);
       setTicketPayloadRaw(qrString);
 
-      // 3. Tenta persistir no Firestore sob o caminho das regras:
-      // restaurantes/{restauranteId}/mesas/{mesa}/comandas_abertas/{clienteId}
+      // 3. Tenta persistir no Firestore sob a nova arquitetura de Rodadas:
+      // Comanda Pai: restaurantes/{restauranteId}/mesas/{mesa}/comandas_abertas/{clienteId}
+      // Rodada/Pedido: restaurantes/{restauranteId}/mesas/{mesa}/comandas_abertas/{clienteId}/pedidos/{pedidoId}
       try {
         const comandaRef = doc(
           db,
@@ -104,24 +109,57 @@ export function CartDrawer({
           uid
         );
 
-        const dadosComanda = {
-          id: uid,
+        const pedidoRef = doc(
+          db,
+          "restaurantes",
+          restauranteId,
+          "mesas",
+          String(mesa),
+          "comandas_abertas",
+          uid,
+          "pedidos",
+          pedidoId
+        );
+
+        const itensMapeados = itens.map((it) => ({
+          menuItemId: it.menuItemId,
+          nome: it.nome,
+          quantidade: it.quantidade,
+          precoFinal: it.precoFinal,
+          modificadores: it.modificadores.map((m) => ({ grupo: m.grupo, opcao: m.opcao })),
+          observacoes: it.observacoes || null,
+        }));
+
+        // Dados da Rodada individual para o KDS da cozinha
+        const dadosPedidoRodada = {
+          id: pedidoId,
+          restauranteId,
+          clienteId: uid,
           nomeCliente: nomeCliente.trim(),
-          criadoEm: serverTimestamp(),
-          itens: itens.map((it) => ({
-            menuItemId: it.menuItemId,
-            nome: it.nome,
-            quantidade: it.quantidade,
-            precoFinal: it.precoFinal,
-            modificadores: it.modificadores.map((m) => ({ grupo: m.grupo, opcao: m.opcao })),
-            observacoes: it.observacoes || null,
-          })),
+          mesa,
+          itens: itensMapeados,
           subtotal,
-          status: "pedindo" as const,
+          status: "a_fazer" as const,
+          criadoEm: serverTimestamp(),
         };
 
-        // Timeout de segurança na chamada do Firestore (4 segundos)
-        const savePromise = setDoc(comandaRef, dadosComanda, { merge: true });
+        // Dados da Comanda Pai (sessão acumulada na mesa)
+        const dadosComanda = {
+          id: uid,
+          restauranteId,
+          nomeCliente: nomeCliente.trim(),
+          mesa,
+          criadoEm: serverTimestamp(),
+          atualizadoEm: serverTimestamp(),
+          subtotal: increment(subtotal),
+          status: "aguardando_pratos" as const,
+        };
+
+        // Grava a comanda pai (merge incrementa subtotal) e a nova rodada na subcoleção
+        const saveComanda = setDoc(comandaRef, dadosComanda, { merge: true });
+        const savePedido = setDoc(pedidoRef, dadosPedidoRodada);
+
+        const savePromise = Promise.all([saveComanda, savePedido]);
         const timeoutSave = new Promise((_, reject) =>
           setTimeout(() => reject(new Error("Timeout Firestore")), 4000)
         );
@@ -138,8 +176,8 @@ export function CartDrawer({
         salvarVisitaLocal({
           id: `vis-${Date.now()}-${mesa}`,
           restaurante: {
-            nome: "MAYaBurger & Co.",
-            slug: "demo",
+            nome: restauranteNome,
+            slug,
           },
           mesa,
           clienteNome: nomeCliente.trim(),
@@ -155,7 +193,7 @@ export function CartDrawer({
           subtotal,
           totalPago: subtotal,
           status: "ativo",
-          comprovanteHash: gerarComprovanteHash("demo", mesa),
+          comprovanteHash: gerarComprovanteHash(slug, mesa),
         });
       } catch (histErr) {
         console.warn("Falha ao salvar visita no histórico local:", histErr);

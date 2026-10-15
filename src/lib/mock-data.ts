@@ -19,6 +19,7 @@ export const CARDAPIO_DEMO: MenuItem[] = [
   {
     id: "item-burguer-artesanal",
     nome: "MAYaBurger Especial",
+    categoria: "Hambúrgueres",
     descricao: "Blend 180g de angus, queijo cheddar inglês derretido, cebola caramelizada e maionese defumada no brioche tostado na manteiga.",
     precoBase: 38.0,
     fotoUrl: "/images/demo/hamburger.webp",
@@ -49,6 +50,7 @@ export const CARDAPIO_DEMO: MenuItem[] = [
   {
     id: "item-pizza-napolitana",
     nome: "Pizza Napolitana Rústica",
+    categoria: "Pizzas",
     descricao: "Massa de fermentação natural (48h), molho de tomate San Marzano D.O.P., mozzarella di bufala e manjericão fresco.",
     precoBase: 54.0,
     fotoUrl: "/images/demo/pizza.webp",
@@ -68,6 +70,7 @@ export const CARDAPIO_DEMO: MenuItem[] = [
   {
     id: "item-coquetel-tropical",
     nome: "Coquetel Sunburst Maya",
+    categoria: "Bebidas",
     descricao: "Gin artesanal infusionado com zimbro, xarope de frutas vermelhas frescas, tônica premium e ramo de alecrim maçaricado.",
     precoBase: 29.0,
     fotoUrl: "/images/demo/coquetel.webp",
@@ -87,6 +90,7 @@ export const CARDAPIO_DEMO: MenuItem[] = [
   {
     id: "item-sorvete-artesanal",
     nome: "Gelato Pistache & Frutas Vermelhas",
+    categoria: "Sobremesas",
     descricao: "Taça artesanal com duas bolas de gelato italiano de pistache siciliano com calda quente de frutas silvestres.",
     precoBase: 22.0,
     fotoUrl: "/images/demo/sorvete.webp",

@@ -37,6 +37,7 @@ interface MesaDetalheModalProps {
   isOpen: boolean;
   onClose: () => void;
   slug: string;
+  modoSomenteLeitura?: boolean; // Se true, esconde ações operacionais (usado no Admin)
   onMarcarPago: (mesaNumero: number, clienteId: string) => void;
   onLiberarMesa: (mesaNumero: number) => void;
   onLancarItem: (
@@ -55,6 +56,7 @@ export function MesaDetalheModal({
   isOpen,
   onClose,
   slug,
+  modoSomenteLeitura = false,
   onMarcarPago,
   onLiberarMesa,
   onLancarItem,
@@ -172,18 +174,20 @@ export function MesaDetalheModal({
               <span>Comandas & Pedidos ({mesa.comandas.length})</span>
             </button>
 
-            <button
-              type="button"
-              onClick={() => setAbaInterna("lancar")}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
-                abaInterna === "lancar"
-                  ? "bg-rose-600 text-white shadow-md"
-                  : "bg-neutral-800/80 text-neutral-400 hover:text-white"
-              }`}
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Lançar Item Manual</span>
-            </button>
+            {!modoSomenteLeitura && (
+              <button
+                type="button"
+                onClick={() => setAbaInterna("lancar")}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  abaInterna === "lancar"
+                    ? "bg-rose-600 text-white shadow-md"
+                    : "bg-neutral-800/80 text-neutral-400 hover:text-white"
+                }`}
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Lançar Item Manual</span>
+              </button>
+            )}
 
             <button
               type="button"
@@ -326,7 +330,7 @@ export function MesaDetalheModal({
                         </div>
 
                         {/* Botão de Cobrança Individual */}
-                        {!jaPago && (
+                        {!jaPago && !modoSomenteLeitura && (
                           <Button
                             type="button"
                             onClick={() => onMarcarPago(mesa.numero, comanda.id)}
@@ -427,20 +431,22 @@ export function MesaDetalheModal({
                   </div>
 
                   {/* AÇÕES DE MESA */}
-                  <div className="pt-2 space-y-2">
-                    <Button
-                      type="button"
-                      onClick={() => onLiberarMesa(mesa.numero)}
-                      className={`w-full h-11 text-xs font-bold rounded-xl flex items-center justify-center gap-2 shadow-lg transition-all ${
-                        todasPagas
-                          ? "bg-emerald-600 hover:bg-emerald-500 text-white"
-                          : "bg-neutral-800 hover:bg-neutral-700 text-white"
-                      }`}
-                    >
-                      <CheckCircle2 className="w-4 h-4" />
-                      <span>Liberar / Finalizar Mesa {mesa.numero}</span>
-                    </Button>
-                  </div>
+                  {!modoSomenteLeitura && (
+                    <div className="pt-2 space-y-2">
+                      <Button
+                        type="button"
+                        onClick={() => onLiberarMesa(mesa.numero)}
+                        className={`w-full h-11 text-xs font-bold rounded-xl flex items-center justify-center gap-2 shadow-lg transition-all ${
+                          todasPagas
+                            ? "bg-emerald-600 hover:bg-emerald-500 text-white"
+                            : "bg-neutral-800 hover:bg-neutral-700 text-white"
+                        }`}
+                      >
+                        <CheckCircle2 className="w-4 h-4" />
+                        <span>Liberar / Finalizar Mesa {mesa.numero}</span>
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

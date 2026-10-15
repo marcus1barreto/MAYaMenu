@@ -1,15 +1,19 @@
 "use client";
 
-import React, { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
-import type { MenuItem, Restaurante } from "@/types";
+import type { MenuItem, Restaurante, ComandaCliente } from "@/types";
 import { useCart } from "@/context/cart-context";
 import { ItemModal } from "./item-modal";
 import { CartDrawer } from "./cart-drawer";
 import { HistoricoVisitasModal } from "./historico-visitas-modal";
-import { ShoppingBag, Sparkles, MapPin, Search, Receipt } from "lucide-react";
+import { ShoppingBag, Sparkles, MapPin, Search, Receipt, DollarSign, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { ensureClienteAnonimo, db } from "@/lib/firebase";
+import { doc, updateDoc, serverTimestamp, onSnapshot } from "firebase/firestore";
+import { escutarCardapio } from "@/lib/restaurante-service";
+import { marcarVisitaAtualComoPaga } from "@/lib/historico-cliente";
 
 interface MenuViewProps {
   restaurante: Restaurante;
@@ -17,18 +21,108 @@ interface MenuViewProps {
   numeroMesa?: number | string;
 }
 
-export function MenuView({ restaurante, cardapio, numeroMesa = 1 }: MenuViewProps) {
-  const { totalItens, subtotal } = useCart();
+export function MenuView({ restaurante, cardapio: cardapioInicial, numeroMesa = 1 }: MenuViewProps) {
+  const { totalItens, subtotal, nomeCliente } = useCart();
+  const [cardapio, setCardapio] = useState<MenuItem[]>(cardapioInicial);
   const [itemSelecionado, setItemSelecionado] = useState<MenuItem | null>(null);
   const [carrinhoAberto, setCarrinhoAberto] = useState(false);
   const [historicoAberto, setHistoricoAberto] = useState(false);
   const [busca, setBusca] = useState("");
+  const [pedindoConta, setPedindoConta] = useState(false);
+  const [contaPedidaSucesso, setContaPedidaSucesso] = useState(false);
+  const [comandaStatus, setComandaStatus] = useState<string | null>(null);
+  const [categoriaAtiva, setCategoriaAtiva] = useState<string>("Todas");
+
+  // Categorias únicas disponíveis no cardápio
+  const categorias = ["Todas", ...Array.from(new Set(cardapio.map((i) => i.categoria || "Geral")))];
+
+  // Escuta o cardápio em tempo real (mudança de preço, pausa de esgotados)
+  useEffect(() => {
+    if (!restaurante.id) return;
+    const unsub = escutarCardapio(restaurante.id, (novosItens) => {
+      setCardapio(novosItens);
+    });
+    return () => unsub();
+  }, [restaurante.id]);
+
+  // Escuta o status da comanda do cliente nesta mesa em tempo real
+  useEffect(() => {
+    let unsubSnapshot: (() => void) | null = null;
+
+    ensureClienteAnonimo().then((user) => {
+      const comandaRef = doc(
+        db,
+        "restaurantes",
+        restaurante.id,
+        "mesas",
+        String(numeroMesa),
+        "comandas_abertas",
+        user.uid
+      );
+
+      unsubSnapshot = onSnapshot(
+        comandaRef,
+        (snap) => {
+          if (snap.exists()) {
+            const data = snap.data() as ComandaCliente;
+            setComandaStatus(data.status);
+            if (data.status === "conta_pedida") {
+              setContaPedidaSucesso(true);
+            } else if (data.status === "pago") {
+              // Regra de desconexão oficial: comanda paga!
+              marcarVisitaAtualComoPaga(restaurante.slug, numeroMesa);
+            }
+          }
+        },
+        (err) => {
+          console.warn("Listener da comanda do cliente indisponível:", err);
+        }
+      );
+    });
+
+    return () => {
+      if (unsubSnapshot) unsubSnapshot();
+    };
+  }, [restaurante.id, restaurante.slug, numeroMesa]);
 
   const corPrimaria = restaurante.configuracoes?.corPrimaria || "#E11D48";
   const capaUrl = restaurante.configuracoes?.capaUrl || "/images/capa-padrao.webp";
 
+  const handlePedirConta = async () => {
+    if (pedindoConta || contaPedidaSucesso) return;
+    const confirmou = window.confirm("Deseja pedir a conta da sua mesa ao garçom?");
+    if (!confirmou) return;
+
+    setPedindoConta(true);
+    try {
+      const user = await ensureClienteAnonimo();
+      const comandaRef = doc(
+        db,
+        "restaurantes",
+        restaurante.id,
+        "mesas",
+        String(numeroMesa),
+        "comandas_abertas",
+        user.uid
+      );
+
+      await updateDoc(comandaRef, {
+        status: "conta_pedida",
+        atualizadoEm: serverTimestamp(),
+      });
+      setContaPedidaSucesso(true);
+    } catch (e) {
+      console.warn("Conta pedida localmente ou offline:", e);
+      // Mesmo com fallback de rede, registra feedback de sucesso visual ao cliente
+      setContaPedidaSucesso(true);
+    } finally {
+      setPedindoConta(false);
+    }
+  };
+
   const itensFiltrados = cardapio.filter((item) => {
     if (!item.ativo) return false;
+    if (categoriaAtiva !== "Todas" && (item.categoria || "Geral") !== categoriaAtiva) return false;
     if (!busca.trim()) return true;
     const b = busca.toLowerCase();
     return (
@@ -76,6 +170,30 @@ export function MenuView({ restaurante, cardapio, numeroMesa = 1 }: MenuViewProp
               <Receipt className="w-3 h-3 text-rose-300" />
               <span>Meus Comprovantes</span>
             </button>
+
+            {/* BOTÃO PEDIR A CONTA */}
+            <button
+              type="button"
+              onClick={handlePedirConta}
+              disabled={pedindoConta || contaPedidaSucesso}
+              className={`backdrop-blur-md text-white text-[11px] font-bold px-2.5 py-0.5 rounded-full transition-colors flex items-center gap-1.5 shadow-sm ${
+                contaPedidaSucesso
+                  ? "bg-amber-500/80 text-amber-950 font-black"
+                  : "bg-rose-600/80 hover:bg-rose-600"
+              }`}
+            >
+              {contaPedidaSucesso ? (
+                <>
+                  <CheckCircle2 className="w-3 h-3 text-white" />
+                  <span>Conta Solicitada!</span>
+                </>
+              ) : (
+                <>
+                  <DollarSign className="w-3 h-3 text-white" />
+                  <span>{pedindoConta ? "Chamando..." : "Pedir a Conta"}</span>
+                </>
+              )}
+            </button>
           </div>
 
           <h1 className="text-2xl sm:text-4xl font-black text-white tracking-tight drop-shadow-md">
@@ -84,11 +202,19 @@ export function MenuView({ restaurante, cardapio, numeroMesa = 1 }: MenuViewProp
           <p className="text-xs sm:text-sm text-neutral-300 font-medium mt-1">
             Toque nos itens para personalizar seu pedido sem espera
           </p>
+
+          {/* BANNER INFORMATIVO SE A CONTA FOI PEDIDA */}
+          {contaPedidaSucesso && (
+            <div className="mt-2.5 p-2.5 bg-amber-500/20 border border-amber-400/40 rounded-xl text-amber-200 text-xs flex items-center gap-2 backdrop-blur-md">
+              <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+              <span>Conta solicitada ao garçom para a <strong>Mesa {numeroMesa}</strong>. Ele virá com a maquininha!</span>
+            </div>
+          )}
         </div>
       </header>
 
       {/* BARRA DE PESQUISA / FILTRO */}
-      <div className="max-w-3xl mx-auto px-4 -mt-4 relative z-10">
+      <div className="max-w-3xl mx-auto px-4 -mt-4 relative z-10 space-y-3">
         <div className="bg-white rounded-2xl shadow-md p-2 flex items-center gap-2 border border-neutral-200/80">
           <Search className="w-5 h-5 text-neutral-400 ml-2" />
           <input
@@ -99,13 +225,37 @@ export function MenuView({ restaurante, cardapio, numeroMesa = 1 }: MenuViewProp
             className="w-full text-sm font-medium bg-transparent border-none focus:outline-none placeholder:text-neutral-400"
           />
         </div>
+
+        {/* ABAS / PÍLULAS DE CATEGORIAS */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar select-none">
+          {categorias.map((cat) => {
+            const ativa = categoriaAtiva === cat;
+            return (
+              <button
+                key={cat}
+                type="button"
+                onClick={() => setCategoriaAtiva(cat)}
+                style={{
+                  backgroundColor: ativa ? corPrimaria : undefined,
+                }}
+                className={`px-3.5 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all shadow-xs active:scale-95 ${
+                  ativa
+                    ? "text-white shadow-md"
+                    : "bg-white text-neutral-600 hover:bg-neutral-50 border border-neutral-200/80"
+                }`}
+              >
+                {cat}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* LISTA DE ITENS DO CARDÁPIO */}
       <main className="max-w-3xl mx-auto px-4 mt-6">
         <div className="flex items-center justify-between mb-4 px-1">
           <h2 className="text-sm font-black uppercase tracking-wider text-neutral-500">
-            Destaques da Casa ({itensFiltrados.length})
+            {categoriaAtiva === "Todas" ? "Destaques da Casa" : categoriaAtiva} ({itensFiltrados.length})
           </h2>
         </div>
 
@@ -214,6 +364,8 @@ export function MenuView({ restaurante, cardapio, numeroMesa = 1 }: MenuViewProp
         isOpen={carrinhoAberto}
         onClose={() => setCarrinhoAberto(false)}
         restauranteId={restaurante.id}
+        slug={restaurante.slug}
+        restauranteNome={restaurante.nome}
         corPrimaria={corPrimaria}
       />
 

@@ -1,19 +1,21 @@
 "use client";
 
-import React, { useState } from "react";
-import type { ComandaCliente } from "@/types";
+import { useState, useEffect } from "react";
+import type { ComandaCliente, PedidoRodada } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Clock, CheckCircle, ChefHat, Sparkles, AlertTriangle, ArrowRight } from "lucide-react";
+import { escutarPedidosKds, atualizarStatusPedido } from "@/lib/restaurante-service";
 
 export interface PedidoKDS {
-  id: string; // id da comanda
+  id: string; // id do pedido
+  refPath?: string; // caminho no Firestore
   mesa: number | string;
   clienteId: string;
   nomeCliente: string;
   horario: string;
   subtotal: number;
-  status: "a_fazer" | "pronto";
+  status: "a_fazer" | "pronto" | "entregue";
   itens: {
     menuItemId: string;
     nome: string;
@@ -95,26 +97,76 @@ export const PEDIDOS_INICIAIS_KDS: PedidoKDS[] = [
 ];
 
 export function KdsView({
+  restauranteId,
   nomeRestaurante = "MAYaMenu",
 }: {
+  restauranteId?: string;
   nomeRestaurante?: string;
 }) {
   const [pedidos, setPedidos] = useState<PedidoKDS[]>(PEDIDOS_INICIAIS_KDS);
   const [filtro, setFiltro] = useState<"todos" | "a_fazer" | "pronto">("todos");
 
+  // Conecta ao Firestore em tempo real
+  useEffect(() => {
+    if (!restauranteId) return;
+
+    const unsub = escutarPedidosKds(restauranteId, (rodadas) => {
+      if (rodadas.length > 0) {
+        const convertidos: PedidoKDS[] = rodadas.map((r) => {
+          let horarioFormatado = "Agora";
+          if (r.criadoEm?.toDate) {
+            horarioFormatado = r.criadoEm.toDate().toLocaleTimeString("pt-BR", {
+              hour: "2-digit",
+              minute: "2-digit",
+            });
+          }
+          return {
+            id: r.id,
+            refPath: r.refPath,
+            mesa: r.mesa,
+            clienteId: r.clienteId,
+            nomeCliente: r.nomeCliente,
+            horario: horarioFormatado,
+            subtotal: r.subtotal,
+            status: r.status,
+            itens: r.itens,
+          };
+        });
+        setPedidos(convertidos);
+      }
+    });
+
+    return () => unsub();
+  }, [restauranteId]);
+
   // Ação essencial da cozinha: "MARCHAR" (Muda de A Fazer -> Pronto)
-  const handleMarchar = (id: string) => {
+  const handleMarchar = async (id: string) => {
+    const pedidoAlvo = pedidos.find((p) => p.id === id);
+    if (!pedidoAlvo) return;
+
+    const novoStatus = pedidoAlvo.status === "a_fazer" ? "pronto" : "a_fazer";
+
+    // Atualização otimista imediata na UI
     setPedidos((prev) =>
       prev.map((p) => {
         if (p.id === id) {
           return {
             ...p,
-            status: p.status === "a_fazer" ? "pronto" : "a_fazer",
+            status: novoStatus,
           };
         }
         return p;
       })
     );
+
+    // Se tiver caminho persistente no Firestore, atualiza em tempo real
+    if (pedidoAlvo.refPath) {
+      try {
+        await atualizarStatusPedido(pedidoAlvo.refPath, novoStatus);
+      } catch (err) {
+        console.warn("Falha ao atualizar status do pedido no Firestore:", err);
+      }
+    }
   };
 
   const pedidosAFazer = pedidos.filter((p) => p.status === "a_fazer");

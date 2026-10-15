@@ -1,11 +1,11 @@
 import { Suspense } from "react";
-import { RESTAURANTE_DEMO, CARDAPIO_DEMO } from "@/lib/mock-data";
+import { obterRestaurantePorSlug, obterCardapioDoRestaurante } from "@/lib/restaurante-service";
 import { MenuView } from "@/components/cliente/menu-view";
 import { CartProvider } from "@/context/cart-context";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: `${RESTAURANTE_DEMO.nome} | Cardápio Digital`,
+  title: "Cardápio Digital | MAYaMenu",
   description: "Faça seu pedido diretamente na mesa sem filas ou esperas.",
 };
 
@@ -20,16 +20,14 @@ async function MenuContent({
   const { mesa } = await searchParamsPromise;
   const numeroMesa = mesa ? Number(mesa) || mesa : 1;
 
-  const restaurante = {
-    ...RESTAURANTE_DEMO,
-    slug,
-  };
+  const restaurante = await obterRestaurantePorSlug(slug);
+  const cardapio = await obterCardapioDoRestaurante(restaurante.id);
 
   return (
     <CartProvider slug={slug} mesaInicial={numeroMesa}>
       <MenuView
         restaurante={restaurante}
-        cardapio={CARDAPIO_DEMO}
+        cardapio={cardapio}
         numeroMesa={numeroMesa}
       />
     </CartProvider>

@@ -14,7 +14,7 @@
 //   ]
 // }
 
-import type { ComandaCliente } from "@/types";
+import type { ItemPedido } from "@/types";
 
 export const TICKET_VERSION = 1;
 
@@ -38,7 +38,7 @@ export interface TicketPayload {
   i: TicketItem[];
 }
 
-type ItemComanda = ComandaCliente["itens"][number];
+type ItemComanda = ItemPedido;
 
 /** Monta o payload a partir dos itens da comanda (omite campos vazios). */
 export function buildTicketPayload(params: {

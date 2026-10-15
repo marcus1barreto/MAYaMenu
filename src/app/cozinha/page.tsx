@@ -4,6 +4,8 @@ import { AuthProvider, useAuth } from "@/context/auth-context";
 import { KdsView } from "@/components/admin/kds-view";
 import { AdminLoginForm } from "@/components/admin/admin-login-form";
 
+import { PinLockGuard } from "@/components/salao/pin-lock-guard";
+
 function CozinhaPageContent() {
   const { user, restaurante, carregando } = useAuth();
 
@@ -30,7 +32,14 @@ function CozinhaPageContent() {
     );
   }
 
-  return <KdsView nomeRestaurante={restaurante?.nome || "MAYaMenu"} />;
+  return (
+    <PinLockGuard role="cozinha">
+      <KdsView
+        restauranteId={restaurante?.id}
+        nomeRestaurante={restaurante?.nome || "MAYaMenu"}
+      />
+    </PinLockGuard>
+  );
 }
 
 export default function CozinhaPage() {

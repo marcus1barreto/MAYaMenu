@@ -106,6 +106,40 @@ export function finalizarVisitaLocal(visitaId: string): void {
 }
 
 /**
+ * Atualiza o status da visita mais recente desta mesa para "concluido" / "pago"
+ */
+export function marcarVisitaAtualComoPaga(slug: string, mesa: number | string): void {
+  if (typeof window === "undefined") return;
+
+  try {
+    const historico = obterHistoricoVisitas();
+    const index = historico.findIndex(
+      (v) => v.restaurante.slug === slug && String(v.mesa) === String(mesa) && v.status === "ativo"
+    );
+    if (index >= 0) {
+      historico[index].status = "concluido";
+      localStorage.setItem(STORAGE_KEY_VISITAS, JSON.stringify(historico));
+    }
+  } catch (e) {
+    console.warn("Falha ao marcar visita atual como paga:", e);
+  }
+}
+
+/**
+ * Timeout de 4 horas para expiração de inatividade da sessão da mesa (Decisão Oficial)
+ */
+export const SESSAO_MESA_TIMEOUT_MS = 4 * 60 * 60 * 1000; // 4 horas
+
+export function isSessaoExpirada(dataHoraIso: string): boolean {
+  try {
+    const tempoDecorrido = Date.now() - new Date(dataHoraIso).getTime();
+    return tempoDecorrido > SESSAO_MESA_TIMEOUT_MS;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Gera um código legível de comprovante digital
  */
 export function gerarComprovanteHash(slug: string, mesa: number | string): string {

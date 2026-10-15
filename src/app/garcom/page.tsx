@@ -4,6 +4,8 @@ import { AuthProvider, useAuth } from "@/context/auth-context";
 import { GarcomView } from "@/components/garcom/garcom-view";
 import { AdminLoginForm } from "@/components/admin/admin-login-form";
 
+import { PinLockGuard } from "@/components/salao/pin-lock-guard";
+
 function GarcomPageContent() {
   const { user, restaurante, carregando } = useAuth();
 
@@ -29,7 +31,15 @@ function GarcomPageContent() {
     );
   }
 
-  return <GarcomView nomeRestaurante={restaurante?.nome || "MAYaMenu"} />;
+  return (
+    <PinLockGuard role="garcom">
+      <GarcomView
+        restauranteId={restaurante?.id}
+        slug={restaurante?.slug}
+        nomeRestaurante={restaurante?.nome || "MAYaMenu"}
+      />
+    </PinLockGuard>
+  );
 }
 
 export default function GarcomPage() {

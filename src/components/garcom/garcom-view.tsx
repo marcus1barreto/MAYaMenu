@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { QrScannerModal } from "./qr-scanner-modal";
 import type { TicketPayload } from "@/lib/ticket";
 import { Badge } from "@/components/ui/badge";
@@ -23,7 +23,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { MesaDetalheModal } from "@/components/admin/mesa-detalhe-modal";
+import { MesaDetalheModal } from "@/components/salao/mesa-detalhe-modal";
+import {
+  escutarComandasSalão,
+  marcarComandaPagaFirestore,
+  liberarMesaFirestore,
+  injetarTicketContingencia,
+} from "@/lib/restaurante-service";
 
 export interface ComandaGarcom {
   id: string; // clienteId
@@ -130,14 +136,67 @@ export const MESAS_INICIAIS: MesaOperacional[] = [
   { numero: 8, status: "livre", comandas: [] },
 ];
 
-export function GarcomView({ nomeRestaurante = "MAYaMenu" }: { nomeRestaurante?: string }) {
+export function GarcomView({
+  restauranteId,
+  slug = "demo",
+  nomeRestaurante = "MAYaMenu",
+}: {
+  restauranteId?: string;
+  slug?: string;
+  nomeRestaurante?: string;
+}) {
   const [mesas, setMesas] = useState<MesaOperacional[]>(MESAS_INICIAIS);
   const [mesaSelecionada, setMesaSelecionada] = useState<MesaOperacional | null>(null);
   const [scannerAberto, setScannerAberto] = useState(false);
   const [feedbackInjecao, setFeedbackInjecao] = useState<string | null>(null);
 
+  // Escuta todas as comandas abertas do salão em tempo real
+  useEffect(() => {
+    if (!restauranteId) return;
+
+    const unsub = escutarComandasSalão(restauranteId, (comandasFirestore) => {
+      if (comandasFirestore.length === 0) return;
+
+      // Agrupa comandas por número de mesa (1 a 12)
+      setMesas((prev) => {
+        const mapa = new Map<number, MesaOperacional>();
+        for (let i = 1; i <= 12; i++) {
+          mapa.set(i, { numero: i, status: "livre", comandas: [] });
+        }
+
+        // Popula com comandas do Firestore
+        for (const c of comandasFirestore) {
+          const numMesa = Number(c.mesa) || 1;
+          const mesaAtual = mapa.get(numMesa) || { numero: numMesa, status: "livre", comandas: [] };
+
+          if (c.status !== "pago") {
+            mesaAtual.comandas.push({
+              id: c.id,
+              nomeCliente: c.nomeCliente,
+              subtotal: c.subtotal || 0,
+              status: c.status,
+              itens: [],
+            });
+
+            if (c.status === "conta_pedida") {
+              mesaAtual.status = "conta_pedida";
+            } else if (mesaAtual.status !== "conta_pedida") {
+              mesaAtual.status = "ocupada";
+            }
+          }
+          mapa.set(numMesa, mesaAtual);
+        }
+
+        return Array.from(mapa.values());
+      });
+    });
+
+    return () => unsub();
+  }, [restauranteId]);
+
   // Fechar/Marcar Comanda Individual como Paga (exclusivo do lojista/garçom)
-  const handleMarcarComoPago = (mesaNumero: number, clienteId: string) => {
+  const handleMarcarComoPago = async (mesaNumero: number, clienteId: string) => {
+    // Atualização otimista
     setMesas((prev) =>
       prev.map((m) => {
         if (m.numero === mesaNumero) {
@@ -163,10 +222,38 @@ export function GarcomView({ nomeRestaurante = "MAYaMenu" }: { nomeRestaurante?:
       const todasPagas = novas.every((c) => c.status === "pago");
       return todasPagas ? null : { ...prev, comandas: novas };
     });
+
+    // Persistência no Firestore
+    if (restauranteId) {
+      try {
+        await marcarComandaPagaFirestore(restauranteId, mesaNumero, clienteId);
+      } catch (err) {
+        console.warn("Falha ao marcar comanda como paga no Firestore:", err);
+      }
+    }
   };
 
-  // Injetar pedido resgatado pelo leitor de QR de contingência
-  const handleTicketLido = (ticket: TicketPayload) => {
+  // Liberar mesa no Firestore
+  const handleLiberarMesa = async (mesaNumero: number) => {
+    const mesaAlvo = mesas.find((m) => m.numero === mesaNumero);
+    const comandasIds = mesaAlvo ? mesaAlvo.comandas.map((c) => c.id) : [];
+
+    setMesas((prev) =>
+      prev.map((m) => (m.numero === mesaNumero ? { ...m, status: "livre", comandas: [] } : m))
+    );
+    setMesaSelecionada(null);
+
+    if (restauranteId && comandasIds.length > 0) {
+      try {
+        await liberarMesaFirestore(restauranteId, mesaNumero, comandasIds);
+      } catch (err) {
+        console.warn("Falha ao liberar mesa no Firestore:", err);
+      }
+    }
+  };
+
+  // Injetar pedido resgatado pelo leitor de QR de contingência diretamente no Firestore
+  const handleTicketLido = async (ticket: TicketPayload) => {
     const mesaNum = Number(ticket.t) || 1;
     const subtotalCalculado = ticket.i.reduce((acc, it) => acc + it.q * 30, 0); // estimativa base
 
@@ -195,6 +282,29 @@ export function GarcomView({ nomeRestaurante = "MAYaMenu" }: { nomeRestaurante?:
         return m;
       })
     );
+
+    // Persiste no Firestore para que a Cozinha veja instantaneamente no KDS!
+    if (restauranteId) {
+      try {
+        await injetarTicketContingencia(restauranteId, {
+          id: ticket.id,
+          mesa: mesaNum,
+          clienteId: ticket.c.id,
+          nomeCliente: ticket.c.n,
+          subtotal: subtotalCalculado,
+          itens: ticket.i.map((it) => ({
+            menuItemId: it.id,
+            nome: `Item (${it.id})`,
+            quantidade: it.q,
+            precoFinal: 30,
+            modificadores: it.m?.map(([g, o]) => ({ grupo: g, opcao: o })),
+            observacoes: it.o,
+          })),
+        });
+      } catch (err) {
+        console.warn("Falha ao injetar pedido de contingência no Firestore:", err);
+      }
+    }
 
     setFeedbackInjecao(`Pedido de ${ticket.c.n} injetado na Mesa ${mesaNum}!`);
     setTimeout(() => setFeedbackInjecao(null), 4000);
@@ -328,14 +438,9 @@ export function GarcomView({ nomeRestaurante = "MAYaMenu" }: { nomeRestaurante?:
         mesa={mesaSelecionada}
         isOpen={!!mesaSelecionada}
         onClose={() => setMesaSelecionada(null)}
-        slug="demo"
+        slug={slug}
         onMarcarPago={handleMarcarComoPago}
-        onLiberarMesa={(num) => {
-          setMesas((prev) =>
-            prev.map((m) => (m.numero === num ? { ...m, status: "livre", comandas: [] } : m))
-          );
-          setMesaSelecionada(null);
-        }}
+        onLiberarMesa={handleLiberarMesa}
         onLancarItem={(num, nome, item, qtd) => {
           const valor = item.precoBase * qtd;
           setMesas((prev) =>

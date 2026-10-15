@@ -15,19 +15,34 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/restaurantes/$(restauranteId)).data.ownerId == request.auth.uid;
     }
 
-    // Campos permitidos numa ComandaCliente (ver src/types/index.ts)
+    // Campos permitidos numa ComandaCliente (sessão pai)
     function comandaKeys() {
-      return ['id', 'nomeCliente', 'criadoEm', 'itens', 'subtotal', 'status'];
+      return ['id', 'restauranteId', 'nomeCliente', 'mesa', 'criadoEm', 'atualizadoEm', 'subtotal', 'status'];
     }
 
     function isValidComanda(d) {
-      return d.keys().hasAll(comandaKeys())
+      return d.keys().hasAll(['id', 'nomeCliente', 'criadoEm', 'subtotal', 'status'])
         && d.keys().hasOnly(comandaKeys())
         && d.nomeCliente is string && d.nomeCliente.size() > 0 && d.nomeCliente.size() <= 60
-        && d.itens is list && d.itens.size() <= 100
         && d.subtotal is number && d.subtotal >= 0
         && d.criadoEm is timestamp
         && d.status in ['pedindo', 'aguardando_pratos', 'conta_pedida', 'pago'];
+    }
+
+    // Campos permitidos num PedidoRodada (subcoleção pedidos)
+    function pedidoKeys() {
+      return ['id', 'restauranteId', 'clienteId', 'nomeCliente', 'mesa', 'itens', 'subtotal', 'status', 'criadoEm'];
+    }
+
+    function isValidPedido(d, clienteId) {
+      return d.keys().hasAll(['id', 'clienteId', 'nomeCliente', 'mesa', 'itens', 'subtotal', 'status', 'criadoEm'])
+        && d.keys().hasOnly(pedidoKeys())
+        && d.clienteId == clienteId
+        && d.nomeCliente is string && d.nomeCliente.size() > 0 && d.nomeCliente.size() <= 60
+        && d.itens is list && d.itens.size() > 0 && d.itens.size() <= 100
+        && d.subtotal is number && d.subtotal >= 0
+        && d.status in ['a_fazer', 'pronto', 'entregue']
+        && d.criadoEm is timestamp;
     }
 
     // Transições de status que o CLIENTE pode fazer na própria comanda.
@@ -69,7 +84,7 @@ service cloud.firestore {
         allow read: if true;
         allow write: if isOwner(restauranteId);
 
-        // Nó Filho: a comanda individual do cliente na mesa.
+        // Nó Pai: a sessão/comanda individual do cliente na mesa.
         // clienteId == uid do login anônimo do cliente (Firebase Auth).
         match /comandas_abertas/{clienteId} {
 
@@ -77,21 +92,18 @@ service cloud.firestore {
           allow read: if isSignedIn()
             && (request.auth.uid == clienteId || isOwner(restauranteId));
 
-          // Cliente cria a própria comanda, sempre começando em 'pedindo'.
+          // Cliente cria a própria comanda (status 'pedindo' ou 'aguardando_pratos' ao enviar primeira rodada).
           // Lojista também pode criar (contingência: QR Code lido pelo garçom).
           allow create: if isValidComanda(request.resource.data)
             && request.resource.data.id == clienteId
             && (
               (isSignedIn() && request.auth.uid == clienteId
-                && request.resource.data.status == 'pedindo'
+                && request.resource.data.status in ['pedindo', 'aguardando_pratos']
                 && request.resource.data.criadoEm == request.time)
               || isOwner(restauranteId)
             );
 
-          // Cliente: só a própria comanda, sem trocar id/criadoEm, e apenas
-          // as transições de status liberadas. Após 'conta_pedida' a comanda
-          // fica congelada para o cliente (não dá para incluir itens).
-          // Lojista: qualquer alteração válida (inclusive status 'pago').
+          // Atualização da Comanda Pai
           allow update: if isValidComanda(request.resource.data)
             && request.resource.data.id == resource.data.id
             && request.resource.data.criadoEm == resource.data.criadoEm
@@ -104,6 +116,30 @@ service cloud.firestore {
 
           // Apenas o lojista fecha/exclui a conta.
           allow delete: if isOwner(restauranteId);
+
+          // ───────────────────── Subcoleção: Pedidos / Rodadas ─────────────────────
+          // Cada envio de carrinho é uma rodada que vai para o KDS da cozinha.
+          match /pedidos/{pedidoId} {
+            // Cliente lê seus próprios pedidos; equipe do restaurante lê todos.
+            allow read: if isSignedIn()
+              && (request.auth.uid == clienteId || isOwner(restauranteId));
+
+            // Cliente cria novo pedido com status inicial 'a_fazer', desde que a comanda pai não esteja fechada.
+            // Dono também pode injetar pedidos (ex: via contingência de garçom).
+            allow create: if isValidPedido(request.resource.data, clienteId)
+              && (
+                (isSignedIn() && request.auth.uid == clienteId
+                  && request.resource.data.status == 'a_fazer'
+                  && request.resource.data.criadoEm == request.time)
+                || isOwner(restauranteId)
+              );
+
+            // Cozinha / Garçom atualizam o status de preparo ('a_fazer' -> 'pronto' -> 'entregue').
+            allow update: if isOwner(restauranteId);
+
+            // Apenas o lojista remove rodadas se necessário.
+            allow delete: if isOwner(restauranteId);
+          }
         }
       }
     }

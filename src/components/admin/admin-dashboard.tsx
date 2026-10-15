@@ -1,13 +1,27 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useAuth } from "@/context/auth-context";
 import { CARDAPIO_DEMO } from "@/lib/mock-data";
 import type { MenuItem } from "@/types";
+import {
+  escutarCardapio,
+  alternarDisponibilidadePrato,
+  salvarItemCardapio,
+  excluirItemCardapio,
+  popularCardapioInicialSeVazio,
+} from "@/lib/restaurante-service";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import {
   UtensilsCrossed,
   ChefHat,
@@ -24,7 +38,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
-import { MesaDetalheModal } from "./mesa-detalhe-modal";
+import { MesaDetalheModal } from "@/components/salao/mesa-detalhe-modal";
 import { MESAS_INICIAIS, type MesaOperacional, type ComandaGarcom } from "@/components/garcom/garcom-view";
 
 export function AdminDashboard() {
@@ -35,6 +49,20 @@ export function AdminDashboard() {
     restaurante?.configuracoes?.corPrimaria || "#E11D48"
   );
   const [salvandoCor, setSalvandoCor] = useState(false);
+
+  // Sincroniza cardápio em tempo real com o Firestore
+  useEffect(() => {
+    if (!restaurante?.id) return;
+
+    // Popula o cardápio inicial caso seja o primeiro acesso deste restaurante
+    popularCardapioInicialSeVazio(restaurante.id);
+
+    const unsub = escutarCardapio(restaurante.id, (novosItens) => {
+      setItensCardapio(novosItens);
+    });
+
+    return () => unsub();
+  }, [restaurante?.id]);
 
   // Controle de Mesas do Salão
   const [mesas, setMesas] = useState<MesaOperacional[]>(MESAS_INICIAIS);
@@ -201,11 +229,85 @@ export function AdminDashboard() {
     });
   };
 
-  // Toggle de item ativo/pausado instantâneo
-  const handleToggleAtivo = (id: string) => {
+  // Toggle de item ativo/pausado instantâneo conectado ao Firestore
+  const handleToggleAtivo = async (id: string) => {
+    const itemAtual = itensCardapio.find((it) => it.id === id);
+    if (!itemAtual) return;
+    const novoStatus = !itemAtual.ativo;
+
+    // Atualização otimista imediata na UI
     setItensCardapio((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, ativo: !item.ativo } : item))
+      prev.map((item) => (item.id === id ? { ...item, ativo: novoStatus } : item))
     );
+
+    if (restaurante?.id) {
+      try {
+        await alternarDisponibilidadePrato(restaurante.id, id, novoStatus);
+      } catch (err) {
+        console.warn("Falha ao sincronizar disponibilidade do prato:", err);
+      }
+    }
+  };
+
+  // Modal de Adicionar / Editar Prato
+  const [modalPratoAberto, setModalPratoAberto] = useState(false);
+  const [itemEmEdicao, setItemEmEdicao] = useState<Partial<MenuItem> | null>(null);
+  const [salvandoPrato, setSalvandoPrato] = useState(false);
+
+  const handleAbrirNovoPrato = () => {
+    setItemEmEdicao({
+      id: `item-${Date.now().toString(36)}`,
+      nome: "",
+      categoria: "Hambúrgueres",
+      descricao: "",
+      precoBase: 30,
+      ativo: true,
+      fotoUrl: "/images/demo/hamburger.webp",
+    });
+    setModalPratoAberto(true);
+  };
+
+  const handleEditarPrato = (item: MenuItem) => {
+    setItemEmEdicao({ ...item });
+    setModalPratoAberto(true);
+  };
+
+  const handleSalvarPrato = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!itemEmEdicao || !itemEmEdicao.nome?.trim() || !restaurante?.id) return;
+
+    setSalvandoPrato(true);
+    try {
+      const itemPronto: MenuItem = {
+        id: itemEmEdicao.id || `item-${Date.now().toString(36)}`,
+        nome: itemEmEdicao.nome.trim(),
+        categoria: itemEmEdicao.categoria?.trim() || "Geral",
+        descricao: itemEmEdicao.descricao?.trim() || "",
+        precoBase: Number(itemEmEdicao.precoBase) || 0,
+        ativo: itemEmEdicao.ativo !== undefined ? itemEmEdicao.ativo : true,
+        fotoUrl: itemEmEdicao.fotoUrl?.trim() || "/images/demo/hamburger.webp",
+        grupoModificadores: itemEmEdicao.grupoModificadores || [],
+      };
+
+      await salvarItemCardapio(restaurante.id, itemPronto);
+      setModalPratoAberto(false);
+      setItemEmEdicao(null);
+    } catch (err) {
+      console.warn("Falha ao salvar prato:", err);
+    } finally {
+      setSalvandoPrato(false);
+    }
+  };
+
+  const handleExcluirPrato = async (id: string) => {
+    if (!window.confirm("Tem certeza que deseja excluir este prato do cardápio?")) return;
+    if (restaurante?.id) {
+      try {
+        await excluirItemCardapio(restaurante.id, id);
+      } catch (err) {
+        console.warn("Falha ao excluir prato:", err);
+      }
+    }
   };
 
   const handleSalvarCor = async () => {
@@ -330,9 +432,18 @@ export function AdminDashboard() {
               <div>
                 <h2 className="text-lg font-bold text-white">Gestão Rápida de Pratos</h2>
                 <p className="text-xs text-neutral-400">
-                  Pause pratos esgotados com um clique para não receber pedidos na cozinha
+                  Gerencie pratos, preços, fotos e pause pratos esgotados com um clique.
                 </p>
               </div>
+
+              <Button
+                type="button"
+                onClick={handleAbrirNovoPrato}
+                className="bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs h-10 px-3.5 rounded-xl flex items-center gap-2 shadow-lg"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Adicionar Prato</span>
+              </Button>
             </div>
 
             <div className="grid grid-cols-1 gap-3">
@@ -352,7 +463,14 @@ export function AdminDashboard() {
                       </div>
                     )}
                     <div className="min-w-0">
-                      <h4 className="text-sm font-bold text-white truncate">{item.nome}</h4>
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-sm font-bold text-white truncate">{item.nome}</h4>
+                        {item.categoria && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-400 border border-neutral-700">
+                            {item.categoria}
+                          </span>
+                        )}
+                      </div>
                       <p className="text-xs text-neutral-400 truncate max-w-md">
                         {item.descricao}
                       </p>
@@ -366,8 +484,22 @@ export function AdminDashboard() {
                   </div>
 
                   <div className="flex items-center gap-3">
-                    <span className="text-xs font-medium text-neutral-400 hidden sm:inline">
-                      {item.ativo ? "Disponível" : "Pausado (Esgotado)"}
+                    <button
+                      type="button"
+                      onClick={() => handleEditarPrato(item)}
+                      className="px-2.5 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 hover:text-white rounded-lg text-xs font-semibold transition-colors"
+                    >
+                      Editar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleExcluirPrato(item.id)}
+                      className="px-2.5 py-1.5 bg-red-950/40 hover:bg-red-900/60 text-red-400 rounded-lg text-xs font-semibold transition-colors"
+                    >
+                      Excluir
+                    </button>
+                    <span className="text-xs font-medium text-neutral-400 hidden sm:inline ml-1">
+                      {item.ativo ? "Disponível" : "Pausado"}
                     </span>
                     <Switch
                       checked={item.ativo}
@@ -545,16 +677,138 @@ export function AdminDashboard() {
         )}
       </main>
 
-      {/* MODAL OPERACIONAL DE DETALHES DA MESA */}
+      {/* MODAL OPERACIONAL DE DETALHES DA MESA (Apenas monitoramento e QR Code no Admin) */}
       <MesaDetalheModal
         mesa={mesaSelecionada}
         isOpen={modalMesaAberto}
         onClose={() => setModalMesaAberto(false)}
         slug={slug}
+        modoSomenteLeitura={true}
         onMarcarPago={handleMarcarComoPago}
         onLiberarMesa={handleLiberarMesa}
         onLancarItem={handleLancarItemManual}
       />
+
+      {/* MODAL DE ADICIONAR / EDITAR PRATO DO CARDÁPIO */}
+      <Dialog open={modalPratoAberto} onOpenChange={(open) => !open && setModalPratoAberto(false)}>
+        <DialogContent className="max-w-lg bg-neutral-900 border-neutral-800 text-white rounded-3xl p-6 shadow-2xl">
+          <DialogHeader className="mb-4">
+            <DialogTitle className="text-lg font-black text-white flex items-center gap-2">
+              <UtensilsCrossed className="w-5 h-5 text-rose-500" />
+              <span>{itemEmEdicao?.nome ? "Editar Prato" : "Novo Prato no Cardápio"}</span>
+            </DialogTitle>
+            <DialogDescription className="text-xs text-neutral-400">
+              Preencha os detalhes do prato. As alterações são sincronizadas em tempo real com todos os clientes.
+            </DialogDescription>
+          </DialogHeader>
+
+          {itemEmEdicao && (
+            <form onSubmit={handleSalvarPrato} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-neutral-300">
+                  Nome do Prato *
+                </label>
+                <Input
+                  required
+                  placeholder="Ex: Smash Burger Duplo"
+                  value={itemEmEdicao.nome || ""}
+                  onChange={(e) => setItemEmEdicao({ ...itemEmEdicao, nome: e.target.value })}
+                  className="bg-neutral-800 border-neutral-700 text-white placeholder:text-neutral-500 rounded-xl"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold uppercase tracking-wider text-neutral-300">
+                    Categoria *
+                  </label>
+                  <select
+                    value={itemEmEdicao.categoria || "Hambúrgueres"}
+                    onChange={(e) => setItemEmEdicao({ ...itemEmEdicao, categoria: e.target.value })}
+                    className="w-full h-9 rounded-xl bg-neutral-800 border border-neutral-700 px-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-rose-500"
+                  >
+                    <option value="Hambúrgueres">Hambúrgueres</option>
+                    <option value="Pizzas">Pizzas</option>
+                    <option value="Bebidas">Bebidas</option>
+                    <option value="Sobremesas">Sobremesas</option>
+                    <option value="Entradas">Entradas</option>
+                    <option value="Outros">Outros</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold uppercase tracking-wider text-neutral-300">
+                    Preço Base (R$) *
+                  </label>
+                  <Input
+                    required
+                    type="number"
+                    step="0.50"
+                    min="0"
+                    placeholder="29.90"
+                    value={itemEmEdicao.precoBase ?? ""}
+                    onChange={(e) =>
+                      setItemEmEdicao({ ...itemEmEdicao, precoBase: parseFloat(e.target.value) || 0 })
+                    }
+                    className="bg-neutral-800 border-neutral-700 text-white placeholder:text-neutral-500 rounded-xl font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-neutral-300">
+                  Descrição dos Ingredientes
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="Ex: Dois burgers de 100g, cheddar duplo, cebola caramelizada e maionese da casa."
+                  value={itemEmEdicao.descricao || ""}
+                  onChange={(e) => setItemEmEdicao({ ...itemEmEdicao, descricao: e.target.value })}
+                  className="w-full rounded-xl bg-neutral-800 border border-neutral-700 p-3 text-sm text-white placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-rose-500 resize-none"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-neutral-300">
+                  URL da Foto
+                </label>
+                <Input
+                  placeholder="/images/demo/hamburger.webp ou URL externa"
+                  value={itemEmEdicao.fotoUrl || ""}
+                  onChange={(e) => setItemEmEdicao({ ...itemEmEdicao, fotoUrl: e.target.value })}
+                  className="bg-neutral-800 border-neutral-700 text-white placeholder:text-neutral-500 rounded-xl text-xs"
+                />
+              </div>
+
+              <div className="flex items-center justify-between p-3 rounded-xl bg-neutral-800/60 border border-neutral-700/60">
+                <span className="text-xs font-bold text-neutral-300">Disponível para Pedidos</span>
+                <Switch
+                  checked={itemEmEdicao.ativo !== false}
+                  onCheckedChange={(val) => setItemEmEdicao({ ...itemEmEdicao, ativo: val })}
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-neutral-800">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setModalPratoAberto(false)}
+                  className="text-neutral-400 hover:text-white rounded-xl text-xs"
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={salvandoPrato}
+                  className="bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl text-xs h-10 px-5 shadow-lg"
+                >
+                  {salvandoPrato ? "Salvando..." : "Salvar Prato"}
+                </Button>
+              </div>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

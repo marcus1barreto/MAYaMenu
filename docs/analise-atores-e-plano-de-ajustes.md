@@ -85,44 +85,53 @@ Fronteira entre Admin e Garçom (proposta): o Admin **monitora** mesas e imprime
 
 ---
 
-## 5. Decisões pendentes (aguardam o responsável pelo produto)
+## 5. Decisões do Responsável pelo Produto (Oficiais)
 
-| # | Decisão | Proposta | Status |
+| # | Decisão | Deliberação Oficial | Status |
 |---|---|---|---|
-| 1 | Identidade da equipe | Papéis `dono`, `garcom`, `cozinha`. Opção de PIN por função para tablets compartilhados. | **Pendente** |
-| 2 | Aba Mesas do Admin | Somente monitoramento e impressão de QR. | **Pendente** |
-| 3 | Modelo de pedido | Subcoleção `pedidos` por comanda (uma rodada por documento, com status de preparo próprio). Altera modelo e regras. | **Pendente** |
-
-Qualquer uma destas propostas pode ser contestada antes de implementar.
+| 1 | Identidade da equipe | Modelo enxuto: Lojista autentica (`ownerId`). PIN numérico por função nos tablets compartilhados (`cozinha`, `garcom`), mantendo controle do `dono`. | **Aprovada** |
+| 2 | Aba Mesas do Admin | Admin exclusivamente para monitoramento de status, gestão de cardápio e QR Codes físicos. Operação de salão centralizada em `/garcom`. Componentes neutros movidos para `components/salao/`. | **Aprovada** |
+| 3 | Modelo de pedido e rodadas | Subcoleção `pedidos` sob comanda do cliente: `/mesas/{id}/comandas_abertas/{clienteId}/pedidos/{pedidoId}` com status `a_fazer` \| `pronto` \| `entregue`. Comanda pai mantém status de sessão (`pedindo` \| `aguardando_pratos` \| `conta_pedida` \| `pago`) e subtotal acumulado via `increment`. | **Aprovada** |
 
 ---
 
-## 6. Plano de ajustes (ordem recomendada)
+## 6. Plano de ajustes (status de execução)
 
-**Fase 1 — Fundação de dados**
-1. Unificar o identificador do restaurante (achado E) e resolver o restaurante pelo `slug`.
-2. Definir o modelo de `pedidos` e separar status de comanda de status de preparo (achado D).
-3. Atualizar `firestore.rules` para os papéis aprovados (achado B) e para o novo modelo.
+**Fase 1 — Fundação de dados [CONCLUÍDA]**
+1. ✅ **Unificar o identificador do restaurante:** Resolução dinâmica pelo slug (`/r/[slug]`) via serviço `src/lib/restaurante-service.ts`, com fallback resiliente offline para o demo.
+2. ✅ **Atualizar Tipagens (`src/types/index.ts`):** Criados `ItemPedido`, `PedidoRodada` e refatorada a `ComandaCliente` como sessão agregadora.
+3. ✅ **Atualizar `firestore.rules`:** Regras para a subcoleção `/pedidos/{pedidoId}` com permissão de criação pelo cliente e gestão de preparo pela equipe/dono.
+4. ✅ **Gravação em Rodadas:** `CartDrawer` refatorado para persistir em `pedidos/{pedidoId}` somando ao pai via `increment(subtotal)` e `aguardando_pratos`, eliminando sobrescrita de arrays no Firestore.
+5. ✅ **Ação "Pedir a Conta" do Cliente:** Botão e feedback visual em `MenuView` com atualização do status para `conta_pedida`.
+6. ✅ **Isolamento de Salão:** Modal de mesa movido para `src/components/salao/mesa-detalhe-modal.tsx`.
+7. ✅ **Validação de Build:** `next build` concluído com sucesso com Turbopack e Serwist PWA.
 
-**Fase 2 — Conectar os atores**
-4. Cardápio real no Firestore (Cliente e Admin passam a ler e escrever a mesma fonte).
-5. Cozinha e Garçom lendo `pedidos` e `comandas` com `onSnapshot`.
-6. Admin em modo monitoramento; operação concentrada no Garçom (achado C).
-7. Scanner do Garçom gravando no Firestore.
+**Fase 2 — Conectar os atores [CONCLUÍDA]**
+8. ✅ **Cardápio em Tempo Real:** Cliente ([`MenuView`](file:///media/mbarreto/geral_ext4/mayaranas/mayamenu/src/components/cliente/menu-view.tsx)) e Admin ([`AdminDashboard`](file:///media/mbarreto/geral_ext4/mayaranas/mayamenu/src/components/admin/admin-dashboard.tsx)) sincronizados via `escutarCardapio`. Quando o admin pausa um prato esgotado, ele se reflete instantaneamente para os clientes no cardápio digital.
+9. ✅ **KDS da Cozinha Conectado:** [`KdsView`](file:///media/mbarreto/geral_ext4/mayaranas/mayamenu/src/components/admin/kds-view.tsx) escutando a subcoleção de pedidos/rodadas (`collectionGroup("pedidos")`) filtrada pelo restaurante. Ação "MARCHAR PEDIDO" atualiza o Firestore em tempo real.
+10. ✅ **Garçom Conectado & Injeção de Contingência:** [`GarcomView`](file:///media/mbarreto/geral_ext4/mayaranas/mayamenu/src/components/garcom/garcom-view.tsx) escutando `comandas_abertas` de todas as mesas. Botão de fechar conta atualiza a comanda para `pago`, e a leitura do QR de contingência injeta o pedido diretamente no Firestore disparando no KDS da cozinha.
+11. ✅ **Admin em Modo Monitoramento:** [`MesaDetalheModal`](file:///media/mbarreto/geral_ext4/mayaranas/mayamenu/src/components/salao/mesa-detalhe-modal.tsx) configurado com `modoSomenteLeitura={true}` no painel do lojista, restringindo ações operacionais ao `/garcom`.
+12. ✅ **Trava por PIN de Função:** Implementado [`PinLockGuard`](file:///media/mbarreto/geral_ext4/mayaranas/mayamenu/src/components/salao/pin-lock-guard.tsx) para travar os tablets compartilhados nos modos `cozinha` (PIN 1234) e `garcom` (PIN 4321).
+13. ✅ **Validação de Build:** `npm run build` executado e aprovado com código 0 com Serwist PWA e Turbopack.
 
-**Fase 3 — Refinamento por ator**
-8. Cliente (PWA), Cozinha (KDS), Garçom/Salão, Admin: ajustes de fluxo e visual, um ator por vez.
-
-**Backlog já registrado (do pedido anterior)**
-- Cliente: categorias em abas fixas, feedback sonoro/tátil, filtros rápidos.
-- Garçom e KDS: sincronização em tempo real, alerta sonoro de novo pedido, fechamento e rateio.
-- Admin: CRUD completo de pratos com upload de foto no Storage, cadastro do restaurante, impressão de QR físicos.
+**Fase 3 — Refinamento por ator [CONCLUÍDA]**
+14. ✅ **Cliente (PWA):**
+    - Adicionado campo opcional `categoria` nos tipos e itens do cardápio.
+    - Implementadas pílulas deslizantes horizontais para filtragem rápida de categorias ("Todos", "Hambúrgueres", "Pizzas", "Bebidas", "Sobremesas") e busca por texto com resposta instantânea e feedback tátil em [`MenuView`](file:///media/mbarreto/geral_ext4/mayaranas/mayamenu/src/components/cliente/menu-view.tsx).
+15. ✅ **Admin (Gestão de Cardápio):**
+    - CRUD completo implementado em [`restaurante-service.ts`](file:///media/mbarreto/geral_ext4/mayaranas/mayamenu/src/lib/restaurante-service.ts) e integrado no [`AdminDashboard`](file:///media/mbarreto/geral_ext4/mayaranas/mayamenu/src/components/admin/admin-dashboard.tsx).
+    - Botão "Adicionar Prato", modal Dialog com campos de nome, categoria, preço, descrição e foto, edição de itens existentes e exclusão com confirmação.
+    - Sincronização em tempo real de itens adicionados/editados/pausados diretamente no Firestore.
+16. ✅ **Cozinha (KDS) & Garçom:**
+    - Visual ergonômico, cartões destacados para comandos táteis rápidos ("MARCHAR PEDIDO" de 56px de altura).
+    - Destaque em vermelho nas personalizações e modificadores conforme especificação técnica.
+    - Mapa de mesas com badges de status de conta pedida com indicação visual pulsante.
+17. ✅ **Validação de Build:** `npm run build` executado e aprovado com sucesso via Turbopack e Serwist PWA.
 
 ---
 
 ## 7. Desconexão do cliente e memória local (regras acordadas)
 
-- **Quando desconectar:** ao ser marcada como `pago` ou ao liberar a mesa. Como segurança, expirar a sessão da mesa após período de inatividade (valor a definir, sugestão de 4 a 6 horas).
-- **Ao desconectar:** encerrar os listeners do Firestore e manter apenas o comprovante em `localStorage`.
-- **Memória local:** restaurante, mesa, data, itens, total e código de autenticação do comprovante. Sem custo de banco e sem dados pessoais na nuvem.
-- **Pendência técnica:** hoje o comprovante é salvo com status `ativo` e nada o marca como concluído quando o garçom fecha a conta. Isso depende da Fase 2 (cliente escutando a própria comanda).
+- **Quando desconectar:** Ao ser marcada como `pago` ou ao liberar a mesa. Timeout oficial de inatividade definido em **4 horas** (`SESSAO_MESA_TIMEOUT_MS`).
+- **Ao desconectar:** Encerrar os listeners do Firestore e marcar comprovante em `localStorage` como `concluido`.
+- **Memória local:** `src/lib/historico-cliente.ts` registra as visitas locais com hash de autenticação legível, dados do restaurante e mesa. Helper `marcarVisitaAtualComoPaga` preparado para a Fase 2 ao escutar o evento `pago`.
