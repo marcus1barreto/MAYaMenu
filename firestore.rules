@@ -53,7 +53,7 @@ service cloud.firestore {
     // 'pago' e qualquer outra transição são exclusivas do lojista.
     function isAllowedClientStatus(antes, depois) {
       return depois == antes
-        || (antes == 'pedindo' && depois == 'aguardando_pratos')                    // enviou o pedido
+        || (antes in ['pedindo', 'conta_pedida'] && depois == 'aguardando_pratos')  // enviou pedido ou nova rodada
         || (antes in ['pedindo', 'aguardando_pratos'] && depois == 'conta_pedida'); // pediu a conta
     }
 
@@ -110,10 +110,9 @@ service cloud.firestore {
           // Atualização da Comanda Pai
           allow update: if isValidComanda(request.resource.data)
             && request.resource.data.id == resource.data.id
-            && request.resource.data.criadoEm == resource.data.criadoEm
             && (
               (isSignedIn() && request.auth.uid == clienteId
-                && resource.data.status in ['pedindo', 'aguardando_pratos']
+                && resource.data.status in ['pedindo', 'aguardando_pratos', 'conta_pedida']
                 && isAllowedClientStatus(resource.data.status, request.resource.data.status))
               || isOwner(restauranteId)
             );

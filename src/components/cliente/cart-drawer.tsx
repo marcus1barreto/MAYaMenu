@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { QRCodeSVG } from "qrcode.react";
 import { buildTicketPayload, encodeTicket } from "@/lib/ticket";
 import { ensureClienteAnonimo, db } from "@/lib/firebase";
-import { doc, setDoc, serverTimestamp, increment, collection } from "firebase/firestore";
+import { doc, getDoc, setDoc, updateDoc, serverTimestamp, increment, collection } from "firebase/firestore";
 import {
   Trash2,
   Plus,
@@ -127,7 +127,7 @@ export function CartDrawer({
           quantidade: it.quantidade,
           precoFinal: it.precoFinal,
           modificadores: it.modificadores.map((m) => ({ grupo: m.grupo, opcao: m.opcao })),
-          observacoes: it.observacoes || null,
+          observacoes: it.observacoes || "",
         }));
 
         // Dados da Rodada individual para o KDS da cozinha
@@ -144,24 +144,38 @@ export function CartDrawer({
           criadoEm: serverTimestamp(),
         };
 
-        // Dados da Comanda Pai (sessão acumulada na mesa)
-        const dadosComanda = {
-          id: uid,
-          restauranteId,
-          nomeCliente: nomeCliente.trim(),
-          mesa,
-          numeroMesa: Number(mesa) || mesa,
-          criadoEm: serverTimestamp(),
-          atualizadoEm: serverTimestamp(),
-          subtotal: increment(subtotal),
-          status: "aguardando_pratos" as const,
-        };
+        // Verifica se a comanda pai já existe para não sobrescrever criadoEm nem conflitar com increment
+        const comandaSnap = await getDoc(comandaRef);
 
-        // Grava a comanda pai (merge incrementa subtotal) e a nova rodada na subcoleção
-        const saveComanda = setDoc(comandaRef, dadosComanda, { merge: true });
-        const savePedido = setDoc(pedidoRef, dadosPedidoRodada);
+        let saveComandaPromise: Promise<unknown>;
+        if (!comandaSnap.exists()) {
+          // 1ª Rodada: cria a comanda pai
+          saveComandaPromise = setDoc(comandaRef, {
+            id: uid,
+            restauranteId,
+            nomeCliente: nomeCliente.trim(),
+            mesa,
+            numeroMesa: Number(mesa) || mesa,
+            criadoEm: serverTimestamp(),
+            atualizadoEm: serverTimestamp(),
+            subtotal,
+            status: "aguardando_pratos" as const,
+          });
+        } else {
+          // 2ª Rodada em diante: atualiza comanda acumulando subtotal e preservando criadoEm
+          saveComandaPromise = updateDoc(comandaRef, {
+            nomeCliente: nomeCliente.trim(),
+            mesa,
+            numeroMesa: Number(mesa) || mesa,
+            atualizadoEm: serverTimestamp(),
+            subtotal: increment(subtotal),
+            status: "aguardando_pratos" as const,
+          });
+        }
 
-        const savePromise = Promise.all([saveComanda, savePedido]);
+        const savePedidoPromise = setDoc(pedidoRef, dadosPedidoRodada);
+
+        const savePromise = Promise.all([saveComandaPromise, savePedidoPromise]);
         const timeoutSave = new Promise((_, reject) =>
           setTimeout(() => reject(new Error("Timeout Firestore")), 4000)
         );
