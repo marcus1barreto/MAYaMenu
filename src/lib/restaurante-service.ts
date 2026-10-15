@@ -415,6 +415,9 @@ export async function injetarTicketContingencia(
     ticket.id
   );
 
+  const { Timestamp } = await import("firebase/firestore");
+  const agoraTimestamp = Timestamp.now();
+
   const dadosPedido = {
     id: ticket.id,
     restauranteId,
@@ -425,7 +428,7 @@ export async function injetarTicketContingencia(
     itens: ticket.itens,
     subtotal: ticket.subtotal,
     status: "a_fazer" as const,
-    criadoEm: new Date(),
+    criadoEm: agoraTimestamp,
   };
 
   const dadosComanda = {
@@ -434,8 +437,8 @@ export async function injetarTicketContingencia(
     nomeCliente: ticket.nomeCliente,
     mesa: ticket.mesa,
     numeroMesa: Number(ticket.mesa) || ticket.mesa,
-    criadoEm: new Date(),
-    atualizadoEm: new Date(),
+    criadoEm: agoraTimestamp,
+    atualizadoEm: agoraTimestamp,
     subtotal: ticket.subtotal,
     status: "aguardando_pratos" as const,
   };

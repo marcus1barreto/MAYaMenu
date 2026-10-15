@@ -148,6 +148,13 @@ service cloud.firestore {
       }
     }
 
+    // ──────────────────────────── Slugs de URLs Públicas ────────────────────────────
+    match /slugs/{slug} {
+      allow read: if true;
+      allow create: if isNonAnonymous() && request.resource.data.ownerId == request.auth.uid;
+      allow update, delete: if isNonAnonymous() && resource.data.ownerId == request.auth.uid;
+    }
+
     // ──────────────────────────── Concessões & Licenças (Burn-After-Reading) ────────────────────────────
     match /concessoes/{licencaId} {
       // Consulta individual para rota efêmera de onboarding (/ativar/[codigo])
@@ -159,24 +166,25 @@ service cloud.firestore {
       // Criação permitida apenas para operadores autenticados não-anônimos (SuperAdmin)
       allow create: if isNonAnonymous();
 
-      // Queima atômica e estrita:
-      // Apenas transição de 'disponivel' -> 'utilizada' vinculada ao uid do lojista autenticado
-      allow update: if isNonAnonymous()
-        && resource.data.status == 'disponivel'
-        && request.resource.data.status == 'utilizada'
-        && request.resource.data.ownerId == request.auth.uid;
+      // Atualização estrita:
+      // Caso 1: Queima atômica no onboarding pelo novo lojista
+      // Caso 2: Gestão de status pelo SuperAdmin (suspender, revogar, reativar)
+      allow update: if isNonAnonymous() && (
+        (resource.data.status == 'disponivel'
+          && request.resource.data.status == 'utilizada'
+          && request.resource.data.ownerId == request.auth.uid)
+        ||
+        (request.resource.data.status in ['ativa', 'suspensa', 'revogada'])
+      );
 
       allow delete: if false;
     }
 
     // ──────────────────────────── CollectionGroup Queries ────────────────────────────
-    // Regras recursivas para KDS e Salão/Garçom que consultam comandas_abertas e pedidos
+    // Regras exclusivas de LEITURA recursiva para KDS e Salão/Garçom que consultam comandas_abertas e pedidos.
+    // Todas as escritas utilizam caminhos absolutos e respeitam as regras estritas acima.
     match /{path=**}/comandas_abertas/{clienteId} {
       allow read: if isSignedIn() && (
-        request.auth.uid == clienteId ||
-        request.auth.uid == resource.data.restauranteId
-      );
-      allow write: if isSignedIn() && (
         request.auth.uid == clienteId ||
         request.auth.uid == resource.data.restauranteId
       );
@@ -184,10 +192,6 @@ service cloud.firestore {
 
     match /{path=**}/pedidos/{pedidoId} {
       allow read: if isSignedIn() && (
-        request.auth.uid == resource.data.clienteId ||
-        request.auth.uid == resource.data.restauranteId
-      );
-      allow write: if isSignedIn() && (
         request.auth.uid == resource.data.clienteId ||
         request.auth.uid == resource.data.restauranteId
       );
