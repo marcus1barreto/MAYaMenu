@@ -69,3 +69,31 @@ export interface ComandaCliente {
   subtotal: number; // Soma acumulada de todos os pedidos/rodadas deste cliente
   status: 'pedindo' | 'aguardando_pratos' | 'conta_pedida' | 'pago';
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Gerência do Sistema (SuperAdmin) & Concessão de Licenças (MAYaRAnas)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type PlanoTipo = 'free' | 'pro' | 'enterprise';
+
+export interface LimitesPlano {
+  maxPratos: number; // ex: 15 no free, 999 no pro/enterprise
+  maxMesas: number;  // ex: 5 no free, 999 no pro/enterprise
+}
+
+export interface Licenca {
+  id: string; // Token único gerado (Ex: "MAYA-7K2X-91A4")
+  status: 'disponivel' | 'ativa' | 'suspensa' | 'revogada' | 'utilizada';
+  plano: PlanoTipo;
+  limites: LimitesPlano;
+  criadaEm: any;
+  expiracaoEm?: any; // Validade do convite/token efêmero
+  ativadaEm?: any;
+  consumidaEm?: any;
+  ownerId?: string; // UID do Firebase Auth do lojista que ativou
+  restauranteId?: string; // UID do restaurante vinculado
+  restauranteNome?: string;
+  slug?: string;
+  responsavel?: string; // Nome/Contato do lojista
+  notas?: string;
+}

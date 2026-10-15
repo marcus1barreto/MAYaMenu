@@ -61,3 +61,29 @@ Estrutura desenhada para evitar concorrência e facilitar o fechamento de contas
 3.  Configure o `next-pwa` (manifesto e service workers).
 4.  Crie as rotas públicas ISR (`/r/[slug]`) e as rotas protegidas do painel (`/admin`).
 5.  Implemente o gerador de Payload/QR Code no checkout do cliente.
+
+---
+
+## 6. Roadmap & Implementações Futuras (Aditivo SuperAdmin e Monetização)
+
+### 6.1. Gerência Geral do Sistema (SuperAdmin MAYaRAnas)
+*   **Portal Exclusivo:** Interface separada da administração dos restaurantes (`/superadmin` ou `/gestao`).
+*   **Gerador de Tokens / UIDs de Ativação:** O SuperAdmin gera chaves de concessão criptográficas ou alfanuméricas (ex: `MAYA-LIC-XXXX-YYYY`).
+*   **Concessão de Estabelecimentos:** O novo restaurante só conclui o cadastro/onboarding se fornecer um Token de Licença válido concedido pela gerência.
+*   **Gestão de Status da Concessão:** Ativo, Suspenso, Em Atraso ou Bloqueado, com interrupção instantânea do serviço via Firestore.
+
+### 6.2. Camadas de Gratuidade (Modelo Freemium / Tiers)
+*   **Plano Gratuito / Básico (Free Tier):**
+    *   Limite máximo de pratos/itens ativos no cardápio (ex: até 15 ou 20 itens).
+    *   Limite máximo de mesas simultâneas (ex: até 5 ou 10 mesas físicas).
+    *   Relatórios e histórico resumidos.
+*   **Planos Pagos (Pro / Enterprise):**
+    *   Itens de cardápio ilimitados.
+    *   Mesas ilimitadas e setores múltiplos (Salão, Varanda, Balcão, Delivery).
+    *   Múltiplos terminais simultâneos para Garçom e Cozinha (KDS).
+    *   Customização visual profunda e relatórios gerenciais avançados.
+
+### 6.3. Isolamento da Demonstração (Sandbox /demo)
+*   **Sandbox Dedicada (`/demo`):** Ambiente isolado com dados mockados contendo seletor para Cliente (Mesa 12), KDS da Cozinha e Terminal do Garçom.
+*   **Fluxo Oficial Limpo:** As rotas oficiais (`/admin`, `/cozinha`, `/garcom`, `/r/[slug]`) operam exclusivamente com instâncias reais de restaurantes e comandas salvas no Firestore.
+*   **Depreciação Futura:** Em release futura pré-lançamento comercial, a rota `/demo` será descontinuada e removida.

@@ -18,7 +18,13 @@ interface AuthContextType {
   restaurante: Restaurante | null;
   carregando: boolean;
   login: (email: string, pass: string) => Promise<void>;
-  cadastrar: (email: string, pass: string, nomeRestaurante: string, slug: string) => Promise<void>;
+  cadastrar: (
+    email: string,
+    pass: string,
+    nomeRestaurante: string,
+    slug: string,
+    codigoLicenca: string
+  ) => Promise<void>;
   logout: () => Promise<void>;
   atualizarRestaurante: (dados: Partial<Restaurante>) => Promise<void>;
 }
@@ -123,48 +129,59 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     email: string,
     pass: string,
     nomeRestaurante: string,
-    slug: string
+    slug: string,
+    codigoLicenca: string
   ) => {
     setCarregando(true);
     try {
-      const cred = await createUserWithEmailAndPassword(auth, email, pass);
-      const uid = cred.user.uid;
+      // 1. Validação estrita inicial da Licença / Concessão
+      const { validarLicencaParaAtivacao, ativarLicencaEInstanciaAtomica } = await import(
+        "@/lib/licenca-service"
+      );
+      const validacao = await validarLicencaParaAtivacao(codigoLicenca);
+      if (!validacao.valida) {
+        throw new Error(validacao.motivo || "Código de concessão inválido ou já utilizado.");
+      }
 
-      const novoRest: Restaurante = {
-        id: uid,
-        ownerId: uid,
-        slug: slug.trim().toLowerCase(),
-        nome: nomeRestaurante.trim(),
-        configuracoes: {
-          corPrimaria: "#E11D48",
-          tema: "light",
-          capaUrl: "/images/capa-padrao.webp",
-        },
-      };
+      // 2. Cria usuário no Firebase Auth
+      let uid: string;
+      try {
+        const cred = await createUserWithEmailAndPassword(auth, email, pass);
+        uid = cred.user.uid;
+      } catch (authErr) {
+        // Fallback para ambiente local/offline de simulação
+        uid = `owner-${Date.now().toString(36)}`;
+        localStorage.setItem("mayamenu_mock_auth", "true");
+        setUser({
+          uid,
+          email,
+          isAnonymous: false,
+        } as unknown as User);
+      }
 
-      const restRef = doc(db, "restaurantes", uid);
-      await setDoc(restRef, novoRest);
+      const slugLimpo = slug.trim().toLowerCase();
+      const nomeLimpo = nomeRestaurante.trim();
+
+      // 3. Queima atômica da licença e criação do restaurante
+      const novoRest = await ativarLicencaEInstanciaAtomica({
+        codigo: codigoLicenca,
+        ownerUid: uid,
+        restauranteNome: nomeLimpo,
+        slug: slugLimpo,
+      });
+
+      // 4. Popula cardápio inicial de cortesia
+      try {
+        const { popularCardapioInicialSeVazio } = await import("@/lib/restaurante-service");
+        await popularCardapioInicialSeVazio(uid);
+      } catch (err) {
+        console.warn("Falha ao popular cardápio padrão:", err);
+      }
+
       setRestaurante(novoRest);
-    } catch {
-      // Modo fallback caso não haja conexão com Firebase
-      const novoRest: Restaurante = {
-        id: "owner-demo-uid",
-        ownerId: "owner-demo-uid",
-        slug: slug.trim().toLowerCase(),
-        nome: nomeRestaurante.trim(),
-        configuracoes: {
-          corPrimaria: "#E11D48",
-          tema: "light",
-          capaUrl: "/images/capa-padrao.webp",
-        },
-      };
-      localStorage.setItem("mayamenu_mock_auth", "true");
-      setUser({
-        uid: "owner-demo-uid",
-        email: email.trim().toLowerCase(),
-        isAnonymous: false,
-      } as unknown as User);
-      setRestaurante(novoRest);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Erro no cadastro";
+      throw new Error(msg);
     } finally {
       setCarregando(false);
     }

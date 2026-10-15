@@ -25,9 +25,10 @@ export default function HomePage() {
 
         {/* BOTÃO PRINCIPAL DE ACESSO AO CARDÁPIO DEMO */}
         <div className="mt-8 flex flex-col sm:flex-row items-center gap-4 w-full justify-center">
-          <Link href="/r/demo?mesa=12" className="w-full sm:w-auto">
+          <Link href="/demo" className="w-full sm:w-auto">
             <Button className="w-full sm:w-auto h-14 px-8 text-base font-bold bg-rose-600 hover:bg-rose-500 text-white rounded-2xl shadow-xl shadow-rose-600/20 active:scale-95 transition-all flex items-center justify-center gap-2">
-              <span>Abrir Cardápio na Mesa 12</span>
+              <Sparkles className="w-4 h-4" />
+              <span>Experimentar Sandbox Demo</span>
               <ArrowRight className="w-4 h-4" />
             </Button>
           </Link>

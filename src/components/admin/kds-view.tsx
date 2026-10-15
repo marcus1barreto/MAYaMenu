@@ -99,11 +99,13 @@ export const PEDIDOS_INICIAIS_KDS: PedidoKDS[] = [
 export function KdsView({
   restauranteId,
   nomeRestaurante = "MAYaMenu",
+  isSandbox = false,
 }: {
   restauranteId?: string;
   nomeRestaurante?: string;
+  isSandbox?: boolean;
 }) {
-  const [pedidos, setPedidos] = useState<PedidoKDS[]>(PEDIDOS_INICIAIS_KDS);
+  const [pedidos, setPedidos] = useState<PedidoKDS[]>(isSandbox ? PEDIDOS_INICIAIS_KDS : []);
   const [filtro, setFiltro] = useState<"todos" | "a_fazer" | "pronto">("todos");
 
   // Conecta ao Firestore em tempo real
@@ -111,29 +113,27 @@ export function KdsView({
     if (!restauranteId) return;
 
     const unsub = escutarPedidosKds(restauranteId, (rodadas) => {
-      if (rodadas.length > 0) {
-        const convertidos: PedidoKDS[] = rodadas.map((r) => {
-          let horarioFormatado = "Agora";
-          if (r.criadoEm?.toDate) {
-            horarioFormatado = r.criadoEm.toDate().toLocaleTimeString("pt-BR", {
-              hour: "2-digit",
-              minute: "2-digit",
-            });
-          }
-          return {
-            id: r.id,
-            refPath: r.refPath,
-            mesa: r.mesa,
-            clienteId: r.clienteId,
-            nomeCliente: r.nomeCliente,
-            horario: horarioFormatado,
-            subtotal: r.subtotal,
-            status: r.status,
-            itens: r.itens,
-          };
-        });
-        setPedidos(convertidos);
-      }
+      const convertidos: PedidoKDS[] = rodadas.map((r) => {
+        let horarioFormatado = "Agora";
+        if (r.criadoEm?.toDate) {
+          horarioFormatado = r.criadoEm.toDate().toLocaleTimeString("pt-BR", {
+            hour: "2-digit",
+            minute: "2-digit",
+          });
+        }
+        return {
+          id: r.id,
+          refPath: r.refPath,
+          mesa: r.mesa,
+          clienteId: r.clienteId,
+          nomeCliente: r.nomeCliente,
+          horario: horarioFormatado,
+          subtotal: r.subtotal,
+          status: r.status,
+          itens: r.itens,
+        };
+      });
+      setPedidos(convertidos);
     });
 
     return () => unsub();

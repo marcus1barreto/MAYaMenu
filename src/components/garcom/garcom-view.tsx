@@ -140,12 +140,21 @@ export function GarcomView({
   restauranteId,
   slug = "demo",
   nomeRestaurante = "MAYaMenu",
+  isSandbox = false,
 }: {
   restauranteId?: string;
   slug?: string;
   nomeRestaurante?: string;
+  isSandbox?: boolean;
 }) {
-  const [mesas, setMesas] = useState<MesaOperacional[]>(MESAS_INICIAIS);
+  const [mesas, setMesas] = useState<MesaOperacional[]>(() => {
+    if (isSandbox) return MESAS_INICIAIS;
+    const mapaLimpo: MesaOperacional[] = [];
+    for (let i = 1; i <= 12; i++) {
+      mapaLimpo.push({ numero: i, status: "livre", comandas: [] });
+    }
+    return mapaLimpo;
+  });
   const [mesaSelecionada, setMesaSelecionada] = useState<MesaOperacional | null>(null);
   const [scannerAberto, setScannerAberto] = useState(false);
   const [feedbackInjecao, setFeedbackInjecao] = useState<string | null>(null);
@@ -155,10 +164,8 @@ export function GarcomView({
     if (!restauranteId) return;
 
     const unsub = escutarComandasSalão(restauranteId, (comandasFirestore) => {
-      if (comandasFirestore.length === 0) return;
-
       // Agrupa comandas por número de mesa (1 a 12)
-      setMesas((prev) => {
+      setMesas(() => {
         const mapa = new Map<number, MesaOperacional>();
         for (let i = 1; i <= 12; i++) {
           mapa.set(i, { numero: i, status: "livre", comandas: [] });

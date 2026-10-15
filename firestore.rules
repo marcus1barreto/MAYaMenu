@@ -144,6 +144,31 @@ service cloud.firestore {
       }
     }
 
+    function isNonAnonymous() {
+      return isSignedIn() && request.auth.token.firebase.sign_in_provider != 'anonymous';
+    }
+
+    // ──────────────────────────── Concessões & Licenças (Burn-After-Reading) ────────────────────────────
+    match /concessoes/{licencaId} {
+      // Consulta individual para rota efêmera de onboarding (/ativar/[codigo])
+      allow get: if true;
+
+      // Listagem geral restrita: exige login não-anônimo (evita scraping público ou por clientes anônimos)
+      allow list: if isNonAnonymous();
+
+      // Criação permitida para operadores autenticados não-anônimos (SuperAdmin)
+      allow create: if isNonAnonymous();
+
+      // Queima atômica e estrita:
+      // Apenas transição de 'disponivel' -> 'utilizada' vinculada ao uid autenticado
+      allow update: if isNonAnonymous()
+        && resource.data.status == 'disponivel'
+        && request.resource.data.status == 'utilizada'
+        && request.resource.data.ownerId == request.auth.uid;
+
+      allow delete: if false;
+    }
+
     // Qualquer outro caminho é negado por padrão.
   }
 }
