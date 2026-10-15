@@ -150,20 +150,51 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error(validacao.motivo || "Código de concessão inválido ou já utilizado.");
       }
 
+      // Validação de unicidade do slug antes de criar qualquer conta
+      const { verificarSlugDisponivel } = await import("@/lib/restaurante-service");
+      const slugLimpo = slug.trim().toLowerCase();
+      const slugDisponivel = await verificarSlugDisponivel(slugLimpo);
+      if (!slugDisponivel) {
+        throw new Error(`O endereço '/r/${slugLimpo}' já está em uso por outro restaurante. Por favor, escolha outro slug.`);
+      }
+
       // Limpa mock anterior para nunca misturar com o Demo
       localStorage.removeItem("mayamenu_mock_auth");
 
-      // 2. Cria usuário no Firebase Auth
+      // 2. Cria usuário no Firebase Auth com recuperação de falha parcial
       let uid: string;
       try {
         const cred = await createUserWithEmailAndPassword(auth, email.trim(), pass);
         uid = cred.user.uid;
       } catch (authErr: unknown) {
-        console.warn("Falha no Firebase Auth:", authErr);
-        throw authErr;
+        const isEmailInUse =
+          authErr instanceof Error &&
+          (authErr.message.includes("auth/email-already-in-use") ||
+            (authErr as { code?: string }).code === "auth/email-already-in-use");
+
+        if (isEmailInUse) {
+          // Recuperação automática de falha parcial: tenta logar para concluir ativação pendente
+          try {
+            const loginRes = await signInWithEmailAndPassword(auth, email.trim(), pass);
+            uid = loginRes.user.uid;
+
+            // Verifica se o restaurante já foi criado anteriormente
+            const restExistenteSnap = await getDoc(doc(db, "restaurantes", uid));
+            if (restExistenteSnap.exists()) {
+              throw new Error("Este e-mail já possui um estabelecimento ativo. Acesse o painel de login.");
+            }
+          } catch (loginErr: unknown) {
+            if (loginErr instanceof Error && loginErr.message.includes("estabelecimento ativo")) {
+              throw loginErr;
+            }
+            throw new Error("Este e-mail já foi cadastrado no sistema, mas a senha informada não confere. Use a senha correta para concluir a ativação.");
+          }
+        } else {
+          console.warn("Falha no Firebase Auth:", authErr);
+          throw authErr;
+        }
       }
 
-      const slugLimpo = slug.trim().toLowerCase();
       const nomeLimpo = nomeRestaurante.trim();
 
       // 3. Queima atômica da licença e criação do restaurante

@@ -8,6 +8,10 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function isNonAnonymous() {
+      return isSignedIn() && request.auth.token.firebase.sign_in_provider != 'anonymous';
+    }
+
     // Dono = uid do Firebase Auth gravado em restaurantes/{id}.ownerId.
     // Usuários anônimos (clientes) nunca casam com ownerId.
     function isOwner(restauranteId) {
@@ -17,7 +21,7 @@ service cloud.firestore {
 
     // Campos permitidos numa ComandaCliente (sessão pai)
     function comandaKeys() {
-      return ['id', 'restauranteId', 'nomeCliente', 'mesa', 'criadoEm', 'atualizadoEm', 'subtotal', 'status'];
+      return ['id', 'restauranteId', 'nomeCliente', 'mesa', 'numeroMesa', 'criadoEm', 'atualizadoEm', 'subtotal', 'status'];
     }
 
     function isValidComanda(d) {
@@ -31,7 +35,7 @@ service cloud.firestore {
 
     // Campos permitidos num PedidoRodada (subcoleção pedidos)
     function pedidoKeys() {
-      return ['id', 'restauranteId', 'clienteId', 'nomeCliente', 'mesa', 'itens', 'subtotal', 'status', 'criadoEm'];
+      return ['id', 'restauranteId', 'clienteId', 'nomeCliente', 'mesa', 'numeroMesa', 'itens', 'subtotal', 'status', 'criadoEm'];
     }
 
     function isValidPedido(d, clienteId) {
@@ -144,29 +148,49 @@ service cloud.firestore {
       }
     }
 
-    function isNonAnonymous() {
-      return isSignedIn() && request.auth.token.firebase.sign_in_provider != 'anonymous';
-    }
-
     // ──────────────────────────── Concessões & Licenças (Burn-After-Reading) ────────────────────────────
     match /concessoes/{licencaId} {
-      // Consulta e escuta em tempo real para SuperAdmin e validação de ativação efêmera
-      allow read: if true;
+      // Consulta individual para rota efêmera de onboarding (/ativar/[codigo])
+      allow get: if true;
 
-      // Criação de novas licenças (SuperAdmin)
-      allow create: if true;
+      // Listagem geral restrita: exige login não-anônimo (evita scraping de tokens por anônimos ou público)
+      allow list: if isNonAnonymous();
 
-      // Atualização:
-      // 1. Queima atômica na ativação (disponivel -> utilizada)
-      // 2. Ou alteração de status/suspensão pela gerência SuperAdmin
-      allow update: if (
-        resource.data.status == 'disponivel'
+      // Criação permitida apenas para operadores autenticados não-anônimos (SuperAdmin)
+      allow create: if isNonAnonymous();
+
+      // Queima atômica e estrita:
+      // Apenas transição de 'disponivel' -> 'utilizada' vinculada ao uid do lojista autenticado
+      allow update: if isNonAnonymous()
+        && resource.data.status == 'disponivel'
         && request.resource.data.status == 'utilizada'
-      ) || (
-        request.resource.data.status in ['ativa', 'suspensa', 'revogada']
-      );
+        && request.resource.data.ownerId == request.auth.uid;
 
       allow delete: if false;
+    }
+
+    // ──────────────────────────── CollectionGroup Queries ────────────────────────────
+    // Regras recursivas para KDS e Salão/Garçom que consultam comandas_abertas e pedidos
+    match /{path=**}/comandas_abertas/{clienteId} {
+      allow read: if isSignedIn() && (
+        request.auth.uid == clienteId ||
+        request.auth.uid == resource.data.restauranteId
+      );
+      allow write: if isSignedIn() && (
+        request.auth.uid == clienteId ||
+        request.auth.uid == resource.data.restauranteId
+      );
+    }
+
+    match /{path=**}/pedidos/{pedidoId} {
+      allow read: if isSignedIn() && (
+        request.auth.uid == resource.data.clienteId ||
+        request.auth.uid == resource.data.restauranteId
+      );
+      allow write: if isSignedIn() && (
+        request.auth.uid == resource.data.clienteId ||
+        request.auth.uid == resource.data.restauranteId
+      );
     }
 
     // Qualquer outro caminho é negado por padrão.

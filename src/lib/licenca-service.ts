@@ -233,14 +233,25 @@ export async function ativarLicencaEInstanciaAtomica(params: {
 
   const { runTransaction } = await import("firebase/firestore");
 
+  const slugTravaRef = doc(db, "slugs", slugLimpo);
+
   try {
     await runTransaction(db, async (transaction) => {
+      // 1. Checa trava de unicidade do slug
+      const slugSnap = await transaction.get(slugTravaRef);
+      if (slugSnap.exists()) {
+        const slugData = slugSnap.data();
+        if (slugData.ownerId && slugData.ownerId !== params.ownerUid) {
+          throw new Error(`O slug '/r/${slugLimpo}' já está em uso por outro restaurante. Escolha outro slug.`);
+        }
+      }
+
       const licSnap = await transaction.get(licencaRef);
 
       if (licSnap.exists()) {
         const licData = licSnap.data() as Licenca;
 
-        // 1. Confirma dentro da transação que a licença continua disponível
+        // 2. Confirma dentro da transação que a licença continua disponível
         if (licData.status === "utilizada" || licData.status === "ativa") {
           throw new Error("Esta licença já foi utilizada e extinta.");
         }
@@ -258,10 +269,18 @@ export async function ativarLicencaEInstanciaAtomica(params: {
         }
       }
 
-      // 2. Grava o documento do restaurante vinculado ao ownerId
+      // 3. Grava o documento do restaurante vinculado ao ownerId
       transaction.set(restRef, novoRest);
 
-      // 3. Queima imediatamente a licença marcando como consumida/utilizada
+      // 4. Grava a trava de unicidade do slug
+      transaction.set(slugTravaRef, {
+        slug: slugLimpo,
+        ownerId: params.ownerUid,
+        restauranteNome: nomeLimpo,
+        criadoEm: serverTimestamp(),
+      });
+
+      // 5. Queima imediatamente a licença marcando como consumida/utilizada
       transaction.set(
         licencaRef,
         {
@@ -278,13 +297,19 @@ export async function ativarLicencaEInstanciaAtomica(params: {
     });
   } catch (err: unknown) {
     console.warn("Falha ou indisponibilidade de transação no Firestore (executando fallback resiliente):", err);
-    // Se a mensagem for de negócio ("já utilizada", etc), repassa o erro
-    if (err instanceof Error && (err.message.includes("utilizada") || err.message.includes("revogada") || err.message.includes("expirou"))) {
+    // Se a mensagem for de negócio ("já utilizada", "slug já está em uso", etc), repassa o erro
+    if (err instanceof Error && (err.message.includes("utilizada") || err.message.includes("revogada") || err.message.includes("expirou") || err.message.includes("slug"))) {
       throw err;
     }
     // Caso de offline ou fallback
     try {
       await setDoc(restRef, novoRest);
+      await setDoc(slugTravaRef, {
+        slug: slugLimpo,
+        ownerId: params.ownerUid,
+        restauranteNome: nomeLimpo,
+        criadoEm: new Date(),
+      }, { merge: true });
       await setDoc(
         licencaRef,
         {

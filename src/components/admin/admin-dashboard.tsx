@@ -107,7 +107,10 @@ export function AdminDashboard() {
     });
   };
 
-  const handleLiberarMesa = (mesaNumero: number) => {
+  const handleLiberarMesa = async (mesaNumero: number) => {
+    const mesaAlvo = mesas.find((m) => m.numero === mesaNumero);
+    const comandasIds = mesaAlvo ? mesaAlvo.comandas.map((c) => c.id) : [];
+
     setMesas((prev) =>
       prev.map((m) =>
         m.numero === mesaNumero ? { ...m, status: "livre", comandas: [] } : m
@@ -116,6 +119,15 @@ export function AdminDashboard() {
     setMesaSelecionada((prev) =>
       prev && prev.numero === mesaNumero ? { ...prev, status: "livre", comandas: [] } : prev
     );
+
+    if (restaurante?.id && comandasIds.length > 0) {
+      try {
+        const { liberarMesaFirestore } = await import("@/lib/restaurante-service");
+        await liberarMesaFirestore(restaurante.id, mesaNumero, comandasIds);
+      } catch (err) {
+        console.warn("Falha ao liberar mesa no Firestore pelo Admin:", err);
+      }
+    }
   };
 
   const handleLancarItemManual = (

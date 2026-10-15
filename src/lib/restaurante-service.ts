@@ -22,6 +22,34 @@ import type { Restaurante, MenuItem, PedidoRodada, ComandaCliente } from "@/type
 import { RESTAURANTE_DEMO, CARDAPIO_DEMO } from "@/lib/mock-data";
 
 /**
+ * Verifica se um slug já está em uso por outro restaurante no Firestore
+ */
+export async function verificarSlugDisponivel(slug: string): Promise<boolean> {
+  const slugLimpo = slug.trim().toLowerCase();
+  if (!slugLimpo) return false;
+
+  try {
+    // 1. Checa trava direta na coleção de slugs se existir
+    const travaDoc = await getDoc(doc(db, "slugs", slugLimpo));
+    if (travaDoc.exists()) {
+      return false;
+    }
+
+    // 2. Consulta em restaurantes
+    const q = query(
+      collection(db, "restaurantes"),
+      where("slug", "==", slugLimpo),
+      limit(1)
+    );
+    const snap = await getDocs(q);
+    return snap.empty;
+  } catch (err) {
+    console.warn("Falha na consulta de unicidade do slug (permitindo em modo resiliente):", err);
+    return true;
+  }
+}
+
+/**
  * Busca restaurante pelo `slug` no Firestore.
  * Se não encontrar ou ocorrer falha/offline, retorna RESTAURANTE_DEMO ajustando o slug.
  */
@@ -297,13 +325,17 @@ export async function marcarComandaPagaFirestore(
 }
 
 /**
- * Libera a mesa fechando ou limpando as comandas do Firestore.
+ * Libera a mesa fechando as comandas e limpando/entregando os pedidos filhos daquela mesa via writeBatch
+ * para evitar que pedidos órfãos fiquem aparecendo no KDS da cozinha.
  */
 export async function liberarMesaFirestore(
   restauranteId: string,
   mesaNumero: number | string,
   comandasIds: string[]
 ): Promise<void> {
+  const { writeBatch } = await import("firebase/firestore");
+  const batch = writeBatch(db);
+
   for (const cId of comandasIds) {
     const comandaRef = doc(
       db,
@@ -314,8 +346,30 @@ export async function liberarMesaFirestore(
       "comandas_abertas",
       cId
     );
-    await updateDoc(comandaRef, { status: "pago" });
+    batch.update(comandaRef, { status: "pago" });
+
+    // Busca pedidos filhos para marcar como 'entregue' (ou arquivado) evitando órfãos no KDS
+    try {
+      const pedidosCol = collection(
+        db,
+        "restaurantes",
+        restauranteId,
+        "mesas",
+        String(mesaNumero),
+        "comandas_abertas",
+        cId,
+        "pedidos"
+      );
+      const snapPedidos = await getDocs(pedidosCol);
+      snapPedidos.forEach((pDoc) => {
+        batch.update(pDoc.ref, { status: "entregue" });
+      });
+    } catch (e) {
+      console.warn("Falha ao buscar pedidos da comanda para baixa em lote:", e);
+    }
   }
+
+  await batch.commit();
 }
 
 /**
@@ -367,6 +421,7 @@ export async function injetarTicketContingencia(
     clienteId: ticket.clienteId,
     nomeCliente: ticket.nomeCliente,
     mesa: ticket.mesa,
+    numeroMesa: Number(ticket.mesa) || ticket.mesa,
     itens: ticket.itens,
     subtotal: ticket.subtotal,
     status: "a_fazer" as const,
@@ -378,6 +433,7 @@ export async function injetarTicketContingencia(
     restauranteId,
     nomeCliente: ticket.nomeCliente,
     mesa: ticket.mesa,
+    numeroMesa: Number(ticket.mesa) || ticket.mesa,
     criadoEm: new Date(),
     atualizadoEm: new Date(),
     subtotal: ticket.subtotal,

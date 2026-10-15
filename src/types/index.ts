@@ -51,6 +51,7 @@ export interface PedidoRodada {
   clienteId: string;
   nomeCliente: string;
   mesa: number | string;
+  numeroMesa?: number | string;
   itens: ItemPedido[];
   subtotal: number;
   status: 'a_fazer' | 'pronto' | 'entregue';
@@ -64,6 +65,7 @@ export interface ComandaCliente {
   restauranteId?: string;
   nomeCliente: string; // Ex: "Marcus"
   mesa?: number | string;
+  numeroMesa?: number | string;
   criadoEm: Timestamp;
   atualizadoEm?: Timestamp;
   subtotal: number; // Soma acumulada de todos os pedidos/rodadas deste cliente
