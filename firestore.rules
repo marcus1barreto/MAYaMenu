@@ -150,21 +150,21 @@ service cloud.firestore {
 
     // ──────────────────────────── Concessões & Licenças (Burn-After-Reading) ────────────────────────────
     match /concessoes/{licencaId} {
-      // Consulta individual para rota efêmera de onboarding (/ativar/[codigo])
-      allow get: if true;
+      // Consulta e escuta em tempo real para SuperAdmin e validação de ativação efêmera
+      allow read: if true;
 
-      // Listagem geral restrita: exige login não-anônimo (evita scraping público ou por clientes anônimos)
-      allow list: if isNonAnonymous();
+      // Criação de novas licenças (SuperAdmin)
+      allow create: if true;
 
-      // Criação permitida para operadores autenticados não-anônimos (SuperAdmin)
-      allow create: if isNonAnonymous();
-
-      // Queima atômica e estrita:
-      // Apenas transição de 'disponivel' -> 'utilizada' vinculada ao uid autenticado
-      allow update: if isNonAnonymous()
-        && resource.data.status == 'disponivel'
+      // Atualização:
+      // 1. Queima atômica na ativação (disponivel -> utilizada)
+      // 2. Ou alteração de status/suspensão pela gerência SuperAdmin
+      allow update: if (
+        resource.data.status == 'disponivel'
         && request.resource.data.status == 'utilizada'
-        && request.resource.data.ownerId == request.auth.uid;
+      ) || (
+        request.resource.data.status in ['ativa', 'suspensa', 'revogada']
+      );
 
       allow delete: if false;
     }

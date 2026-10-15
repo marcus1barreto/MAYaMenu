@@ -38,19 +38,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Monitora estado do Auth
   useEffect(() => {
-    // 1. Verifica se há uma sessão simulada local (para testes sem credenciais do Firebase)
-    const sessaoSimulada = localStorage.getItem("mayamenu_mock_auth");
-    if (sessaoSimulada) {
-      setUser({
-        uid: "owner-demo-uid",
-        email: "admin@mayamenu.com",
-        isAnonymous: false,
-      } as unknown as User);
-      setRestaurante(RESTAURANTE_DEMO);
-      setCarregando(false);
-      return;
-    }
-
     const unsub = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
 
@@ -62,25 +49,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (snap.exists()) {
             setRestaurante({ id: snap.id, ...snap.data() } as Restaurante);
           } else {
-            const novoRestaurante: Restaurante = {
-              id: currentUser.uid,
-              ownerId: currentUser.uid,
-              slug: `rest-${currentUser.uid.slice(0, 6)}`,
-              nome: "Meu Restaurante",
-              configuracoes: {
-                corPrimaria: "#E11D48",
-                tema: "light",
-                capaUrl: "/images/capa-padrao.webp",
-              },
-            };
-            await setDoc(restRef, novoRestaurante);
-            setRestaurante(novoRestaurante);
+            // Se for login simulado demo
+            const sessaoSimulada = localStorage.getItem("mayamenu_mock_auth");
+            if (sessaoSimulada) {
+              setRestaurante(RESTAURANTE_DEMO);
+            } else {
+              // Carrega restaurante local criado offline se existir
+              const restLocalSalvo = localStorage.getItem(`mayamenu_rest_${currentUser.uid}`);
+              if (restLocalSalvo) {
+                setRestaurante(JSON.parse(restLocalSalvo));
+              } else {
+                setRestaurante(null);
+              }
+            }
           }
         } catch {
-          setRestaurante(RESTAURANTE_DEMO);
+          const restLocalSalvo = localStorage.getItem(`mayamenu_rest_${currentUser.uid}`);
+          if (restLocalSalvo) {
+            setRestaurante(JSON.parse(restLocalSalvo));
+          } else {
+            setRestaurante(null);
+          }
         }
       } else {
-        setRestaurante(null);
+        // Verifica se há sessão simulada puramente demo
+        const sessaoSimulada = localStorage.getItem("mayamenu_mock_auth");
+        if (sessaoSimulada) {
+          setUser({
+            uid: "owner-demo-uid",
+            email: "admin@mayamenu.com",
+            isAnonymous: false,
+          } as unknown as User);
+          setRestaurante(RESTAURANTE_DEMO);
+        } else {
+          setRestaurante(null);
+        }
       }
       setCarregando(false);
     });
@@ -91,10 +94,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (email: string, pass: string) => {
     setCarregando(true);
     try {
-      // Credencial de Teste Rápido / Demonstração
+      // Credencial explícita apenas para teste demonstrativo
       if (
         (email.trim().toLowerCase() === "admin@mayamenu.com" && pass === "123456") ||
-        (email.trim().toLowerCase() === "teste@mayamenu.com" && pass === "123456")
+        (email.trim().toLowerCase() === "demo@mayamenu.com" && pass === "123456")
       ) {
         localStorage.setItem("mayamenu_mock_auth", "true");
         setUser({
@@ -106,20 +109,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      await signInWithEmailAndPassword(auth, email, pass);
-    } catch {
-      // Se Firebase Auth não estiver conectado ao projeto real, permite teste com aviso
-      if (pass.length >= 6) {
-        localStorage.setItem("mayamenu_mock_auth", "true");
-        setUser({
-          uid: "owner-demo-uid",
-          email: email.trim().toLowerCase(),
-          isAnonymous: false,
-        } as unknown as User);
-        setRestaurante(RESTAURANTE_DEMO);
-        return;
+      // Limpa qualquer flag mock remanescente antes de autenticar conta real
+      localStorage.removeItem("mayamenu_mock_auth");
+      const cred = await signInWithEmailAndPassword(auth, email.trim(), pass);
+      const uid = cred.user.uid;
+
+      // Busca instância do restaurante do usuário
+      try {
+        const restRef = doc(db, "restaurantes", uid);
+        const snap = await getDoc(restRef);
+        if (snap.exists()) {
+          setRestaurante({ id: snap.id, ...snap.data() } as Restaurante);
+        }
+      } catch (err) {
+        console.warn("Consulta do restaurante falhou, checando cache local:", err);
       }
-      throw new Error("Credenciais inválidas. Use admin@mayamenu.com e senha 123456.");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Erro ao efetuar login";
+      throw new Error(msg);
     } finally {
       setCarregando(false);
     }
@@ -143,20 +150,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error(validacao.motivo || "Código de concessão inválido ou já utilizado.");
       }
 
+      // Limpa mock anterior para nunca misturar com o Demo
+      localStorage.removeItem("mayamenu_mock_auth");
+
       // 2. Cria usuário no Firebase Auth
       let uid: string;
       try {
-        const cred = await createUserWithEmailAndPassword(auth, email, pass);
+        const cred = await createUserWithEmailAndPassword(auth, email.trim(), pass);
         uid = cred.user.uid;
-      } catch (authErr) {
-        // Fallback para ambiente local/offline de simulação
-        uid = `owner-${Date.now().toString(36)}`;
-        localStorage.setItem("mayamenu_mock_auth", "true");
-        setUser({
-          uid,
-          email,
-          isAnonymous: false,
-        } as unknown as User);
+      } catch (authErr: unknown) {
+        console.warn("Falha no Firebase Auth:", authErr);
+        throw authErr;
       }
 
       const slugLimpo = slug.trim().toLowerCase();
@@ -169,6 +173,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         restauranteNome: nomeLimpo,
         slug: slugLimpo,
       });
+
+      // Salva referência do restaurante criado para resiliência local
+      localStorage.setItem(`mayamenu_rest_${uid}`, JSON.stringify(novoRest));
 
       // 4. Popula cardápio inicial de cortesia
       try {
