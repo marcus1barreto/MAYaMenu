@@ -12,6 +12,7 @@ import {
   salvarItemCardapio,
   excluirItemCardapio,
   popularCardapioInicialSeVazio,
+  atenderGarcomFirestore,
 } from "@/lib/restaurante-service";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,6 +38,7 @@ import {
   Check,
   Users,
   Clock,
+  Bell,
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
@@ -96,13 +98,20 @@ export function AdminDashboard() {
           const mesaAtual = mapa.get(numMesa) || { numero: numMesa, status: "livre", comandas: [] };
 
           if (c.status !== "pago") {
+            const garcomChamadoAtivo = Boolean(c.chamadoGarcom?.ativo);
+
             mesaAtual.comandas.push({
               id: c.id,
               nomeCliente: c.nomeCliente,
               subtotal: c.subtotal || 0,
               status: c.status,
               itens: [],
+              chamadoGarcom: c.chamadoGarcom,
             });
+
+            if (garcomChamadoAtivo) {
+              mesaAtual.chamandoGarcom = true;
+            }
 
             if (c.status === "conta_pedida") {
               mesaAtual.status = "conta_pedida";
@@ -185,6 +194,50 @@ export function AdminDashboard() {
         await liberarMesaFirestore(restaurante.id, mesaNumero, comandasIds);
       } catch (err) {
         console.warn("Falha ao liberar mesa no Firestore pelo Admin:", err);
+      }
+    }
+  };
+
+  const handleAtenderGarcom = async (mesaNumero: number, clienteId: string) => {
+    setMesas((prev) =>
+      prev.map((m) => {
+        if (m.numero === mesaNumero) {
+          const novasComandas = m.comandas.map((c) =>
+            c.id === clienteId && c.chamadoGarcom
+              ? { ...c, chamadoGarcom: { ...c.chamadoGarcom, ativo: false } }
+              : c
+          );
+          const aindaTemChamado = novasComandas.some((c) => c.chamadoGarcom?.ativo);
+          return {
+            ...m,
+            chamandoGarcom: aindaTemChamado,
+            comandas: novasComandas,
+          };
+        }
+        return m;
+      })
+    );
+
+    setMesaSelecionada((prev) => {
+      if (!prev || prev.numero !== mesaNumero) return prev;
+      const novasComandas = prev.comandas.map((c) =>
+        c.id === clienteId && c.chamadoGarcom
+          ? { ...c, chamadoGarcom: { ...c.chamadoGarcom, ativo: false } }
+          : c
+      );
+      const aindaTemChamado = novasComandas.some((c) => c.chamadoGarcom?.ativo);
+      return {
+        ...prev,
+        chamandoGarcom: aindaTemChamado,
+        comandas: novasComandas,
+      };
+    });
+
+    if (restaurante?.id) {
+      try {
+        await atenderGarcomFirestore(restaurante.id, mesaNumero, clienteId);
+      } catch (err) {
+        console.warn("Falha ao desarmar chamado no Firestore pelo Admin:", err);
       }
     }
   };
@@ -620,6 +673,7 @@ export function AdminDashboard() {
                   comandas: [],
                 };
 
+                const ehChamado = Boolean(mesa.chamandoGarcom);
                 const totalMesa = mesa.comandas.reduce((acc, c) => acc + c.subtotal, 0);
                 const qtdClientes = mesa.comandas.length;
 
@@ -629,7 +683,9 @@ export function AdminDashboard() {
                     type="button"
                     onClick={() => handleAbrirMesa(num)}
                     className={`p-4 rounded-2xl border text-left transition-all flex flex-col justify-between min-h-[140px] group relative overflow-hidden ${
-                      mesa.status === "conta_pedida"
+                      ehChamado
+                        ? "bg-amber-950/40 border-amber-400 ring-2 ring-amber-400/50 shadow-xl shadow-amber-950/60 animate-pulse"
+                        : mesa.status === "conta_pedida"
                         ? "bg-rose-950/40 border-rose-500/60 hover:border-rose-400 shadow-lg shadow-rose-950/50"
                         : mesa.status === "ocupada"
                         ? "bg-neutral-900 border-amber-500/40 hover:border-amber-400 shadow-md"
@@ -640,7 +696,9 @@ export function AdminDashboard() {
                     <div className="flex items-start justify-between w-full">
                       <div
                         className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-sm transition-transform group-hover:scale-105 ${
-                          mesa.status === "conta_pedida"
+                          ehChamado
+                            ? "bg-amber-400 text-neutral-950 font-black shadow-md shadow-amber-400/50 animate-bounce"
+                            : mesa.status === "conta_pedida"
                             ? "bg-rose-600 text-white shadow-md shadow-rose-600/40 animate-pulse"
                             : mesa.status === "ocupada"
                             ? "bg-amber-500 text-neutral-950 font-black shadow-md"
@@ -650,22 +708,31 @@ export function AdminDashboard() {
                         {num}
                       </div>
 
-                      <Badge
-                        variant="outline"
-                        className={`text-[9px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full ${
-                          mesa.status === "conta_pedida"
-                            ? "bg-rose-500/20 text-rose-300 border-rose-500/40"
+                      <div className="flex flex-col items-end gap-1">
+                        {ehChamado && (
+                          <Badge className="bg-amber-400 text-neutral-950 text-[9px] font-black uppercase tracking-wider px-2 py-0.5 flex items-center gap-1 shadow-md">
+                            <Bell className="w-2.5 h-2.5 fill-neutral-950" />
+                            Garçom!
+                          </Badge>
+                        )}
+
+                        <Badge
+                          variant="outline"
+                          className={`text-[9px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full ${
+                            mesa.status === "conta_pedida"
+                              ? "bg-rose-500/20 text-rose-300 border-rose-500/40"
+                              : mesa.status === "ocupada"
+                              ? "bg-amber-500/20 text-amber-300 border-amber-500/40"
+                              : "bg-neutral-800 text-neutral-500 border-neutral-700"
+                          }`}
+                        >
+                          {mesa.status === "conta_pedida"
+                            ? "Conta"
                             : mesa.status === "ocupada"
-                            ? "bg-amber-500/20 text-amber-300 border-amber-500/40"
-                            : "bg-neutral-800 text-neutral-500 border-neutral-700"
-                        }`}
-                      >
-                        {mesa.status === "conta_pedida"
-                          ? "Conta"
-                          : mesa.status === "ocupada"
-                          ? "Ocupada"
-                          : "Livre"}
-                      </Badge>
+                            ? "Ocupada"
+                            : "Livre"}
+                        </Badge>
+                      </div>
                     </div>
 
                     {/* Resumo da Mesa */}
@@ -815,6 +882,7 @@ export function AdminDashboard() {
         modoSomenteLeitura={true}
         onMarcarPago={handleMarcarComoPago}
         onLiberarMesa={handleLiberarMesa}
+        onAtenderGarcom={handleAtenderGarcom}
         onLancarItem={handleLancarItemManual}
       />
 

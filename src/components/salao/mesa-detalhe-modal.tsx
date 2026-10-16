@@ -28,6 +28,7 @@ import {
   X,
   CreditCard,
   Percent,
+  Bell,
 } from "lucide-react";
 import Link from "next/link";
 import { QRCodeSVG } from "qrcode.react";
@@ -40,6 +41,7 @@ interface MesaDetalheModalProps {
   modoSomenteLeitura?: boolean; // Se true, esconde ações operacionais (usado no Admin)
   onMarcarPago: (mesaNumero: number, clienteId: string) => void;
   onLiberarMesa: (mesaNumero: number) => void;
+  onAtenderGarcom?: (mesaNumero: number, clienteId: string) => void;
   onLancarItem: (
     mesaNumero: number,
     clienteNome: string,
@@ -59,6 +61,7 @@ export function MesaDetalheModal({
   modoSomenteLeitura = false,
   onMarcarPago,
   onLiberarMesa,
+  onAtenderGarcom,
   onLancarItem,
   onSalvarObservacao,
   observacaoInicial = "",
@@ -328,6 +331,26 @@ export function MesaDetalheModal({
                             </div>
                           ))}
                         </div>
+
+                        {/* Alerta de Chamado do Garçom */}
+                        {comanda.chamadoGarcom?.ativo && (
+                          <div className="mb-3 p-2 bg-amber-500/20 border border-amber-500/40 rounded-xl flex items-center justify-between text-xs text-amber-200">
+                            <div className="flex items-center gap-1.5 font-bold">
+                              <Bell className="w-3.5 h-3.5 text-amber-400 animate-bounce" />
+                              <span>Solicitou garçom na mesa</span>
+                            </div>
+                            {!modoSomenteLeitura && onAtenderGarcom && (
+                              <Button
+                                type="button"
+                                size="sm"
+                                onClick={() => onAtenderGarcom(mesa.numero, comanda.id)}
+                                className="h-7 px-2.5 text-[10px] font-bold bg-amber-500 hover:bg-amber-400 text-neutral-950 rounded-lg shadow-xs"
+                              >
+                                Marcar Atendido
+                              </Button>
+                            )}
+                          </div>
+                        )}
 
                         {/* Botão de Cobrança Individual */}
                         {!jaPago && !modoSomenteLeitura && (

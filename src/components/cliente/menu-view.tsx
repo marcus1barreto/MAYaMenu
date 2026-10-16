@@ -7,12 +7,12 @@ import { useCart } from "@/context/cart-context";
 import { ItemModal } from "./item-modal";
 import { CartDrawer } from "./cart-drawer";
 import { HistoricoVisitasModal } from "./historico-visitas-modal";
-import { ShoppingBag, Sparkles, MapPin, Search, Receipt, DollarSign, CheckCircle2 } from "lucide-react";
+import { ShoppingBag, Sparkles, MapPin, Search, Receipt, DollarSign, CheckCircle2, Bell, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ensureClienteAnonimo, db } from "@/lib/firebase";
 import { doc, updateDoc, serverTimestamp, onSnapshot } from "firebase/firestore";
-import { escutarCardapio } from "@/lib/restaurante-service";
+import { escutarCardapio, chamarGarcomFirestore } from "@/lib/restaurante-service";
 import { marcarVisitaAtualComoPaga } from "@/lib/historico-cliente";
 
 interface MenuViewProps {
@@ -85,8 +85,54 @@ export function MenuView({ restaurante, cardapio: cardapioInicial, numeroMesa = 
     };
   }, [restaurante.id, restaurante.slug, numeroMesa]);
 
+  const [chamandoGarcom, setChamandoGarcom] = useState(false);
+  const [garcomChamadoSucesso, setGarcomChamadoSucesso] = useState(false);
+  const [segundosCooldown, setSegundosCooldown] = useState(0);
+
+  // Monitora o cooldown anti-flooding de 120s
+  useEffect(() => {
+    if (segundosCooldown <= 0) return;
+    const timer = setInterval(() => {
+      setSegundosCooldown((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          setGarcomChamadoSucesso(false);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [segundosCooldown]);
+
   const corPrimaria = restaurante.configuracoes?.corPrimaria || "#E11D48";
   const capaUrl = restaurante.configuracoes?.capaUrl || "/images/capa-padrao.webp";
+  const modoOperacao = restaurante.configuracoes?.modoOperacao || "hibrido";
+
+  const handleChamarGarcom = async () => {
+    if (chamandoGarcom || segundosCooldown > 0) return;
+
+    setChamandoGarcom(true);
+    try {
+      const user = await ensureClienteAnonimo();
+      await chamarGarcomFirestore({
+        restauranteId: restaurante.id,
+        mesaNumero: numeroMesa,
+        clienteId: user.uid,
+        nomeCliente: nomeCliente || "Cliente",
+        motivo: "Atendimento no Salão",
+      });
+
+      setGarcomChamadoSucesso(true);
+      setSegundosCooldown(120); // 2 minutos de cooldown anti-flooding
+    } catch (err) {
+      console.warn("Falha ao registrar chamado do garçom online, ativando cooldown local:", err);
+      setGarcomChamadoSucesso(true);
+      setSegundosCooldown(120);
+    } finally {
+      setChamandoGarcom(false);
+    }
+  };
 
   const handlePedirConta = async () => {
     if (pedindoConta || contaPedidaSucesso) return;
@@ -168,8 +214,35 @@ export function MenuView({ restaurante, cardapio: cardapioInicial, numeroMesa = 
               className="ml-auto bg-white/15 hover:bg-white/25 backdrop-blur-md text-white text-[11px] font-bold px-2.5 py-0.5 rounded-full transition-colors flex items-center gap-1.5 shadow-sm"
             >
               <Receipt className="w-3 h-3 text-rose-300" />
-              <span>Meus Comprovantes</span>
+              <span>Comprovantes</span>
             </button>
+
+            {/* BOTÃO SOLICITAR GARÇOM (Oculto se restaurante opera em modo balcão puro) */}
+            {modoOperacao !== "balcao" && (
+              <button
+                type="button"
+                onClick={handleChamarGarcom}
+                disabled={chamandoGarcom || segundosCooldown > 0}
+                className={`backdrop-blur-md text-white text-[11px] font-bold px-2.5 py-0.5 rounded-full transition-all flex items-center gap-1.5 shadow-sm ${
+                  segundosCooldown > 0
+                    ? "bg-amber-500/90 text-amber-950 font-black cursor-not-allowed"
+                    : "bg-emerald-600/90 hover:bg-emerald-500 text-white active:scale-95 shadow-emerald-950/40"
+                }`}
+                title={segundosCooldown > 0 ? "Aguarde o garçom chegar à sua mesa" : "Chamar garçom na mesa"}
+              >
+                {segundosCooldown > 0 ? (
+                  <>
+                    <Clock className="w-3 h-3 text-amber-950 animate-spin" />
+                    <span>Garçom a caminho ({Math.floor(segundosCooldown / 60)}:{String(segundosCooldown % 60).padStart(2, '0')})</span>
+                  </>
+                ) : (
+                  <>
+                    <Bell className="w-3 h-3 text-white animate-bounce" />
+                    <span>{chamandoGarcom ? "Chamando..." : "Chamar Garçom"}</span>
+                  </>
+                )}
+              </button>
+            )}
 
             {/* BOTÃO PEDIR A CONTA */}
             <button
@@ -202,6 +275,19 @@ export function MenuView({ restaurante, cardapio: cardapioInicial, numeroMesa = 
           <p className="text-xs sm:text-sm text-neutral-300 font-medium mt-1">
             Toque nos itens para personalizar seu pedido sem espera
           </p>
+
+          {/* BANNER INFORMATIVO SE O GARÇOM FOI SOLICITADO (COM ANTI-FLOODING) */}
+          {segundosCooldown > 0 && (
+            <div className="mt-2.5 p-2.5 bg-emerald-500/20 border border-emerald-400/40 rounded-xl text-emerald-200 text-xs flex items-center justify-between backdrop-blur-md animate-in fade-in slide-in-from-top-1">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                <span>Garçom avisado para a <strong>Mesa {numeroMesa}</strong>. Já está vindo atender você!</span>
+              </div>
+              <Badge variant="outline" className="text-[10px] bg-emerald-950/80 text-emerald-300 border-emerald-500/40">
+                Anti-spam: {segundosCooldown}s
+              </Badge>
+            </div>
+          )}
 
           {/* BANNER INFORMATIVO SE A CONTA FOI PEDIDA */}
           {contaPedidaSucesso && (

@@ -16,6 +16,7 @@ import {
   Smartphone,
   ChevronRight,
   ExternalLink,
+  Bell,
 } from "lucide-react";
 import {
   Dialog,
@@ -29,6 +30,7 @@ import {
   marcarComandaPagaFirestore,
   liberarMesaFirestore,
   injetarTicketContingencia,
+  atenderGarcomFirestore,
 } from "@/lib/restaurante-service";
 
 export interface ComandaGarcom {
@@ -42,11 +44,17 @@ export interface ComandaGarcom {
     precoFinal: number;
     modificadores?: { grupo: string; opcao: string }[];
   }[];
+  chamadoGarcom?: {
+    ativo: boolean;
+    solicitadoEm?: any;
+    motivo?: string;
+  };
 }
 
 export interface MesaOperacional {
   numero: number;
   status: "livre" | "ocupada" | "conta_pedida";
+  chamandoGarcom?: boolean;
   comandas: ComandaGarcom[];
 }
 
@@ -177,13 +185,20 @@ export function GarcomView({
           const mesaAtual = mapa.get(numMesa) || { numero: numMesa, status: "livre", comandas: [] };
 
           if (c.status !== "pago") {
+            const garcomChamadoAtivo = Boolean(c.chamadoGarcom?.ativo);
+
             mesaAtual.comandas.push({
               id: c.id,
               nomeCliente: c.nomeCliente,
               subtotal: c.subtotal || 0,
               status: c.status,
               itens: [],
+              chamadoGarcom: c.chamadoGarcom,
             });
+
+            if (garcomChamadoAtivo) {
+              mesaAtual.chamandoGarcom = true;
+            }
 
             if (c.status === "conta_pedida") {
               mesaAtual.status = "conta_pedida";
@@ -200,6 +215,52 @@ export function GarcomView({
 
     return () => unsub();
   }, [restauranteId]);
+
+  // Atender chamado do garçom
+  const handleAtenderGarcom = async (mesaNumero: number, clienteId: string) => {
+    // Atualização otimista local
+    setMesas((prev) =>
+      prev.map((m) => {
+        if (m.numero === mesaNumero) {
+          const novasComandas = m.comandas.map((c) =>
+            c.id === clienteId && c.chamadoGarcom
+              ? { ...c, chamadoGarcom: { ...c.chamadoGarcom, ativo: false } }
+              : c
+          );
+          const aindaTemChamado = novasComandas.some((c) => c.chamadoGarcom?.ativo);
+          return {
+            ...m,
+            chamandoGarcom: aindaTemChamado,
+            comandas: novasComandas,
+          };
+        }
+        return m;
+      })
+    );
+
+    setMesaSelecionada((prev) => {
+      if (!prev || prev.numero !== mesaNumero) return prev;
+      const novasComandas = prev.comandas.map((c) =>
+        c.id === clienteId && c.chamadoGarcom
+          ? { ...c, chamadoGarcom: { ...c.chamadoGarcom, ativo: false } }
+          : c
+      );
+      const aindaTemChamado = novasComandas.some((c) => c.chamadoGarcom?.ativo);
+      return {
+        ...prev,
+        chamandoGarcom: aindaTemChamado,
+        comandas: novasComandas,
+      };
+    });
+
+    if (restauranteId) {
+      try {
+        await atenderGarcomFirestore(restauranteId, mesaNumero, clienteId);
+      } catch (err) {
+        console.warn("Falha ao desarmar chamado do garçom no Firestore:", err);
+      }
+    }
+  };
 
   // Fechar/Marcar Comanda Individual como Paga (exclusivo do lojista/garçom)
   const handleMarcarComoPago = async (mesaNumero: number, clienteId: string) => {
@@ -376,6 +437,7 @@ export function GarcomView({
       <main className="flex-1 mt-6">
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
           {mesas.map((m) => {
+            const ehChamado = Boolean(m.chamandoGarcom);
             const ehConta = m.status === "conta_pedida";
             const ehOcupada = m.status === "ocupada";
             const totalMesa = m.comandas.reduce((acc, c) => acc + c.subtotal, 0);
@@ -387,7 +449,9 @@ export function GarcomView({
                 onClick={() => m.comandas.length > 0 && setMesaSelecionada(m)}
                 disabled={m.status === "livre"}
                 className={`p-5 rounded-3xl border-2 text-left transition-all relative overflow-hidden flex flex-col justify-between h-40 ${
-                  ehConta
+                  ehChamado
+                    ? "bg-amber-950/30 border-amber-400 ring-2 ring-amber-400/50 shadow-xl shadow-amber-950/50 active:scale-95 animate-pulse"
+                    : ehConta
                     ? "bg-rose-950/20 border-rose-500 shadow-lg shadow-rose-950/40 active:scale-95"
                     : ehOcupada
                     ? "bg-neutral-900 border-amber-500/60 hover:border-amber-500 active:scale-95"
@@ -397,7 +461,9 @@ export function GarcomView({
                 <div className="flex items-start justify-between">
                   <div
                     className={`w-10 h-10 rounded-2xl flex items-center justify-center font-black text-lg ${
-                      ehConta
+                      ehChamado
+                        ? "bg-amber-400 text-neutral-950 animate-bounce"
+                        : ehConta
                         ? "bg-rose-600 text-white"
                         : ehOcupada
                         ? "bg-amber-500 text-neutral-950"
@@ -407,11 +473,20 @@ export function GarcomView({
                     {m.numero}
                   </div>
 
-                  {ehConta && (
-                    <Badge className="bg-rose-600 text-white text-[10px] font-black uppercase tracking-wider px-2 py-0.5">
-                      Pediu Conta
-                    </Badge>
-                  )}
+                  <div className="flex flex-col items-end gap-1">
+                    {ehChamado && (
+                      <Badge className="bg-amber-400 text-neutral-950 text-[10px] font-black uppercase tracking-wider px-2 py-0.5 flex items-center gap-1 shadow-md">
+                        <Bell className="w-3 h-3 fill-neutral-950" />
+                        Garçom!
+                      </Badge>
+                    )}
+
+                    {ehConta && !ehChamado && (
+                      <Badge className="bg-rose-600 text-white text-[10px] font-black uppercase tracking-wider px-2 py-0.5">
+                        Pediu Conta
+                      </Badge>
+                    )}
+                  </div>
                 </div>
 
                 <div>
@@ -448,6 +523,7 @@ export function GarcomView({
         slug={slug}
         onMarcarPago={handleMarcarComoPago}
         onLiberarMesa={handleLiberarMesa}
+        onAtenderGarcom={handleAtenderGarcom}
         onLancarItem={(num, nome, item, qtd) => {
           const valor = item.precoBase * qtd;
           setMesas((prev) =>

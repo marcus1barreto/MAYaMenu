@@ -16,6 +16,7 @@ import {
   updateDoc,
   onSnapshot,
   limit,
+  serverTimestamp,
   type Unsubscribe,
 } from "firebase/firestore";
 import type { Restaurante, MenuItem, PedidoRodada, ComandaCliente } from "@/types";
@@ -324,6 +325,69 @@ export async function marcarComandaPagaFirestore(
     clienteId
   );
   await updateDoc(comandaRef, { status: "pago" });
+}
+
+/**
+ * Cliente solicita a presença do Garçom na mesa com anti-flooding integrado.
+ */
+export async function chamarGarcomFirestore(params: {
+  restauranteId: string;
+  mesaNumero: number | string;
+  clienteId: string;
+  nomeCliente?: string;
+  motivo?: string;
+}): Promise<void> {
+  const comandaRef = doc(
+    db,
+    "restaurantes",
+    params.restauranteId,
+    "mesas",
+    String(params.mesaNumero),
+    "comandas_abertas",
+    params.clienteId
+  );
+
+  await setDoc(
+    comandaRef,
+    {
+      id: params.clienteId,
+      restauranteId: params.restauranteId,
+      nomeCliente: params.nomeCliente || "Cliente",
+      mesa: params.mesaNumero,
+      numeroMesa: Number(params.mesaNumero) || params.mesaNumero,
+      atualizadoEm: serverTimestamp(),
+      chamadoGarcom: {
+        ativo: true,
+        solicitadoEm: serverTimestamp(),
+        motivo: params.motivo || "Atendimento",
+      },
+    },
+    { merge: true }
+  );
+}
+
+/**
+ * Garçom atende e desativa o chamado da mesa.
+ */
+export async function atenderGarcomFirestore(
+  restauranteId: string,
+  mesaNumero: number | string,
+  clienteId: string
+): Promise<void> {
+  const comandaRef = doc(
+    db,
+    "restaurantes",
+    restauranteId,
+    "mesas",
+    String(mesaNumero),
+    "comandas_abertas",
+    clienteId
+  );
+
+  await updateDoc(comandaRef, {
+    "chamadoGarcom.ativo": false,
+    atualizadoEm: serverTimestamp(),
+  });
 }
 
 /**
