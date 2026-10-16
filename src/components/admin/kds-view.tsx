@@ -98,10 +98,12 @@ export const PEDIDOS_INICIAIS_KDS: PedidoKDS[] = [
 
 export function KdsView({
   restauranteId,
+  slug,
   nomeRestaurante = "MAYaMenu",
   isSandbox = false,
 }: {
   restauranteId?: string;
+  slug?: string;
   nomeRestaurante?: string;
   isSandbox?: boolean;
 }) {
@@ -110,34 +112,38 @@ export function KdsView({
 
   // Conecta ao Firestore em tempo real
   useEffect(() => {
-    if (!restauranteId) return;
+    if (!restauranteId && !slug) return;
 
-    const unsub = escutarPedidosKds(restauranteId, (rodadas) => {
-      const convertidos: PedidoKDS[] = rodadas.map((r) => {
-        let horarioFormatado = "Agora";
-        if (r.criadoEm?.toDate) {
-          horarioFormatado = r.criadoEm.toDate().toLocaleTimeString("pt-BR", {
-            hour: "2-digit",
-            minute: "2-digit",
-          });
-        }
-        return {
-          id: r.id,
-          refPath: r.refPath,
-          mesa: r.mesa,
-          clienteId: r.clienteId,
-          nomeCliente: r.nomeCliente,
-          horario: horarioFormatado,
-          subtotal: r.subtotal,
-          status: r.status,
-          itens: r.itens,
-        };
-      });
-      setPedidos(convertidos);
-    });
+    const unsub = escutarPedidosKds(
+      restauranteId || slug!,
+      (rodadas) => {
+        const convertidos: PedidoKDS[] = rodadas.map((r) => {
+          let horarioFormatado = "Agora";
+          if (r.criadoEm?.toDate) {
+            horarioFormatado = r.criadoEm.toDate().toLocaleTimeString("pt-BR", {
+              hour: "2-digit",
+              minute: "2-digit",
+            });
+          }
+          return {
+            id: r.id,
+            refPath: r.refPath,
+            mesa: r.mesa,
+            clienteId: r.clienteId,
+            nomeCliente: r.nomeCliente,
+            horario: horarioFormatado,
+            subtotal: r.subtotal,
+            status: r.status,
+            itens: r.itens,
+          };
+        });
+        setPedidos(convertidos);
+      },
+      slug
+    );
 
     return () => unsub();
-  }, [restauranteId]);
+  }, [restauranteId, slug]);
 
   // Ação essencial da cozinha: "MARCHAR" (Muda de A Fazer -> Pronto)
   const handleMarchar = async (id: string) => {

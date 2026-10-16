@@ -12,6 +12,7 @@ export const RESTAURANTE_DEMO: Restaurante = {
     corPrimaria: "#E11D48", // Rose-600 vibrante e elegante
     tema: "light",
     capaUrl: "/images/capa-padrao.webp",
+    modoOperacao: "hibrido",
   },
 };
 

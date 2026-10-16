@@ -83,14 +83,19 @@ export function MesaDetalheModal({
   const [pedidosMesa, setPedidosMesa] = useState<any[]>([]);
 
   useEffect(() => {
-    if (!isOpen || !mesa || !restauranteId) return;
+    if (!isOpen || !mesa || (!restauranteId && !slug)) return;
 
-    const unsub = escutarPedidosMesa(restauranteId, mesa.numero, (lista) => {
-      setPedidosMesa(lista);
-    });
+    const unsub = escutarPedidosMesa(
+      restauranteId || slug!,
+      mesa.numero,
+      (lista) => {
+        setPedidosMesa(lista);
+      },
+      slug
+    );
 
     return () => unsub();
-  }, [isOpen, mesa?.numero, restauranteId]);
+  }, [isOpen, mesa?.numero, restauranteId, slug]);
 
   if (!mesa) return null;
 
@@ -146,7 +151,7 @@ export function MesaDetalheModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="w-[95vw] max-w-4xl max-h-[92vh] bg-neutral-900 border-neutral-800 text-white p-0 flex flex-col rounded-3xl overflow-hidden shadow-2xl">
+      <DialogContent className="w-[95vw] sm:max-w-4xl max-h-[92vh] bg-neutral-900 border-neutral-800 text-white p-0 flex flex-col rounded-3xl overflow-hidden shadow-2xl">
         {/* HEADER DA MESA */}
         <DialogHeader className="p-5 sm:p-6 bg-neutral-950 border-b border-neutral-800 flex flex-col gap-3">
           <div className="flex flex-wrap items-center justify-between gap-3">

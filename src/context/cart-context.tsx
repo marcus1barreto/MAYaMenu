@@ -58,15 +58,21 @@ export function CartProvider({
           const ultimoNome = obterUltimoNomeCliente();
           if (ultimoNome) setNomeClienteState(ultimoNome);
         }
-        if (parsed.mesa) setMesaState(parsed.mesa);
+        // Se a URL do QR Code forneceu uma mesa explícita, respeita a mesa escaneada
+        if (mesaInicial) {
+          setMesaState(mesaInicial);
+        } else if (parsed.mesa) {
+          setMesaState(parsed.mesa);
+        }
       } else {
+        if (mesaInicial) setMesaState(mesaInicial);
         const ultimoNome = obterUltimoNomeCliente();
         if (ultimoNome) setNomeClienteState(ultimoNome);
       }
     } catch {
       // Ignora erro de storage
     }
-  }, [slug]);
+  }, [slug, mesaInicial]);
 
   // Salva no localStorage quando mudar
   useEffect(() => {

@@ -192,17 +192,18 @@ export function MenuView({ restaurante, cardapio: cardapioInicial, numeroMesa = 
         <div className="absolute inset-0 bg-gradient-to-t from-neutral-950/95 via-neutral-950/40 to-transparent" />
 
         <div className="absolute bottom-0 left-0 right-0 p-5 sm:p-8 max-w-3xl mx-auto flex flex-col justify-end">
-          <div className="flex items-center gap-2 mb-2">
+          {/* LINHA DE STATUS E AÇÕES RÁPIDAS DA MESA */}
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mb-2">
             <Badge
               variant="outline"
-              className="bg-white/10 backdrop-blur-md text-white border-white/20 text-[11px] font-bold px-2.5 py-0.5 rounded-full"
+              className="bg-white/10 backdrop-blur-md text-white border-white/20 text-[11px] font-bold px-2.5 py-1 rounded-full shrink-0"
             >
               <MapPin className="w-3 h-3 mr-1 text-emerald-400" />
               Mesa {numeroMesa}
             </Badge>
             <Badge
               variant="outline"
-              className="bg-white/10 backdrop-blur-md text-white border-white/20 text-[11px] font-semibold px-2 py-0.5 rounded-full"
+              className="hidden xs:inline-flex bg-white/10 backdrop-blur-md text-white border-white/20 text-[11px] font-semibold px-2 py-1 rounded-full shrink-0"
             >
               Cardápio Digital PWA
             </Badge>
@@ -211,22 +212,22 @@ export function MenuView({ restaurante, cardapio: cardapioInicial, numeroMesa = 
             <button
               type="button"
               onClick={() => setHistoricoAberto(true)}
-              className="ml-auto bg-white/15 hover:bg-white/25 backdrop-blur-md text-white text-[11px] font-bold px-2.5 py-0.5 rounded-full transition-colors flex items-center gap-1.5 shadow-sm"
+              className="bg-white/15 hover:bg-white/25 backdrop-blur-md text-white text-[11px] font-bold px-2.5 py-1 rounded-full transition-colors flex items-center gap-1.5 shadow-sm shrink-0"
             >
               <Receipt className="w-3 h-3 text-rose-300" />
               <span>Comprovantes</span>
             </button>
 
-            {/* BOTÃO SOLICITAR GARÇOM (Oculto se restaurante opera em modo balcão puro) */}
+            {/* BOTÃO SOLICITAR GARÇOM (Oculto somente se configurado explicitamente como balcao) */}
             {modoOperacao !== "balcao" && (
               <button
                 type="button"
                 onClick={handleChamarGarcom}
                 disabled={chamandoGarcom || segundosCooldown > 0}
-                className={`backdrop-blur-md text-white text-[11px] font-bold px-2.5 py-0.5 rounded-full transition-all flex items-center gap-1.5 shadow-sm ${
+                className={`backdrop-blur-md text-white text-[11px] font-bold px-3 py-1 rounded-full transition-all flex items-center gap-1.5 shadow-md shrink-0 ${
                   segundosCooldown > 0
                     ? "bg-amber-500/90 text-amber-950 font-black cursor-not-allowed"
-                    : "bg-emerald-600/90 hover:bg-emerald-500 text-white active:scale-95 shadow-emerald-950/40"
+                    : "bg-emerald-600 hover:bg-emerald-500 text-white active:scale-95 shadow-emerald-950/40"
                 }`}
                 title={segundosCooldown > 0 ? "Aguarde o garçom chegar à sua mesa" : "Chamar garçom na mesa"}
               >
@@ -249,7 +250,7 @@ export function MenuView({ restaurante, cardapio: cardapioInicial, numeroMesa = 
               type="button"
               onClick={handlePedirConta}
               disabled={pedindoConta || contaPedidaSucesso}
-              className={`backdrop-blur-md text-white text-[11px] font-bold px-2.5 py-0.5 rounded-full transition-colors flex items-center gap-1.5 shadow-sm ${
+              className={`backdrop-blur-md text-white text-[11px] font-bold px-2.5 py-1 rounded-full transition-colors flex items-center gap-1.5 shadow-sm shrink-0 ${
                 contaPedidaSucesso
                   ? "bg-amber-500/80 text-amber-950 font-black"
                   : "bg-rose-600/80 hover:bg-rose-600"

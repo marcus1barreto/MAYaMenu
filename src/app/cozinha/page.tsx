@@ -36,6 +36,7 @@ function CozinhaPageContent() {
     <PinLockGuard role="cozinha">
       <KdsView
         restauranteId={restaurante?.id}
+        slug={restaurante?.slug}
         nomeRestaurante={restaurante?.nome || "MAYaMenu"}
       />
     </PinLockGuard>

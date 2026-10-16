@@ -84,50 +84,54 @@ export function AdminDashboard() {
 
   // Escuta comandas reais do restaurante no Firestore para o Salão do Admin
   useEffect(() => {
-    if (!restaurante?.id) return;
+    if (!restaurante?.id && !restaurante?.slug) return;
 
-    const unsub = escutarComandasSalão(restaurante.id, (comandasFirestore) => {
-      setMesas(() => {
-        const mapa = new Map<number, MesaOperacional>();
-        for (let i = 1; i <= 12; i++) {
-          mapa.set(i, { numero: i, status: "livre", comandas: [] });
-        }
-
-        for (const c of comandasFirestore) {
-          const numMesa = Number(c.mesa) || 1;
-          const mesaAtual = mapa.get(numMesa) || { numero: numMesa, status: "livre", comandas: [] };
-
-          if (c.status !== "pago") {
-            const garcomChamadoAtivo = Boolean(c.chamadoGarcom?.ativo);
-
-            mesaAtual.comandas.push({
-              id: c.id,
-              nomeCliente: c.nomeCliente,
-              subtotal: c.subtotal || 0,
-              status: c.status,
-              itens: [],
-              chamadoGarcom: c.chamadoGarcom,
-            });
-
-            if (garcomChamadoAtivo) {
-              mesaAtual.chamandoGarcom = true;
-            }
-
-            if (c.status === "conta_pedida") {
-              mesaAtual.status = "conta_pedida";
-            } else if (mesaAtual.status !== "conta_pedida") {
-              mesaAtual.status = "ocupada";
-            }
+    const unsub = escutarComandasSalão(
+      restaurante?.id || restaurante?.slug!,
+      (comandasFirestore) => {
+        setMesas(() => {
+          const mapa = new Map<number, MesaOperacional>();
+          for (let i = 1; i <= 12; i++) {
+            mapa.set(i, { numero: i, status: "livre", comandas: [] });
           }
-          mapa.set(numMesa, mesaAtual);
-        }
 
-        return Array.from(mapa.values());
-      });
-    });
+          for (const c of comandasFirestore) {
+            const numMesa = Number(c.mesa) || 1;
+            const mesaAtual = mapa.get(numMesa) || { numero: numMesa, status: "livre", comandas: [] };
+
+            if (c.status !== "pago") {
+              const garcomChamadoAtivo = Boolean(c.chamadoGarcom?.ativo);
+
+              mesaAtual.comandas.push({
+                id: c.id,
+                nomeCliente: c.nomeCliente,
+                subtotal: c.subtotal || 0,
+                status: c.status,
+                itens: [],
+                chamadoGarcom: c.chamadoGarcom,
+              });
+
+              if (garcomChamadoAtivo) {
+                mesaAtual.chamandoGarcom = true;
+              }
+
+              if (c.status === "conta_pedida") {
+                mesaAtual.status = "conta_pedida";
+              } else if (mesaAtual.status !== "conta_pedida") {
+                mesaAtual.status = "ocupada";
+              }
+            }
+            mapa.set(numMesa, mesaAtual);
+          }
+
+          return Array.from(mapa.values());
+        });
+      },
+      restaurante?.slug
+    );
 
     return () => unsub();
-  }, [restaurante?.id]);
+  }, [restaurante?.id, restaurante?.slug]);
 
   const handleAbrirMesa = (num: number) => {
     const mesaEncontrada = mesas.find((m) => m.numero === num) || {

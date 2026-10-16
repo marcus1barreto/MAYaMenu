@@ -224,17 +224,20 @@ export async function popularCardapioInicialSeVazio(restauranteId: string): Prom
 
 /**
  * Escuta os pedidos/rodadas de cozinha em tempo real usando collectionGroup("pedidos").
- * O KDS filtra os pratos pelo restaurante logado.
+ * O KDS filtra os pratos pelo restaurante logado (por UID ou por Slug).
  */
 export function escutarPedidosKds(
-  restauranteId: string,
-  onAtualizacao: (pedidos: (PedidoRodada & { refPath: string })[]) => void
+  restauranteIdOuSlug: string,
+  onAtualizacao: (pedidos: (PedidoRodada & { refPath: string })[]) => void,
+  slugAlternativo?: string
 ): Unsubscribe {
-  // Query na collection group 'pedidos' filtrada pelo restauranteId
-  const q = query(
-    collectionGroup(db, "pedidos"),
-    where("restauranteId", "==", restauranteId)
+  const idsParaBuscar = Array.from(
+    new Set([restauranteIdOuSlug, slugAlternativo].filter(Boolean) as string[])
   );
+
+  const q = idsParaBuscar.length > 1
+    ? query(collectionGroup(db, "pedidos"), where("restauranteId", "in", idsParaBuscar))
+    : query(collectionGroup(db, "pedidos"), where("restauranteId", "==", idsParaBuscar[0]));
 
   return onSnapshot(
     q,
@@ -279,13 +282,17 @@ export async function atualizarStatusPedido(
  * Escuta as comandas abertas de todas as mesas de um restaurante via collectionGroup.
  */
 export function escutarComandasSalão(
-  restauranteId: string,
-  onAtualizacao: (comandas: (ComandaCliente & { refPath: string })[]) => void
+  restauranteIdOuSlug: string,
+  onAtualizacao: (comandas: (ComandaCliente & { refPath: string })[]) => void,
+  slugAlternativo?: string
 ): Unsubscribe {
-  const q = query(
-    collectionGroup(db, "comandas_abertas"),
-    where("restauranteId", "==", restauranteId)
+  const idsParaBuscar = Array.from(
+    new Set([restauranteIdOuSlug, slugAlternativo].filter(Boolean) as string[])
   );
+
+  const q = idsParaBuscar.length > 1
+    ? query(collectionGroup(db, "comandas_abertas"), where("restauranteId", "in", idsParaBuscar))
+    : query(collectionGroup(db, "comandas_abertas"), where("restauranteId", "==", idsParaBuscar[0]));
 
   return onSnapshot(
     q,
@@ -311,16 +318,27 @@ export function escutarComandasSalão(
  * Escuta os pedidos/rodadas de uma mesa específica em tempo real para exibir os pratos nas comandas.
  */
 export function escutarPedidosMesa(
-  restauranteId: string,
+  restauranteIdOuSlug: string,
   mesaNumero: number | string,
-  onAtualizacao: (pedidos: PedidoRodada[]) => void
+  onAtualizacao: (pedidos: PedidoRodada[]) => void,
+  slugAlternativo?: string
 ): Unsubscribe {
   const numMesa = Number(mesaNumero) || mesaNumero;
-  const q = query(
-    collectionGroup(db, "pedidos"),
-    where("restauranteId", "==", restauranteId),
-    where("numeroMesa", "==", numMesa)
+  const idsParaBuscar = Array.from(
+    new Set([restauranteIdOuSlug, slugAlternativo].filter(Boolean) as string[])
   );
+
+  const q = idsParaBuscar.length > 1
+    ? query(
+        collectionGroup(db, "pedidos"),
+        where("restauranteId", "in", idsParaBuscar),
+        where("numeroMesa", "==", numMesa)
+      )
+    : query(
+        collectionGroup(db, "pedidos"),
+        where("restauranteId", "==", idsParaBuscar[0]),
+        where("numeroMesa", "==", numMesa)
+      );
 
   return onSnapshot(
     q,
