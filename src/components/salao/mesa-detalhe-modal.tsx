@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import type { MesaOperacional, ComandaGarcom } from "@/components/garcom/garcom-view";
 import type { MenuItem } from "@/types";
 import { CARDAPIO_DEMO } from "@/lib/mock-data";
+import { escutarPedidosMesa } from "@/lib/restaurante-service";
 import {
   Dialog,
   DialogContent,
@@ -38,6 +39,7 @@ interface MesaDetalheModalProps {
   isOpen: boolean;
   onClose: () => void;
   slug: string;
+  restauranteId?: string;
   modoSomenteLeitura?: boolean; // Se true, esconde ações operacionais (usado no Admin)
   onMarcarPago: (mesaNumero: number, clienteId: string) => void;
   onLiberarMesa: (mesaNumero: number) => void;
@@ -58,6 +60,7 @@ export function MesaDetalheModal({
   isOpen,
   onClose,
   slug,
+  restauranteId,
   modoSomenteLeitura = false,
   onMarcarPago,
   onLiberarMesa,
@@ -76,16 +79,57 @@ export function MesaDetalheModal({
   const [quantidade, setQuantidade] = useState(1);
   const [obsItem, setObsItem] = useState("");
 
+  // Escuta os pedidos/pratos reais da mesa no Firestore quando o modal está aberto
+  const [pedidosMesa, setPedidosMesa] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!isOpen || !mesa || !restauranteId) return;
+
+    const unsub = escutarPedidosMesa(restauranteId, mesa.numero, (lista) => {
+      setPedidosMesa(lista);
+    });
+
+    return () => unsub();
+  }, [isOpen, mesa?.numero, restauranteId]);
+
   if (!mesa) return null;
 
-  const totalMesa = mesa.comandas.reduce((acc, c) => acc + c.subtotal, 0);
+  // Mescla itens dos pedidos reais nas comandas correspondentes
+  const comandasComItens = mesa.comandas.map((c) => {
+    if (c.itens && c.itens.length > 0) return c; // Já possui itens lançados
+
+    const pedidosDesteCliente = pedidosMesa.filter(
+      (p) => p.clienteId === c.id || p.nomeCliente?.toLowerCase() === c.nomeCliente?.toLowerCase()
+    );
+
+    const todosItens: typeof c.itens = [];
+    pedidosDesteCliente.forEach((p) => {
+      if (Array.isArray(p.itens)) {
+        p.itens.forEach((it: any) => {
+          todosItens.push({
+            nome: it.nome,
+            quantidade: it.quantidade || 1,
+            precoFinal: it.precoFinal || 0,
+            modificadores: it.modificadores || [],
+          });
+        });
+      }
+    });
+
+    return {
+      ...c,
+      itens: todosItens,
+    };
+  });
+
+  const totalMesa = comandasComItens.reduce((acc, c) => acc + c.subtotal, 0);
   const taxaServico = taxaServicoAtiva ? totalMesa * 0.1 : 0;
   const totalComTaxa = totalMesa + taxaServico;
-  const totalPessoas = mesa.comandas.length;
+  const totalPessoas = comandasComItens.length;
   const rateioIgualitario = totalPessoas > 0 ? totalComTaxa / totalPessoas : 0;
 
   const todasPagas =
-    mesa.comandas.length > 0 && mesa.comandas.every((c) => c.status === "pago");
+    comandasComItens.length > 0 && comandasComItens.every((c) => c.status === "pago");
 
   const urlMesa = `/r/${slug}?mesa=${mesa.numero}`;
   const urlCompleta = typeof window !== "undefined" ? `${window.location.origin}${urlMesa}` : urlMesa;
@@ -102,13 +146,13 @@ export function MesaDetalheModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-3xl max-h-[90vh] bg-neutral-900 border-neutral-800 text-white p-0 flex flex-col rounded-3xl overflow-hidden shadow-2xl">
+      <DialogContent className="w-[95vw] max-w-4xl max-h-[92vh] bg-neutral-900 border-neutral-800 text-white p-0 flex flex-col rounded-3xl overflow-hidden shadow-2xl">
         {/* HEADER DA MESA */}
-        <DialogHeader className="p-5 sm:p-6 bg-neutral-950 border-b border-neutral-800 flex flex-col gap-2">
+        <DialogHeader className="p-5 sm:p-6 bg-neutral-950 border-b border-neutral-800 flex flex-col gap-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <div
-                className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-xl shadow-lg ${
+                className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-xl shadow-lg shrink-0 ${
                   mesa.status === "conta_pedida"
                     ? "bg-rose-600 text-white animate-pulse"
                     : mesa.status === "ocupada"
@@ -138,7 +182,7 @@ export function MesaDetalheModal({
                       : "Livre"}
                   </Badge>
                 </DialogTitle>
-                <DialogDescription className="text-xs text-neutral-400 mt-0.5 flex items-center gap-3">
+                <DialogDescription className="text-xs text-neutral-400 mt-0.5 flex flex-wrap items-center gap-3">
                   <span className="flex items-center gap-1">
                     <Users className="w-3.5 h-3.5 text-neutral-500" />
                     {totalPessoas} {totalPessoas === 1 ? "pagante" : "pagantes"}
@@ -152,7 +196,7 @@ export function MesaDetalheModal({
             </div>
 
             {/* TOTAL GERAL DA MESA */}
-            <div className="text-right">
+            <div className="text-right ml-auto">
               <span className="text-[10px] uppercase font-bold text-neutral-400 block tracking-wider">
                 Total da Mesa
               </span>
@@ -163,7 +207,7 @@ export function MesaDetalheModal({
           </div>
 
           {/* ABAS INTERNAS */}
-          <div className="flex items-center gap-2 mt-4 pt-2 border-t border-neutral-800/80">
+          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-neutral-800/80">
             <button
               type="button"
               onClick={() => setAbaInterna("comandas")}
@@ -208,29 +252,29 @@ export function MesaDetalheModal({
         </DialogHeader>
 
         {/* CORPO DO MODAL */}
-        <div className="flex-1 p-5 sm:p-6 overflow-y-auto space-y-6">
+        <div className="flex-1 p-4 sm:p-6 overflow-y-auto overflow-x-hidden space-y-6">
           {/* 1. ABA DE COMANDAS E RATEIO */}
           {abaInterna === "comandas" && (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-5">
               {/* LISTA DE COMANDAS DOS CLIENTES NA MESA */}
-              <div className="lg:col-span-2 space-y-4">
+              <div className="md:col-span-7 space-y-4">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-bold uppercase tracking-wider text-neutral-300">
-                    Comandas Individuais (Anti-Concorrência)
+                  <h3 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-neutral-300">
+                    Comandas na Mesa
                   </h3>
                   <span className="text-xs text-neutral-500 font-medium">
-                    Rateio automatizado por pessoa
+                    Rateio individual por pessoa
                   </span>
                 </div>
 
-                {mesa.comandas.length === 0 ? (
+                {comandasComItens.length === 0 ? (
                   <div className="p-8 text-center bg-neutral-950/60 rounded-2xl border border-dashed border-neutral-800">
                     <Coffee className="w-10 h-10 text-neutral-600 mx-auto mb-2" />
                     <p className="text-sm font-bold text-neutral-300">Nenhum pedido nesta mesa ainda</p>
                     <p className="text-xs text-neutral-500 mt-1">
                       A mesa está livre. O cliente pode escanear o QR Code ou você pode lançar itens manualmente.
                     </p>
-                    <div className="mt-4 flex justify-center gap-3">
+                    <div className="mt-4 flex flex-wrap justify-center gap-3">
                       <Button
                         type="button"
                         onClick={() => setAbaInterna("lancar")}
@@ -251,7 +295,7 @@ export function MesaDetalheModal({
                     </div>
                   </div>
                 ) : (
-                  mesa.comandas.map((comanda) => {
+                  comandasComItens.map((comanda) => {
                     const jaPago = comanda.status === "pago";
 
                     return (
@@ -377,36 +421,34 @@ export function MesaDetalheModal({
               </div>
 
               {/* CARD DE RATEIO & FECHAMENTO DA CONTA */}
-              <div className="space-y-4">
-                <div className="p-5 rounded-2xl bg-neutral-950 border border-neutral-800 space-y-4">
+              <div className="md:col-span-5 space-y-4">
+                <div className="p-4 sm:p-5 rounded-2xl bg-neutral-950 border border-neutral-800 space-y-4">
                   <h3 className="text-xs font-bold uppercase tracking-wider text-neutral-400 flex items-center gap-2">
-                    <CreditCard className="w-4 h-4 text-rose-500" />
+                    <CreditCard className="w-4 h-4 text-rose-500 shrink-0" />
                     <span>Fechamento & Rateio</span>
                   </h3>
 
-                  <div className="space-y-2 text-xs border-b border-neutral-800 pb-3">
-                    <div className="flex justify-between text-neutral-300">
-                      <span>Subtotal Consumido:</span>
-                      <span className="font-bold">
+                  <div className="space-y-2.5 text-xs border-b border-neutral-800 pb-3">
+                    <div className="flex items-center justify-between gap-2 text-neutral-300">
+                      <span className="shrink-0">Subtotal Consumido:</span>
+                      <span className="font-bold text-right text-white">
                         {totalMesa.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
                       </span>
                     </div>
 
-                    <div className="flex items-center justify-between text-neutral-300">
-                      <span className="flex items-center gap-1">
-                        <span>Taxa de Serviço (10%):</span>
-                      </span>
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold">
+                    <div className="flex items-center justify-between gap-2 text-neutral-300">
+                      <span className="shrink-0">Taxa de Serviço (10%):</span>
+                      <div className="flex items-center gap-2 ml-auto">
+                        <span className="font-bold text-white">
                           {taxaServico.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
                         </span>
                         <button
                           type="button"
                           onClick={() => setTaxaServicoAtiva(!taxaServicoAtiva)}
-                          className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
+                          className={`text-[10px] px-2 py-0.5 rounded font-black transition-colors ${
                             taxaServicoAtiva
-                              ? "bg-rose-600/20 text-rose-400"
-                              : "bg-neutral-800 text-neutral-500"
+                              ? "bg-rose-600/30 text-rose-300 border border-rose-500/40"
+                              : "bg-neutral-800 text-neutral-500 border border-neutral-700"
                           }`}
                         >
                           {taxaServicoAtiva ? "ON" : "OFF"}
@@ -414,9 +456,9 @@ export function MesaDetalheModal({
                       </div>
                     </div>
 
-                    <div className="flex justify-between text-sm font-black text-white pt-1">
-                      <span>Total da Mesa:</span>
-                      <span className="text-rose-400 text-base">
+                    <div className="flex items-center justify-between gap-2 text-sm font-black text-white pt-2 border-t border-neutral-800/60">
+                      <span className="shrink-0">Total da Mesa:</span>
+                      <span className="text-rose-400 text-base sm:text-lg text-right">
                         {totalComTaxa.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
                       </span>
                     </div>

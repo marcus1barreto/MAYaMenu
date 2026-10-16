@@ -879,6 +879,7 @@ export function AdminDashboard() {
         isOpen={modalMesaAberto}
         onClose={() => setModalMesaAberto(false)}
         slug={slug}
+        restauranteId={restaurante?.id}
         modoSomenteLeitura={true}
         onMarcarPago={handleMarcarComoPago}
         onLiberarMesa={handleLiberarMesa}

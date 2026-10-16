@@ -308,6 +308,36 @@ export function escutarComandasSalão(
 }
 
 /**
+ * Escuta os pedidos/rodadas de uma mesa específica em tempo real para exibir os pratos nas comandas.
+ */
+export function escutarPedidosMesa(
+  restauranteId: string,
+  mesaNumero: number | string,
+  onAtualizacao: (pedidos: PedidoRodada[]) => void
+): Unsubscribe {
+  const numMesa = Number(mesaNumero) || mesaNumero;
+  const q = query(
+    collectionGroup(db, "pedidos"),
+    where("restauranteId", "==", restauranteId),
+    where("numeroMesa", "==", numMesa)
+  );
+
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const lista: PedidoRodada[] = [];
+      snapshot.forEach((d) => {
+        lista.push({ ...(d.data() as PedidoRodada), id: d.id });
+      });
+      onAtualizacao(lista);
+    },
+    (err) => {
+      console.warn(`Listener de pedidos da Mesa ${mesaNumero} indisponível:`, err);
+    }
+  );
+}
+
+/**
  * Marca uma comanda específica como 'pago' no Firestore (ação exclusiva do lojista/garçom).
  */
 export async function marcarComandaPagaFirestore(
