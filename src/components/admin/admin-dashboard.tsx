@@ -6,6 +6,8 @@ import { CARDAPIO_DEMO } from "@/lib/mock-data";
 import type { MenuItem } from "@/types";
 import {
   escutarCardapio,
+  escutarComandasSalão,
+  marcarComandaPagaFirestore,
   alternarDisponibilidadePrato,
   salvarItemCardapio,
   excluirItemCardapio,
@@ -64,10 +66,56 @@ export function AdminDashboard() {
     return () => unsub();
   }, [restaurante?.id]);
 
-  // Controle de Mesas do Salão
-  const [mesas, setMesas] = useState<MesaOperacional[]>(MESAS_INICIAIS);
+  // Controle de Mesas do Salão (1 a 12 livres por padrão, sincronizadas com Firestore)
+  const [mesas, setMesas] = useState<MesaOperacional[]>(() => {
+    const mapaLimpo: MesaOperacional[] = [];
+    for (let i = 1; i <= 12; i++) {
+      mapaLimpo.push({ numero: i, status: "livre", comandas: [] });
+    }
+    return mapaLimpo;
+  });
   const [mesaSelecionada, setMesaSelecionada] = useState<MesaOperacional | null>(null);
   const [modalMesaAberto, setModalMesaAberto] = useState(false);
+
+  // Escuta comandas reais do restaurante no Firestore para o Salão do Admin
+  useEffect(() => {
+    if (!restaurante?.id) return;
+
+    const unsub = escutarComandasSalão(restaurante.id, (comandasFirestore) => {
+      setMesas(() => {
+        const mapa = new Map<number, MesaOperacional>();
+        for (let i = 1; i <= 12; i++) {
+          mapa.set(i, { numero: i, status: "livre", comandas: [] });
+        }
+
+        for (const c of comandasFirestore) {
+          const numMesa = Number(c.mesa) || 1;
+          const mesaAtual = mapa.get(numMesa) || { numero: numMesa, status: "livre", comandas: [] };
+
+          if (c.status !== "pago") {
+            mesaAtual.comandas.push({
+              id: c.id,
+              nomeCliente: c.nomeCliente,
+              subtotal: c.subtotal || 0,
+              status: c.status,
+              itens: [],
+            });
+
+            if (c.status === "conta_pedida") {
+              mesaAtual.status = "conta_pedida";
+            } else if (mesaAtual.status !== "conta_pedida") {
+              mesaAtual.status = "ocupada";
+            }
+          }
+          mapa.set(numMesa, mesaAtual);
+        }
+
+        return Array.from(mapa.values());
+      });
+    });
+
+    return () => unsub();
+  }, [restaurante?.id]);
 
   const handleAbrirMesa = (num: number) => {
     const mesaEncontrada = mesas.find((m) => m.numero === num) || {
@@ -105,6 +153,14 @@ export function AdminDashboard() {
       const todasPagas = novas.every((c) => c.status === "pago");
       return todasPagas ? { ...prev, status: "livre", comandas: [] } : { ...prev, comandas: novas };
     });
+
+    if (restaurante?.id) {
+      try {
+        await marcarComandaPagaFirestore(restaurante.id, mesaNumero, clienteId);
+      } catch (err) {
+        console.warn("Falha ao marcar comanda como paga no Firestore:", err);
+      }
+    }
   };
 
   const handleLiberarMesa = async (mesaNumero: number) => {
