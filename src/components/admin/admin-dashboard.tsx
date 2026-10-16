@@ -127,7 +127,7 @@ export function AdminDashboard() {
     setModalMesaAberto(true);
   };
 
-  const handleMarcarComoPago = (mesaNumero: number, clienteId: string) => {
+  const handleMarcarComoPago = async (mesaNumero: number, clienteId: string) => {
     setMesas((prev) =>
       prev.map((m) => {
         if (m.numero === mesaNumero) {
