@@ -211,6 +211,7 @@ export async function ativarLicencaEInstanciaAtomica(params: {
   ownerUid: string;
   restauranteNome: string;
   slug: string;
+  modoOperacao?: "com_garcom" | "hibrido" | "balcao";
 }): Promise<Restaurante> {
   const codigoFormatado = params.codigo.trim().toUpperCase();
   const licencaRef = doc(db, "concessoes", codigoFormatado);
@@ -228,6 +229,7 @@ export async function ativarLicencaEInstanciaAtomica(params: {
       corPrimaria: "#E11D48",
       tema: "light",
       capaUrl: "/images/capa-padrao.webp",
+      modoOperacao: params.modoOperacao || "hibrido",
     },
   };
 

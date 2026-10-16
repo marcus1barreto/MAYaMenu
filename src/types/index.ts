@@ -3,6 +3,8 @@
 
 import type { Timestamp } from "firebase/firestore";
 
+export type ModoOperacao = 'com_garcom' | 'hibrido' | 'balcao';
+
 export interface Restaurante {
   id: string;
   ownerId: string; // ID do Firebase Auth do lojista
@@ -13,6 +15,7 @@ export interface Restaurante {
     tema: 'light' | 'dark';
     logoUrl?: string;
     capaUrl?: string; // Se vazio, o app usa a capa padrão rústica
+    modoOperacao?: ModoOperacao; // 'com_garcom' | 'hibrido' (padrão) | 'balcao'
   };
 }
 

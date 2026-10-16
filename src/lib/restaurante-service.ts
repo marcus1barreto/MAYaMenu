@@ -78,6 +78,7 @@ export async function obterRestaurantePorSlug(slug: string): Promise<Restaurante
           tema: data.configuracoes?.tema || "light",
           logoUrl: data.configuracoes?.logoUrl,
           capaUrl: data.configuracoes?.capaUrl || "/images/capa-padrao.webp",
+          modoOperacao: data.configuracoes?.modoOperacao || "hibrido",
         },
       };
     }
@@ -96,6 +97,7 @@ export async function obterRestaurantePorSlug(slug: string): Promise<Restaurante
           tema: data.configuracoes?.tema || "light",
           logoUrl: data.configuracoes?.logoUrl,
           capaUrl: data.configuracoes?.capaUrl || "/images/capa-padrao.webp",
+          modoOperacao: data.configuracoes?.modoOperacao || "hibrido",
         },
       };
     }

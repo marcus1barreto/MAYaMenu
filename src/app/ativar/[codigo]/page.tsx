@@ -19,6 +19,8 @@ import {
   Ban,
   ArrowRight,
   Flame,
+  Utensils,
+  ChefHat,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -37,6 +39,7 @@ function AtivarContent({ codigoParam }: { codigoParam: string }) {
   // Campos do formulário
   const [nomeRestaurante, setNomeRestaurante] = useState("");
   const [slug, setSlug] = useState("");
+  const [modoOperacao, setModoOperacao] = useState<"com_garcom" | "hibrido" | "balcao">("hibrido");
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [erroForm, setErroForm] = useState<string | null>(null);
@@ -129,7 +132,7 @@ function AtivarContent({ codigoParam }: { codigoParam: string }) {
       if (senha.length < 6) throw new Error("A senha deve conter no mínimo 6 caracteres.");
 
       // Executa cadastro e queima atômica da licença
-      await cadastrar(email, senha, nomeRestaurante, slug, licenca.id);
+      await cadastrar(email, senha, nomeRestaurante, slug, licenca.id, modoOperacao);
 
       // Redireciona imediatamente para o painel admin ativo
       router.push("/admin");
@@ -263,6 +266,60 @@ function AtivarContent({ codigoParam }: { codigoParam: string }) {
             <p className="text-[10px] text-neutral-400">
               Endereço único que seus clientes acessarão na mesa através do QR Code.
             </p>
+          </div>
+
+          {/* MODO DE OPERAÇÃO DO ESTABELECIMENTO */}
+          <div className="space-y-2">
+            <label className="text-xs font-bold uppercase tracking-wider text-neutral-400 flex items-center gap-1.5">
+              <Utensils className="w-3.5 h-3.5 text-rose-500" />
+              Modelo Operacional do Salão
+            </label>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              <button
+                type="button"
+                onClick={() => setModoOperacao("hibrido")}
+                className={`p-3 rounded-xl border text-left transition-all ${
+                  modoOperacao === "hibrido"
+                    ? "bg-rose-950/40 border-rose-500 text-white"
+                    : "bg-neutral-800/50 border-neutral-700/60 text-neutral-400 hover:border-neutral-600"
+                }`}
+              >
+                <span className="text-xs font-bold block text-white">Híbrido (Padrão)</span>
+                <span className="text-[10px] text-neutral-400 block mt-0.5 leading-snug">
+                  Pedido vai direto à cozinha; garçom dá suporte, serve e cobra.
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setModoOperacao("com_garcom")}
+                className={`p-3 rounded-xl border text-left transition-all ${
+                  modoOperacao === "com_garcom"
+                    ? "bg-rose-950/40 border-rose-500 text-white"
+                    : "bg-neutral-800/50 border-neutral-700/60 text-neutral-400 hover:border-neutral-600"
+                }`}
+              >
+                <span className="text-xs font-bold block text-white">Com Garçom</span>
+                <span className="text-[10px] text-neutral-400 block mt-0.5 leading-snug">
+                  Garçom valida cada pedido antes de liberar para a cozinha.
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setModoOperacao("balcao")}
+                className={`p-3 rounded-xl border text-left transition-all ${
+                  modoOperacao === "balcao"
+                    ? "bg-rose-950/40 border-rose-500 text-white"
+                    : "bg-neutral-800/50 border-neutral-700/60 text-neutral-400 hover:border-neutral-600"
+                }`}
+              >
+                <span className="text-xs font-bold block text-white">Sem Garçom</span>
+                <span className="text-[10px] text-neutral-400 block mt-0.5 leading-snug">
+                  Autoatendimento: cliente pede e retira no balcão / paga no caixa.
+                </span>
+              </button>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

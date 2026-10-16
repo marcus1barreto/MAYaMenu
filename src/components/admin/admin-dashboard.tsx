@@ -50,6 +50,9 @@ export function AdminDashboard() {
   const [corPrimaria, setCorPrimaria] = useState(
     restaurante?.configuracoes?.corPrimaria || "#E11D48"
   );
+  const [modoOperacao, setModoOperacao] = useState<"com_garcom" | "hibrido" | "balcao">(
+    restaurante?.configuracoes?.modoOperacao || "hibrido"
+  );
   const [salvandoCor, setSalvandoCor] = useState(false);
 
   // Sincroniza cardápio em tempo real com o Firestore
@@ -386,6 +389,7 @@ export function AdminDashboard() {
           tema: "light",
           corPrimaria,
           capaUrl: restaurante?.configuracoes?.capaUrl || "/images/capa-padrao.webp",
+          modoOperacao,
         },
       });
     } finally {
@@ -731,14 +735,71 @@ export function AdminDashboard() {
               >
                 Exemplo de Botão no Cardápio
               </div>
+            </div>
+
+            {/* MODELO OPERACIONAL DO SALÃO */}
+            <div className="space-y-3 p-5 rounded-2xl bg-neutral-900 border border-neutral-800">
+              <label className="text-xs font-bold uppercase tracking-wider text-neutral-300 block">
+                Modelo Operacional do Salão
+              </label>
+              <p className="text-xs text-neutral-400">
+                Defina como os pedidos fluem entre a mesa, o garçom e a cozinha
+              </p>
+
+              <div className="grid grid-cols-1 gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setModoOperacao("hibrido")}
+                  className={`p-3 rounded-xl border text-left transition-all ${
+                    modoOperacao === "hibrido"
+                      ? "bg-rose-950/40 border-rose-500 text-white"
+                      : "bg-neutral-800/50 border-neutral-700/60 text-neutral-400 hover:border-neutral-600"
+                  }`}
+                >
+                  <span className="text-xs font-bold block text-white">Híbrido / Suporte (Padrão)</span>
+                  <span className="text-[10px] text-neutral-400 block mt-0.5 leading-snug">
+                    O pedido vai direto para a cozinha. O garçom atende, entrega e recebe.
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setModoOperacao("com_garcom")}
+                  className={`p-3 rounded-xl border text-left transition-all ${
+                    modoOperacao === "com_garcom"
+                      ? "bg-rose-950/40 border-rose-500 text-white"
+                      : "bg-neutral-800/50 border-neutral-700/60 text-neutral-400 hover:border-neutral-600"
+                  }`}
+                >
+                  <span className="text-xs font-bold block text-white">Garçom Obrigatório</span>
+                  <span className="text-[10px] text-neutral-400 block mt-0.5 leading-snug">
+                    O pedido fica pendente e o garçom valida antes de liberar para a cozinha.
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setModoOperacao("balcao")}
+                  className={`p-3 rounded-xl border text-left transition-all ${
+                    modoOperacao === "balcao"
+                      ? "bg-rose-950/40 border-rose-500 text-white"
+                      : "bg-neutral-800/50 border-neutral-700/60 text-neutral-400 hover:border-neutral-600"
+                  }`}
+                >
+                  <span className="text-xs font-bold block text-white">Sem Garçom (Autoatendimento)</span>
+                  <span className="text-[10px] text-neutral-400 block mt-0.5 leading-snug">
+                    Cliente pede na mesa e retira no balcão quando pronto.
+                  </span>
+                </button>
+              </div>
 
               <Button
                 type="button"
                 onClick={handleSalvarCor}
                 disabled={salvandoCor}
-                className="w-full bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl mt-2"
+                className="w-full bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl mt-3"
               >
-                {salvandoCor ? "Salvando..." : "Salvar Alterações"}
+                {salvandoCor ? "Salvando..." : "Salvar Configurações"}
               </Button>
             </div>
           </div>

@@ -23,7 +23,8 @@ interface AuthContextType {
     pass: string,
     nomeRestaurante: string,
     slug: string,
-    codigoLicenca: string
+    codigoLicenca: string,
+    modoOperacao?: "com_garcom" | "hibrido" | "balcao"
   ) => Promise<void>;
   logout: () => Promise<void>;
   atualizarRestaurante: (dados: Partial<Restaurante>) => Promise<void>;
@@ -137,7 +138,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     pass: string,
     nomeRestaurante: string,
     slug: string,
-    codigoLicenca: string
+    codigoLicenca: string,
+    modoOperacao?: "com_garcom" | "hibrido" | "balcao"
   ) => {
     setCarregando(true);
     try {
@@ -203,6 +205,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         ownerUid: uid,
         restauranteNome: nomeLimpo,
         slug: slugLimpo,
+        modoOperacao: modoOperacao || "hibrido",
       });
 
       // Salva referência do restaurante criado para resiliência local
