@@ -5,6 +5,8 @@ import type { ComandaCliente, PedidoRodada } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Clock, CheckCircle, ChefHat, Sparkles, AlertTriangle, ArrowRight } from "lucide-react";
+import { db } from "@/lib/firebase";
+import { collectionGroup, query, where, onSnapshot } from "firebase/firestore";
 import { escutarPedidosKds, atualizarStatusPedido } from "@/lib/restaurante-service";
 
 export interface PedidoKDS {
@@ -110,40 +112,79 @@ export function KdsView({
   const [pedidos, setPedidos] = useState<PedidoKDS[]>(isSandbox ? PEDIDOS_INICIAIS_KDS : []);
   const [filtro, setFiltro] = useState<"todos" | "a_fazer" | "pronto">("todos");
 
-  // Conecta ao Firestore em tempo real
+  // Conecta ao Firestore em tempo real tratando a deleção e remoção de pedidos ao fechar a mesa
   useEffect(() => {
-    if (!restauranteId && !slug) return;
+    if (isSandbox) return;
+    const idBusca = restauranteId || slug;
+    if (!idBusca) return;
 
-    const unsub = escutarPedidosKds(
-      restauranteId || slug!,
-      (rodadas) => {
-        const convertidos: PedidoKDS[] = rodadas.map((r) => {
-          let horarioFormatado = "Agora";
-          if (r.criadoEm?.toDate) {
-            horarioFormatado = r.criadoEm.toDate().toLocaleTimeString("pt-BR", {
-              hour: "2-digit",
-              minute: "2-digit",
-            });
-          }
-          return {
-            id: r.id,
-            refPath: r.refPath,
-            mesa: r.mesa,
-            clienteId: r.clienteId,
-            nomeCliente: r.nomeCliente,
-            horario: horarioFormatado,
-            subtotal: r.subtotal,
-            status: r.status,
-            itens: r.itens,
-          };
+    const idsParaBuscar = Array.from(
+      new Set([restauranteId, slug].filter(Boolean) as string[])
+    );
+
+    const q = idsParaBuscar.length > 1
+      ? query(collectionGroup(db, "pedidos"), where("restauranteId", "in", idsParaBuscar))
+      : query(collectionGroup(db, "pedidos"), where("restauranteId", "==", idsParaBuscar[0]));
+
+    const unsub = onSnapshot(
+      q,
+      (snapshot) => {
+        setPedidos((prevPedidos) => {
+          let lista = [...prevPedidos];
+
+          snapshot.docChanges().forEach((change) => {
+            const docId = change.doc.id;
+            if (change.type === "removed") {
+              // Quando a mesa é fechada ou os pedidos são excluídos, retira os pratos do ecrã instantaneamente
+              lista = lista.filter((p) => p.id !== docId);
+            } else if (change.type === "added" || change.type === "modified") {
+              const data = change.doc.data() as PedidoRodada;
+
+              // Se marcado como entregue, não polui a esteira do KDS
+              if (data.status === "entregue") {
+                lista = lista.filter((p) => p.id !== docId);
+                return;
+              }
+
+              let horarioFormatado = "Agora";
+              if (data.criadoEm?.toDate) {
+                horarioFormatado = data.criadoEm.toDate().toLocaleTimeString("pt-BR", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                });
+              }
+
+              const pedidoConvertido: PedidoKDS = {
+                id: docId,
+                refPath: change.doc.ref.path,
+                mesa: data.mesa,
+                clienteId: data.clienteId,
+                nomeCliente: data.nomeCliente,
+                horario: horarioFormatado,
+                subtotal: data.subtotal,
+                status: data.status,
+                itens: data.itens || [],
+              };
+
+              const index = lista.findIndex((p) => p.id === docId);
+              if (index >= 0) {
+                lista[index] = pedidoConvertido;
+              } else {
+                lista.push(pedidoConvertido);
+              }
+            }
+          });
+
+          return lista;
         });
-        setPedidos(convertidos);
       },
-      slug
+      (err) => {
+        console.warn("Listener do KDS indisponível (offline ou index pendente):", err);
+      }
     );
 
     return () => unsub();
-  }, [restauranteId, slug]);
+  }, [restauranteId, slug, isSandbox]);
 
   // Ação essencial da cozinha: "MARCHAR" (Muda de A Fazer -> Pronto)
   const handleMarchar = async (id: string) => {

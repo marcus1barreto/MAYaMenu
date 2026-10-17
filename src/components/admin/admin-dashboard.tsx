@@ -3,7 +3,9 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "@/context/auth-context";
 import { CARDAPIO_DEMO } from "@/lib/mock-data";
-import type { MenuItem } from "@/types";
+import type { MenuItem, ComandaCliente } from "@/types";
+import { db } from "@/lib/firebase";
+import { collectionGroup, query, where, onSnapshot } from "firebase/firestore";
 import {
   escutarCardapio,
   escutarComandasSalão,
@@ -92,26 +94,60 @@ export function AdminDashboard() {
     }
     return mapaLimpo;
   });
+  const [comandas, setComandas] = useState<(ComandaCliente & { refPath?: string })[]>([]);
   const [mesaSelecionada, setMesaSelecionada] = useState<MesaOperacional | null>(null);
   const [modalMesaAberto, setModalMesaAberto] = useState(false);
 
-  // Escuta comandas reais do restaurante no Firestore para o Salão do Admin
+  // Escuta comandas reais do restaurante no Firestore para o Salão do Admin com tratamento de remoção em tempo real
   useEffect(() => {
-    if (!restaurante?.id && !restaurante?.slug) return;
+    const idBusca = restaurante?.id || restaurante?.slug;
+    if (!idBusca) return;
 
-    const unsub = escutarComandasSalão(
-      restaurante?.id || restaurante?.slug!,
-      (comandasFirestore) => {
-        setMesas(() => {
+    const idsParaBuscar = Array.from(
+      new Set([restaurante?.id, restaurante?.slug].filter(Boolean) as string[])
+    );
+
+    const q = idsParaBuscar.length > 1
+      ? query(collectionGroup(db, "comandas_abertas"), where("restauranteId", "in", idsParaBuscar))
+      : query(collectionGroup(db, "comandas_abertas"), where("restauranteId", "==", idsParaBuscar[0]));
+
+    const unsub = onSnapshot(
+      q,
+      (snapshot) => {
+        // Trata os eventos docChanges para atualizar o estado local de comandas
+        setComandas((prevComandas) => {
+          let lista = [...prevComandas];
+
+          snapshot.docChanges().forEach((change) => {
+            const docId = change.doc.id;
+            if (change.type === "removed") {
+              // Remoção explícita da comanda ao ser liberada / arquivada
+              lista = lista.filter((c) => c.id !== docId);
+            } else if (change.type === "added" || change.type === "modified") {
+              const data = change.doc.data() as ComandaCliente;
+              const comandaItem: ComandaCliente & { refPath: string } = {
+                ...data,
+                id: docId,
+                refPath: change.doc.ref.path,
+              };
+              const index = lista.findIndex((c) => c.id === docId);
+              if (index >= 0) {
+                lista[index] = comandaItem;
+              } else {
+                lista.push(comandaItem);
+              }
+            }
+          });
+
+          // Reconstrói as 12 mesas com base nas comandas ativas
           const mapa = new Map<number, MesaOperacional>();
           for (let i = 1; i <= 12; i++) {
             mapa.set(i, { numero: i, status: "livre", comandas: [] });
           }
 
-          for (const c of comandasFirestore) {
+          for (const c of lista) {
             const numMesa = Number(c.mesa) || 1;
             const mesaAtual = mapa.get(numMesa) || { numero: numMesa, status: "livre", comandas: [] };
-
             const garcomChamadoAtivo = Boolean(c.chamadoGarcom?.ativo);
 
             mesaAtual.comandas.push({
@@ -141,10 +177,22 @@ export function AdminDashboard() {
             mapa.set(numMesa, mesaAtual);
           }
 
-          return Array.from(mapa.values());
+          const novasMesas = Array.from(mapa.values());
+          setMesas(novasMesas);
+
+          // Sincroniza a mesa selecionada se estiver aberta no modal
+          setMesaSelecionada((prevSelecionada) => {
+            if (!prevSelecionada) return null;
+            const mesaAtualizada = mapa.get(prevSelecionada.numero);
+            return mesaAtualizada || { numero: prevSelecionada.numero, status: "livre", comandas: [] };
+          });
+
+          return lista;
         });
       },
-      restaurante?.slug
+      (err) => {
+        console.warn("Listener de comandas do salão no Admin indisponível:", err);
+      }
     );
 
     return () => unsub();
