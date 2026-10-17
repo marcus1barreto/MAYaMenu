@@ -160,6 +160,8 @@ export function MesaDetalheModal({
                 className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-xl shadow-lg shrink-0 ${
                   mesa.status === "conta_pedida"
                     ? "bg-rose-600 text-white animate-pulse"
+                    : mesa.status === "paga_ocupada"
+                    ? "bg-emerald-600 text-white"
                     : mesa.status === "ocupada"
                     ? "bg-amber-500 text-neutral-950"
                     : "bg-neutral-800 text-neutral-400"
@@ -175,6 +177,8 @@ export function MesaDetalheModal({
                     className={`text-[10px] uppercase font-bold tracking-wider px-2.5 py-0.5 rounded-full ${
                       mesa.status === "conta_pedida"
                         ? "bg-rose-500/20 text-rose-400 border-rose-500/40"
+                        : mesa.status === "paga_ocupada"
+                        ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/40"
                         : mesa.status === "ocupada"
                         ? "bg-amber-500/20 text-amber-400 border-amber-500/40"
                         : "bg-neutral-800 text-neutral-400 border-neutral-700"
@@ -182,6 +186,8 @@ export function MesaDetalheModal({
                   >
                     {mesa.status === "conta_pedida"
                       ? "Pediu a Conta"
+                      : mesa.status === "paga_ocupada"
+                      ? "Paga / Aguardando Saída"
                       : mesa.status === "ocupada"
                       ? "Ocupada / Consumindo"
                       : "Livre"}
@@ -194,7 +200,7 @@ export function MesaDetalheModal({
                   </span>
                   <span className="flex items-center gap-1">
                     <Clock className="w-3.5 h-3.5 text-neutral-500" />
-                    Atendimento ativo
+                    {mesa.status === "paga_ocupada" ? "Conta liquidada" : "Atendimento ativo"}
                   </span>
                 </DialogDescription>
               </div>
@@ -505,16 +511,23 @@ export function MesaDetalheModal({
                     <div className="pt-2 space-y-2">
                       <Button
                         type="button"
+                        disabled={!todasPagas || comandasComItens.length === 0}
                         onClick={() => onLiberarMesa(mesa.numero)}
                         className={`w-full h-11 text-xs font-bold rounded-xl flex items-center justify-center gap-2 shadow-lg transition-all ${
-                          todasPagas
-                            ? "bg-emerald-600 hover:bg-emerald-500 text-white"
-                            : "bg-neutral-800 hover:bg-neutral-700 text-white"
+                          todasPagas && comandasComItens.length > 0
+                            ? "bg-emerald-600 hover:bg-emerald-500 text-white cursor-pointer"
+                            : "bg-neutral-800 text-neutral-500 cursor-not-allowed border border-neutral-700/50"
                         }`}
                       >
                         <CheckCircle2 className="w-4 h-4" />
                         <span>Liberar / Finalizar Mesa {mesa.numero}</span>
                       </Button>
+                      {!todasPagas && comandasComItens.length > 0 && (
+                        <p className="text-[11px] text-amber-400/90 text-center flex items-center justify-center gap-1.5 font-medium">
+                          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                          <span>Finalize o pagamento de todas as comandas para liberar a mesa</span>
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>

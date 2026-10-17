@@ -106,28 +106,32 @@ export function AdminDashboard() {
             const numMesa = Number(c.mesa) || 1;
             const mesaAtual = mapa.get(numMesa) || { numero: numMesa, status: "livre", comandas: [] };
 
-            if (c.status !== "pago") {
-              const garcomChamadoAtivo = Boolean(c.chamadoGarcom?.ativo);
+            const garcomChamadoAtivo = Boolean(c.chamadoGarcom?.ativo);
 
-              mesaAtual.comandas.push({
-                id: c.id,
-                nomeCliente: c.nomeCliente,
-                subtotal: c.subtotal || 0,
-                status: c.status,
-                itens: [],
-                chamadoGarcom: c.chamadoGarcom,
-              });
+            mesaAtual.comandas.push({
+              id: c.id,
+              nomeCliente: c.nomeCliente,
+              subtotal: c.subtotal || 0,
+              status: c.status,
+              itens: [],
+              chamadoGarcom: c.chamadoGarcom,
+            });
 
-              if (garcomChamadoAtivo) {
-                mesaAtual.chamandoGarcom = true;
-              }
-
-              if (c.status === "conta_pedida") {
-                mesaAtual.status = "conta_pedida";
-              } else if (mesaAtual.status !== "conta_pedida") {
-                mesaAtual.status = "ocupada";
-              }
+            if (garcomChamadoAtivo) {
+              mesaAtual.chamandoGarcom = true;
             }
+
+            if (c.status === "conta_pedida") {
+              mesaAtual.status = "conta_pedida";
+            } else if (c.status === "pago") {
+              const todasPagas = mesaAtual.comandas.every((cmd) => cmd.status === "pago");
+              if (todasPagas && mesaAtual.status !== "conta_pedida") {
+                mesaAtual.status = "paga_ocupada";
+              }
+            } else if (mesaAtual.status !== "conta_pedida" && mesaAtual.status !== "paga_ocupada") {
+              mesaAtual.status = "ocupada";
+            }
+
             mapa.set(numMesa, mesaAtual);
           }
 
@@ -160,8 +164,8 @@ export function AdminDashboard() {
           const todasPagas = novasComandas.every((c) => c.status === "pago");
           return {
             ...m,
-            status: todasPagas ? "livre" : m.status,
-            comandas: todasPagas ? [] : novasComandas,
+            status: todasPagas ? ("paga_ocupada" as const) : m.status,
+            comandas: novasComandas,
           };
         }
         return m;
@@ -174,7 +178,11 @@ export function AdminDashboard() {
         c.id === clienteId ? { ...c, status: "pago" as const } : c
       );
       const todasPagas = novas.every((c) => c.status === "pago");
-      return todasPagas ? { ...prev, status: "livre", comandas: [] } : { ...prev, comandas: novas };
+      return {
+        ...prev,
+        status: todasPagas ? ("paga_ocupada" as const) : prev.status,
+        comandas: novas,
+      };
     });
 
     if (restaurante?.id) {
@@ -782,6 +790,8 @@ export function AdminDashboard() {
                         ? "bg-amber-950/40 border-amber-400 ring-2 ring-amber-400/50 shadow-xl shadow-amber-950/60 animate-pulse"
                         : mesa.status === "conta_pedida"
                         ? "bg-rose-950/40 border-rose-500/60 hover:border-rose-400 shadow-lg shadow-rose-950/50"
+                        : mesa.status === "paga_ocupada"
+                        ? "bg-emerald-950/40 border-emerald-500/80 ring-1 ring-emerald-500/40 shadow-lg shadow-emerald-950/50 hover:border-emerald-400"
                         : mesa.status === "ocupada"
                         ? "bg-neutral-900 border-amber-500/40 hover:border-amber-400 shadow-md"
                         : "bg-neutral-900/60 border-neutral-800 hover:border-neutral-700"
@@ -795,6 +805,8 @@ export function AdminDashboard() {
                             ? "bg-amber-400 text-neutral-950 font-black shadow-md shadow-amber-400/50 animate-bounce"
                             : mesa.status === "conta_pedida"
                             ? "bg-rose-600 text-white shadow-md shadow-rose-600/40 animate-pulse"
+                            : mesa.status === "paga_ocupada"
+                            ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/40"
                             : mesa.status === "ocupada"
                             ? "bg-amber-500 text-neutral-950 font-black shadow-md"
                             : "bg-neutral-800 text-neutral-400 group-hover:bg-neutral-700"
@@ -816,6 +828,8 @@ export function AdminDashboard() {
                           className={`text-[9px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full ${
                             mesa.status === "conta_pedida"
                               ? "bg-rose-500/20 text-rose-300 border-rose-500/40"
+                              : mesa.status === "paga_ocupada"
+                              ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40 font-black"
                               : mesa.status === "ocupada"
                               ? "bg-amber-500/20 text-amber-300 border-amber-500/40"
                               : "bg-neutral-800 text-neutral-500 border-neutral-700"
@@ -823,6 +837,8 @@ export function AdminDashboard() {
                         >
                           {mesa.status === "conta_pedida"
                             ? "Conta"
+                            : mesa.status === "paga_ocupada"
+                            ? "Paga"
                             : mesa.status === "ocupada"
                             ? "Ocupada"
                             : "Livre"}

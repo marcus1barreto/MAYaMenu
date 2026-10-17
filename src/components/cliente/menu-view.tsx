@@ -432,37 +432,64 @@ export function MenuView({ restaurante, cardapio: cardapioInicial, numeroMesa = 
         )}
       </main>
 
-      {/* BARRA FLUTUANTE DE CARRINHO (Fat-finger friendly) */}
-      {totalItens > 0 && (
+      {/* BARRA FLUTUANTE INFERIOR (Acesso permanente à Comanda ou Carrinho) */}
+      {(totalItens > 0 || subtotalComandaBanco > 0) && (
         <div className="fixed bottom-4 left-4 right-4 z-40 max-w-md mx-auto">
-          <Button
-            type="button"
-            onClick={() => setCarrinhoAberto(true)}
-            style={{ backgroundColor: corPrimaria }}
-            className="w-full h-16 rounded-2xl shadow-2xl text-white font-black text-base flex items-center justify-between px-5 active:scale-[0.98] transition-all"
-          >
-            <div className="flex items-center gap-3">
-              <div className="relative p-2 bg-white/20 rounded-xl">
-                <ShoppingBag className="w-5 h-5 text-white" />
-                <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-white text-neutral-900 rounded-full text-xs font-black flex items-center justify-center shadow-sm">
-                  {totalItens}
-                </span>
+          {totalItens > 0 ? (
+            <Button
+              type="button"
+              onClick={() => setCarrinhoAberto(true)}
+              style={{ backgroundColor: corPrimaria }}
+              className="w-full h-16 rounded-2xl shadow-2xl text-white font-black text-base flex items-center justify-between px-5 active:scale-[0.98] transition-all"
+            >
+              <div className="flex items-center gap-3">
+                <div className="relative p-2 bg-white/20 rounded-xl">
+                  <ShoppingBag className="w-5 h-5 text-white" />
+                  <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-white text-neutral-900 rounded-full text-xs font-black flex items-center justify-center shadow-sm">
+                    {totalItens}
+                  </span>
+                </div>
+                <div className="text-left">
+                  <span className="block text-xs uppercase tracking-wider font-semibold opacity-90">
+                    Enviar Rodada / Carrinho
+                  </span>
+                  <span className="text-sm font-bold">Mesa {numeroMesa}</span>
+                </div>
               </div>
-              <div className="text-left">
-                <span className="block text-xs uppercase tracking-wider font-semibold opacity-90">
-                  Ver Comanda
-                </span>
-                <span className="text-sm font-bold">Mesa {numeroMesa}</span>
-              </div>
-            </div>
 
-            <div className="text-right">
-              <span className="text-xs uppercase font-semibold opacity-90 block">Total</span>
-              <span className="text-lg font-black tracking-tight">
-                {subtotal.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
-              </span>
-            </div>
-          </Button>
+              <div className="text-right">
+                <span className="text-xs uppercase font-semibold opacity-90 block">Total Itens</span>
+                <span className="text-lg font-black tracking-tight">
+                  {subtotal.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                </span>
+              </div>
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              onClick={() => setMinhaComandaAberta(true)}
+              className="w-full h-14 rounded-2xl shadow-2xl bg-neutral-900 hover:bg-neutral-800 border border-neutral-700 text-white font-black text-sm flex items-center justify-between px-5 active:scale-[0.98] transition-all"
+            >
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-rose-600/20 text-rose-400 rounded-xl">
+                  <Utensils className="w-5 h-5" />
+                </div>
+                <div className="text-left">
+                  <span className="block text-xs uppercase tracking-wider font-bold text-neutral-300">
+                    Minha Comanda Ativa
+                  </span>
+                  <span className="text-xs text-neutral-400">Mesa {numeroMesa} • Acompanhar pratos</span>
+                </div>
+              </div>
+
+              <div className="text-right">
+                <span className="text-[10px] uppercase font-semibold text-neutral-400 block">Total</span>
+                <span className="text-base font-black text-rose-400 font-mono tracking-tight">
+                  {subtotalComandaBanco.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                </span>
+              </div>
+            </Button>
+          )}
         </div>
       )}
 

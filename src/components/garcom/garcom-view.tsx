@@ -54,7 +54,7 @@ export interface ComandaGarcom {
 
 export interface MesaOperacional {
   numero: number;
-  status: "livre" | "ocupada" | "conta_pedida";
+  status: "livre" | "ocupada" | "conta_pedida" | "paga_ocupada";
   chamandoGarcom?: boolean;
   comandas: ComandaGarcom[];
 }
@@ -187,28 +187,34 @@ export function GarcomView({
             const numMesa = Number(c.mesa) || 1;
             const mesaAtual = mapa.get(numMesa) || { numero: numMesa, status: "livre", comandas: [] };
 
-            if (c.status !== "pago") {
-              const garcomChamadoAtivo = Boolean(c.chamadoGarcom?.ativo);
+            const garcomChamadoAtivo = Boolean(c.chamadoGarcom?.ativo);
 
-              mesaAtual.comandas.push({
-                id: c.id,
-                nomeCliente: c.nomeCliente,
-                subtotal: c.subtotal || 0,
-                status: c.status,
-                itens: [],
-                chamadoGarcom: c.chamadoGarcom,
-              });
+            mesaAtual.comandas.push({
+              id: c.id,
+              nomeCliente: c.nomeCliente,
+              subtotal: c.subtotal || 0,
+              status: c.status,
+              itens: [],
+              chamadoGarcom: c.chamadoGarcom,
+            });
 
-              if (garcomChamadoAtivo) {
-                mesaAtual.chamandoGarcom = true;
-              }
-
-              if (c.status === "conta_pedida") {
-                mesaAtual.status = "conta_pedida";
-              } else if (mesaAtual.status !== "conta_pedida") {
-                mesaAtual.status = "ocupada";
-              }
+            if (garcomChamadoAtivo) {
+              mesaAtual.chamandoGarcom = true;
             }
+
+            // Define o status global da mesa com a nova regra de "paga_ocupada"
+            if (c.status === "conta_pedida") {
+              mesaAtual.status = "conta_pedida";
+            } else if (c.status === "pago") {
+              // Se já temos comanda paga, checa se TODAS as comandas da mesa foram pagas
+              const todasPagas = mesaAtual.comandas.every((cmd) => cmd.status === "pago");
+              if (todasPagas && mesaAtual.status !== "conta_pedida") {
+                mesaAtual.status = "paga_ocupada";
+              }
+            } else if (mesaAtual.status !== "conta_pedida" && mesaAtual.status !== "paga_ocupada") {
+              mesaAtual.status = "ocupada";
+            }
+
             mapa.set(numMesa, mesaAtual);
           }
 
@@ -279,8 +285,8 @@ export function GarcomView({
           const todasPagas = novasComandas.every((c) => c.status === "pago");
           return {
             ...m,
-            status: todasPagas ? "livre" : m.status,
-            comandas: todasPagas ? [] : novasComandas,
+            status: todasPagas ? ("paga_ocupada" as const) : m.status,
+            comandas: novasComandas,
           };
         }
         return m;
@@ -293,7 +299,11 @@ export function GarcomView({
         c.id === clienteId ? { ...c, status: "pago" as const } : c
       );
       const todasPagas = novas.every((c) => c.status === "pago");
-      return todasPagas ? null : { ...prev, comandas: novas };
+      return {
+        ...prev,
+        status: todasPagas ? ("paga_ocupada" as const) : prev.status,
+        comandas: novas,
+      };
     });
 
     // Persistência no Firestore
@@ -444,6 +454,7 @@ export function GarcomView({
           {mesas.map((m) => {
             const ehChamado = Boolean(m.chamandoGarcom);
             const ehConta = m.status === "conta_pedida";
+            const ehPagaOcupada = m.status === "paga_ocupada";
             const ehOcupada = m.status === "ocupada";
             const totalMesa = m.comandas.reduce((acc, c) => acc + c.subtotal, 0);
 
@@ -458,6 +469,8 @@ export function GarcomView({
                     ? "bg-amber-950/30 border-amber-400 ring-2 ring-amber-400/50 shadow-xl shadow-amber-950/50 active:scale-95 animate-pulse"
                     : ehConta
                     ? "bg-rose-950/20 border-rose-500 shadow-lg shadow-rose-950/40 active:scale-95"
+                    : ehPagaOcupada
+                    ? "bg-emerald-950/30 border-emerald-500 ring-1 ring-emerald-500/40 shadow-lg shadow-emerald-950/50 active:scale-95 hover:border-emerald-400"
                     : ehOcupada
                     ? "bg-neutral-900 border-amber-500/60 hover:border-amber-500 active:scale-95"
                     : "bg-neutral-900/40 border-neutral-800/60 opacity-40 cursor-default"
@@ -470,6 +483,8 @@ export function GarcomView({
                         ? "bg-amber-400 text-neutral-950 animate-bounce"
                         : ehConta
                         ? "bg-rose-600 text-white"
+                        : ehPagaOcupada
+                        ? "bg-emerald-600 text-white"
                         : ehOcupada
                         ? "bg-amber-500 text-neutral-950"
                         : "bg-neutral-800 text-neutral-400"
@@ -489,6 +504,13 @@ export function GarcomView({
                     {ehConta && !ehChamado && (
                       <Badge className="bg-rose-600 text-white text-[10px] font-black uppercase tracking-wider px-2 py-0.5">
                         Pediu Conta
+                      </Badge>
+                    )}
+
+                    {ehPagaOcupada && !ehChamado && (
+                      <Badge className="bg-emerald-600 text-white text-[10px] font-black uppercase tracking-wider px-2 py-0.5 shadow-md flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3" />
+                        Paga / Ocupada
                       </Badge>
                     )}
                   </div>
