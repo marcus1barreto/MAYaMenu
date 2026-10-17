@@ -99,10 +99,13 @@ export function CartDrawer({
       // Comanda Pai: restaurantes/{restauranteId}/mesas/{mesa}/comandas_abertas/{clienteId}
       // Rodada/Pedido: restaurantes/{restauranteId}/mesas/{mesa}/comandas_abertas/{clienteId}/pedidos/{pedidoId}
       try {
+        // ID final garantido do restaurante (com fallback robusto)
+        const idRestauranteFinal = (restauranteId || slug || "demo").trim();
+
         const comandaRef = doc(
           db,
           "restaurantes",
-          restauranteId,
+          idRestauranteFinal,
           "mesas",
           String(mesa),
           "comandas_abertas",
@@ -112,7 +115,7 @@ export function CartDrawer({
         const pedidoRef = doc(
           db,
           "restaurantes",
-          restauranteId,
+          idRestauranteFinal,
           "mesas",
           String(mesa),
           "comandas_abertas",
@@ -130,10 +133,11 @@ export function CartDrawer({
           observacoes: it.observacoes || "",
         }));
 
-        // Dados da Rodada individual para o KDS da cozinha
+        // Dados da Rodada individual para o KDS da cozinha (restauranteId explícito e obrigatório)
         const dadosPedidoRodada = {
           id: pedidoId,
-          restauranteId,
+          restauranteId: idRestauranteFinal,
+          slug: slug || idRestauranteFinal,
           clienteId: uid,
           nomeCliente: nomeCliente.trim(),
           mesa,
@@ -149,10 +153,11 @@ export function CartDrawer({
 
         let saveComandaPromise: Promise<unknown>;
         if (!comandaSnap.exists()) {
-          // 1ª Rodada: cria a comanda pai
+          // 1ª Rodada: cria a comanda pai (com restauranteId explícito)
           saveComandaPromise = setDoc(comandaRef, {
             id: uid,
-            restauranteId,
+            restauranteId: idRestauranteFinal,
+            slug: slug || idRestauranteFinal,
             nomeCliente: nomeCliente.trim(),
             mesa,
             numeroMesa: Number(mesa) || mesa,
@@ -162,8 +167,10 @@ export function CartDrawer({
             status: "aguardando_pratos" as const,
           });
         } else {
-          // 2ª Rodada em diante: atualiza comanda acumulando subtotal e preservando criadoEm
+          // 2ª Rodada em diante: atualiza comanda acumulando subtotal e garantindo restauranteId
           saveComandaPromise = updateDoc(comandaRef, {
+            restauranteId: idRestauranteFinal,
+            slug: slug || idRestauranteFinal,
             nomeCliente: nomeCliente.trim(),
             mesa,
             numeroMesa: Number(mesa) || mesa,
@@ -177,7 +184,7 @@ export function CartDrawer({
 
         const savePromise = Promise.all([saveComandaPromise, savePedidoPromise]);
         const timeoutSave = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error("Timeout Firestore")), 4000)
+          setTimeout(() => reject(new Error("Timeout Firestore")), 5000)
         );
 
         await Promise.race([savePromise, timeoutSave]);

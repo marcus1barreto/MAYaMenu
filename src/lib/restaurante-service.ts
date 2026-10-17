@@ -384,34 +384,54 @@ export async function chamarGarcomFirestore(params: {
   clienteId: string;
   nomeCliente?: string;
   motivo?: string;
+  slug?: string;
 }): Promise<void> {
+  const idFinal = (params.restauranteId || params.slug || "demo").trim();
+
   const comandaRef = doc(
     db,
     "restaurantes",
-    params.restauranteId,
+    idFinal,
     "mesas",
     String(params.mesaNumero),
     "comandas_abertas",
     params.clienteId
   );
 
-  await setDoc(
-    comandaRef,
-    {
+  const comandaSnap = await getDoc(comandaRef);
+
+  if (!comandaSnap.exists()) {
+    // 1ª vez: cria a comanda com status inicial 'pedindo' e restauranteId garantido
+    await setDoc(comandaRef, {
       id: params.clienteId,
-      restauranteId: params.restauranteId,
+      restauranteId: idFinal,
+      slug: params.slug || idFinal,
       nomeCliente: params.nomeCliente || "Cliente",
       mesa: params.mesaNumero,
       numeroMesa: Number(params.mesaNumero) || params.mesaNumero,
+      subtotal: 0,
+      status: "pedindo",
+      criadoEm: serverTimestamp(),
       atualizadoEm: serverTimestamp(),
       chamadoGarcom: {
         ativo: true,
         solicitadoEm: serverTimestamp(),
         motivo: params.motivo || "Atendimento",
       },
-    },
-    { merge: true }
-  );
+    });
+  } else {
+    // Comanda já existe: ativa o chamado preservando status e subtotal
+    await updateDoc(comandaRef, {
+      restauranteId: idFinal,
+      slug: params.slug || idFinal,
+      atualizadoEm: serverTimestamp(),
+      chamadoGarcom: {
+        ativo: true,
+        solicitadoEm: serverTimestamp(),
+        motivo: params.motivo || "Atendimento",
+      },
+    });
+  }
 }
 
 /**

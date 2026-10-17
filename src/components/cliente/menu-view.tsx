@@ -117,6 +117,7 @@ export function MenuView({ restaurante, cardapio: cardapioInicial, numeroMesa = 
       const user = await ensureClienteAnonimo();
       await chamarGarcomFirestore({
         restauranteId: restaurante.id,
+        slug: restaurante.slug,
         mesaNumero: numeroMesa,
         clienteId: user.uid,
         nomeCliente: nomeCliente || "Cliente",
