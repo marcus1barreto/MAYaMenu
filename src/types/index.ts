@@ -120,3 +120,20 @@ export interface LicencaArquivada {
   snapshotJson: string; // JSON serializado completo da licença e transação
   dadosLicenca: Licenca;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Histórico de Sessões de Mesas (Analytics & Inteligência Salão)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface HistoricoSessaoMesa {
+  id: string;
+  restauranteId: string;
+  mesa: number | string;
+  subtotalTotal: number;
+  quantidadePagantes: number;
+  comandasIds: string[];
+  abertaEm: any;
+  pagaEm: any;
+  liberadaEm: any;
+  duracaoTotalMinutos?: number;
+}

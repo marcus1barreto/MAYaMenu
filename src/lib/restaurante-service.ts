@@ -481,6 +481,12 @@ export async function liberarMesaFirestore(
   const { writeBatch } = await import("firebase/firestore");
   const batch = writeBatch(db);
 
+  // 1. Coleta e consolidação de dados da sessão para histórico analítico
+  let subtotalTotal = 0;
+  let quantidadePagantes = 0;
+  let abertaEmTimestamp: any = null;
+  let pagaEmTimestamp: any = null;
+
   for (const cId of comandasIds) {
     const comandaRef = doc(
       db,
@@ -491,6 +497,28 @@ export async function liberarMesaFirestore(
       "comandas_abertas",
       cId
     );
+
+    try {
+      const snapComanda = await getDoc(comandaRef);
+      if (snapComanda.exists()) {
+        const cData = snapComanda.data();
+        quantidadePagantes++;
+        subtotalTotal += Number(cData.subtotal) || 0;
+
+        if (cData.criadoEm) {
+          if (!abertaEmTimestamp || (cData.criadoEm.toMillis && cData.criadoEm.toMillis() < (abertaEmTimestamp.toMillis ? abertaEmTimestamp.toMillis() : Infinity))) {
+            abertaEmTimestamp = cData.criadoEm;
+          }
+        }
+        if (cData.atualizadoEm) {
+          pagaEmTimestamp = cData.atualizadoEm;
+        }
+      }
+    } catch (e) {
+      console.warn(`Aviso ao ler comanda ${cId} para consolidar histórico da mesa:`, e);
+    }
+
+    // Marca como pago / fechado
     batch.update(comandaRef, { status: "pago" });
 
     // Busca pedidos filhos para marcar como 'entregue' (ou arquivado) evitando órfãos no KDS
@@ -512,6 +540,32 @@ export async function liberarMesaFirestore(
     } catch (e) {
       console.warn("Falha ao buscar pedidos da comanda para baixa em lote:", e);
     }
+  }
+
+  // 2. Gravação atômica do documento histórico de sessão
+  try {
+    const idHistorico = `sessao_${mesaNumero}_${Date.now()}`;
+    const historicoRef = doc(
+      db,
+      "restaurantes",
+      restauranteId,
+      "historico_sessoes_mesas",
+      idHistorico
+    );
+
+    batch.set(historicoRef, {
+      id: idHistorico,
+      restauranteId,
+      mesa: Number(mesaNumero) || mesaNumero,
+      subtotalTotal,
+      quantidadePagantes: Math.max(quantidadePagantes, comandasIds.length),
+      comandasIds,
+      abertaEm: abertaEmTimestamp || serverTimestamp(),
+      pagaEm: pagaEmTimestamp || serverTimestamp(),
+      liberadaEm: serverTimestamp(),
+    });
+  } catch (errHistorico) {
+    console.warn("Falha ao preparar gravação de histórico de sessão no lote:", errHistorico);
   }
 
   await batch.commit();
