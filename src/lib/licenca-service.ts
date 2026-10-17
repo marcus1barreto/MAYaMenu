@@ -131,7 +131,9 @@ export function escutarLicencas(
         locaisAtuais.forEach((l) => mapa.set(l.id, l));
         listaFirestore.forEach((l) => mapa.set(l.id, l));
 
-        const mesclada = Array.from(mapa.values());
+        const mesclada = Array.from(mapa.values()).filter(
+          (l) => l.status !== "utilizada"
+        );
         mesclada.sort((a, b) => {
           const tA = a.criadaEm?.toMillis ? a.criadaEm.toMillis() : new Date(a.criadaEm || 0).getTime();
           const tB = b.criadaEm?.toMillis ? b.criadaEm.toMillis() : new Date(b.criadaEm || 0).getTime();
@@ -188,11 +190,22 @@ export async function validarLicencaParaAtivacao(codigo: string): Promise<{
       const licencaFirestore = { ...(docSnap.data() as Licenca), id: docSnap.id };
       return checarLicenca(licencaFirestore);
     }
+
+    // Checa se já está no Arquivo Morto (licença já utilizada e arquivada)
+    const arquivoSnap = await getDoc(doc(db, "arquivo_morto_licencas", codigoFormatado));
+    if (arquivoSnap.exists()) {
+      return { valida: false, motivo: "Esta licença já foi utilizada, ativada e transferida para o Arquivo Morto." };
+    }
   } catch (err) {
     console.warn("Consulta Firestore da licença falhou, checando local:", err);
   }
 
   // 2. Se não encontrar no Firestore ou offline, checa armazenamento local
+  const mortosLocais = obterArquivoMortoLocais();
+  if (mortosLocais.some((m) => m.id === codigoFormatado || m.codigo === codigoFormatado)) {
+    return { valida: false, motivo: "Esta licença já foi utilizada, ativada e transferida para o Arquivo Morto." };
+  }
+
   const locais = obterLicencasLocais();
   const localEncontrada = locais.find((l) => l.id === codigoFormatado);
   if (localEncontrada) {
@@ -203,7 +216,8 @@ export async function validarLicencaParaAtivacao(codigo: string): Promise<{
 }
 
 /**
- * Executa a queima atômica (Burn-After-Reading) da licença e a criação da instância do restaurante
+ * Executa a queima atômica (Burn-After-Reading) da licença, arquivamento definitivo
+ * em JSON no 'arquivo_morto_licencas', remoção de 'concessoes' e criação da instância do restaurante
  * usando runTransaction do Firestore, garantindo anti-race condition e uso único estrito.
  */
 export async function ativarLicencaEInstanciaAtomica(params: {
@@ -215,6 +229,7 @@ export async function ativarLicencaEInstanciaAtomica(params: {
 }): Promise<Restaurante> {
   const codigoFormatado = params.codigo.trim().toUpperCase();
   const licencaRef = doc(db, "concessoes", codigoFormatado);
+  const arquivoMortoRef = doc(db, "arquivo_morto_licencas", codigoFormatado);
   const restRef = doc(db, "restaurantes", params.ownerUid);
 
   const slugLimpo = params.slug.trim().toLowerCase();
@@ -248,12 +263,19 @@ export async function ativarLicencaEInstanciaAtomica(params: {
         }
       }
 
+      // 2. Checa se já existe no Arquivo Morto
+      const arquivoSnap = await transaction.get(arquivoMortoRef);
+      if (arquivoSnap.exists()) {
+        throw new Error("Esta licença já foi utilizada, ativada e transferida para o Arquivo Morto.");
+      }
+
       const licSnap = await transaction.get(licencaRef);
+      let licData: Licenca | null = null;
 
       if (licSnap.exists()) {
-        const licData = licSnap.data() as Licenca;
+        licData = licSnap.data() as Licenca;
 
-        // 2. Confirma dentro da transação que a licença continua disponível
+        // 3. Confirma dentro da transação que a licença continua disponível
         if (licData.status === "utilizada" || licData.status === "ativa") {
           throw new Error("Esta licença já foi utilizada e extinta.");
         }
@@ -271,10 +293,10 @@ export async function ativarLicencaEInstanciaAtomica(params: {
         }
       }
 
-      // 3. Grava o documento do restaurante vinculado ao ownerId
+      // 4. Grava o documento do restaurante vinculado ao ownerId
       transaction.set(restRef, novoRest);
 
-      // 4. Grava a trava de unicidade do slug
+      // 5. Grava a trava de unicidade do slug
       transaction.set(slugTravaRef, {
         slug: slugLimpo,
         ownerId: params.ownerUid,
@@ -282,29 +304,54 @@ export async function ativarLicencaEInstanciaAtomica(params: {
         criadoEm: serverTimestamp(),
       });
 
-      // 5. Queima imediatamente a licença marcando como consumida/utilizada
-      transaction.set(
-        licencaRef,
-        {
-          status: "utilizada",
-          consumidaEm: serverTimestamp(),
-          ativadaEm: serverTimestamp(),
-          restauranteId: params.ownerUid,
-          restauranteNome: nomeLimpo,
-          slug: slugLimpo,
-          ownerId: params.ownerUid,
-        },
-        { merge: true }
-      );
+      // 6. Prepara os dados consolidados para o Arquivo Morto (WORM)
+      const agora = new Date();
+      const dadosConsolidados: Licenca = {
+        ...(licData || {
+          id: codigoFormatado,
+          plano: "free",
+          limites: { maxPratos: 15, maxMesas: 5 },
+          criadaEm: agora,
+        }),
+        status: "utilizada",
+        consumidaEm: agora,
+        ativadaEm: agora,
+        restauranteId: params.ownerUid,
+        restauranteNome: nomeLimpo,
+        slug: slugLimpo,
+        ownerId: params.ownerUid,
+      };
+
+      const arquivoMortoDoc = {
+        id: codigoFormatado,
+        codigo: codigoFormatado,
+        arquivadoEm: serverTimestamp(),
+        motivo: "ativacao_concluida",
+        restauranteId: params.ownerUid,
+        restauranteNome: nomeLimpo,
+        slug: slugLimpo,
+        ownerId: params.ownerUid,
+        snapshotJson: JSON.stringify(dadosConsolidados, null, 2),
+        dadosLicenca: dadosConsolidados,
+      };
+
+      // 7. Grava no Arquivo Morto
+      transaction.set(arquivoMortoRef, arquivoMortoDoc);
+
+      // 8. Remove da coleção concessoes para sumir do portal e evitar reuso
+      if (licSnap.exists()) {
+        transaction.delete(licencaRef);
+      }
     });
   } catch (err: unknown) {
     console.warn("Falha ou indisponibilidade de transação no Firestore (executando fallback resiliente):", err);
     // Se a mensagem for de negócio ("já utilizada", "slug já está em uso", etc), repassa o erro
-    if (err instanceof Error && (err.message.includes("utilizada") || err.message.includes("revogada") || err.message.includes("expirou") || err.message.includes("slug"))) {
+    if (err instanceof Error && (err.message.includes("utilizada") || err.message.includes("revogada") || err.message.includes("expirou") || err.message.includes("slug") || err.message.includes("Arquivo Morto"))) {
       throw err;
     }
     // Caso de offline ou fallback
     try {
+      const { deleteDoc } = await import("firebase/firestore");
       await setDoc(restRef, novoRest);
       await setDoc(slugTravaRef, {
         slug: slugLimpo,
@@ -312,46 +359,122 @@ export async function ativarLicencaEInstanciaAtomica(params: {
         restauranteNome: nomeLimpo,
         criadoEm: new Date(),
       }, { merge: true });
-      await setDoc(
-        licencaRef,
-        {
-          status: "utilizada",
-          consumidaEm: new Date(),
-          ativadaEm: new Date(),
-          restauranteId: params.ownerUid,
-          restauranteNome: nomeLimpo,
-          slug: slugLimpo,
-          ownerId: params.ownerUid,
-        },
-        { merge: true }
-      );
+
+      const agora = new Date();
+      const dadosConsolidados: Licenca = {
+        id: codigoFormatado,
+        plano: "free",
+        limites: { maxPratos: 15, maxMesas: 5 },
+        criadaEm: agora,
+        status: "utilizada",
+        consumidaEm: agora,
+        ativadaEm: agora,
+        restauranteId: params.ownerUid,
+        restauranteNome: nomeLimpo,
+        slug: slugLimpo,
+        ownerId: params.ownerUid,
+      };
+
+      await setDoc(arquivoMortoRef, {
+        id: codigoFormatado,
+        codigo: codigoFormatado,
+        arquivadoEm: agora,
+        motivo: "ativacao_concluida",
+        restauranteId: params.ownerUid,
+        restauranteNome: nomeLimpo,
+        slug: slugLimpo,
+        ownerId: params.ownerUid,
+        snapshotJson: JSON.stringify(dadosConsolidados, null, 2),
+        dadosLicenca: dadosConsolidados,
+      });
+
+      await deleteDoc(licencaRef);
     } catch {
       // Ignora erro se totalmente desconectado
     }
   }
 
-  // Atualiza cache local para refletir a extinção imediata do link
-  const locais = obterLicencasLocais();
-  const atualizadas = locais.map((l) => {
-    if (l.id === codigoFormatado) {
-      return {
-        ...l,
-        status: "utilizada" as const,
-        restauranteId: params.ownerUid,
-        restauranteNome: nomeLimpo,
-        slug: slugLimpo,
-        consumidaEm: new Date(),
-        ativadaEm: new Date(),
-        ownerId: params.ownerUid,
-      };
-    }
-    return l;
+  // 9. Atualiza cache local: remove de concessões ativas e move para arquivo morto local
+  removerLicencaLocal(codigoFormatado);
+  salvarArquivoMortoLocal({
+    id: codigoFormatado,
+    codigo: codigoFormatado,
+    arquivadoEm: new Date().toISOString(),
+    motivo: "ativacao_concluida",
+    restauranteId: params.ownerUid,
+    restauranteNome: nomeLimpo,
+    slug: slugLimpo,
+    ownerId: params.ownerUid,
+    snapshotJson: JSON.stringify({
+      id: codigoFormatado,
+      restauranteId: params.ownerUid,
+      restauranteNome: nomeLimpo,
+      slug: slugLimpo,
+      arquivadoEm: new Date(),
+    }, null, 2),
+    dadosLicenca: {
+      id: codigoFormatado,
+      status: "utilizada",
+      plano: "free",
+      limites: { maxPratos: 15, maxMesas: 5 },
+      criadaEm: new Date(),
+      restauranteId: params.ownerUid,
+      restauranteNome: nomeLimpo,
+      slug: slugLimpo,
+    },
   });
-  if (typeof window !== "undefined") {
-    localStorage.setItem("mayamenu_concessoes_locais", JSON.stringify(atualizadas));
-  }
 
   return novoRest;
+}
+
+/**
+ * Escuta os registros do Arquivo Morto de Licenças em tempo real
+ */
+export function escutarArquivoMorto(
+  onAtualizacao: (arquivadas: import("@/types").LicencaArquivada[]) => void
+): Unsubscribe {
+  const locais = obterArquivoMortoLocais();
+  if (locais.length > 0) {
+    onAtualizacao(locais);
+  }
+
+  const colRef = collection(db, "arquivo_morto_licencas");
+  const q = query(colRef, orderBy("arquivadoEm", "desc"));
+
+  try {
+    return onSnapshot(
+      q,
+      (snapshot) => {
+        const listaFirestore: import("@/types").LicencaArquivada[] = [];
+        snapshot.forEach((d) => {
+          listaFirestore.push({
+            ...(d.data() as import("@/types").LicencaArquivada),
+            id: d.id,
+          });
+        });
+
+        const locaisAtuais = obterArquivoMortoLocais();
+        const mapa = new Map<string, import("@/types").LicencaArquivada>();
+        locaisAtuais.forEach((l) => mapa.set(l.id, l));
+        listaFirestore.forEach((l) => mapa.set(l.id, l));
+
+        const mesclada = Array.from(mapa.values());
+        mesclada.sort((a, b) => {
+          const tA = (a.arquivadoEm as any)?.toMillis ? (a.arquivadoEm as any).toMillis() : new Date(a.arquivadoEm || 0).getTime();
+          const tB = (b.arquivadoEm as any)?.toMillis ? (b.arquivadoEm as any).toMillis() : new Date(b.arquivadoEm || 0).getTime();
+          return tB - tA;
+        });
+
+        onAtualizacao(mesclada);
+      },
+      (err) => {
+        console.warn("Listener do Firestore indisponível para arquivo_morto_licencas (usando local):", err);
+        onAtualizacao(obterArquivoMortoLocais());
+      }
+    );
+  } catch {
+    return () => {};
+  }
 }
 
 /**
@@ -413,6 +536,39 @@ function obterLicencasLocais(): Licenca[] {
   if (typeof window === "undefined") return [];
   try {
     const salvo = localStorage.getItem("mayamenu_concessoes_locais");
+    return salvo ? JSON.parse(salvo) : [];
+  } catch {
+    return [];
+  }
+}
+
+function removerLicencaLocal(codigo: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    const locais = obterLicencasLocais();
+    const filtrada = locais.filter((l) => l.id !== codigo);
+    localStorage.setItem("mayamenu_concessoes_locais", JSON.stringify(filtrada));
+  } catch (e) {
+    console.warn("Falha ao remover licença do localStorage:", e);
+  }
+}
+
+function salvarArquivoMortoLocal(arquivada: import("@/types").LicencaArquivada): void {
+  if (typeof window === "undefined") return;
+  try {
+    const locais = obterArquivoMortoLocais();
+    const existe = locais.some((l) => l.id === arquivada.id);
+    const novaLista = existe ? locais.map((l) => (l.id === arquivada.id ? arquivada : l)) : [arquivada, ...locais];
+    localStorage.setItem("mayamenu_arquivo_morto_locais", JSON.stringify(novaLista));
+  } catch (e) {
+    console.warn("Falha ao salvar no arquivo morto local:", e);
+  }
+}
+
+function obterArquivoMortoLocais(): import("@/types").LicencaArquivada[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const salvo = localStorage.getItem("mayamenu_arquivo_morto_locais");
     return salvo ? JSON.parse(salvo) : [];
   } catch {
     return [];

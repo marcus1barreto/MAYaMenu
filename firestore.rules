@@ -38,7 +38,15 @@ service cloud.firestore {
         (resource.data.status == 'disponivel' && request.resource.data.status == 'utilizada' && request.resource.data.ownerId == request.auth.uid)
         || (request.resource.data.status in ['ativa', 'suspensa', 'revogada'])
       );
-      allow delete: if false; // Licenças nunca são apagadas (histórico/auditoria)
+      // Permite exclusão atômica quando a licença é movida para o Arquivo Morto
+      allow delete: if isNonAnonymous();
+    }
+
+    // Arquivo Morto de Licenças Utilizadas (Armazenamento em JSON de Auditoria)
+    match /arquivo_morto_licencas/{licencaId} {
+      allow read: if isNonAnonymous();
+      allow create: if isNonAnonymous();
+      allow update, delete: if false; // Arquivo morto é estritamente imutável (WORM - Write Once, Read Many)
     }
 
     // Slugs (Trava de Unicidade)

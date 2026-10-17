@@ -107,3 +107,16 @@ export interface Licenca {
   responsavel?: string; // Nome/Contato do lojista
   notas?: string;
 }
+
+export interface LicencaArquivada {
+  id: string; // Token original (Ex: "MAYA-7K2X-91A4")
+  codigo: string;
+  arquivadoEm: any;
+  motivo: "ativacao_concluida" | "expirada" | "revogada_manual";
+  restauranteId: string;
+  restauranteNome: string;
+  slug: string;
+  ownerId: string;
+  snapshotJson: string; // JSON serializado completo da licença e transação
+  dadosLicenca: Licenca;
+}
