@@ -7,13 +7,14 @@ import { useCart } from "@/context/cart-context";
 import { ItemModal } from "./item-modal";
 import { CartDrawer } from "./cart-drawer";
 import { HistoricoVisitasModal } from "./historico-visitas-modal";
-import { ShoppingBag, Sparkles, MapPin, Search, Receipt, DollarSign, CheckCircle2, Bell, Clock } from "lucide-react";
+import { MinhaComandaModal } from "./minha-comanda-modal";
+import { ShoppingBag, Sparkles, MapPin, Search, Receipt, DollarSign, CheckCircle2, Bell, Clock, PartyPopper, HeartHandshake, Utensils } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ensureClienteAnonimo, db } from "@/lib/firebase";
 import { doc, updateDoc, serverTimestamp, onSnapshot } from "firebase/firestore";
 import { escutarCardapio, chamarGarcomFirestore } from "@/lib/restaurante-service";
-import { marcarVisitaAtualComoPaga } from "@/lib/historico-cliente";
+import { marcarVisitaAtualComoPaga, limparSessaoClienteLocal } from "@/lib/historico-cliente";
 
 interface MenuViewProps {
   restaurante: Restaurante;
@@ -27,6 +28,9 @@ export function MenuView({ restaurante, cardapio: cardapioInicial, numeroMesa = 
   const [itemSelecionado, setItemSelecionado] = useState<MenuItem | null>(null);
   const [carrinhoAberto, setCarrinhoAberto] = useState(false);
   const [historicoAberto, setHistoricoAberto] = useState(false);
+  const [minhaComandaAberta, setMinhaComandaAberta] = useState(false);
+  const [contaPagaModal, setContaPagaModal] = useState(false);
+  const [subtotalComandaBanco, setSubtotalComandaBanco] = useState(0);
   const [busca, setBusca] = useState("");
   const [pedindoConta, setPedindoConta] = useState(false);
   const [contaPedidaSucesso, setContaPedidaSucesso] = useState(false);
@@ -66,16 +70,24 @@ export function MenuView({ restaurante, cardapio: cardapioInicial, numeroMesa = 
           if (snap.exists()) {
             const data = snap.data() as ComandaCliente;
             setComandaStatus(data.status);
+            setSubtotalComandaBanco(data.subtotal || 0);
+
             if (data.status === "conta_pedida") {
               setContaPedidaSucesso(true);
             } else if (data.status === "pago") {
-              // Regra de desconexão oficial: comanda paga!
+              // 1. Sincronia do Status "Pago" para o Cliente: feedback visual imediato
               marcarVisitaAtualComoPaga(restaurante.slug, numeroMesa);
+              setContaPedidaSucesso(false);
+              setContaPagaModal(true);
+              setMinhaComandaAberta(false);
+              setCarrinhoAberto(false);
+              // 2. Limpa o carrinho e a sessão local da mesa
+              limparSessaoClienteLocal(restaurante.slug);
             }
           }
         },
         (err) => {
-          console.warn("Listener da comanda do cliente indisponível:", err);
+          console.error("Erro no listener da comanda do cliente:", err);
         }
       );
     });
@@ -208,6 +220,21 @@ export function MenuView({ restaurante, cardapio: cardapioInicial, numeroMesa = 
             >
               Cardápio Digital PWA
             </Badge>
+
+            {/* BOTÃO VER MINHA COMANDA (Acompanhamento em Tempo Real dos Pratos) */}
+            <button
+              type="button"
+              onClick={() => setMinhaComandaAberta(true)}
+              className="bg-rose-600/90 hover:bg-rose-600 text-white text-[11px] font-black px-3 py-1 rounded-full transition-all flex items-center gap-1.5 shadow-md shrink-0 active:scale-95"
+            >
+              <Utensils className="w-3 h-3 text-white" />
+              <span>Minha Comanda</span>
+              {subtotalComandaBanco > 0 && (
+                <span className="bg-white/20 px-1.5 py-0.2 rounded-full font-mono text-[10px]">
+                  {subtotalComandaBanco.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                </span>
+              )}
+            </button>
 
             {/* BOTÃO DA CARTEIRA / HISTÓRICO DE VISITAS */}
             <button
@@ -462,6 +489,69 @@ export function MenuView({ restaurante, cardapio: cardapioInicial, numeroMesa = 
         isOpen={historicoAberto}
         onClose={() => setHistoricoAberto(false)}
       />
+
+      {/* MODAL DE CONSULTA DA COMANDA ATIVA PELO CLIENTE (RODADAS & KDS) */}
+      <MinhaComandaModal
+        isOpen={minhaComandaAberta}
+        onClose={() => setMinhaComandaAberta(false)}
+        restauranteId={restaurante.id}
+        mesaNumero={numeroMesa}
+        slug={restaurante.slug}
+        corPrimaria={corPrimaria}
+        subtotalAcumulado={subtotalComandaBanco}
+        statusComanda={comandaStatus}
+        onPedirConta={handlePedirConta}
+        pedindoConta={pedindoConta}
+        contaPedidaSucesso={contaPedidaSucesso}
+      />
+
+      {/* MODAL DE FEEDBACK DE CONTA PAGA COM SUCESSO (Sincronia Garçom -> Cliente) */}
+      {contaPagaModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-neutral-900 border border-neutral-800 rounded-3xl max-w-sm w-full p-6 text-center space-y-5 shadow-2xl animate-in zoom-in-95">
+            <div className="w-16 h-16 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 mx-auto flex items-center justify-center">
+              <CheckCircle2 className="w-9 h-9 animate-bounce" />
+            </div>
+
+            <div className="space-y-1.5">
+              <h3 className="text-xl font-black text-white">Conta Paga com Sucesso!</h3>
+              <p className="text-xs text-neutral-400 leading-relaxed">
+                Seu pagamento foi confirmado pelo restaurante. A comanda da <strong>Mesa {numeroMesa}</strong> foi encerrada.
+              </p>
+              <p className="text-xs text-rose-400 font-semibold pt-1">
+                Muito obrigado pela visita! Volte sempre! ✨
+              </p>
+            </div>
+
+            <div className="pt-2 flex flex-col gap-2">
+              <Button
+                type="button"
+                onClick={() => {
+                  setContaPagaModal(false);
+                  setHistoricoAberto(true);
+                }}
+                className="w-full h-11 bg-neutral-800 hover:bg-neutral-700 text-white font-bold rounded-xl text-xs uppercase tracking-wider flex items-center justify-center gap-2"
+              >
+                <Receipt className="w-4 h-4 text-rose-400" />
+                Ver Comprovante Digital
+              </Button>
+
+              <Button
+                type="button"
+                onClick={() => {
+                  setContaPagaModal(false);
+                  if (typeof window !== "undefined") {
+                    window.location.reload();
+                  }
+                }}
+                className="w-full h-11 bg-rose-600 hover:bg-rose-500 text-white font-black rounded-xl text-xs uppercase tracking-wider"
+              >
+                Concluir
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

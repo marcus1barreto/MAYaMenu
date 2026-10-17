@@ -31,6 +31,7 @@ import {
   liberarMesaFirestore,
   injetarTicketContingencia,
   atenderGarcomFirestore,
+  lancarItemManualFirestore,
 } from "@/lib/restaurante-service";
 
 export interface ComandaGarcom {
@@ -529,8 +530,10 @@ export function GarcomView({
         onMarcarPago={handleMarcarComoPago}
         onLiberarMesa={handleLiberarMesa}
         onAtenderGarcom={handleAtenderGarcom}
-        onLancarItem={(num, nome, item, qtd) => {
+        onLancarItem={(num, nome, item, qtd, obs) => {
           const valor = item.precoBase * qtd;
+          let clienteIdDestino: string | undefined = undefined;
+
           setMesas((prev) =>
             prev.map((m) => {
               if (m.numero === num) {
@@ -539,6 +542,7 @@ export function GarcomView({
                 );
                 let novasComandas: ComandaGarcom[];
                 if (comandaExistente) {
+                  clienteIdDestino = comandaExistente.id;
                   novasComandas = m.comandas.map((c) =>
                     c.id === comandaExistente.id
                       ? {
@@ -552,10 +556,12 @@ export function GarcomView({
                       : c
                   );
                 } else {
+                  const novoCId = `cli-${Date.now().toString(36)}`;
+                  clienteIdDestino = novoCId;
                   novasComandas = [
                     ...m.comandas,
                     {
-                      id: `cli-${Date.now().toString(36)}`,
+                      id: novoCId,
                       nomeCliente: nome,
                       subtotal: valor,
                       status: "aguardando_pratos",
@@ -568,6 +574,7 @@ export function GarcomView({
               return m;
             })
           );
+
           setMesaSelecionada((prev) => {
             if (!prev || prev.numero !== num) return prev;
             const comandaExistente = prev.comandas.find(
@@ -606,6 +613,22 @@ export function GarcomView({
               ],
             };
           });
+
+          // Injeção real no Firestore para o KDS da cozinha receber
+          if (restauranteId) {
+            lancarItemManualFirestore({
+              restauranteId,
+              slug,
+              mesaNumero: num,
+              clienteNome: nome,
+              clienteId: clienteIdDestino,
+              item,
+              quantidade: qtd,
+              observacao: obs,
+            }).catch((err) => {
+              console.warn("Falha ao injetar item lançado pelo garçom no Firestore:", err);
+            });
+          }
         }}
       />
 

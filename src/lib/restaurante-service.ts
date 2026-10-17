@@ -17,6 +17,7 @@ import {
   onSnapshot,
   limit,
   serverTimestamp,
+  increment,
   type Unsubscribe,
 } from "firebase/firestore";
 import type { Restaurante, MenuItem, PedidoRodada, ComandaCliente } from "@/types";
@@ -589,4 +590,143 @@ export async function injetarTicketContingencia(
 
   await setDoc(comandaRef, dadosComanda, { merge: true });
   await setDoc(pedidoRef, dadosPedido);
+}
+
+/**
+ * Lança um item manualmente em uma mesa (ação do Garçom ou Admin).
+ * Cria o documento na subcoleção 'pedidos' com status 'a_fazer' (garantindo injeção no KDS)
+ * e atualiza o subtotal acumulado na comanda pai via increment.
+ */
+export async function lancarItemManualFirestore(params: {
+  restauranteId: string;
+  slug?: string;
+  mesaNumero: number | string;
+  clienteNome: string;
+  clienteId?: string;
+  item: MenuItem;
+  quantidade: number;
+  observacao?: string;
+}): Promise<void> {
+  const idFinal = (params.restauranteId || params.slug || "demo").trim();
+  const cId = params.clienteId || `garcom-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+  const pedidoId = `ped-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+  const subtotalItem = (Number(params.item.precoBase) || 0) * params.quantidade;
+
+  const comandaRef = doc(
+    db,
+    "restaurantes",
+    idFinal,
+    "mesas",
+    String(params.mesaNumero),
+    "comandas_abertas",
+    cId
+  );
+
+  const pedidoRef = doc(
+    db,
+    "restaurantes",
+    idFinal,
+    "mesas",
+    String(params.mesaNumero),
+    "comandas_abertas",
+    cId,
+    "pedidos",
+    pedidoId
+  );
+
+  const itensMapeados = [
+    {
+      menuItemId: params.item.id,
+      nome: params.item.nome,
+      quantidade: params.quantidade,
+      precoFinal: Number(params.item.precoBase) || 0,
+      modificadores: [],
+      observacoes: params.observacao || "",
+    },
+  ];
+
+  // Documento individual da rodada para o KDS da cozinha
+  const dadosPedidoRodada = {
+    id: pedidoId,
+    restauranteId: idFinal,
+    slug: params.slug || idFinal,
+    clienteId: cId,
+    nomeCliente: params.clienteNome.trim(),
+    mesa: params.mesaNumero,
+    numeroMesa: Number(params.mesaNumero) || params.mesaNumero,
+    itens: itensMapeados,
+    subtotal: subtotalItem,
+    status: "a_fazer" as const,
+    criadoEm: serverTimestamp(),
+  };
+
+  const comandaSnap = await getDoc(comandaRef);
+
+  let saveComandaPromise: Promise<unknown>;
+  if (!comandaSnap.exists()) {
+    saveComandaPromise = setDoc(comandaRef, {
+      id: cId,
+      restauranteId: idFinal,
+      slug: params.slug || idFinal,
+      nomeCliente: params.clienteNome.trim(),
+      mesa: params.mesaNumero,
+      numeroMesa: Number(params.mesaNumero) || params.mesaNumero,
+      criadoEm: serverTimestamp(),
+      atualizadoEm: serverTimestamp(),
+      subtotal: subtotalItem,
+      status: "aguardando_pratos" as const,
+    });
+  } else {
+    saveComandaPromise = updateDoc(comandaRef, {
+      restauranteId: idFinal,
+      slug: params.slug || idFinal,
+      nomeCliente: params.clienteNome.trim(),
+      mesa: params.mesaNumero,
+      numeroMesa: Number(params.mesaNumero) || params.mesaNumero,
+      atualizadoEm: serverTimestamp(),
+      subtotal: increment(subtotalItem),
+      status: "aguardando_pratos" as const,
+    });
+  }
+
+  const savePedidoPromise = setDoc(pedidoRef, dadosPedidoRodada);
+
+  await Promise.all([saveComandaPromise, savePedidoPromise]);
+}
+
+/**
+ * Escuta todos os pedidos/rodadas já realizados por um cliente específico na sua comanda.
+ */
+export function escutarPedidosCliente(
+  restauranteId: string,
+  mesaNumero: number | string,
+  clienteId: string,
+  onAtualizacao: (pedidos: PedidoRodada[]) => void
+): Unsubscribe {
+  const colRef = collection(
+    db,
+    "restaurantes",
+    restauranteId,
+    "mesas",
+    String(mesaNumero),
+    "comandas_abertas",
+    clienteId,
+    "pedidos"
+  );
+
+  const q = query(colRef, orderBy("criadoEm", "asc"));
+
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const lista: PedidoRodada[] = [];
+      snapshot.forEach((d) => {
+        lista.push({ ...(d.data() as PedidoRodada), id: d.id });
+      });
+      onAtualizacao(lista);
+    },
+    (err) => {
+      console.error(`Erro ao escutar pedidos do cliente ${clienteId} na mesa ${mesaNumero}:`, err);
+    }
+  );
 }

@@ -13,6 +13,7 @@ import {
   excluirItemCardapio,
   popularCardapioInicialSeVazio,
   atenderGarcomFirestore,
+  lancarItemManualFirestore,
 } from "@/lib/restaurante-service";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -261,6 +262,8 @@ export function AdminDashboard() {
   ) => {
     const precoFinal = item.precoBase * quantidade;
 
+    let clienteIdDestino: string | undefined = undefined;
+
     setMesas((prev) =>
       prev.map((m) => {
         if (m.numero === mesaNumero) {
@@ -270,6 +273,7 @@ export function AdminDashboard() {
 
           let novasComandas: ComandaGarcom[];
           if (comandaExistente) {
+            clienteIdDestino = comandaExistente.id;
             novasComandas = m.comandas.map((c) =>
               c.id === comandaExistente.id
                 ? {
@@ -287,8 +291,10 @@ export function AdminDashboard() {
                 : c
             );
           } else {
+            const novoCId = `cli-${Date.now().toString(36)}`;
+            clienteIdDestino = novoCId;
             const novaComanda: ComandaGarcom = {
-              id: `cli-${Date.now().toString(36)}`,
+              id: novoCId,
               nomeCliente: clienteNome,
               subtotal: precoFinal,
               status: "aguardando_pratos",
@@ -361,6 +367,22 @@ export function AdminDashboard() {
         ],
       };
     });
+
+    // Injeção real no Firestore para o KDS da Cozinha
+    if (restaurante?.id) {
+      lancarItemManualFirestore({
+        restauranteId: restaurante.id,
+        slug: restaurante.slug,
+        mesaNumero,
+        clienteNome,
+        clienteId: clienteIdDestino,
+        item,
+        quantidade,
+        observacao,
+      }).catch((err) => {
+        console.warn("Falha ao injetar item lançado manualmente no Firestore pelo Admin:", err);
+      });
+    }
   };
 
   // Toggle de item ativo/pausado instantâneo conectado ao Firestore

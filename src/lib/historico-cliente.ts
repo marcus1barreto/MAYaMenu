@@ -150,3 +150,16 @@ export function gerarComprovanteHash(slug: string, mesa: number | string): strin
   }
   return `MM-${slug.toUpperCase()}-M${mesa}-${hash}`;
 }
+
+/**
+ * Limpa a sessão local da mesa e carrinho quando a conta é marcada como paga
+ */
+export function limparSessaoClienteLocal(slug: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.removeItem(`mayamenu_cart_${slug}`);
+    localStorage.removeItem("mayamenu_anon_uid");
+  } catch (e) {
+    console.warn("Falha ao limpar sessão do cliente no localStorage:", e);
+  }
+}
