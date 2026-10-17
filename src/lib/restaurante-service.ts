@@ -197,11 +197,21 @@ export async function salvarItemCardapio(
  */
 export async function excluirItemCardapio(
   restauranteId: string,
-  itemId: string
+  itemId: string,
+  fotoUrl?: string
 ): Promise<void> {
   const { deleteDoc } = await import("firebase/firestore");
   const itemRef = doc(db, "restaurantes", restauranteId, "cardapio", itemId);
   await deleteDoc(itemRef);
+
+  if (fotoUrl) {
+    try {
+      const { excluirFotoPrato } = await import("@/lib/storage-service");
+      await excluirFotoPrato(fotoUrl);
+    } catch (e) {
+      console.warn("Aviso ao limpar foto do prato excluído no Storage:", e);
+    }
+  }
 }
 
 /**

@@ -1,18 +1,19 @@
 rules_version = '2';
 
 // Regras do Firebase Storage - MAYaMenu
-// Permite que qualquer pessoa veja as fotos dos pratos/restaurante.
-// Apenas usuários autenticados (donos/gerentes) podem subir ou alterar fotos.
+// Estrutura: /restaurantes/{restauranteId}/cardapio/{fileName}
+// Clientes podem ler as fotos publicamente.
+// Apenas o dono autenticado da sua própria pasta de restaurante pode criar, atualizar ou deletar fotos.
 service firebase.storage {
   match /b/{bucket}/o {
-    match /restaurantes/{restauranteId}/{allPaths=**} {
+    match /restaurantes/{restauranteId}/cardapio/{fileName} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write, delete: if request.auth != null && request.auth.uid == restauranteId;
     }
 
-    match /{allPaths=**} {
+    match /restaurantes/{restauranteId}/{allPaths=**} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write, delete: if request.auth != null && request.auth.uid == restauranteId;
     }
   }
 }

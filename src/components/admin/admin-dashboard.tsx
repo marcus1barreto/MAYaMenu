@@ -39,9 +39,15 @@ import {
   Users,
   Clock,
   Bell,
+  Upload,
+  Camera,
+  Trash2,
+  Loader2,
+  ImageIcon,
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
+import { uploadFotoPrato, excluirFotoPrato } from "@/lib/storage-service";
 import { MesaDetalheModal } from "@/components/salao/mesa-detalhe-modal";
 import { MESAS_INICIAIS, type MesaOperacional, type ComandaGarcom } from "@/components/garcom/garcom-view";
 
@@ -381,8 +387,13 @@ export function AdminDashboard() {
   const [modalPratoAberto, setModalPratoAberto] = useState(false);
   const [itemEmEdicao, setItemEmEdicao] = useState<Partial<MenuItem> | null>(null);
   const [salvandoPrato, setSalvandoPrato] = useState(false);
+  const [arquivoFoto, setArquivoFoto] = useState<File | null>(null);
+  const [previewFoto, setPreviewFoto] = useState<string | null>(null);
+  const [enviandoFoto, setEnviandoFoto] = useState(false);
 
   const handleAbrirNovoPrato = () => {
+    setArquivoFoto(null);
+    setPreviewFoto(null);
     setItemEmEdicao({
       id: `item-${Date.now().toString(36)}`,
       nome: "",
@@ -390,14 +401,39 @@ export function AdminDashboard() {
       descricao: "",
       precoBase: 30,
       ativo: true,
-      fotoUrl: "/images/demo/hamburger.webp",
+      fotoUrl: "",
     });
     setModalPratoAberto(true);
   };
 
   const handleEditarPrato = (item: MenuItem) => {
+    setArquivoFoto(null);
+    setPreviewFoto(item.fotoUrl || null);
     setItemEmEdicao({ ...item });
     setModalPratoAberto(true);
+  };
+
+  const handleFotoSelecionada = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Limite de 5MB
+    if (file.size > 5 * 1024 * 1024) {
+      alert("A imagem selecionada ultrapassa o limite de 5MB. Escolha uma imagem menor.");
+      return;
+    }
+
+    setArquivoFoto(file);
+    const objectUrl = URL.createObjectURL(file);
+    setPreviewFoto(objectUrl);
+  };
+
+  const handleRemoverFoto = () => {
+    setArquivoFoto(null);
+    setPreviewFoto(null);
+    if (itemEmEdicao) {
+      setItemEmEdicao({ ...itemEmEdicao, fotoUrl: "" });
+    }
   };
 
   const handleSalvarPrato = async (e: React.FormEvent) => {
@@ -405,6 +441,37 @@ export function AdminDashboard() {
     if (!itemEmEdicao || !itemEmEdicao.nome?.trim() || !restaurante?.id) return;
 
     setSalvandoPrato(true);
+    let fotoUrlFinal = itemEmEdicao.fotoUrl?.trim() || "";
+
+    // 1. Se o lojista selecionou uma nova foto, faz upload no Storage primeiro
+    if (arquivoFoto) {
+      setEnviandoFoto(true);
+      try {
+        const urlUpload = await uploadFotoPrato(restaurante.id, arquivoFoto);
+        
+        // Se já existia uma foto antiga no Storage antes da troca, remove para não deixar lixo
+        if (
+          itemEmEdicao.fotoUrl &&
+          itemEmEdicao.fotoUrl !== urlUpload &&
+          (itemEmEdicao.fotoUrl.includes("firebasestorage.googleapis.com") ||
+           itemEmEdicao.fotoUrl.includes("storage.googleapis.com"))
+        ) {
+          excluirFotoPrato(itemEmEdicao.fotoUrl).catch((err) =>
+            console.warn("Aviso ao limpar foto anterior no Storage:", err)
+          );
+        }
+
+        fotoUrlFinal = urlUpload;
+      } catch (uploadErr) {
+        console.error("Falha ao enviar foto para o Storage:", uploadErr);
+        // Resiliência: avisa o usuário mas permite continuar o salvamento dos dados do prato
+        alert("Não foi possível enviar a foto no momento. O prato será salvo com as informações de texto.");
+      } finally {
+        setEnviandoFoto(false);
+      }
+    }
+
+    // 2. Salva o prato no Firestore
     try {
       const itemPronto: MenuItem = {
         id: itemEmEdicao.id || `item-${Date.now().toString(36)}`,
@@ -413,13 +480,15 @@ export function AdminDashboard() {
         descricao: itemEmEdicao.descricao?.trim() || "",
         precoBase: Number(itemEmEdicao.precoBase) || 0,
         ativo: itemEmEdicao.ativo !== undefined ? itemEmEdicao.ativo : true,
-        fotoUrl: itemEmEdicao.fotoUrl?.trim() || "/images/demo/hamburger.webp",
+        fotoUrl: fotoUrlFinal,
         grupoModificadores: itemEmEdicao.grupoModificadores || [],
       };
 
       await salvarItemCardapio(restaurante.id, itemPronto);
       setModalPratoAberto(false);
       setItemEmEdicao(null);
+      setArquivoFoto(null);
+      setPreviewFoto(null);
     } catch (err) {
       console.warn("Falha ao salvar prato:", err);
     } finally {
@@ -427,11 +496,11 @@ export function AdminDashboard() {
     }
   };
 
-  const handleExcluirPrato = async (id: string) => {
+  const handleExcluirPrato = async (id: string, fotoUrl?: string) => {
     if (!window.confirm("Tem certeza que deseja excluir este prato do cardápio?")) return;
     if (restaurante?.id) {
       try {
-        await excluirItemCardapio(restaurante.id, id);
+        await excluirItemCardapio(restaurante.id, id, fotoUrl);
       } catch (err) {
         console.warn("Falha ao excluir prato:", err);
       }
@@ -622,7 +691,7 @@ export function AdminDashboard() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleExcluirPrato(item.id)}
+                      onClick={() => handleExcluirPrato(item.id, item.fotoUrl)}
                       className="px-2.5 py-1.5 bg-red-950/40 hover:bg-red-900/60 text-red-400 rounded-lg text-xs font-semibold transition-colors"
                     >
                       Excluir
@@ -970,16 +1039,63 @@ export function AdminDashboard() {
                 />
               </div>
 
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold uppercase tracking-wider text-neutral-300">
-                  URL da Foto
+              {/* FOTO DO PRATO (STORAGE UPLOAD COM PREVIEW) */}
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-neutral-300 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Camera className="w-3.5 h-3.5 text-rose-500" />
+                    Foto do Prato
+                  </span>
+                  <span className="text-[10px] text-neutral-400 font-normal">Máx 5MB (JPG, PNG, WebP)</span>
                 </label>
-                <Input
-                  placeholder="/images/demo/hamburger.webp ou URL externa"
-                  value={itemEmEdicao.fotoUrl || ""}
-                  onChange={(e) => setItemEmEdicao({ ...itemEmEdicao, fotoUrl: e.target.value })}
-                  className="bg-neutral-800 border-neutral-700 text-white placeholder:text-neutral-500 rounded-xl text-xs"
-                />
+
+                {/* PREVIEW DA IMAGEM SE HOUVER */}
+                {previewFoto ? (
+                  <div className="relative w-full h-44 rounded-2xl overflow-hidden bg-neutral-950 border border-neutral-700/80 group">
+                    <Image
+                      src={previewFoto}
+                      alt="Prévia do prato"
+                      fill
+                      className="object-cover"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex items-end justify-between p-3 opacity-90 group-hover:opacity-100 transition-opacity">
+                      <span className="text-[11px] text-neutral-300 truncate max-w-[200px]">
+                        {arquivoFoto ? arquivoFoto.name : "Imagem atual do prato"}
+                      </span>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="destructive"
+                        onClick={handleRemoverFoto}
+                        className="h-8 px-2.5 bg-red-600/80 hover:bg-red-600 text-white rounded-xl text-xs flex items-center gap-1 shadow-lg"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        Remover
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  /* DROPZONE / SELETOR DE ARQUIVO */
+                  <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-neutral-700 hover:border-rose-500 rounded-2xl cursor-pointer bg-neutral-800/40 hover:bg-neutral-800/80 transition-all p-4 text-center">
+                    <div className="flex flex-col items-center justify-center">
+                      <div className="p-2.5 bg-rose-500/10 rounded-xl text-rose-400 mb-2">
+                        <Upload className="w-5 h-5" />
+                      </div>
+                      <p className="text-xs font-bold text-neutral-200">
+                        Clique para selecionar ou tirar foto
+                      </p>
+                      <p className="text-[10px] text-neutral-400 mt-0.5">
+                        Upload direto para o Firebase Storage
+                      </p>
+                    </div>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleFotoSelecionada}
+                      className="hidden"
+                    />
+                  </label>
+                )}
               </div>
 
               <div className="flex items-center justify-between p-3 rounded-xl bg-neutral-800/60 border border-neutral-700/60">
@@ -995,16 +1111,29 @@ export function AdminDashboard() {
                   type="button"
                   variant="ghost"
                   onClick={() => setModalPratoAberto(false)}
+                  disabled={salvandoPrato || enviandoFoto}
                   className="text-neutral-400 hover:text-white rounded-xl text-xs"
                 >
                   Cancelar
                 </Button>
                 <Button
                   type="submit"
-                  disabled={salvandoPrato}
-                  className="bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl text-xs h-10 px-5 shadow-lg"
+                  disabled={salvandoPrato || enviandoFoto}
+                  className="bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl text-xs h-10 px-5 shadow-lg flex items-center gap-1.5"
                 >
-                  {salvandoPrato ? "Salvando..." : "Salvar Prato"}
+                  {enviandoFoto ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Enviando imagem...
+                    </>
+                  ) : salvandoPrato ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Salvando...
+                    </>
+                  ) : (
+                    "Salvar Prato"
+                  )}
                 </Button>
               </div>
             </form>
