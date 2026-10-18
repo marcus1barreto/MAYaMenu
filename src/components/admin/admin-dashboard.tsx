@@ -86,10 +86,11 @@ export function AdminDashboard() {
     return () => unsub();
   }, [restaurante?.id]);
 
-  // Controle de Mesas do Salão (1 a 12 livres por padrão, sincronizadas com Firestore)
+  // Controle de Mesas do Salão (sincronizadas com Firestore conforme o limite do plano)
+  const maxMesas = (restaurante as any)?.licenca?.maxMesas || (restaurante as any)?.licenca?.limites?.maxMesas || restaurante?.maxMesas || 5;
   const [mesas, setMesas] = useState<MesaOperacional[]>(() => {
     const mapaLimpo: MesaOperacional[] = [];
-    for (let i = 1; i <= 12; i++) {
+    for (let i = 1; i <= maxMesas; i++) {
       mapaLimpo.push({ numero: i, status: "livre", comandas: [] });
     }
     return mapaLimpo;
@@ -139,9 +140,9 @@ export function AdminDashboard() {
             }
           });
 
-          // Reconstrói as 12 mesas com base nas comandas ativas
+          // Reconstrói as mesas com base nas comandas ativas e no limite do plano
           const mapa = new Map<number, MesaOperacional>();
-          for (let i = 1; i <= 12; i++) {
+          for (let i = 1; i <= maxMesas; i++) {
             mapa.set(i, { numero: i, status: "livre", comandas: [] });
           }
 
@@ -196,7 +197,7 @@ export function AdminDashboard() {
     );
 
     return () => unsub();
-  }, [restaurante?.id, restaurante?.slug]);
+  }, [restaurante?.id, restaurante?.slug, maxMesas]);
 
   const handleAbrirMesa = (num: number) => {
     const mesaEncontrada = mesas.find((m) => m.numero === num) || {
@@ -523,6 +524,13 @@ export function AdminDashboard() {
   const handleSalvarPrato = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!itemEmEdicao || !itemEmEdicao.nome?.trim() || !restaurante?.id) return;
+
+    // Bloqueio de limite de pratos conforme o plano
+    const maxPratos = (restaurante as any)?.licenca?.maxPratos || (restaurante as any)?.licenca?.limites?.maxPratos || restaurante?.maxPratos || 15;
+    if (!itemEmEdicao.id && itensCardapio.length >= maxPratos) {
+      alert(`O seu plano permite no máximo ${maxPratos} pratos. Faça upgrade!`);
+      return;
+    }
 
     setSalvandoPrato(true);
     let fotoUrlFinal = itemEmEdicao.fotoUrl?.trim() || "";
@@ -1058,140 +1066,157 @@ export function AdminDashboard() {
         {/* ABA: MAYA INTELIGÊNCIA / ANALYTICS (PREMIUM UPSELL) */}
         {abaAtiva === "analytics" && (
           <div className="relative min-h-[640px] rounded-3xl overflow-hidden border border-neutral-800 bg-neutral-950/60 p-4 sm:p-8">
-            {/* CONTEÚDO FICTÍCIO DESFOCADO (SKELETON / BACKGROUND METRICS) */}
-            <div className="filter blur-md select-none pointer-events-none space-y-6 opacity-40">
-              {/* Header do Relatório */}
-              <div className="flex justify-between items-center pb-4 border-b border-neutral-800">
-                <div>
-                  <h3 className="text-lg font-black text-white">Relatório de Desempenho e Eficiência do Salão</h3>
-                  <p className="text-xs text-neutral-400">Últimos 30 dias • Comparativo por turno e rotatividade</p>
-                </div>
-                <div className="flex gap-2">
-                  <div className="h-8 w-24 bg-neutral-800 rounded-lg" />
-                  <div className="h-8 w-28 bg-neutral-800 rounded-lg" />
-                </div>
-              </div>
+            {/* CONTEÚDO DOS RELATÓRIOS (Desfocado apenas se for plano Free) */}
+            {(() => {
+              const planoAtual = (restaurante as any)?.licenca?.plano || restaurante?.plano;
+              const isFree = !planoAtual || planoAtual === "free";
 
-              {/* Grid dos 3 Cards Principais */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                {/* 1. Eficiência do Salão */}
-                <div className="bg-neutral-900 border border-neutral-800 p-5 rounded-2xl space-y-3">
-                  <div className="flex justify-between items-start">
-                    <span className="text-xs font-bold text-neutral-400 uppercase">Eficiência do Salão</span>
-                    <span className="text-xs text-emerald-400 font-bold">+18.4%</span>
-                  </div>
-                  <div className="text-3xl font-black text-white">84.2%</div>
-                  <div className="h-2 w-full bg-neutral-800 rounded-full overflow-hidden">
-                    <div className="h-full bg-rose-500 w-[84%]" />
-                  </div>
-                  <p className="text-[11px] text-neutral-400">Giro médio: 4.2 clientes por mesa / noite</p>
-                </div>
-
-                {/* 2. Mapa de Calor das Mesas */}
-                <div className="bg-neutral-900 border border-neutral-800 p-5 rounded-2xl space-y-3">
-                  <div className="flex justify-between items-start">
-                    <span className="text-xs font-bold text-neutral-400 uppercase">Mapa de Calor das Mesas</span>
-                    <span className="text-xs text-amber-400 font-bold">Mesa 4 & 7 no topo</span>
-                  </div>
-                  <div className="text-3xl font-black text-amber-400">R$ 14.850</div>
-                  <div className="grid grid-cols-6 gap-1 pt-1">
-                    {[90, 45, 60, 100, 30, 85, 95, 70, 40, 80, 55, 65].map((v, i) => (
-                      <div
-                        key={i}
-                        className={`h-6 rounded flex items-center justify-center text-[9px] font-bold ${
-                          v > 80 ? "bg-rose-500 text-white" : v > 50 ? "bg-amber-500/80 text-black" : "bg-neutral-800 text-neutral-400"
-                        }`}
-                      >
-                        {i + 1}
+              return (
+                <>
+                  <div
+                    className={`space-y-6 ${
+                      isFree
+                        ? "filter blur-md select-none pointer-events-none opacity-40"
+                        : "opacity-100"
+                    }`}
+                  >
+                    {/* Header do Relatório */}
+                    <div className="flex justify-between items-center pb-4 border-b border-neutral-800">
+                      <div>
+                        <h3 className="text-lg font-black text-white">Relatório de Desempenho e Eficiência do Salão</h3>
+                        <p className="text-xs text-neutral-400">Últimos 30 dias • Comparativo por turno e rotatividade</p>
                       </div>
-                    ))}
+                      <div className="flex gap-2">
+                        <div className="h-8 w-24 bg-neutral-800 rounded-lg" />
+                        <div className="h-8 w-28 bg-neutral-800 rounded-lg" />
+                      </div>
+                    </div>
+
+                    {/* Grid dos 3 Cards Principais */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                      {/* 1. Eficiência do Salão */}
+                      <div className="bg-neutral-900 border border-neutral-800 p-5 rounded-2xl space-y-3">
+                        <div className="flex justify-between items-start">
+                          <span className="text-xs font-bold text-neutral-400 uppercase">Eficiência do Salão</span>
+                          <span className="text-xs text-emerald-400 font-bold">+18.4%</span>
+                        </div>
+                        <div className="text-3xl font-black text-white">84.2%</div>
+                        <div className="h-2 w-full bg-neutral-800 rounded-full overflow-hidden">
+                          <div className="h-full bg-rose-500 w-[84%]" />
+                        </div>
+                        <p className="text-[11px] text-neutral-400">Giro médio: 4.2 clientes por mesa / noite</p>
+                      </div>
+
+                      {/* 2. Mapa de Calor das Mesas */}
+                      <div className="bg-neutral-900 border border-neutral-800 p-5 rounded-2xl space-y-3">
+                        <div className="flex justify-between items-start">
+                          <span className="text-xs font-bold text-neutral-400 uppercase">Mapa de Calor das Mesas</span>
+                          <span className="text-xs text-amber-400 font-bold">Mesa 4 & 7 no topo</span>
+                        </div>
+                        <div className="text-3xl font-black text-amber-400">R$ 14.850</div>
+                        <div className="grid grid-cols-6 gap-1 pt-1">
+                          {[90, 45, 60, 100, 30, 85, 95, 70, 40, 80, 55, 65].map((v, i) => (
+                            <div
+                              key={i}
+                              className={`h-6 rounded flex items-center justify-center text-[9px] font-bold ${
+                                v > 80 ? "bg-rose-500 text-white" : v > 50 ? "bg-amber-500/80 text-black" : "bg-neutral-800 text-neutral-400"
+                              }`}
+                            >
+                              {i + 1}
+                            </div>
+                          ))}
+                        </div>
+                        <p className="text-[11px] text-neutral-400">Taxa de ociosidade média: 14.8 minutos</p>
+                      </div>
+
+                      {/* 3. Tempo Médio da Cozinha */}
+                      <div className="bg-neutral-900 border border-neutral-800 p-5 rounded-2xl space-y-3">
+                        <div className="flex justify-between items-start">
+                          <span className="text-xs font-bold text-neutral-400 uppercase">Tempo Médio da Cozinha</span>
+                          <span className="text-xs text-emerald-400 font-bold">-4 min hoje</span>
+                        </div>
+                        <div className="text-3xl font-black text-white">12m 45s</div>
+                        <div className="h-2 w-full bg-neutral-800 rounded-full overflow-hidden">
+                          <div className="h-full bg-emerald-500 w-[65%]" />
+                        </div>
+                        <p className="text-[11px] text-neutral-400">Do envio ao primeiro prato servido</p>
+                      </div>
+                    </div>
+
+                    {/* Gráfico Simulado */}
+                    <div className="bg-neutral-900 border border-neutral-800 p-6 rounded-2xl space-y-4">
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs font-bold text-neutral-300">Faturamento por Hora x Tempo de Permanência</span>
+                        <span className="text-xs text-neutral-500">Pico: 20h30 às 22h00</span>
+                      </div>
+                      <div className="h-44 flex items-end gap-2 pt-6">
+                        {[20, 35, 45, 75, 100, 90, 85, 60, 40, 25].map((h, i) => (
+                          <div key={i} className="flex-1 bg-gradient-to-t from-rose-600 to-rose-400 rounded-t-lg" style={{ height: `${h}%` }} />
+                        ))}
+                      </div>
+                    </div>
                   </div>
-                  <p className="text-[11px] text-neutral-400">Taxa de ociosidade média: 14.8 minutos</p>
+
+                  {/* Só mostra o cadeado e o overlay se for plano 'free' (ou undefined) */}
+                  {isFree && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center bg-neutral-950/70 backdrop-blur-md z-20">
+                <div className="w-16 h-16 rounded-3xl bg-gradient-to-tr from-amber-500/20 to-rose-500/20 border border-amber-500/40 flex items-center justify-center mb-5 shadow-2xl shadow-amber-500/20 animate-pulse">
+                  <Lock className="w-8 h-8 text-amber-400" />
                 </div>
 
-                {/* 3. Tempo Médio da Cozinha */}
-                <div className="bg-neutral-900 border border-neutral-800 p-5 rounded-2xl space-y-3">
-                  <div className="flex justify-between items-start">
-                    <span className="text-xs font-bold text-neutral-400 uppercase">Tempo Médio da Cozinha</span>
-                    <span className="text-xs text-emerald-400 font-bold">-4 min hoje</span>
-                  </div>
-                  <div className="text-3xl font-black text-white">12m 45s</div>
-                  <div className="h-2 w-full bg-neutral-800 rounded-full overflow-hidden">
-                    <div className="h-full bg-emerald-500 w-[65%]" />
-                  </div>
-                  <p className="text-[11px] text-neutral-400">Do envio ao primeiro prato servido</p>
+                <Badge className="bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-black uppercase tracking-widest px-3 py-1 mb-3">
+                  Módulo Exclusivo MAYaMenu PRO
+                </Badge>
+
+                <h2 className="text-2xl sm:text-3xl font-black text-white max-w-xl tracking-tight leading-tight">
+                  Descubra onde o seu restaurante <span className="text-rose-500">perde dinheiro</span>.
+                </h2>
+
+                <p className="text-xs sm:text-sm text-neutral-400 max-w-lg mt-3 leading-relaxed">
+                  Monitore a <strong>taxa de ociosidade das mesas</strong>, tempo médio de preparo do KDS, pratos mais lucrativos e ticket médio em tempo real com o poder da Inteligência MAYa.
+                </p>
+
+                <div className="flex flex-col sm:flex-row items-center gap-3 mt-6">
+                  <Button
+                    type="button"
+                    onClick={() => setModalProAberto(true)}
+                    className="h-12 px-6 bg-gradient-to-r from-amber-500 to-rose-600 hover:from-amber-400 hover:to-rose-500 text-white font-black text-xs uppercase tracking-wider rounded-2xl shadow-xl shadow-rose-950/60 flex items-center gap-2 transform active:scale-95 transition-all"
+                  >
+                    <Sparkles className="w-4 h-4" />
+                    <span>Desbloquear MAYaMenu PRO</span>
+                    <ArrowUpRight className="w-4 h-4 ml-1" />
+                  </Button>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setModalProAberto(true)}
+                    className="h-12 px-5 border-neutral-700 bg-neutral-900/80 hover:bg-neutral-800 text-neutral-300 font-bold text-xs rounded-2xl"
+                  >
+                    Falar com Consultor
+                  </Button>
+                </div>
+
+                <div className="flex items-center gap-4 mt-6 text-[11px] text-neutral-500">
+                  <span className="flex items-center gap-1">
+                    <Check className="w-3.5 h-3.5 text-emerald-400" /> Sem taxa de adesão
+                  </span>
+                  <span>•</span>
+                  <span className="flex items-center gap-1">
+                    <Check className="w-3.5 h-3.5 text-emerald-400" /> Ativação instantânea
+                  </span>
+                  <span>•</span>
+                  <span className="flex items-center gap-1">
+                    <Check className="w-3.5 h-3.5 text-emerald-400" /> Suporte 24/7
+                  </span>
                 </div>
               </div>
-
-              {/* Gráfico Simulado */}
-              <div className="bg-neutral-900 border border-neutral-800 p-6 rounded-2xl space-y-4">
-                <div className="flex justify-between items-center">
-                  <span className="text-xs font-bold text-neutral-300">Faturamento por Hora x Tempo de Permanência</span>
-                  <span className="text-xs text-neutral-500">Pico: 20h30 às 22h00</span>
-                </div>
-                <div className="h-44 flex items-end gap-2 pt-6">
-                  {[20, 35, 45, 75, 100, 90, 85, 60, 40, 25].map((h, i) => (
-                    <div key={i} className="flex-1 bg-gradient-to-t from-rose-600 to-rose-400 rounded-t-lg" style={{ height: `${h}%` }} />
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* OVERLAY DE CONVERSÃO / UPSELL B2B */}
-            <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center bg-neutral-950/70 backdrop-blur-md z-20">
-              <div className="w-16 h-16 rounded-3xl bg-gradient-to-tr from-amber-500/20 to-rose-500/20 border border-amber-500/40 flex items-center justify-center mb-5 shadow-2xl shadow-amber-500/20 animate-pulse">
-                <Lock className="w-8 h-8 text-amber-400" />
-              </div>
-
-              <Badge className="bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-black uppercase tracking-widest px-3 py-1 mb-3">
-                Módulo Exclusivo MAYaMenu PRO
-              </Badge>
-
-              <h2 className="text-2xl sm:text-3xl font-black text-white max-w-xl tracking-tight leading-tight">
-                Descubra onde o seu restaurante <span className="text-rose-500">perde dinheiro</span>.
-              </h2>
-
-              <p className="text-xs sm:text-sm text-neutral-400 max-w-lg mt-3 leading-relaxed">
-                Monitore a <strong>taxa de ociosidade das mesas</strong>, tempo médio de preparo do KDS, pratos mais lucrativos e ticket médio em tempo real com o poder da Inteligência MAYa.
-              </p>
-
-              <div className="flex flex-col sm:flex-row items-center gap-3 mt-6">
-                <Button
-                  type="button"
-                  onClick={() => setModalProAberto(true)}
-                  className="h-12 px-6 bg-gradient-to-r from-amber-500 to-rose-600 hover:from-amber-400 hover:to-rose-500 text-white font-black text-xs uppercase tracking-wider rounded-2xl shadow-xl shadow-rose-950/60 flex items-center gap-2 transform active:scale-95 transition-all"
-                >
-                  <Sparkles className="w-4 h-4" />
-                  <span>Desbloquear MAYaMenu PRO</span>
-                  <ArrowUpRight className="w-4 h-4 ml-1" />
-                </Button>
-
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setModalProAberto(true)}
-                  className="h-12 px-5 border-neutral-700 bg-neutral-900/80 hover:bg-neutral-800 text-neutral-300 font-bold text-xs rounded-2xl"
-                >
-                  Falar com Consultor
-                </Button>
-              </div>
-
-              <div className="flex items-center gap-4 mt-6 text-[11px] text-neutral-500">
-                <span className="flex items-center gap-1">
-                  <Check className="w-3.5 h-3.5 text-emerald-400" /> Sem taxa de adesão
-                </span>
-                <span>•</span>
-                <span className="flex items-center gap-1">
-                  <Check className="w-3.5 h-3.5 text-emerald-400" /> Ativação instantânea
-                </span>
-                <span>•</span>
-                <span className="flex items-center gap-1">
-                  <Check className="w-3.5 h-3.5 text-emerald-400" /> Suporte 24/7
-                </span>
-              </div>
-            </div>
-          </div>
-        )}
+            )}
+          </>
+        );
+      })()}
+    </div>
+  )}
       </main>
 
       {/* MODAL DE CONTATO / UPSELL PRO */}

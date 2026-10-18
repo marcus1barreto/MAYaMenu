@@ -294,6 +294,16 @@ export async function ativarLicencaEInstanciaAtomica(params: {
       }
 
       // 4. Grava o documento do restaurante vinculado ao ownerId
+      const planoAtivo = licData?.plano || "free";
+      const limitesAtivos = licData?.limites || LIMITES_POR_PLANO[planoAtivo];
+      novoRest.plano = planoAtivo;
+      novoRest.maxMesas = limitesAtivos.maxMesas;
+      novoRest.maxPratos = limitesAtivos.maxPratos;
+      novoRest.licenca = {
+        id: codigoFormatado,
+        plano: planoAtivo,
+        limites: limitesAtivos,
+      };
       transaction.set(restRef, novoRest);
 
       // 5. Grava a trava de unicidade do slug

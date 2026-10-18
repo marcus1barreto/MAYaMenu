@@ -3,7 +3,8 @@
 import React, { useEffect, useState } from "react";
 import type { PedidoRodada } from "@/types";
 import { escutarPedidosCliente } from "@/lib/restaurante-service";
-import { ensureClienteAnonimo } from "@/lib/firebase";
+import { ensureClienteAnonimo, db } from "@/lib/firebase";
+import { collection, onSnapshot, doc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,6 +17,8 @@ import {
   Utensils,
   AlertCircle,
   X,
+  Users,
+  User,
 } from "lucide-react";
 
 interface MinhaComandaModalProps {
@@ -46,7 +49,10 @@ export function MinhaComandaModal({
   contaPedidaSucesso = false,
 }: MinhaComandaModalProps) {
   const [pedidos, setPedidos] = useState<PedidoRodada[]>([]);
+  const [subtotalMesa, setSubtotalMesa] = useState<number>(0);
   const [carregando, setCarregando] = useState(true);
+  const [pedindoMesaToda, setPedindoMesaToda] = useState(false);
+  const [mesaTodaPedidaSucesso, setMesaTodaPedidaSucesso] = useState(false);
 
   useEffect(() => {
     if (!isOpen || !restauranteId) return;
@@ -69,9 +75,84 @@ export function MinhaComandaModal({
     };
   }, [isOpen, restauranteId, mesaNumero]);
 
+  // Escuta todas as comandas da mesa para rateio/total geral da mesa
+  useEffect(() => {
+    if (!isOpen || !restauranteId) return;
+
+    try {
+      const colRef = collection(
+        db,
+        "restaurantes",
+        restauranteId,
+        "mesas",
+        String(mesaNumero),
+        "comandas_abertas"
+      );
+
+      const unsubMesa = onSnapshot(
+        colRef,
+        (snap) => {
+          let total = 0;
+          snap.forEach((d) => {
+            const data = d.data();
+            total += Number(data.subtotal) || 0;
+          });
+          setSubtotalMesa(total);
+        },
+        (err) => {
+          console.warn("Aviso ao escutar total da mesa para rateio:", err);
+        }
+      );
+
+      return () => unsubMesa();
+    } catch (e) {
+      console.warn("Falha ao inicializar listener de total da mesa:", e);
+    }
+  }, [isOpen, restauranteId, mesaNumero]);
+
   // Total recalculado a partir dos pedidos confirmados no banco
   const totalConfirmado = pedidos.reduce((acc, p) => acc + (p.subtotal || 0), 0);
-  const totalFinal = totalConfirmado > 0 ? totalConfirmado : subtotalAcumulado;
+  const totalCliente = totalConfirmado > 0 ? totalConfirmado : subtotalAcumulado;
+  const totalGeralMesa = Math.max(subtotalMesa, totalCliente);
+
+  // Solicitar pagamento da mesa completa
+  const handlePagarMesaCompleta = async () => {
+    if (pedindoMesaToda || mesaTodaPedidaSucesso) return;
+    const confirmou = window.confirm(
+      `Deseja solicitar o fechamento da MESA COMPLETA (${mesaNumero}) no valor de ${totalGeralMesa.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}?`
+    );
+    if (!confirmou) return;
+
+    setPedindoMesaToda(true);
+    try {
+      const user = await ensureClienteAnonimo();
+      const comandaRef = doc(
+        db,
+        "restaurantes",
+        restauranteId,
+        "mesas",
+        String(mesaNumero),
+        "comandas_abertas",
+        user.uid
+      );
+
+      await updateDoc(comandaRef, {
+        status: "conta_pedida",
+        chamadoGarcom: {
+          ativo: true,
+          motivo: `Fechamento Geral da Mesa ${mesaNumero} (Conta Completa)`,
+          solicitadoEm: serverTimestamp(),
+        },
+        atualizadoEm: serverTimestamp(),
+      });
+      setMesaTodaPedidaSucesso(true);
+    } catch (e) {
+      console.warn("Aviso ao pedir conta completa:", e);
+      setMesaTodaPedidaSucesso(true);
+    } finally {
+      setPedindoMesaToda(false);
+    }
+  };
 
   const getStatusBadge = (status: "a_fazer" | "pronto" | "entregue") => {
     switch (status) {
@@ -202,46 +283,91 @@ export function MinhaComandaModal({
           )}
         </div>
 
-        {/* RODAPÉ COM SUBTOTAL E PEDIR A CONTA */}
-        <div className="p-5 bg-neutral-900 border-t border-neutral-800 space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs uppercase font-bold tracking-wider text-neutral-400">
-              Total Acumulado
-            </span>
-            <span className="text-xl font-black text-rose-400 font-mono">
-              {totalFinal.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
-            </span>
+        {/* RODAPÉ COM DIVISÃO DE CONTAS (RATEIO) & BOTÕES DE AÇÃO */}
+        <div className="p-5 bg-neutral-900 border-t border-neutral-800 space-y-3.5">
+          {/* RESUMO FINANCEIRO EM DUAS LINHAS */}
+          <div className="space-y-2 p-3 bg-neutral-950/70 border border-neutral-800/80 rounded-2xl">
+            <div className="flex items-center justify-between">
+              <span className="text-xs uppercase font-bold tracking-wider text-neutral-400 flex items-center gap-1.5">
+                <User className="w-3.5 h-3.5 text-rose-400" />
+                A Minha Comanda:
+              </span>
+              <span className="text-base font-black text-rose-400 font-mono">
+                {totalCliente.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between pt-1.5 border-t border-neutral-800/60">
+              <span className="text-xs uppercase font-bold tracking-wider text-neutral-400 flex items-center gap-1.5">
+                <Users className="w-3.5 h-3.5 text-amber-400" />
+                Total da Mesa:
+              </span>
+              <span className="text-base font-black text-amber-400 font-mono">
+                {totalGeralMesa.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+              </span>
+            </div>
           </div>
 
-          {onPedirConta && (
+          {/* BOTÕES DE AÇÃO LADO A LADO */}
+          <div className="grid grid-cols-2 gap-2.5">
+            {/* 1. PAGAR A MINHA PARTE */}
             <Button
               type="button"
               onClick={onPedirConta}
-              disabled={pedindoConta || contaPedidaSucesso || totalFinal === 0}
-              className={`w-full h-12 rounded-xl text-xs uppercase tracking-wider font-bold transition-all shadow-lg flex items-center justify-center gap-2 ${
+              disabled={pedindoConta || contaPedidaSucesso || totalCliente === 0}
+              className={`h-11 rounded-xl text-[11px] uppercase tracking-wider font-bold transition-all shadow-md flex items-center justify-center gap-1.5 ${
                 contaPedidaSucesso
-                  ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
-                  : "bg-rose-600 hover:bg-rose-500 text-white shadow-rose-600/30"
+                  ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
+                  : "bg-rose-600 hover:bg-rose-500 text-white shadow-rose-600/20"
               }`}
             >
               {contaPedidaSucesso ? (
                 <>
-                  <CheckCircle2 className="w-4 h-4 text-amber-400" />
-                  Conta Solicitada ao Garçom!
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                  Parte Pedida!
                 </>
               ) : pedindoConta ? (
                 <>
-                  <Clock className="w-4 h-4 animate-spin" />
-                  Chamando o Garçom...
+                  <Clock className="w-3.5 h-3.5 animate-spin" />
+                  Pedindo...
                 </>
               ) : (
                 <>
-                  <Receipt className="w-4 h-4" />
-                  Pedir a Conta da Mesa
+                  <Receipt className="w-3.5 h-3.5" />
+                  Pagar Minha Parte
                 </>
               )}
             </Button>
-          )}
+
+            {/* 2. PAGAR MESA COMPLETA */}
+            <Button
+              type="button"
+              onClick={handlePagarMesaCompleta}
+              disabled={pedindoMesaToda || mesaTodaPedidaSucesso || totalGeralMesa === 0}
+              className={`h-11 rounded-xl text-[11px] uppercase tracking-wider font-bold transition-all border shadow-md flex items-center justify-center gap-1.5 ${
+                mesaTodaPedidaSucesso
+                  ? "bg-amber-500/20 text-amber-300 border-amber-500/40"
+                  : "bg-neutral-800 hover:bg-neutral-700 text-amber-300 border-amber-500/30 hover:border-amber-500/50"
+              }`}
+            >
+              {mesaTodaPedidaSucesso ? (
+                <>
+                  <CheckCircle2 className="w-3.5 h-3.5 text-amber-400" />
+                  Mesa Solicitada!
+                </>
+              ) : pedindoMesaToda ? (
+                <>
+                  <Clock className="w-3.5 h-3.5 animate-spin text-amber-400" />
+                  Solicitando...
+                </>
+              ) : (
+                <>
+                  <Users className="w-3.5 h-3.5 text-amber-400" />
+                  Pagar Mesa Completa
+                </>
+              )}
+            </Button>
+          </div>
         </div>
       </SheetContent>
     </Sheet>

@@ -10,6 +10,10 @@ export interface Restaurante {
   ownerId: string; // ID do Firebase Auth do lojista
   slug: string; // Ex: "burger-do-marcus"
   nome: string;
+  plano?: PlanoTipo; // 'free' | 'pro' | 'enterprise'
+  maxMesas?: number;
+  maxPratos?: number;
+  licenca?: Partial<Licenca>;
   configuracoes: {
     corPrimaria: string; // Injetada no Tailwind
     tema: 'light' | 'dark';

@@ -518,10 +518,10 @@ export async function liberarMesaFirestore(
       console.warn(`Aviso ao ler comanda ${cId} para consolidar histórico da mesa:`, e);
     }
 
-    // Marca como pago / fechado
-    batch.update(comandaRef, { status: "pago" });
+    // Apaga a comanda ativa após copiar para o histórico
+    batch.delete(comandaRef);
 
-    // Busca pedidos filhos para marcar como 'entregue' (ou arquivado) evitando órfãos no KDS
+    // Busca pedidos filhos para exclusão evitando órfãos no KDS
     try {
       const pedidosCol = collection(
         db,
@@ -535,7 +535,8 @@ export async function liberarMesaFirestore(
       );
       const snapPedidos = await getDocs(pedidosCol);
       snapPedidos.forEach((pDoc) => {
-        batch.update(pDoc.ref, { status: "entregue" });
+        // Apaga os pedidos ativos para limpar o KDS
+        batch.delete(pDoc.ref);
       });
     } catch (e) {
       console.warn("Falha ao buscar pedidos da comanda para baixa em lote:", e);
