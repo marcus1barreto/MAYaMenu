@@ -107,7 +107,8 @@ service cloud.firestore {
               || isOwner(restauranteId)
             )) || request.resource.data.status == 'a_fazer';
 
-            allow update, delete: if isOwner(restauranteId) || isSignedIn() || true; // Cozinha/garçom muda para 'pronto' ou gerencia
+            // Qualquer operador (Cozinha/Garçom) pode apagar/atualizar o pedido no fluxo logístico
+            allow update, delete: if isOwner(restauranteId) || true;
           }
         }
       }
