@@ -512,7 +512,10 @@ export function MesaDetalheModal({
                       <Button
                         type="button"
                         disabled={!todasPagas || comandasComItens.length === 0}
-                        onClick={() => onLiberarMesa(mesa.numero)}
+                        onClick={() => {
+                          onClose();
+                          onLiberarMesa(mesa.numero);
+                        }}
                         className={`w-full h-11 text-xs font-bold rounded-xl flex items-center justify-center gap-2 shadow-lg transition-all ${
                           todasPagas && comandasComItens.length > 0
                             ? "bg-emerald-600 hover:bg-emerald-500 text-white cursor-pointer"

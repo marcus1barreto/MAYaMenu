@@ -57,7 +57,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { uploadFotoPrato, excluirFotoPrato } from "@/lib/storage-service";
 import { MesaDetalheModal } from "@/components/salao/mesa-detalhe-modal";
-import { MESAS_INICIAIS, type MesaOperacional, type ComandaGarcom } from "@/components/garcom/garcom-view";
+import { MESAS_INICIAIS, type MesaOperacional, type ComandaGarcom, TEMPO_TOLERANCIA_MINUTOS } from "@/components/garcom/garcom-view";
 
 export function AdminDashboard() {
   const { restaurante, logout, atualizarRestaurante } = useAuth();
@@ -170,6 +170,29 @@ export function AdminDashboard() {
               const todasPagas = mesaAtual.comandas.every((cmd) => cmd.status === "pago");
               if (todasPagas && mesaAtual.status !== "conta_pedida") {
                 mesaAtual.status = "paga_ocupada";
+
+                // Registra o momento em que a conta foi paga a partir de atualizadoEm
+                const millisPago = (c as any).atualizadoEm?.toMillis
+                  ? (c as any).atualizadoEm.toMillis()
+                  : (c as any).atualizadoEm?.toDate
+                  ? (c as any).atualizadoEm.toDate().getTime()
+                  : (c as any).atualizadoEm
+                  ? new Date((c as any).atualizadoEm).getTime()
+                  : null;
+
+                if (millisPago) {
+                  if (!mesaAtual.pagoEm || millisPago > mesaAtual.pagoEm) {
+                    mesaAtual.pagoEm = millisPago;
+                  }
+                }
+
+                // Alerta Proativo de Upsell: verifica se já ultrapassou o tempo de tolerância
+                if (mesaAtual.pagoEm) {
+                  const minutosPassados = (Date.now() - mesaAtual.pagoEm) / (1000 * 60);
+                  if (minutosPassados >= TEMPO_TOLERANCIA_MINUTOS) {
+                    mesaAtual.alertaUpsell = true;
+                  }
+                }
               }
             } else if (mesaAtual.status !== "conta_pedida" && mesaAtual.status !== "paga_ocupada") {
               mesaAtual.status = "ocupada";
@@ -258,9 +281,8 @@ export function AdminDashboard() {
         m.numero === mesaNumero ? { ...m, status: "livre", comandas: [] } : m
       )
     );
-    setMesaSelecionada((prev) =>
-      prev && prev.numero === mesaNumero ? { ...prev, status: "livre", comandas: [] } : prev
-    );
+    setMesaSelecionada(null);
+    setModalMesaAberto(false);
 
     if (restaurante?.id && comandasIds.length > 0) {
       try {
@@ -849,23 +871,17 @@ export function AdminDashboard() {
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3.5">
-              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((num) => {
-                const mesa = mesas.find((m) => m.numero === num) || {
-                  numero: num,
-                  status: "livre" as const,
-                  comandas: [],
-                };
-
+              {mesas.map((mesa) => {
+                const num = mesa.numero;
                 const ehChamado = Boolean(mesa.chamandoGarcom);
                 const totalMesa = mesa.comandas.reduce((acc, c) => acc + c.subtotal, 0);
                 const qtdClientes = mesa.comandas.length;
 
                 return (
-                  <button
+                  <div
                     key={num}
-                    type="button"
                     onClick={() => handleAbrirMesa(num)}
-                    className={`p-4 rounded-2xl border text-left transition-all flex flex-col justify-between min-h-[140px] group relative overflow-hidden ${
+                    className={`p-4 rounded-2xl border text-left transition-all flex flex-col justify-between min-h-[140px] group relative overflow-hidden cursor-pointer select-none active:scale-[0.98] ${
                       ehChamado
                         ? "bg-amber-950/40 border-amber-400 ring-2 ring-amber-400/50 shadow-xl shadow-amber-950/60 animate-pulse"
                         : mesa.status === "conta_pedida"
@@ -923,6 +939,12 @@ export function AdminDashboard() {
                             ? "Ocupada"
                             : "Livre"}
                         </Badge>
+
+                        {mesa.alertaUpsell && (
+                          <Badge className="bg-purple-900/90 text-purple-200 border border-purple-500/50 text-[9px] font-black uppercase tracking-wider px-2 py-0.5 shadow-md flex items-center gap-1 animate-pulse">
+                            ⏳ +15m parada (Sugerir Upsell?)
+                          </Badge>
+                        )}
                       </div>
                     </div>
 
@@ -946,12 +968,7 @@ export function AdminDashboard() {
                         <span className="text-[10px] text-neutral-500 block mt-1">Disponível</span>
                       )}
                     </div>
-
-                    <div className="mt-2 pt-2 border-t border-neutral-800/80 text-[10px] font-bold text-neutral-400 group-hover:text-rose-400 flex items-center justify-between">
-                      <span>Gerenciar Mesa</span>
-                      <span>→</span>
-                    </div>
-                  </button>
+                  </div>
                 );
               })}
             </div>

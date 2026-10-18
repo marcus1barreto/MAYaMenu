@@ -17,6 +17,8 @@ import {
   ChevronRight,
   ExternalLink,
   Bell,
+  ChefHat,
+  Utensils,
 } from "lucide-react";
 import {
   Dialog,
@@ -25,6 +27,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { MesaDetalheModal } from "@/components/salao/mesa-detalhe-modal";
+import { useAuth } from "@/context/auth-context";
+import { db } from "@/lib/firebase";
+import { collectionGroup, query, where, onSnapshot } from "firebase/firestore";
+import type { ComandaCliente, PedidoRodada } from "@/types";
 import {
   escutarComandasSalão,
   marcarComandaPagaFirestore,
@@ -32,6 +38,7 @@ import {
   injetarTicketContingencia,
   atenderGarcomFirestore,
   lancarItemManualFirestore,
+  atualizarStatusPedido,
 } from "@/lib/restaurante-service";
 
 export interface ComandaGarcom {
@@ -56,8 +63,12 @@ export interface MesaOperacional {
   numero: number;
   status: "livre" | "ocupada" | "conta_pedida" | "paga_ocupada";
   chamandoGarcom?: boolean;
+  alertaUpsell?: boolean;
+  pagoEm?: any;
   comandas: ComandaGarcom[];
 }
+
+export const TEMPO_TOLERANCIA_MINUTOS = 15;
 
 export const MESAS_INICIAIS: MesaOperacional[] = [
   {
@@ -156,34 +167,73 @@ export function GarcomView({
   nomeRestaurante?: string;
   isSandbox?: boolean;
 }) {
+  const { restaurante } = useAuth();
+  const maxMesas = (restaurante as any)?.licenca?.maxMesas || (restaurante as any)?.licenca?.limites?.maxMesas || restaurante?.maxMesas || 5;
+
   const [mesas, setMesas] = useState<MesaOperacional[]>(() => {
     if (isSandbox) return MESAS_INICIAIS;
     const mapaLimpo: MesaOperacional[] = [];
-    for (let i = 1; i <= 12; i++) {
+    for (let i = 1; i <= maxMesas; i++) {
       mapaLimpo.push({ numero: i, status: "livre", comandas: [] });
     }
     return mapaLimpo;
   });
+  const [comandas, setComandas] = useState<(ComandaCliente & { refPath?: string })[]>([]);
   const [mesaSelecionada, setMesaSelecionada] = useState<MesaOperacional | null>(null);
   const [scannerAberto, setScannerAberto] = useState(false);
   const [feedbackInjecao, setFeedbackInjecao] = useState<string | null>(null);
 
-  // Escuta todas as comandas abertas do salão em tempo real
-  useEffect(() => {
-    if (!restauranteId && !slug) return;
+  const [pedidosProntos, setPedidosProntos] = useState<(PedidoRodada & { refPath: string })[]>([]);
+  const [atualizandoPedidoId, setAtualizandoPedidoId] = useState<string | null>(null);
 
-    const unsub = escutarComandasSalão(
-      restauranteId || slug!,
-      (comandasFirestore) => {
-        // Agrupa comandas por número de mesa (1 a 12)
-        setMesas(() => {
+  // 1. Escuta todas as comandas abertas do salão em tempo real com expurgo explícito de 'removed'
+  useEffect(() => {
+    const idBusca = restauranteId || restaurante?.id || slug || restaurante?.slug;
+    if (!idBusca) return;
+
+    const idsParaBuscar = Array.from(
+      new Set([restauranteId, restaurante?.id, slug, restaurante?.slug].filter(Boolean) as string[])
+    );
+
+    const q = idsParaBuscar.length > 1
+      ? query(collectionGroup(db, "comandas_abertas"), where("restauranteId", "in", idsParaBuscar))
+      : query(collectionGroup(db, "comandas_abertas"), where("restauranteId", "==", idsParaBuscar[0]));
+
+    const unsub = onSnapshot(
+      q,
+      (snapshot) => {
+        setComandas((prevComandas) => {
+          let lista = [...prevComandas];
+
+          snapshot.docChanges().forEach((change) => {
+            const docId = change.doc.id;
+            if (change.type === "removed") {
+              // Remoção explícita da comanda ao ser liberada / arquivada
+              lista = lista.filter((c) => c.id !== docId);
+            } else if (change.type === "added" || change.type === "modified") {
+              const data = change.doc.data() as ComandaCliente;
+              const comandaItem: ComandaCliente & { refPath: string } = {
+                ...data,
+                id: docId,
+                refPath: change.doc.ref.path,
+              };
+              const index = lista.findIndex((c) => c.id === docId);
+              if (index >= 0) {
+                lista[index] = comandaItem;
+              } else {
+                lista.push(comandaItem);
+              }
+            }
+          });
+
+          // Reconstrói as mesas com base nas comandas ativas e no limite de mesas do plano
           const mapa = new Map<number, MesaOperacional>();
-          for (let i = 1; i <= 12; i++) {
+          for (let i = 1; i <= maxMesas; i++) {
             mapa.set(i, { numero: i, status: "livre", comandas: [] });
           }
 
           // Popula com comandas do Firestore
-          for (const c of comandasFirestore) {
+          for (const c of lista) {
             const numMesa = Number(c.mesa) || 1;
             const mesaAtual = mapa.get(numMesa) || { numero: numMesa, status: "livre", comandas: [] };
 
@@ -202,7 +252,7 @@ export function GarcomView({
               mesaAtual.chamandoGarcom = true;
             }
 
-            // Define o status global da mesa com a nova regra de "paga_ocupada"
+            // Define o status global da mesa com a regra de "paga_ocupada" e alerta de tolerância
             if (c.status === "conta_pedida") {
               mesaAtual.status = "conta_pedida";
             } else if (c.status === "pago") {
@@ -210,6 +260,29 @@ export function GarcomView({
               const todasPagas = mesaAtual.comandas.every((cmd) => cmd.status === "pago");
               if (todasPagas && mesaAtual.status !== "conta_pedida") {
                 mesaAtual.status = "paga_ocupada";
+
+                // Registra o momento em que a conta foi paga a partir de atualizadoEm
+                const millisPago = (c.atualizadoEm as any)?.toMillis
+                  ? (c.atualizadoEm as any).toMillis()
+                  : (c.atualizadoEm as any)?.toDate
+                  ? (c.atualizadoEm as any).toDate().getTime()
+                  : c.atualizadoEm
+                  ? new Date(c.atualizadoEm as any).getTime()
+                  : null;
+
+                if (millisPago) {
+                  if (!mesaAtual.pagoEm || millisPago > mesaAtual.pagoEm) {
+                    mesaAtual.pagoEm = millisPago;
+                  }
+                }
+
+                // Alerta Proativo de Upsell: verifica se já ultrapassou o tempo de tolerância
+                if (mesaAtual.pagoEm) {
+                  const minutosPassados = (Date.now() - mesaAtual.pagoEm) / (1000 * 60);
+                  if (minutosPassados >= TEMPO_TOLERANCIA_MINUTOS) {
+                    mesaAtual.alertaUpsell = true;
+                  }
+                }
               }
             } else if (mesaAtual.status !== "conta_pedida" && mesaAtual.status !== "paga_ocupada") {
               mesaAtual.status = "ocupada";
@@ -218,14 +291,83 @@ export function GarcomView({
             mapa.set(numMesa, mesaAtual);
           }
 
-          return Array.from(mapa.values());
+          const novasMesas = Array.from(mapa.values());
+          setMesas(novasMesas);
+
+          // Sincroniza a mesa selecionada se estiver aberta no modal
+          setMesaSelecionada((prevSelecionada) => {
+            if (!prevSelecionada) return null;
+            const mesaAtualizada = mapa.get(prevSelecionada.numero);
+            return mesaAtualizada || { numero: prevSelecionada.numero, status: "livre", comandas: [] };
+          });
+
+          return lista;
         });
       },
-      slug
+      (err) => {
+        console.warn("Listener de comandas do salão no Garçom indisponível:", err);
+      }
     );
 
     return () => unsub();
-  }, [restauranteId, slug]);
+  }, [restauranteId, restaurante?.id, slug, restaurante?.slug, maxMesas]);
+
+  // 2. Escuta pedidos prontos na cozinha (Bandeja / Avisos de Entrega) em tempo real
+  useEffect(() => {
+    const idBusca = restauranteId || restaurante?.id || slug || restaurante?.slug;
+    if (!idBusca) return;
+
+    const idsParaBuscar = Array.from(
+      new Set([restauranteId, restaurante?.id, slug, restaurante?.slug].filter(Boolean) as string[])
+    );
+
+    const q = idsParaBuscar.length > 1
+      ? query(collectionGroup(db, "pedidos"), where("restauranteId", "in", idsParaBuscar))
+      : query(collectionGroup(db, "pedidos"), where("restauranteId", "==", idsParaBuscar[0]));
+
+    const unsub = onSnapshot(
+      q,
+      (snapshot) => {
+        const prontos: (PedidoRodada & { refPath: string })[] = [];
+        snapshot.forEach((docSnap) => {
+          const data = docSnap.data() as PedidoRodada;
+          if (data.status === "pronto") {
+            prontos.push({
+              ...data,
+              id: docSnap.id,
+              refPath: docSnap.ref.path,
+            });
+          }
+        });
+
+        // Ordena por data de criação (mais antigos primeiro para agilizar a entrega)
+        prontos.sort((a, b) => {
+          const timeA = a.criadoEm?.toMillis ? a.criadoEm.toMillis() : 0;
+          const timeB = b.criadoEm?.toMillis ? b.criadoEm.toMillis() : 0;
+          return timeA - timeB;
+        });
+
+        setPedidosProntos(prontos);
+      },
+      (err) => {
+        console.warn("Aviso ao escutar pedidos prontos na cozinha:", err);
+      }
+    );
+
+    return () => unsub();
+  }, [restauranteId, restaurante?.id, slug, restaurante?.slug]);
+
+  // Carimbar pedido como entregue
+  const handleMarcarEntregue = async (refPath: string, pedidoId: string) => {
+    setAtualizandoPedidoId(pedidoId);
+    try {
+      await atualizarStatusPedido(refPath, "entregue");
+    } catch (err) {
+      console.error("Falha ao marcar pedido como entregue:", err);
+    } finally {
+      setAtualizandoPedidoId(null);
+    }
+  };
 
   // Atender chamado do garçom
   const handleAtenderGarcom = async (mesaNumero: number, clienteId: string) => {
@@ -432,6 +574,68 @@ export function GarcomView({
         </div>
       )}
 
+      {/* BANDEJA DE AVISOS DE ENTREGA (PRATOS PRONTOS NA COZINHA) */}
+      {pedidosProntos.length > 0 && (
+        <section className="mt-4 p-4 bg-gradient-to-r from-amber-950/60 via-amber-900/40 to-orange-950/60 border-2 border-amber-500/60 rounded-2xl shadow-xl shadow-amber-950/40 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="relative flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500" />
+              </span>
+              <h2 className="text-sm font-black text-amber-300 flex items-center gap-1.5 uppercase tracking-wide">
+                <ChefHat className="w-4 h-4 text-amber-400" />
+                Bandeja de Entrega ({pedidosProntos.length}{" "}
+                {pedidosProntos.length === 1 ? "pronto" : "prontos"})
+              </h2>
+            </div>
+            <Badge className="bg-amber-500 text-neutral-950 text-[10px] font-black uppercase px-2 py-0.5">
+              Pronto para Servir
+            </Badge>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+            {pedidosProntos.map((p) => {
+              const estaAtualizando = atualizandoPedidoId === p.id;
+              const totalItens = p.itens.reduce((acc, it) => acc + (it.quantidade || 1), 0);
+
+              return (
+                <div
+                  key={p.id}
+                  className="p-3 bg-neutral-900/90 border border-amber-500/40 rounded-xl flex items-center justify-between gap-3 shadow-md"
+                >
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 font-black text-xs">
+                        Mesa {p.mesa || p.numeroMesa || "?"}
+                      </span>
+                      <span className="text-xs font-bold text-white truncate">
+                        {p.nomeCliente || "Cliente"}
+                      </span>
+                    </div>
+
+                    <p className="text-[11px] text-neutral-300 truncate mt-1">
+                      {p.itens.map((it) => `${it.quantidade}x ${it.nome}`).join(", ")}
+                    </p>
+                  </div>
+
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={estaAtualizando}
+                    onClick={() => handleMarcarEntregue(p.refPath, p.id)}
+                    className="h-9 px-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] rounded-lg shrink-0 flex items-center gap-1.5 shadow-md active:scale-95 transition-all"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>{estaAtualizando ? "Entregando..." : "Marcar como Entregue"}</span>
+                  </Button>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
       {/* RESUMO DO SALÃO */}
       <div className="mt-6 flex items-center gap-3 text-xs font-semibold">
         <span className="flex items-center gap-1.5 text-neutral-400">
@@ -459,21 +663,21 @@ export function GarcomView({
             const totalMesa = m.comandas.reduce((acc, c) => acc + c.subtotal, 0);
 
             return (
-              <button
+              <div
                 key={m.numero}
-                type="button"
                 onClick={() => m.comandas.length > 0 && setMesaSelecionada(m)}
-                disabled={m.status === "livre"}
-                className={`p-5 rounded-3xl border-2 text-left transition-all relative overflow-hidden flex flex-col justify-between h-40 ${
+                className={`p-5 rounded-3xl border-2 text-left transition-all relative overflow-hidden flex flex-col justify-between h-40 select-none ${
+                  m.comandas.length > 0 ? "cursor-pointer active:scale-95" : "cursor-default opacity-40"
+                } ${
                   ehChamado
-                    ? "bg-amber-950/30 border-amber-400 ring-2 ring-amber-400/50 shadow-xl shadow-amber-950/50 active:scale-95 animate-pulse"
+                    ? "bg-amber-950/30 border-amber-400 ring-2 ring-amber-400/50 shadow-xl shadow-amber-950/50 animate-pulse"
                     : ehConta
-                    ? "bg-rose-950/20 border-rose-500 shadow-lg shadow-rose-950/40 active:scale-95"
+                    ? "bg-rose-950/20 border-rose-500 shadow-lg shadow-rose-950/40"
                     : ehPagaOcupada
-                    ? "bg-emerald-950/30 border-emerald-500 ring-1 ring-emerald-500/40 shadow-lg shadow-emerald-950/50 active:scale-95 hover:border-emerald-400"
+                    ? "bg-emerald-950/30 border-emerald-500 ring-1 ring-emerald-500/40 shadow-lg shadow-emerald-950/50 hover:border-emerald-400"
                     : ehOcupada
-                    ? "bg-neutral-900 border-amber-500/60 hover:border-amber-500 active:scale-95"
-                    : "bg-neutral-900/40 border-neutral-800/60 opacity-40 cursor-default"
+                    ? "bg-neutral-900 border-amber-500/60 hover:border-amber-500"
+                    : "bg-neutral-900/40 border-neutral-800/60"
                 }`}
               >
                 <div className="flex items-start justify-between">
@@ -513,6 +717,12 @@ export function GarcomView({
                         Paga / Ocupada
                       </Badge>
                     )}
+
+                    {m.alertaUpsell && (
+                      <Badge className="bg-purple-900/90 text-purple-200 border border-purple-500/50 text-[10px] font-black uppercase tracking-wider px-2 py-0.5 shadow-md flex items-center gap-1 animate-pulse">
+                        ⏳ +15m parada (Sugerir Upsell?)
+                      </Badge>
+                    )}
                   </div>
                 </div>
 
@@ -536,7 +746,7 @@ export function GarcomView({
                     <span className="text-xs text-neutral-600 font-bold block">Mesa Livre</span>
                   )}
                 </div>
-              </button>
+              </div>
             );
           })}
         </div>
