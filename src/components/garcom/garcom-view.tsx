@@ -27,7 +27,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { MesaDetalheModal } from "@/components/salao/mesa-detalhe-modal";
-import { useAuth } from "@/context/auth-context";
+import { useSafeAuth } from "@/context/auth-context";
 import { db } from "@/lib/firebase";
 import { collectionGroup, query, where, onSnapshot } from "firebase/firestore";
 import type { ComandaCliente, PedidoRodada } from "@/types";
@@ -76,8 +76,8 @@ export const MESAS_INICIAIS: MesaOperacional[] = [
     status: "conta_pedida",
     comandas: [
       {
-        id: "cli-marcus",
-        nomeCliente: "Marcus",
+        id: "cli-cliente-a",
+        nomeCliente: "Cliente A",
         subtotal: 67.0,
         status: "conta_pedida",
         itens: [
@@ -95,8 +95,8 @@ export const MESAS_INICIAIS: MesaOperacional[] = [
         ],
       },
       {
-        id: "cli-patricia",
-        nomeCliente: "Patrícia",
+        id: "cli-cliente-b",
+        nomeCliente: "Cliente B",
         subtotal: 54.0,
         status: "conta_pedida",
         itens: [
@@ -114,8 +114,8 @@ export const MESAS_INICIAIS: MesaOperacional[] = [
     status: "ocupada",
     comandas: [
       {
-        id: "cli-mayara",
-        nomeCliente: "Mayara",
+        id: "cli-cliente-c",
+        nomeCliente: "Cliente C",
         subtotal: 62.0,
         status: "aguardando_pratos",
         itens: [
@@ -134,8 +134,8 @@ export const MESAS_INICIAIS: MesaOperacional[] = [
     status: "ocupada",
     comandas: [
       {
-        id: "cli-pedro",
-        nomeCliente: "Pedro",
+        id: "cli-cliente-d",
+        nomeCliente: "Cliente D",
         subtotal: 22.0,
         status: "pedindo",
         itens: [
@@ -161,16 +161,20 @@ export function GarcomView({
   slug = "demo",
   nomeRestaurante = "MAYaMenu",
   isSandbox = false,
+  dadosIniciais,
 }: {
   restauranteId?: string;
   slug?: string;
   nomeRestaurante?: string;
   isSandbox?: boolean;
+  dadosIniciais?: MesaOperacional[];
 }) {
-  const { restaurante } = useAuth();
+  const auth = useSafeAuth();
+  const restaurante = auth?.restaurante;
   const maxMesas = (restaurante as any)?.licenca?.maxMesas || (restaurante as any)?.licenca?.limites?.maxMesas || restaurante?.maxMesas || 5;
 
   const [mesas, setMesas] = useState<MesaOperacional[]>(() => {
+    if (dadosIniciais !== undefined) return dadosIniciais;
     if (isSandbox) return MESAS_INICIAIS;
     const mapaLimpo: MesaOperacional[] = [];
     for (let i = 1; i <= maxMesas; i++) {

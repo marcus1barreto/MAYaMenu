@@ -31,10 +31,10 @@ export interface PedidoKDS {
 // Pedidos demonstrativos para operação e teste do KDS
 export const PEDIDOS_INICIAIS_KDS: PedidoKDS[] = [
   {
-    id: "comanda-mesa-12-marcus",
+    id: "comanda-mesa-12-cliente-a",
     mesa: 12,
-    clienteId: "user-marcus",
-    nomeCliente: "Marcus",
+    clienteId: "user-cliente-a",
+    nomeCliente: "Cliente A",
     horario: "19:42",
     subtotal: 82.0,
     status: "a_fazer",
@@ -60,10 +60,10 @@ export const PEDIDOS_INICIAIS_KDS: PedidoKDS[] = [
     ],
   },
   {
-    id: "comanda-mesa-04-mayara",
+    id: "comanda-mesa-04-cliente-b",
     mesa: 4,
-    clienteId: "user-mayara",
-    nomeCliente: "Mayara",
+    clienteId: "user-cliente-b",
+    nomeCliente: "Cliente B",
     horario: "19:48",
     subtotal: 62.0,
     status: "a_fazer",
@@ -79,10 +79,10 @@ export const PEDIDOS_INICIAIS_KDS: PedidoKDS[] = [
     ],
   },
   {
-    id: "comanda-mesa-07-pedro",
+    id: "comanda-mesa-07-cliente-c",
     mesa: 7,
-    clienteId: "user-pedro",
-    nomeCliente: "Pedro",
+    clienteId: "user-cliente-c",
+    nomeCliente: "Cliente C",
     horario: "19:35",
     subtotal: 22.0,
     status: "pronto",
@@ -103,13 +103,18 @@ export function KdsView({
   slug,
   nomeRestaurante = "MAYaMenu",
   isSandbox = false,
+  dadosIniciais,
 }: {
   restauranteId?: string;
   slug?: string;
   nomeRestaurante?: string;
   isSandbox?: boolean;
+  dadosIniciais?: PedidoKDS[];
 }) {
-  const [pedidos, setPedidos] = useState<PedidoKDS[]>(isSandbox ? PEDIDOS_INICIAIS_KDS : []);
+  const [pedidos, setPedidos] = useState<PedidoKDS[]>(() => {
+    if (dadosIniciais !== undefined) return dadosIniciais;
+    return isSandbox ? PEDIDOS_INICIAIS_KDS : [];
+  });
   const [filtro, setFiltro] = useState<"todos" | "a_fazer" | "pronto">("todos");
 
   // Conecta ao Firestore em tempo real tratando a deleção e remoção de pedidos ao fechar a mesa
