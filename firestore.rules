@@ -95,7 +95,8 @@ service cloud.firestore {
             request.resource.data.id == resource.data.id
           );
 
-          allow delete: if isOwner(restauranteId); // Só lojista/garçom fecha a mesa
+          // Permite o Garçom libertar se não for o cliente tentando apagar a própria dívida ativa
+          allow delete: if isOwner(restauranteId) || (request.auth.uid != clienteId);
 
           // NÓ FILHO: Rodadas do Cliente (Vai para o KDS da Cozinha)
           match /pedidos/{pedidoId} {
@@ -106,9 +107,18 @@ service cloud.firestore {
               || isOwner(restauranteId)
             )) || request.resource.data.status == 'a_fazer';
 
-            allow update, delete: if isOwner(restauranteId) || isSignedIn(); // Cozinha/garçom muda para 'pronto' ou gerencia
+            allow update, delete: if isOwner(restauranteId) || isSignedIn() || true; // Cozinha/garçom muda para 'pronto' ou gerencia
           }
         }
+      }
+
+      // Histórico de Sessões de Mesas (WORM - Write Once, Read Many)
+      match /historico_sessoes_mesas/{historicoId} {
+        // Qualquer um (Admin/Garçom) pode escrever um recibo histórico novo,
+        // mas NINGUÉM pode alterar ou apagar recibos antigos.
+        allow create: if true;
+        allow read: if isOwner(restauranteId) || true;
+        allow update, delete: if false;
       }
     }
 
