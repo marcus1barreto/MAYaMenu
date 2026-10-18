@@ -23,7 +23,7 @@ interface MenuViewProps {
 }
 
 export function MenuView({ restaurante, cardapio: cardapioInicial, numeroMesa = 1 }: MenuViewProps) {
-  const { totalItens, subtotal, nomeCliente } = useCart();
+  const { totalItens, subtotal, nomeCliente, limparCarrinho } = useCart();
   const [cardapio, setCardapio] = useState<MenuItem[]>(cardapioInicial);
   const [itemSelecionado, setItemSelecionado] = useState<MenuItem | null>(null);
   const [carrinhoAberto, setCarrinhoAberto] = useState(false);
@@ -75,14 +75,25 @@ export function MenuView({ restaurante, cardapio: cardapioInicial, numeroMesa = 
             if (data.status === "conta_pedida") {
               setContaPedidaSucesso(true);
             } else if (data.status === "pago") {
-              // 1. Sincronia do Status "Pago" para o Cliente: feedback visual imediato
+              // 1. Mata o listener imediatamente para evitar o loop infinito!
+              if (unsubSnapshot) {
+                unsubSnapshot();
+                unsubSnapshot = null;
+              }
+
+              // 2. Feedback visual imediato
               marcarVisitaAtualComoPaga(restaurante.slug, numeroMesa);
               setContaPedidaSucesso(false);
               setContaPagaModal(true);
               setMinhaComandaAberta(false);
               setCarrinhoAberto(false);
-              // 2. Limpa o carrinho e a sessão local da mesa
+
+              // 3. Limpeza Nuclear (LocalStorage + Contexto React)
               limparSessaoClienteLocal(restaurante.slug);
+
+              if (typeof limparCarrinho === "function") {
+                limparCarrinho();
+              }
             }
           }
         },

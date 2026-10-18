@@ -119,6 +119,14 @@ export function CartProvider({
 
   const limparCarrinho = () => {
     setItens([]);
+    try {
+      if (typeof window !== "undefined") {
+        localStorage.removeItem(`mayamenu_cart_${slug}`);
+        localStorage.removeItem("mayamenu_cart");
+      }
+    } catch (e) {
+      console.warn("Falha ao limpar cache do carrinho:", e);
+    }
   };
 
   const subtotal = itens.reduce(
