@@ -8,7 +8,7 @@ import { ItemModal } from "./item-modal";
 import { CartDrawer } from "./cart-drawer";
 import { HistoricoVisitasModal } from "./historico-visitas-modal";
 import { MinhaComandaModal } from "./minha-comanda-modal";
-import { ShoppingBag, Sparkles, MapPin, Search, Receipt, DollarSign, CheckCircle2, Bell, Clock, PartyPopper, HeartHandshake, Utensils } from "lucide-react";
+import { ShoppingBag, Sparkles, MapPin, Search, Receipt, DollarSign, CheckCircle2, Bell, Clock, PartyPopper, HeartHandshake, Utensils, QrCode } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ensureClienteAnonimo, db } from "@/lib/firebase";
@@ -30,6 +30,7 @@ export function MenuView({ restaurante, cardapio: cardapioInicial, numeroMesa = 
   const [historicoAberto, setHistoricoAberto] = useState(false);
   const [minhaComandaAberta, setMinhaComandaAberta] = useState(false);
   const [contaPagaModal, setContaPagaModal] = useState(false);
+  const [sessaoFinalizada, setSessaoFinalizada] = useState(false);
   const [subtotalComandaBanco, setSubtotalComandaBanco] = useState(0);
   const [busca, setBusca] = useState("");
   const [pedindoConta, setPedindoConta] = useState(false);
@@ -200,6 +201,104 @@ export function MenuView({ restaurante, cardapio: cardapioInicial, numeroMesa = 
       item.descricao.toLowerCase().includes(b)
     );
   });
+
+  if (sessaoFinalizada) {
+    return (
+      <div className="min-h-screen bg-neutral-950 text-white flex flex-col justify-between p-6 antialiased selection:bg-rose-500 selection:text-white relative overflow-hidden">
+        {/* Glow de fundo */}
+        <div className="absolute -top-32 -left-32 w-80 h-80 bg-rose-600/20 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-32 -right-32 w-80 h-80 bg-emerald-600/15 rounded-full blur-3xl pointer-events-none" />
+
+        {/* TOPO: STATUS E AGRADECIMENTO */}
+        <div className="max-w-md mx-auto w-full pt-10 sm:pt-16 text-center space-y-6 relative z-10">
+          <div className="w-20 h-20 rounded-3xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 mx-auto flex items-center justify-center shadow-2xl shadow-emerald-950/50">
+            <CheckCircle2 className="w-10 h-10 animate-bounce" />
+          </div>
+
+          <div className="space-y-3">
+            <Badge className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-full">
+              Mesa {numeroMesa} • Encerrada
+            </Badge>
+            <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+              Conta Paga!
+            </h1>
+            <p className="text-sm text-neutral-300 leading-relaxed font-medium">
+              Obrigado por visitar o <strong className="text-white">{restaurante.nome}</strong>. Foi um enorme prazer recebê-lo!
+            </p>
+          </div>
+
+          <div className="p-4 bg-neutral-900/80 border border-neutral-800 rounded-2xl text-xs text-neutral-400 space-y-2">
+            <div className="flex items-center justify-center gap-1.5 text-rose-400 font-bold">
+              <QrCode className="w-4 h-4" />
+              <span>Deseja pedir mais alguma coisa?</span>
+            </div>
+            <p className="text-[11px] text-neutral-400">
+              Para reabrir a sua comanda, escaneie o QR Code da mesa novamente com a câmera do seu celular.
+            </p>
+          </div>
+
+          {/* BOTÃO COMPROVANTE DIGITAL */}
+          <Button
+            type="button"
+            onClick={() => setHistoricoAberto(true)}
+            className="h-11 px-5 bg-neutral-900 hover:bg-neutral-800 text-neutral-300 border border-neutral-800 hover:border-neutral-700 font-bold rounded-xl text-xs flex items-center justify-center gap-2 mx-auto transition-all shadow-sm"
+          >
+            <Receipt className="w-4 h-4 text-rose-400" />
+            <span>Ver Comprovantes Anteriores</span>
+          </Button>
+
+          {/* BANNER DE ADS B2B (Patrocinador / Fornecedor) */}
+          <div className="p-5 bg-gradient-to-r from-neutral-900 via-neutral-800/80 to-neutral-900 border border-neutral-800/80 rounded-3xl text-center space-y-2.5 shadow-xl relative overflow-hidden group">
+            <div className="absolute -top-10 -right-10 w-24 h-24 bg-rose-500/10 rounded-full blur-xl group-hover:bg-rose-500/20 transition-all" />
+            <span className="text-[9px] font-black uppercase tracking-widest text-neutral-500 block">
+              Parceiro Oficial • Espaço B2B
+            </span>
+            <div className="py-3 px-4 bg-neutral-950/70 border border-neutral-800/60 rounded-2xl">
+              <span className="text-xs font-bold text-neutral-200 block">
+                Espaço para Patrocinador / Fornecedor
+              </span>
+              <p className="text-[10px] text-neutral-400 mt-0.5">
+                Conecte a sua marca a milhares de clientes no momento da refeição.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* RODAPÉ COM BOTÃO DE SOLICITAR GARÇOM */}
+        <div className="max-w-md mx-auto w-full pt-8 pb-4 relative z-10 text-center space-y-3">
+          <Button
+            type="button"
+            onClick={handleChamarGarcom}
+            disabled={chamandoGarcom || segundosCooldown > 0}
+            className={`w-full h-12 rounded-2xl text-xs uppercase tracking-wider font-black shadow-xl flex items-center justify-center gap-2 transition-all ${
+              garcomChamadoSucesso
+                ? "bg-amber-500 text-neutral-950"
+                : "bg-neutral-800 hover:bg-neutral-700 text-white border border-neutral-700"
+            }`}
+          >
+            <Bell className={`w-4 h-4 ${garcomChamadoSucesso ? "fill-neutral-950 animate-bounce" : "text-amber-400"}`} />
+            <span>
+              {garcomChamadoSucesso
+                ? "Garçom a Caminho da Mesa!"
+                : segundosCooldown > 0
+                ? `Aguarde (${segundosCooldown}s)`
+                : "🔔 Solicitar Garçom"}
+            </span>
+          </Button>
+
+          <p className="text-[10px] text-neutral-400">
+            MAYaMenu • Tecnologia para Experiências Gastronômicas
+          </p>
+        </div>
+
+        {/* MODAL DE HISTÓRICO DE VISITAS / COMPROVANTES SE O CLIENTE QUISER CONSULTAR */}
+        <HistoricoVisitasModal
+          isOpen={historicoAberto}
+          onClose={() => setHistoricoAberto(false)}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-neutral-100/60 pb-28 text-neutral-900 antialiased selection:bg-neutral-900 selection:text-white">
@@ -578,9 +677,7 @@ export function MenuView({ restaurante, cardapio: cardapioInicial, numeroMesa = 
                 type="button"
                 onClick={() => {
                   setContaPagaModal(false);
-                  if (typeof window !== "undefined") {
-                    window.location.reload();
-                  }
+                  setSessaoFinalizada(true);
                 }}
                 className="w-full h-11 bg-rose-600 hover:bg-rose-500 text-white font-black rounded-xl text-xs uppercase tracking-wider"
               >

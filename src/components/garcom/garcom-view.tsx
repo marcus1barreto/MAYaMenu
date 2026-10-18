@@ -462,17 +462,19 @@ export function GarcomView({
   const handleLiberarMesa = async (mesaNumero: number) => {
     const mesaAlvo = mesas.find((m) => m.numero === mesaNumero);
     const comandasIds = mesaAlvo ? mesaAlvo.comandas.map((c) => c.id) : [];
+    const idRestauranteFinal = restauranteId || restaurante?.id;
 
     setMesas((prev) =>
       prev.map((m) => (m.numero === mesaNumero ? { ...m, status: "livre", comandas: [] } : m))
     );
     setMesaSelecionada(null);
 
-    if (restauranteId && comandasIds.length > 0) {
+    if (idRestauranteFinal && comandasIds.length > 0) {
       try {
-        await liberarMesaFirestore(restauranteId, mesaNumero, comandasIds);
-      } catch (err) {
+        await liberarMesaFirestore(idRestauranteFinal, mesaNumero, comandasIds);
+      } catch (err: any) {
         console.warn("Falha ao liberar mesa no Firestore:", err);
+        alert("Erro ao libertar: " + (err?.message || "Falha na comunicação com o servidor"));
       }
     }
   };
