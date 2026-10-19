@@ -211,14 +211,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Salva referência do restaurante criado para resiliência local
       localStorage.setItem(`mayamenu_rest_${uid}`, JSON.stringify(novoRest));
 
-      // 4. Popula cardápio inicial de cortesia
-      try {
-        const { popularCardapioInicialSeVazio } = await import("@/lib/restaurante-service");
-        await popularCardapioInicialSeVazio(uid);
-      } catch (err) {
-        console.warn("Falha ao popular cardápio padrão:", err);
-      }
-
+      // Garante estado limpo e vazio para novo onboarding (Guided Empty State)
       setRestaurante(novoRest);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Erro no cadastro";

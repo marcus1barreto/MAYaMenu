@@ -16,7 +16,11 @@ import {
   popularCardapioInicialSeVazio,
   atenderGarcomFirestore,
   lancarItemManualFirestore,
+  trocarOrdemItens,
+  fixarItemNoTopo,
 } from "@/lib/restaurante-service";
+import { GuidedEmptyCardapio } from "./guided-empty-cardapio";
+import { MAYA_MEDIA_LIBRARY } from "@/lib/maya-media-library";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -52,6 +56,9 @@ import {
   Sparkles,
   BarChart3,
   ArrowUpRight,
+  ArrowUp,
+  ArrowDown,
+  Pin,
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
@@ -63,7 +70,8 @@ export function AdminDashboard() {
   const { restaurante, logout, atualizarRestaurante } = useAuth();
   const [abaAtiva, setAbaAtiva] = useState<"cardapio" | "config" | "mesas" | "analytics">("cardapio");
   const [modalProAberto, setModalProAberto] = useState(false);
-  const [itensCardapio, setItensCardapio] = useState<MenuItem[]>(CARDAPIO_DEMO);
+  const [itensCardapio, setItensCardapio] = useState<MenuItem[]>([]);
+  const [carregandoCardapio, setCarregandoCardapio] = useState(true);
   const [corPrimaria, setCorPrimaria] = useState(
     restaurante?.configuracoes?.corPrimaria || "#E11D48"
   );
@@ -76,11 +84,10 @@ export function AdminDashboard() {
   useEffect(() => {
     if (!restaurante?.id) return;
 
-    // Popula o cardápio inicial caso seja o primeiro acesso deste restaurante
-    popularCardapioInicialSeVazio(restaurante.id);
-
+    setCarregandoCardapio(true);
     const unsub = escutarCardapio(restaurante.id, (novosItens) => {
       setItensCardapio(novosItens);
+      setCarregandoCardapio(false);
     });
 
     return () => unsub();
@@ -587,6 +594,15 @@ export function AdminDashboard() {
 
     // 2. Salva o prato no Firestore
     try {
+      // Se for novo item, coloca na última posição da categoria
+      const itensMesmaCat = itensCardapio.filter(
+        (i) => (i.categoria || "Geral") === (itemEmEdicao.categoria?.trim() || "Geral")
+      );
+      const ordemCalculada =
+        itemEmEdicao.ordem !== undefined
+          ? itemEmEdicao.ordem
+          : itensMesmaCat.length;
+
       const itemPronto: MenuItem = {
         id: itemEmEdicao.id || `item-${Date.now().toString(36)}`,
         nome: itemEmEdicao.nome.trim(),
@@ -594,6 +610,7 @@ export function AdminDashboard() {
         descricao: itemEmEdicao.descricao?.trim() || "",
         precoBase: Number(itemEmEdicao.precoBase) || 0,
         ativo: itemEmEdicao.ativo !== undefined ? itemEmEdicao.ativo : true,
+        ordem: ordemCalculada,
         fotoUrl: fotoUrlFinal,
         grupoModificadores: itemEmEdicao.grupoModificadores || [],
       };
@@ -607,6 +624,50 @@ export function AdminDashboard() {
       console.warn("Falha ao salvar prato:", err);
     } finally {
       setSalvandoPrato(false);
+    }
+  };
+
+  // Sistema de Ordenação Tátil (sem drag-and-drop): Move item para cima ou para baixo
+  const handleMoverItem = async (item: MenuItem, direcao: "cima" | "baixo") => {
+    if (!restaurante?.id) return;
+    const cat = item.categoria || "Geral";
+    const itensDaCat = itensCardapio
+      .filter((i) => (i.categoria || "Geral") === cat)
+      .sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0));
+
+    const indexAtual = itensDaCat.findIndex((i) => i.id === item.id);
+    if (indexAtual === -1) return;
+
+    const indexAlvo = direcao === "cima" ? indexAtual - 1 : indexAtual + 1;
+    if (indexAlvo < 0 || indexAlvo >= itensDaCat.length) return;
+
+    const itemAlvo = itensDaCat[indexAlvo];
+    const ordemAtual = item.ordem ?? indexAtual;
+    const ordemAlvo = itemAlvo.ordem ?? indexAlvo;
+
+    try {
+      await trocarOrdemItens(
+        restaurante.id,
+        { id: item.id, ordem: ordemAtual },
+        { id: itemAlvo.id, ordem: ordemAlvo }
+      );
+    } catch (err) {
+      console.error("Falha ao reordenar pratos:", err);
+    }
+  };
+
+  // Sistema de Ordenação Tátil: Fixa o prato imediatamente no topo (ordem: 0)
+  const handleFixarTopo = async (item: MenuItem) => {
+    if (!restaurante?.id) return;
+    const cat = item.categoria || "Geral";
+    const itensDaCat = itensCardapio
+      .filter((i) => (i.categoria || "Geral") === cat)
+      .sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0));
+
+    try {
+      await fixarItemNoTopo(restaurante.id, item.id, itensDaCat);
+    } catch (err) {
+      console.error("Falha ao fixar prato no topo:", err);
     }
   };
 
@@ -757,88 +818,159 @@ export function AdminDashboard() {
       <main className="flex-1 p-4 sm:p-6 max-w-5xl w-full mx-auto">
         {/* ABA: CARDÁPIO */}
         {abaAtiva === "cardapio" && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-bold text-white">Gestão Rápida de Pratos</h2>
-                <p className="text-xs text-neutral-400">
-                  Gerencie pratos, preços, fotos e pause pratos esgotados com um clique.
-                </p>
+          <div className="space-y-6">
+            {carregandoCardapio ? (
+              <div className="py-20 flex flex-col items-center justify-center space-y-3">
+                <Loader2 className="w-8 h-8 text-rose-500 animate-spin" />
+                <p className="text-xs font-bold text-neutral-400">Carregando cardápio...</p>
               </div>
-
-              <Button
-                type="button"
-                onClick={handleAbrirNovoPrato}
-                className="bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs h-10 px-3.5 rounded-xl flex items-center gap-2 shadow-lg"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Adicionar Prato</span>
-              </Button>
-            </div>
-
-            <div className="grid grid-cols-1 gap-3">
-              {itensCardapio.map((item) => (
-                <div
-                  key={item.id}
-                  className={`p-4 rounded-2xl border transition-all flex items-center justify-between gap-4 ${
-                    item.ativo
-                      ? "bg-neutral-900 border-neutral-800"
-                      : "bg-neutral-900/40 border-neutral-800/50 opacity-60"
-                  }`}
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    {item.fotoUrl && (
-                      <div className="relative w-14 h-14 rounded-xl overflow-hidden bg-neutral-800 flex-shrink-0">
-                        <Image src={item.fotoUrl} alt={item.nome} fill className="object-cover" />
-                      </div>
-                    )}
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <h4 className="text-sm font-bold text-white truncate">{item.nome}</h4>
-                        {item.categoria && (
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-400 border border-neutral-700">
-                            {item.categoria}
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-xs text-neutral-400 truncate max-w-md">
-                        {item.descricao}
-                      </p>
-                      <span className="text-xs font-black text-rose-400 mt-1 block">
-                        {item.precoBase.toLocaleString("pt-BR", {
-                          style: "currency",
-                          currency: "BRL",
-                        })}
-                      </span>
-                    </div>
+            ) : itensCardapio.length === 0 ? (
+              /* GUIDED EMPTY STATE: ONBOARDING DO 1º PRATO */
+              <GuidedEmptyCardapio
+                restauranteId={restaurante?.id || "demo"}
+                onItemCriado={() => {
+                  // O listener em tempo real já sincroniza o novo prato
+                }}
+              />
+            ) : (
+              <div className="space-y-6">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div>
+                    <h2 className="text-lg font-bold text-white">Gestão & Ordenação de Pratos</h2>
+                    <p className="text-xs text-neutral-400">
+                      Organize a ordem dos seus pratos de forma tátil, ajuste preços ou pause esgotados.
+                    </p>
                   </div>
 
-                  <div className="flex items-center gap-3">
-                    <button
-                      type="button"
-                      onClick={() => handleEditarPrato(item)}
-                      className="px-2.5 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 hover:text-white rounded-lg text-xs font-semibold transition-colors"
-                    >
-                      Editar
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleExcluirPrato(item.id, item.fotoUrl)}
-                      className="px-2.5 py-1.5 bg-red-950/40 hover:bg-red-900/60 text-red-400 rounded-lg text-xs font-semibold transition-colors"
-                    >
-                      Excluir
-                    </button>
-                    <span className="text-xs font-medium text-neutral-400 hidden sm:inline ml-1">
-                      {item.ativo ? "Disponível" : "Pausado"}
-                    </span>
-                    <Switch
-                      checked={item.ativo}
-                      onCheckedChange={() => handleToggleAtivo(item.id)}
-                    />
-                  </div>
+                  <Button
+                    type="button"
+                    onClick={handleAbrirNovoPrato}
+                    className="bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs h-10 px-4 rounded-xl flex items-center gap-2 shadow-lg"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>+ Adicionar Novo Item</span>
+                  </Button>
                 </div>
-              ))}
-            </div>
+
+                {/* AGRUPAMENTO POR CATEGORIAS COM ORDENAÇÃO TÁTIL */}
+                {Array.from(new Set(itensCardapio.map((i) => i.categoria || "Geral"))).map((catNome) => {
+                  const itensDaCat = itensCardapio
+                    .filter((i) => (i.categoria || "Geral") === catNome)
+                    .sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0));
+
+                  return (
+                    <div key={catNome} className="space-y-3">
+                      <div className="flex items-center gap-2 px-1">
+                        <span className="w-2 h-2 rounded-full bg-rose-500" />
+                        <h3 className="text-xs font-black uppercase tracking-wider text-neutral-300">
+                          {catNome} ({itensDaCat.length})
+                        </h3>
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-2.5">
+                        {itensDaCat.map((item, idx) => {
+                          const ehPrimeiro = idx === 0;
+                          const ehUltimo = idx === itensDaCat.length - 1;
+
+                          return (
+                            <div
+                              key={item.id}
+                              className={`p-3.5 sm:p-4 rounded-2xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                                item.ativo
+                                  ? "bg-neutral-900 border-neutral-800 hover:border-neutral-750"
+                                  : "bg-neutral-900/40 border-neutral-800/50 opacity-60"
+                              }`}
+                            >
+                              <div className="flex items-center gap-3 min-w-0">
+                                {item.fotoUrl && (
+                                  <div className="relative w-14 h-14 rounded-xl overflow-hidden bg-neutral-800 flex-shrink-0 border border-neutral-800">
+                                    <Image src={item.fotoUrl} alt={item.nome} fill className="object-cover" />
+                                  </div>
+                                )}
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-2">
+                                    <h4 className="text-sm font-bold text-white truncate">{item.nome}</h4>
+                                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-400 border border-neutral-700">
+                                      #{idx + 1}
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-neutral-400 truncate max-w-md mt-0.5">
+                                    {item.descricao}
+                                  </p>
+                                  <span className="text-xs font-black text-rose-400 mt-1 block">
+                                    {item.precoBase.toLocaleString("pt-BR", {
+                                      style: "currency",
+                                      currency: "BRL",
+                                    })}
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center justify-between sm:justify-end gap-2.5 pt-2 sm:pt-0 border-t sm:border-t-0 border-neutral-800/60">
+                                {/* CONTROLES TÁTEIS DE ORDENAÇÃO */}
+                                <div className="flex items-center gap-1 bg-neutral-950/80 border border-neutral-800 p-1 rounded-xl">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleMoverItem(item, "cima")}
+                                    disabled={ehPrimeiro}
+                                    title="Mover para cima"
+                                    className="p-1.5 rounded-lg text-neutral-300 hover:text-white hover:bg-neutral-800 disabled:opacity-30 disabled:pointer-events-none transition-all active:scale-90"
+                                  >
+                                    <ArrowUp className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleMoverItem(item, "baixo")}
+                                    disabled={ehUltimo}
+                                    title="Mover para baixo"
+                                    className="p-1.5 rounded-lg text-neutral-300 hover:text-white hover:bg-neutral-800 disabled:opacity-30 disabled:pointer-events-none transition-all active:scale-90"
+                                  >
+                                    <ArrowDown className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleFixarTopo(item)}
+                                    disabled={ehPrimeiro}
+                                    title="Destacar no Topo desta categoria"
+                                    className="px-2 py-1 rounded-lg text-[10px] font-black uppercase text-amber-400 hover:text-amber-300 hover:bg-amber-500/10 disabled:opacity-30 disabled:pointer-events-none transition-all flex items-center gap-1"
+                                  >
+                                    <Pin className="w-3 h-3" />
+                                    <span>Topo</span>
+                                  </button>
+                                </div>
+
+                                {/* AÇÕES DE EDIÇÃO & DISPONIBILIDADE */}
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleEditarPrato(item)}
+                                    className="px-2.5 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 hover:text-white rounded-lg text-xs font-semibold transition-colors"
+                                  >
+                                    Editar
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleExcluirPrato(item.id, item.fotoUrl)}
+                                    className="p-1.5 bg-red-950/40 hover:bg-red-900/60 text-red-400 rounded-lg text-xs transition-colors"
+                                    title="Excluir item"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                  <Switch
+                                    checked={item.ativo}
+                                    onCheckedChange={() => handleToggleAtivo(item.id)}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 
@@ -1427,15 +1559,15 @@ export function AdminDashboard() {
                   </div>
                 ) : (
                   /* DROPZONE / SELETOR DE ARQUIVO */
-                  <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-neutral-700 hover:border-rose-500 rounded-2xl cursor-pointer bg-neutral-800/40 hover:bg-neutral-800/80 transition-all p-4 text-center">
+                  <label className="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-neutral-700 hover:border-rose-500 rounded-2xl cursor-pointer bg-neutral-800/40 hover:bg-neutral-800/80 transition-all p-3 text-center">
                     <div className="flex flex-col items-center justify-center">
-                      <div className="p-2.5 bg-rose-500/10 rounded-xl text-rose-400 mb-2">
-                        <Upload className="w-5 h-5" />
+                      <div className="p-2 bg-rose-500/10 rounded-xl text-rose-400 mb-1.5">
+                        <Upload className="w-4 h-4" />
                       </div>
                       <p className="text-xs font-bold text-neutral-200">
-                        Clique para selecionar ou tirar foto
+                        Clique para enviar ou tirar foto
                       </p>
-                      <p className="text-[10px] text-neutral-400 mt-0.5">
+                      <p className="text-[10px] text-neutral-400">
                         Upload direto para o Firebase Storage
                       </p>
                     </div>
@@ -1447,6 +1579,43 @@ export function AdminDashboard() {
                     />
                   </label>
                 )}
+
+                {/* GALERIA MAYA MEDIA LIBRARY (OPÇÕES PROFISSIONAIS PRONTAS) */}
+                <div className="pt-1">
+                  <span className="text-[11px] font-bold text-neutral-400 block mb-1.5">
+                    Ou selecione uma foto profissional da Galeria MAYa:
+                  </span>
+                  <div className="grid grid-cols-5 gap-2">
+                    {MAYA_MEDIA_LIBRARY.map((foto) => {
+                      const selecionada = previewFoto === foto.url;
+                      return (
+                        <button
+                          key={foto.id}
+                          type="button"
+                          onClick={() => {
+                            setArquivoFoto(null);
+                            setPreviewFoto(foto.url);
+                            if (itemEmEdicao) {
+                              setItemEmEdicao({ ...itemEmEdicao, fotoUrl: foto.url });
+                            }
+                          }}
+                          className={`relative aspect-square rounded-xl overflow-hidden border-2 transition-all group ${
+                            selecionada
+                              ? "border-rose-500 scale-105 shadow-md shadow-rose-600/30"
+                              : "border-neutral-800 hover:border-neutral-600 opacity-70 hover:opacity-100"
+                          }`}
+                        >
+                          <Image src={foto.thumbnail} alt={foto.titulo} fill className="object-cover" />
+                          {selecionada && (
+                            <div className="absolute inset-0 bg-rose-500/30 flex items-center justify-center">
+                              <Check className="w-3.5 h-3.5 text-white stroke-[3]" />
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
 
               <div className="flex items-center justify-between p-3 rounded-xl bg-neutral-800/60 border border-neutral-700/60">

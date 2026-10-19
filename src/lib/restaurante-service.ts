@@ -14,6 +14,7 @@ import {
   getDoc,
   setDoc,
   updateDoc,
+  writeBatch,
   onSnapshot,
   limit,
   serverTimestamp,
@@ -138,9 +139,11 @@ export async function obterRestaurantePorSlug(slug: string): Promise<Restaurante
 
 /**
  * Busca cardápio do restaurante no Firestore.
- * Se vazio ou falhar, retorna o cardápio demo padrão.
+ * Se o restaurante for demo, retorna o cardápio demo.
+ * Para outros restaurantes, retorna a lista do Firestore (ou [] se vazio).
  */
 export async function obterCardapioDoRestaurante(restauranteId: string): Promise<MenuItem[]> {
+  const isDemo = restauranteId === "rest-demo-alpha" || restauranteId === "demo";
   try {
     const snap = await getDocs(collection(db, "restaurantes", restauranteId, "cardapio"));
     if (!snap.empty) {
@@ -148,22 +151,27 @@ export async function obterCardapioDoRestaurante(restauranteId: string): Promise
       snap.forEach((d) => {
         itens.push({ id: d.id, ...(d.data() as Omit<MenuItem, "id">) });
       });
+      // Ordenação rigorosa por 'ordem' crescente
+      itens.sort((a, b) => (a.ordem ?? 9999) - (b.ordem ?? 9999));
       return itens;
     }
+    // Coleção vazia
+    return isDemo ? CARDAPIO_DEMO : [];
   } catch (err) {
-    console.warn("Falha ao buscar cardápio no Firestore (usando fallback demo):", err);
+    console.warn("Falha ao buscar cardápio no Firestore:", err);
+    return isDemo ? CARDAPIO_DEMO : [];
   }
-
-  return CARDAPIO_DEMO;
 }
 
 /**
  * Escuta o cardápio em tempo real com onSnapshot (usado pelo Admin e Cliente).
+ * Respeita coleções vazias para que novos restaurantes entrem no Guided Empty State.
  */
 export function escutarCardapio(
   restauranteId: string,
   onAtualizacao: (itens: MenuItem[]) => void
 ): Unsubscribe {
+  const isDemo = restauranteId === "rest-demo-alpha" || restauranteId === "demo";
   const colRef = collection(db, "restaurantes", restauranteId, "cardapio");
 
   return onSnapshot(
@@ -174,14 +182,15 @@ export function escutarCardapio(
         snapshot.forEach((d) => {
           itens.push({ id: d.id, ...(d.data() as Omit<MenuItem, "id">) });
         });
+        itens.sort((a, b) => (a.ordem ?? 9999) - (b.ordem ?? 9999));
         onAtualizacao(itens);
       } else {
-        onAtualizacao(CARDAPIO_DEMO);
+        onAtualizacao(isDemo ? CARDAPIO_DEMO : []);
       }
     },
     (err) => {
       console.warn("Listener do cardápio indisponível (offline/fallback):", err);
-      onAtualizacao(CARDAPIO_DEMO);
+      onAtualizacao(isDemo ? CARDAPIO_DEMO : []);
     }
   );
 }
@@ -238,6 +247,69 @@ export async function excluirItemCardapio(
 }
 
 /**
+ * Atualiza em batch a ordem de múltiplos pratos no Firestore.
+ */
+export async function atualizarOrdemItensBatch(
+  restauranteId: string,
+  atualizacoes: { id: string; ordem: number }[]
+): Promise<void> {
+  if (!restauranteId || atualizacoes.length === 0) return;
+  const batch = writeBatch(db);
+
+  for (const item of atualizacoes) {
+    const ref = doc(db, "restaurantes", restauranteId, "cardapio", item.id);
+    batch.update(ref, { ordem: item.ordem });
+  }
+
+  await batch.commit();
+}
+
+/**
+ * Realiza a troca (swap) direta da posição de 'ordem' entre dois itens adjacentes.
+ */
+export async function trocarOrdemItens(
+  restauranteId: string,
+  itemA: { id: string; ordem: number },
+  itemB: { id: string; ordem: number }
+): Promise<void> {
+  const batch = writeBatch(db);
+  const refA = doc(db, "restaurantes", restauranteId, "cardapio", itemA.id);
+  const refB = doc(db, "restaurantes", restauranteId, "cardapio", itemB.id);
+
+  batch.update(refA, { ordem: itemB.ordem });
+  batch.update(refB, { ordem: itemA.ordem });
+
+  await batch.commit();
+}
+
+/**
+ * Fixa o item imediatamente no topo (ordem: 0) e reordena os demais da mesma categoria.
+ */
+export async function fixarItemNoTopo(
+  restauranteId: string,
+  itemId: string,
+  itensDaCategoria: MenuItem[]
+): Promise<void> {
+  const batch = writeBatch(db);
+
+  // O item selecionado fica com ordem 0
+  const refTopo = doc(db, "restaurantes", restauranteId, "cardapio", itemId);
+  batch.update(refTopo, { ordem: 0 });
+
+  // Os outros itens recebem ordens sequenciais 1, 2, 3...
+  let proximaOrdem = 1;
+  for (const item of itensDaCategoria) {
+    if (item.id !== itemId) {
+      const refOutro = doc(db, "restaurantes", restauranteId, "cardapio", item.id);
+      batch.update(refOutro, { ordem: proximaOrdem });
+      proximaOrdem++;
+    }
+  }
+
+  await batch.commit();
+}
+
+/**
  * Inicializa os itens demo no Firestore do restaurante caso ainda esteja vazio.
  */
 export async function popularCardapioInicialSeVazio(restauranteId: string): Promise<void> {
@@ -245,9 +317,10 @@ export async function popularCardapioInicialSeVazio(restauranteId: string): Prom
     const colRef = collection(db, "restaurantes", restauranteId, "cardapio");
     const snap = await getDocs(colRef);
     if (snap.empty) {
+      let idx = 0;
       for (const item of CARDAPIO_DEMO) {
         const { id, ...resto } = item;
-        await setDoc(doc(colRef, id), resto);
+        await setDoc(doc(colRef, id), { ...resto, ordem: idx++ });
       }
     }
   } catch (err) {

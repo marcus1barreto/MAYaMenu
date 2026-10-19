@@ -9,6 +9,7 @@ import {
   initializeFirestore,
   persistentLocalCache,
   persistentMultipleTabManager,
+  memoryLocalCache,
   type Firestore,
 } from "firebase/firestore";
 import { getStorage, type FirebaseStorage } from "firebase/storage";
@@ -30,20 +31,40 @@ export const app: FirebaseApp = getApps().length ? getApp() : initializeApp(fire
 const FIRESTORE_DATABASE_ID = process.env.NEXT_PUBLIC_FIREBASE_DATABASE_ID || "mayamenu-bd";
 
 /**
- * Firestore:
- * - No navegador: cache persistente em IndexedDB com suporte a várias abas.
- * - No servidor (ISR/SSR): cache em memória padrão.
+ * Isolamento de Persistência (Firebase):
+ * - Contexto Operacional (Garçom, Admin, Cozinha, Superadmin): Ativa persistentLocalCache (IndexedDB multi-tab)
+ *   para garantir operação contínua e offline do salão.
+ * - Contexto do Cliente (/r/[slug] ou outros públicos): Utiliza memoryLocalCache para garantir uma
+ *   "Sessão Efêmera", eliminando vazamento de dados de sessão entre clientes e poupando armazenamento do celular.
  */
 function createFirestore(): Firestore {
   if (!isBrowser) return getFirestore(app, FIRESTORE_DATABASE_ID);
+
   try {
-    return initializeFirestore(
-      app,
-      {
-        localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
-      },
-      FIRESTORE_DATABASE_ID
-    );
+    const pathname = window.location.pathname;
+    const isOperacional =
+      pathname.startsWith("/garcom") ||
+      pathname.startsWith("/admin") ||
+      pathname.startsWith("/cozinha") ||
+      pathname.startsWith("/superadmin");
+
+    if (isOperacional) {
+      return initializeFirestore(
+        app,
+        {
+          localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+        },
+        FIRESTORE_DATABASE_ID
+      );
+    } else {
+      return initializeFirestore(
+        app,
+        {
+          localCache: memoryLocalCache(),
+        },
+        FIRESTORE_DATABASE_ID
+      );
+    }
   } catch {
     return getFirestore(app, FIRESTORE_DATABASE_ID);
   }

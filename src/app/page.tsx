@@ -409,6 +409,9 @@ export default function LandingPage() {
             <Link href="/demo" className="hover:text-white transition-colors">
               Sandbox Demo
             </Link>
+            <Link href="/historico" className="hover:text-white transition-colors">
+              Meus Recibos
+            </Link>
             <Link href="/admin" className="hover:text-white transition-colors">
               Acesso Restaurante
             </Link>

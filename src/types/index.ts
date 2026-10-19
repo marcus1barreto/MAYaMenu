@@ -31,6 +31,7 @@ export interface MenuItem {
   precoBase: number;
   fotoUrl?: string;
   ativo: boolean; // Para pausar itens esgotados rapidamente
+  ordem?: number; // Posição de ordenação tátil dentro da categoria ou cardápio
   grupoModificadores?: GrupoModificador[];
 }
 

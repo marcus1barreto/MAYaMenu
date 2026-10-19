@@ -38,8 +38,11 @@ export function MenuView({ restaurante, cardapio: cardapioInicial, numeroMesa = 
   const [comandaStatus, setComandaStatus] = useState<string | null>(null);
   const [categoriaAtiva, setCategoriaAtiva] = useState<string>("Todas");
 
-  // Categorias únicas disponíveis no cardápio
-  const categorias = ["Todas", ...Array.from(new Set(cardapio.map((i) => i.categoria || "Geral")))];
+  // Categorias únicas disponíveis no cardápio na ordem em que aparecem no cardápio ordenado
+  const categorias = [
+    "Todas",
+    ...Array.from(new Set(cardapio.map((i) => i.categoria || "Geral"))),
+  ];
 
   // Escuta o cardápio em tempo real (mudança de preço, pausa de esgotados)
   useEffect(() => {
@@ -191,16 +194,18 @@ export function MenuView({ restaurante, cardapio: cardapioInicial, numeroMesa = 
     }
   };
 
-  const itensFiltrados = cardapio.filter((item) => {
-    if (!item.ativo) return false;
-    if (categoriaAtiva !== "Todas" && (item.categoria || "Geral") !== categoriaAtiva) return false;
-    if (!busca.trim()) return true;
-    const b = busca.toLowerCase();
-    return (
-      item.nome.toLowerCase().includes(b) ||
-      item.descricao.toLowerCase().includes(b)
-    );
-  });
+  const itensFiltrados = cardapio
+    .filter((item) => {
+      if (!item.ativo) return false;
+      if (categoriaAtiva !== "Todas" && (item.categoria || "Geral") !== categoriaAtiva) return false;
+      if (!busca.trim()) return true;
+      const b = busca.toLowerCase();
+      return (
+        item.nome.toLowerCase().includes(b) ||
+        item.descricao.toLowerCase().includes(b)
+      );
+    })
+    .sort((a, b) => (a.ordem ?? 9999) - (b.ordem ?? 9999));
 
   if (sessaoFinalizada) {
     return (
