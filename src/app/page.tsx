@@ -9,8 +9,6 @@ import {
   TrendingUp,
   ShieldCheck,
   CheckCircle2,
-  Clock,
-  Layers,
   HelpCircle,
   LogIn,
   Zap,
@@ -62,7 +60,7 @@ export default function LandingPage() {
               Como Funciona
             </a>
             <a href="#precos" className="hover:text-neutral-100 transition-colors">
-              Tarifa Solidária
+              Tarifa Flexível
             </a>
             <a href="#perguntas" className="hover:text-neutral-100 transition-colors">
               Dúvidas
@@ -75,22 +73,22 @@ export default function LandingPage() {
               className="inline-flex items-center gap-2 px-3.5 py-1.5 text-xs sm:text-sm font-medium text-neutral-300 hover:text-white rounded-lg hover:bg-neutral-900 border border-transparent hover:border-neutral-800 transition-all"
             >
               <LogIn className="w-4 h-4 text-neutral-400" />
-              <span>Acesso Restrito</span>
+              <span>Acesso Restrito / Login</span>
             </Link>
             <Link
               href="#precos"
               className="hidden sm:inline-flex items-center justify-center px-4 py-2 text-xs sm:text-sm font-semibold text-white bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 rounded-lg shadow-md shadow-rose-950/50 hover:shadow-rose-600/25 active:scale-[0.98] transition-all"
             >
-              Garantir Minha Vaga
+              Garanta a Solução
             </Link>
           </div>
         </div>
       </header>
 
       <main className="flex-1">
-        {/* SEÇÃO A: HERO SECTION */}
+        {/* SEÇÃO A: HERO SECTION (A PRIMEIRA IMPRESSÃO) */}
         <section className="relative overflow-hidden pt-12 md:pt-20 pb-20 md:pb-28 border-b border-neutral-850">
-          {/* Subtle Ambient Radial Glows */}
+          {/* Iluminação Radial Elegante */}
           <div className="absolute top-1/4 left-1/4 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-rose-600/10 rounded-full blur-[140px] pointer-events-none" />
           <div className="absolute top-1/3 right-10 w-[450px] h-[450px] bg-amber-500/10 rounded-full blur-[130px] pointer-events-none" />
 
@@ -103,7 +101,7 @@ export default function LandingPage() {
                 <span>✨ Vagas Abertas para Membros Fundadores (Kits limitados)</span>
               </div>
 
-              {/* Título H1 */}
+              {/* Título H1 Impactante */}
               <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight text-white leading-[1.12]">
                 Quanto custa um guardanapo extra?{" "}
                 <span className="bg-gradient-to-r from-amber-400 via-rose-400 to-rose-500 bg-clip-text text-transparent">
@@ -111,14 +109,14 @@ export default function LandingPage() {
                 </span>
               </h1>
 
-              {/* Subtítulo Humanizado */}
+              {/* Subtítulo Oficial Aprovado */}
               <p className="mt-6 text-base sm:text-lg lg:text-xl text-neutral-400 max-w-2xl font-normal leading-relaxed">
                 Por apenas <strong className="text-neutral-100 font-semibold">R$ 0,26 diários por mesa</strong>,
                 organize a sua cozinha, acabe com a confusão nos pedidos e aumente as suas vendas. O sistema feito para
                 quem vive a realidade do balcão e do salão.
               </p>
 
-              {/* CTAs de Ação */}
+              {/* CTAs de Conversão */}
               <div className="mt-8 sm:mt-10 flex flex-col sm:flex-row items-stretch sm:items-center gap-4 w-full sm:w-auto">
                 <a
                   href="#precos"
@@ -149,19 +147,21 @@ export default function LandingPage() {
                 </span>
                 <span className="flex items-center gap-1.5">
                   <CheckCircle2 className="w-4 h-4 text-amber-500" />
-                  Tarifa solidária em meses fracos
+                  Tarifa flexível em meses fracos
                 </span>
               </div>
             </div>
 
-            {/* Imagem / Mascote à Direita (5 cols) */}
+            {/* Imagem / Mascote à Direita (5 cols) com direcionamento visual para o CTA */}
             <div className="lg:col-span-5 relative flex items-center justify-center">
               <div className="relative w-full max-w-[460px] aspect-[16/10] sm:aspect-[16/9] lg:aspect-[4/3] rounded-3xl overflow-hidden border border-neutral-800/80 bg-gradient-to-b from-neutral-900/80 to-neutral-950 p-2.5 sm:p-3 shadow-2xl shadow-black/80 group">
                 <div className="absolute inset-0 bg-gradient-to-tr from-amber-500/10 via-transparent to-rose-500/10 pointer-events-none" />
+                
+                {/* O mascote segura a bandeja apontando/apresentando naturalmente para a esquerda em direção aos CTAs */}
                 <div className="relative w-full h-full rounded-2xl overflow-hidden bg-neutral-900/90 flex items-center justify-center">
                   <Image
                     src="/chef-mayamenu.png"
-                    alt="Mascote Chef MAYaMenu - Menus Inteligentes"
+                    alt="Chef MAYaMenu 2D - Apresentando a Solução para o seu Restaurante"
                     width={900}
                     height={506}
                     priority
@@ -169,7 +169,7 @@ export default function LandingPage() {
                   />
                 </div>
 
-                {/* Card Flutuante de Estatística Micro */}
+                {/* Card Flutuante de Custo Diário */}
                 <div className="absolute -bottom-3 -left-3 sm:bottom-4 sm:-left-4 bg-neutral-900/95 border border-neutral-750 p-3.5 rounded-2xl backdrop-blur-md shadow-xl flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400">
                     <Store className="w-5 h-5" />
@@ -187,7 +187,7 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* SEÇÃO B: PILARES */}
+        {/* SEÇÃO B: PILARES (TECNOLOGIA DE GIGANTE, PREÇO DE BAIRRO) */}
         <section id="pilares" className="py-20 md:py-28 max-w-7xl mx-auto px-6">
           <div className="text-center max-w-3xl mx-auto mb-16">
             <h2 className="text-xs sm:text-sm uppercase tracking-widest font-bold text-amber-500 mb-3">
@@ -199,7 +199,7 @@ export default function LandingPage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
-            {/* Card 1 */}
+            {/* Card 1: Zero fricção na entrada do cliente */}
             <article className="p-8 rounded-2xl bg-neutral-900/40 border border-neutral-800/80 hover:border-neutral-700/80 hover:bg-neutral-900/60 transition-all duration-300 flex flex-col justify-between group">
               <div>
                 <div className="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
@@ -216,7 +216,7 @@ export default function LandingPage() {
               </div>
             </article>
 
-            {/* Card 2 */}
+            {/* Card 2: Organização instantânea por rodadas */}
             <article className="p-8 rounded-2xl bg-neutral-900/40 border border-neutral-800/80 hover:border-neutral-700/80 hover:bg-neutral-900/60 transition-all duration-300 flex flex-col justify-between group">
               <div>
                 <div className="w-12 h-12 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
@@ -233,7 +233,7 @@ export default function LandingPage() {
               </div>
             </article>
 
-            {/* Card 3 */}
+            {/* Card 3: Radar pró-ativo de mesas inativas */}
             <article className="p-8 rounded-2xl bg-neutral-900/40 border border-neutral-800/80 hover:border-neutral-700/80 hover:bg-neutral-900/60 transition-all duration-300 flex flex-col justify-between group">
               <div>
                 <div className="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
@@ -253,7 +253,7 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* SEÇÃO C: PREÇOS (A TARIFA SOLIDÁRIA) */}
+        {/* SEÇÃO C: PREÇOS (TRANSPARÊNCIA RADICAL) */}
         <section id="precos" className="py-20 md:py-28 border-t border-neutral-850 bg-neutral-900/20">
           <div className="max-w-4xl mx-auto px-6">
             <div className="text-center mb-12">
@@ -276,11 +276,14 @@ export default function LandingPage() {
               <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-center">
                 <div className="md:col-span-7 flex flex-col items-start">
                   <div className="text-xs font-semibold uppercase tracking-wider text-amber-400 mb-2">
-                    A Tarifa Solidária
+                    A Tarifa Flexível
                   </div>
                   <div className="flex items-baseline gap-2">
                     <span className="text-4xl sm:text-6xl font-black text-white tracking-tight">R$ 8,00</span>
                     <span className="text-neutral-400 text-sm sm:text-base font-normal">ao mês por mesa</span>
+                  </div>
+                  <div className="text-xs text-amber-400/90 font-medium mt-1">
+                    (Equivale a R$ 0,26 por dia por mesa)
                   </div>
 
                   <p className="mt-5 text-sm sm:text-base text-neutral-300 leading-relaxed">
@@ -292,22 +295,27 @@ export default function LandingPage() {
                     . Um sistema que é seu verdadeiro parceiro.
                   </p>
 
-                  <div className="mt-6 space-y-2.5 text-xs sm:text-sm text-neutral-400">
+                  <div className="mt-6 space-y-2.5 text-xs sm:text-sm text-neutral-300">
                     <div className="flex items-center gap-2">
-                      <CheckCircle2 className="w-4 h-4 text-amber-500" />
-                      <span>Equivale a R$ 0,26 por dia por mesa</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <CheckCircle2 className="w-4 h-4 text-amber-500" />
+                      <CheckCircle2 className="w-4 h-4 text-amber-500 shrink-0" />
                       <span>Comandas e pedidos ilimitados</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <CheckCircle2 className="w-4 h-4 text-amber-500" />
+                      <CheckCircle2 className="w-4 h-4 text-amber-500 shrink-0" />
                       <span>Telas do Garçom e Cozinha (KDS) inclusas</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-amber-500 shrink-0" />
+                      <span>Sem fidelidade ou multas</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-amber-500 shrink-0" />
+                      <span>Funciona no celular de qualquer cliente</span>
                     </div>
                   </div>
                 </div>
 
+                {/* Card Secundário: Programa Fundadores */}
                 <div className="md:col-span-5 flex flex-col items-center justify-center p-6 rounded-2xl bg-neutral-950/70 border border-neutral-800/90 text-center">
                   <div className="w-12 h-12 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center mb-3">
                     <Zap className="w-6 h-6" />
@@ -329,7 +337,7 @@ export default function LandingPage() {
 
                   <Link
                     href="/demo"
-                    className="mt-3 text-xs text-neutral-400 hover:text-white transition-colors underline-offset-4 hover:underline"
+                    className="mt-3.5 text-xs text-neutral-400 hover:text-white transition-colors underline-offset-4 hover:underline"
                   >
                     Ou teste uma mesa na Sandbox Demo
                   </Link>
@@ -367,7 +375,8 @@ export default function LandingPage() {
               </h3>
               <p className="text-sm text-neutral-400 mt-2 leading-relaxed">
                 Nossa tecnologia é desenhada para contingência com suporte a PWA e comprovantes por Ticket Digital com
-                validação local. Seu cliente nunca fica na mão.
+                validação local. Se o 4G do cliente estiver ruim, o garçom pode lançar o pedido em 3 toques pelo tablet
+                do salão usando a mesma conta da mesa. Seu cliente nunca fica na mão.
               </p>
             </div>
 
@@ -377,7 +386,7 @@ export default function LandingPage() {
                 O que acontece se meu movimento cair muito no mês?
               </h3>
               <p className="text-sm text-neutral-400 mt-2 leading-relaxed">
-                Nós aplicamos a Tarifa Solidária: nossa tecnologia calcula o ritmo de utilização das mesas e reduz a
+                Nós aplicamos a Tarifa Flexível: nossa tecnologia calcula o ritmo de utilização das mesas e reduz a
                 cobrança automaticamente. Você só investe na proporção em que o sistema de fato está gerando valor.
               </p>
             </div>
@@ -407,7 +416,7 @@ export default function LandingPage() {
               PWA e KDS
             </a>
             <a href="#precos" className="hover:text-white transition-colors">
-              Tarifa Solidária
+              Tarifa Flexível
             </a>
           </div>
 
