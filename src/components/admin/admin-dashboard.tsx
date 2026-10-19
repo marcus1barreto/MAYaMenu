@@ -61,6 +61,9 @@ import {
   ArrowDown,
   Pin,
   Settings,
+  ListOrdered,
+  Layers,
+  Zap,
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
@@ -80,6 +83,9 @@ export function AdminDashboard() {
   );
   const [modoOperacao, setModoOperacao] = useState<"com_garcom" | "hibrido" | "balcao">(
     restaurante?.configuracoes?.modoOperacao || "hibrido"
+  );
+  const [modoFilaKds, setModoFilaKds] = useState<"sequencial" | "agrupamento">(
+    restaurante?.configuracoes?.modoFilaKds || "sequencial"
   );
   const [salvandoCor, setSalvandoCor] = useState(false);
   const [scannerBalcaoAberto, setScannerBalcaoAberto] = useState(false);
@@ -721,6 +727,7 @@ export function AdminDashboard() {
           corPrimaria,
           capaUrl: restaurante?.configuracoes?.capaUrl || "/images/capa-padrao.webp",
           modoOperacao,
+          modoFilaKds,
         },
       });
     } finally {
@@ -1728,6 +1735,102 @@ export function AdminDashboard() {
                     O cliente pede na mesa e retira diretamente no balcão/caixa.
                   </span>
                 </button>
+              </div>
+            </div>
+
+            {/* MODO DE OPERAÇÃO DO KDS (COZINHA) */}
+            <div className="space-y-4 pt-4 border-t border-neutral-800">
+              <div className="flex flex-col gap-1">
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <Zap className="w-4 h-4 text-amber-400" />
+                  Modo de Operação do KDS (Cozinha)
+                </h3>
+                <p className="text-xs text-neutral-400">
+                  Altere a forma como os pedidos são organizados no monitor da cozinha em tempo real.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Card 1: Modo Sequencial */}
+                <label
+                  className={`relative cursor-pointer rounded-xl border p-4 flex flex-col gap-2 transition-all duration-200 ${
+                    modoFilaKds === "sequencial"
+                      ? "bg-rose-600/10 border-rose-500"
+                      : "bg-neutral-900 border-neutral-800 hover:border-neutral-700 hover:bg-neutral-800/50"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="modo_fila"
+                    value="sequencial"
+                    checked={modoFilaKds === "sequencial"}
+                    onChange={() => setModoFilaKds("sequencial")}
+                    className="sr-only"
+                  />
+                  <div className="flex items-center gap-2">
+                    <div
+                      className={`p-1.5 rounded-lg ${
+                        modoFilaKds === "sequencial"
+                          ? "bg-rose-500 text-white"
+                          : "bg-neutral-800 text-neutral-400"
+                      }`}
+                    >
+                      <ListOrdered className="w-4 h-4" />
+                    </div>
+                    <span
+                      className={`text-sm font-bold ${
+                        modoFilaKds === "sequencial" ? "text-rose-400" : "text-neutral-300"
+                      }`}
+                    >
+                      Sequencial (Padrão)
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-neutral-400 leading-relaxed">
+                    Pedidos entram na fila por ordem de chegada (First-In, First-Out). Ideal para dias de movimento tranquilo ou cozinhas lineares.
+                  </p>
+                </label>
+
+                {/* Card 2: Modo Agrupamento */}
+                <label
+                  className={`relative cursor-pointer rounded-xl border p-4 flex flex-col gap-2 transition-all duration-200 ${
+                    modoFilaKds === "agrupamento"
+                      ? "bg-emerald-600/10 border-emerald-500"
+                      : "bg-neutral-900 border-neutral-800 hover:border-neutral-700 hover:bg-neutral-800/50"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="modo_fila"
+                    value="agrupamento"
+                    checked={modoFilaKds === "agrupamento"}
+                    onChange={() => setModoFilaKds("agrupamento")}
+                    className="sr-only"
+                  />
+                  <div className="absolute top-3 right-3 bg-neutral-800 px-2 py-0.5 rounded text-[9px] font-bold text-emerald-400 uppercase tracking-wider">
+                    Pro
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div
+                      className={`p-1.5 rounded-lg ${
+                        modoFilaKds === "agrupamento"
+                          ? "bg-emerald-500 text-white"
+                          : "bg-neutral-800 text-neutral-400"
+                      }`}
+                    >
+                      <Layers className="w-4 h-4" />
+                    </div>
+                    <span
+                      className={`text-sm font-bold ${
+                        modoFilaKds === "agrupamento" ? "text-emerald-400" : "text-neutral-300"
+                      }`}
+                    >
+                      Agrupamento Ágil
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-neutral-400 leading-relaxed">
+                    Consolida tickets da mesma mesa e prioriza pratos com base no tempo de preparo. Essencial para não travar o salão nos horários de pico.
+                  </p>
+                </label>
               </div>
             </div>
 

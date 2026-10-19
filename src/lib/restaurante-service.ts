@@ -88,6 +88,7 @@ export async function obterRestaurantePorSlugValido(slug: string): Promise<Resta
           logoUrl: data.configuracoes?.logoUrl,
           capaUrl: data.configuracoes?.capaUrl || "/images/capa-padrao.webp",
           modoOperacao: data.configuracoes?.modoOperacao || "hibrido",
+          modoFilaKds: data.configuracoes?.modoFilaKds || "sequencial",
         },
       };
     }
@@ -107,6 +108,7 @@ export async function obterRestaurantePorSlugValido(slug: string): Promise<Resta
           logoUrl: data.configuracoes?.logoUrl,
           capaUrl: data.configuracoes?.capaUrl || "/images/capa-padrao.webp",
           modoOperacao: data.configuracoes?.modoOperacao || "hibrido",
+          modoFilaKds: data.configuracoes?.modoFilaKds || "sequencial",
         },
       };
     }

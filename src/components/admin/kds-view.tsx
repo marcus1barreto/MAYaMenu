@@ -104,12 +104,14 @@ export function KdsView({
   nomeRestaurante = "MAYaMenu",
   isSandbox = false,
   dadosIniciais,
+  modoFilaKds = "sequencial",
 }: {
   restauranteId?: string;
   slug?: string;
   nomeRestaurante?: string;
   isSandbox?: boolean;
   dadosIniciais?: PedidoKDS[];
+  modoFilaKds?: "sequencial" | "agrupamento";
 }) {
   const [pedidos, setPedidos] = useState<PedidoKDS[]>(() => {
     if (dadosIniciais !== undefined) return dadosIniciais;
@@ -224,12 +226,31 @@ export function KdsView({
   const pedidosAFazer = pedidos.filter((p) => p.status === "a_fazer");
   const pedidosProntos = pedidos.filter((p) => p.status === "pronto");
 
-  const listaExibicao =
+  // Ordenação de acordo com o modo da fila selecionado:
+  // - "sequencial": FIFO por horário (ou ordem de chegada)
+  // - "agrupamento": Agrupa por mesa para agilidade da praça nos horários de pico
+  const ordenarLista = (lista: PedidoKDS[]) => {
+    if (modoFilaKds === "agrupamento") {
+      return [...lista].sort((a, b) => {
+        // Agrupa mesas iguais primeiro
+        if (a.mesa !== b.mesa) {
+          return String(a.mesa).localeCompare(String(b.mesa), undefined, { numeric: true });
+        }
+        return a.horario.localeCompare(b.horario);
+      });
+    }
+    // Sequencial padrão: FIFO por horário
+    return [...lista].sort((a, b) => a.horario.localeCompare(b.horario));
+  };
+
+  const listaFiltrada =
     filtro === "todos"
       ? pedidos
       : filtro === "a_fazer"
       ? pedidosAFazer
       : pedidosProntos;
+
+  const listaExibicao = ordenarLista(listaFiltrada);
 
   return (
     <div className="min-h-screen bg-neutral-950 text-white p-4 sm:p-6 flex flex-col">
@@ -245,6 +266,15 @@ export function KdsView({
               <span className="text-xs px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 font-bold">
                 AO VIVO
               </span>
+              {modoFilaKds === "agrupamento" ? (
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold uppercase tracking-wider">
+                  Agrupamento Ágil Pro
+                </span>
+              ) : (
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-300 font-bold uppercase tracking-wider">
+                  Fila Sequencial (FIFO)
+                </span>
+              )}
             </h1>
             <p className="text-xs text-neutral-400">{nomeRestaurante} • Visão Operacional</p>
           </div>

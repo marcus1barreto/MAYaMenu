@@ -38,6 +38,7 @@ function CozinhaPageContent() {
         restauranteId={restaurante?.id}
         slug={restaurante?.slug}
         nomeRestaurante={restaurante?.nome || "MAYaMenu"}
+        modoFilaKds={restaurante?.configuracoes?.modoFilaKds || "sequencial"}
       />
     </PinLockGuard>
   );

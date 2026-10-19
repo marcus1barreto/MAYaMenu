@@ -4,6 +4,7 @@
 import type { Timestamp } from "firebase/firestore";
 
 export type ModoOperacao = 'com_garcom' | 'hibrido' | 'balcao';
+export type ModoFilaKds = 'sequencial' | 'agrupamento';
 
 export interface Restaurante {
   id: string;
@@ -20,6 +21,7 @@ export interface Restaurante {
     logoUrl?: string;
     capaUrl?: string; // Se vazio, o app usa a capa padrão rústica
     modoOperacao?: ModoOperacao; // 'com_garcom' | 'hibrido' (padrão) | 'balcao'
+    modoFilaKds?: ModoFilaKds; // 'sequencial' (padrão FIFO) | 'agrupamento' (Ágil / Otimizado)
   };
 }
 
