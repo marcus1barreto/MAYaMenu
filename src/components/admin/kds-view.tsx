@@ -23,6 +23,7 @@ export interface PedidoKDS {
     nome: string;
     quantidade: number;
     precoFinal: number;
+    tempoPreparoEstimado?: number;
     modificadores?: { grupo: string; opcao: string }[];
     observacoes?: string;
   }[];
@@ -226,20 +227,48 @@ export function KdsView({
   const pedidosAFazer = pedidos.filter((p) => p.status === "a_fazer");
   const pedidosProntos = pedidos.filter((p) => p.status === "pronto");
 
-  // Ordenação de acordo com o modo da fila selecionado:
-  // - "sequencial": FIFO por horário (ou ordem de chegada)
-  // - "agrupamento": Agrupa por mesa para agilidade da praça nos horários de pico
+  // Ordenação inteligente do KDS
   const ordenarLista = (lista: PedidoKDS[]) => {
     if (modoFilaKds === "agrupamento") {
-      return [...lista].sort((a, b) => {
-        // Agrupa mesas iguais primeiro
-        if (a.mesa !== b.mesa) {
-          return String(a.mesa).localeCompare(String(b.mesa), undefined, { numeric: true });
+      // Passo 1: Descobrir o horário do pedido raiz (mais antigo) de cada mesa
+      const tempoPrimeiroPedidoPorMesa: Record<string, string> = {};
+
+      lista.forEach((ped) => {
+        const mesaStr = String(ped.mesa);
+        if (!tempoPrimeiroPedidoPorMesa[mesaStr] || ped.horario < tempoPrimeiroPedidoPorMesa[mesaStr]) {
+          tempoPrimeiroPedidoPorMesa[mesaStr] = ped.horario;
         }
+      });
+
+      return [...lista].sort((a, b) => {
+        const mesaA = String(a.mesa);
+        const mesaB = String(b.mesa);
+
+        // Passo 2: Se forem mesas diferentes, a mesa que chegou primeiro na loja ganha
+        if (mesaA !== mesaB) {
+          const tempoA = tempoPrimeiroPedidoPorMesa[mesaA];
+          const tempoB = tempoPrimeiroPedidoPorMesa[mesaB];
+          if (tempoA !== tempoB) {
+            return tempoA.localeCompare(tempoB);
+          }
+          // Desempate por número numérico da mesa se os horários forem idênticos
+          return mesaA.localeCompare(mesaB, undefined, { numeric: true });
+        }
+
+        // Passo 3: Mesma mesa? Prioriza o ticket que tem o prato mais demorado para sincronizar a entrega
+        const tempoMaxA = Math.max(...a.itens.map((i) => i.tempoPreparoEstimado || 0));
+        const tempoMaxB = Math.max(...b.itens.map((i) => i.tempoPreparoEstimado || 0));
+
+        if (tempoMaxA !== tempoMaxB) {
+          return tempoMaxB - tempoMaxA; // Ordem decrescente
+        }
+
+        // Desempate final pelo horário do ticket
         return a.horario.localeCompare(b.horario);
       });
     }
-    // Sequencial padrão: FIFO por horário
+
+    // Sequencial padrão: Estrito FIFO por horário de chegada do ticket
     return [...lista].sort((a, b) => a.horario.localeCompare(b.horario));
   };
 
@@ -378,14 +407,28 @@ export function KdsView({
                     {ped.itens.map((it, idx) => (
                       <div key={idx} className={idx > 0 ? "pt-3.5" : ""}>
                         <div className="flex items-start justify-between gap-2">
-                          <div className="flex items-baseline gap-2">
-                            <span className="w-6 h-6 rounded-lg bg-neutral-800 text-white font-black text-xs flex items-center justify-center flex-shrink-0">
+                          <div className="flex items-start gap-2">
+                            <span className="w-6 h-6 mt-0.5 rounded-lg bg-neutral-800 text-white font-black text-xs flex items-center justify-center flex-shrink-0">
                               {it.quantidade}x
                             </span>
                             <span className="text-sm font-bold text-white leading-snug">
                               {it.nome}
                             </span>
                           </div>
+
+                          {/* Novo Badge Dinâmico de Tempo de Preparo */}
+                          {it.tempoPreparoEstimado && (
+                            <div 
+                              className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-black shrink-0 ${
+                                it.tempoPreparoEstimado >= 30 
+                                  ? "bg-rose-500/20 text-rose-400" // Urgente/Demorado
+                                  : "bg-amber-500/20 text-amber-400" // Padrão
+                              }`}
+                            >
+                              <Clock className="w-3 h-3" />
+                              <span>{it.tempoPreparoEstimado}m</span>
+                            </div>
+                          )}
                         </div>
 
                         {/* Modificadores em VERMELHO conforme especificação */}

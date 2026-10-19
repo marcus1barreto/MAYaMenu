@@ -14,6 +14,7 @@ export interface ItemCarrinho {
   modificadores: { grupo: string; opcao: string; precoAdicional: number }[];
   observacoes?: string;
   fotoUrl?: string;
+  tempoPreparoEstimado?: number;
 }
 
 interface CartContextType {

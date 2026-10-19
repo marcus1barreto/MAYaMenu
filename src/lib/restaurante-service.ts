@@ -2,6 +2,7 @@
 // Serviço para resolução de restaurante e cardápio dinâmicos via Firestore
 // com fallback resiliente para mock offline
 
+import { useState, useEffect } from "react";
 import { db } from "@/lib/firebase";
 import {
   collection,
@@ -881,4 +882,99 @@ export function escutarPedidosCliente(
       console.error(`Erro ao escutar pedidos do cliente ${clienteId} na mesa ${mesaNumero}:`, err);
     }
   );
+}
+
+/**
+ * Hook de Tempo Real para cálculo auditável do valor da comanda no Caixa/Garçom.
+ * Deriva a soma dos pedidos da subcoleção "pedidos", ignorando cancelados ou estornados.
+ */
+export function useTotalComanda(
+  restauranteId?: string,
+  mesa?: string | number,
+  clienteId?: string
+) {
+  const [totalCalculado, setTotalCalculado] = useState(0);
+  const [pedidosMesa, setPedidosMesa] = useState<any[]>([]);
+  const [carregando, setCarregando] = useState(true);
+
+  useEffect(() => {
+    if (!restauranteId || !mesa || !clienteId) {
+      setCarregando(false);
+      return;
+    }
+
+    const pedidosRef = collection(
+      db,
+      "restaurantes",
+      restauranteId,
+      "mesas",
+      String(mesa),
+      "comandas_abertas",
+      clienteId,
+      "pedidos"
+    );
+
+    const unsub = onSnapshot(
+      pedidosRef,
+      (snapshot) => {
+        let soma = 0;
+        const lista: any[] = [];
+
+        snapshot.forEach((d) => {
+          const data = d.data();
+          lista.push({ id: d.id, ...data });
+
+          // Blindagem: Não soma se o pedido foi cancelado ou estornado
+          if (data.status !== "cancelado" && data.status !== "estornado") {
+            soma += data.subtotal || 0;
+          }
+        });
+
+        setTotalCalculado(soma);
+        setPedidosMesa(lista);
+        setCarregando(false);
+      },
+      (err) => {
+        console.error("Erro ao escutar subcoleção de pedidos:", err);
+        setCarregando(false);
+      }
+    );
+
+    return () => unsub();
+  }, [restauranteId, mesa, clienteId]);
+
+  return { totalCalculado, pedidosMesa, carregando };
+}
+
+/**
+ * Função Estática para Fechar a Conta e Gerar Recibo:
+ * Realiza leitura atômica da subcoleção de pedidos e calcula o total exato sem listeners contínuos.
+ */
+export async function calcularTotalComandaFechamento(
+  restauranteId: string,
+  mesa: string | number,
+  clienteId: string
+): Promise<number> {
+  const pedidosRef = collection(
+    db,
+    "restaurantes",
+    restauranteId,
+    "mesas",
+    String(mesa),
+    "comandas_abertas",
+    clienteId,
+    "pedidos"
+  );
+
+  const snap = await getDocs(pedidosRef);
+
+  let totalExato = 0;
+  snap.forEach((d) => {
+    const data = d.data();
+    if (data.status !== "cancelado" && data.status !== "estornado") {
+      totalExato += data.subtotal || 0;
+    }
+  });
+
+  return totalExato;
 }

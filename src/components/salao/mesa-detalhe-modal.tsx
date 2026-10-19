@@ -108,9 +108,16 @@ export function MesaDetalheModal({
     );
 
     const todosItens: typeof c.itens = [];
+    let subtotalCalculado = 0;
+
     pedidosDesteCliente.forEach((p) => {
+      // Ignora pedidos cancelados ou estornados
+      if (p.status === "cancelado" || p.status === "estornado") return;
+
       if (Array.isArray(p.itens)) {
         p.itens.forEach((it: any) => {
+          const valorLinha = (it.precoFinal || 0) * (it.quantidade || 1);
+          subtotalCalculado += valorLinha;
           todosItens.push({
             nome: it.nome,
             quantidade: it.quantidade || 1,
@@ -123,6 +130,7 @@ export function MesaDetalheModal({
 
     return {
       ...c,
+      subtotal: subtotalCalculado > 0 ? subtotalCalculado : c.subtotal,
       itens: todosItens,
     };
   });

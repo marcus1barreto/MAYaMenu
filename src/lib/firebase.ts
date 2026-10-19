@@ -9,7 +9,6 @@ import {
   initializeFirestore,
   persistentLocalCache,
   persistentMultipleTabManager,
-  memoryLocalCache,
   type Firestore,
 } from "firebase/firestore";
 import { getStorage, type FirebaseStorage } from "firebase/storage";
@@ -31,41 +30,24 @@ export const app: FirebaseApp = getApps().length ? getApp() : initializeApp(fire
 const FIRESTORE_DATABASE_ID = process.env.NEXT_PUBLIC_FIREBASE_DATABASE_ID || "mayamenu-bd";
 
 /**
- * Isolamento de Persistência (Firebase):
- * - Contexto Operacional (Garçom, Admin, Cozinha, Superadmin): Ativa persistentLocalCache (IndexedDB multi-tab)
- *   para garantir operação contínua e offline do salão.
- * - Contexto do Cliente (/r/[slug] ou outros públicos): Utiliza memoryLocalCache para garantir uma
- *   "Sessão Efêmera", eliminando vazamento de dados de sessão entre clientes e poupando armazenamento do celular.
+ * Firestore:
+ * - No navegador: Cache persistente SEMPRE em IndexedDB (garante a fila do MAYa Sync-QR).
+ * - No servidor (ISR/SSR): Cache padrão em memória para evitar leaks.
  */
 function createFirestore(): Firestore {
   if (!isBrowser) return getFirestore(app, FIRESTORE_DATABASE_ID);
 
   try {
-    const pathname = window.location.pathname;
-    const isOperacional =
-      pathname.startsWith("/garcom") ||
-      pathname.startsWith("/admin") ||
-      pathname.startsWith("/cozinha") ||
-      pathname.startsWith("/superadmin");
-
-    if (isOperacional) {
-      return initializeFirestore(
-        app,
-        {
-          localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
-        },
-        FIRESTORE_DATABASE_ID
-      );
-    } else {
-      return initializeFirestore(
-        app,
-        {
-          localCache: memoryLocalCache(),
-        },
-        FIRESTORE_DATABASE_ID
-      );
-    }
-  } catch {
+    return initializeFirestore(
+      app,
+      {
+        // ATENÇÃO: Isso ativa o IndexedDB universalmente para todas as rotas (Admin, KDS e Cliente).
+        localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+      },
+      FIRESTORE_DATABASE_ID
+    );
+  } catch (err) {
+    console.warn("Falha ao inicializar o cache persistente. Fazendo fallback para o Firestore padrão.", err);
     return getFirestore(app, FIRESTORE_DATABASE_ID);
   }
 }
@@ -74,39 +56,62 @@ export const db: Firestore = createFirestore();
 export const auth: Auth = getAuth(app);
 export const storage: FirebaseStorage = getStorage(app);
 
+const OFFLINE_SESSION_KEY = "mayamenu_cliente_session_id";
+
 /**
- * Garante uma sessão para o cliente do PWA sem nenhuma tela de cadastro.
- * O uid anônimo é o `clienteId` da comanda (ver firestore.rules).
- * Se já houver alguém logado (inclusive o dono), reaproveita a sessão.
+ * Garante um ID único para o cliente, mesmo em apagão total de rede.
+ * Fluxo:
+ * 1. Tem usuário em cache do Firebase Auth? Usa ele.
+ * 2. Tenta logar anonimamente no servidor.
+ * 3. Falhou (offline)? Puxa UUID do localStorage.
+ * 4. Não tem no localStorage? Cria um UUID novo (crypto.randomUUID) e salva.
+ *
+ * Retorna uma String com compatibilidade de objeto ({ uid: string } e toString()):
+ * permite tanto `const uid = await ensureClienteAnonimo()` quanto `user.uid`.
  */
-export async function ensureClienteAnonimo(): Promise<{ uid: string }> {
-  try {
-    const authPromise = async () => {
-      await auth.authStateReady();
-      if (auth.currentUser) return auth.currentUser;
-      const { user } = await signInAnonymously(auth);
-      return user;
-    };
+export async function ensureClienteAnonimo(): Promise<string & { uid: string }> {
+  let finalUid: string;
 
-    // Timeout de 3 segundos para não travar a UI caso o Auth falhe
-    const timeoutPromise = new Promise<{ uid: string }>((resolve) =>
-      setTimeout(() => {
-        let localUid = typeof window !== "undefined" ? localStorage.getItem("mayamenu_anon_uid") : null;
-        if (!localUid) {
-          localUid = `anon-${Math.random().toString(36).substring(2, 10)}`;
-          if (typeof window !== "undefined") localStorage.setItem("mayamenu_anon_uid", localUid);
+  // 1. Se já existe um usuário persistido pelo Firebase Auth, usa ele
+  if (auth.currentUser) {
+    finalUid = auth.currentUser.uid;
+  } else {
+    try {
+      // 2. Tenta criar/recuperar a sessão no servidor do Firebase
+      const userCred = await signInAnonymously(auth);
+
+      // Se deu certo, salva no localStorage também para garantir sincronia futura
+      if (typeof window !== "undefined") {
+        localStorage.setItem(OFFLINE_SESSION_KEY, userCred.user.uid);
+      }
+
+      finalUid = userCred.user.uid;
+    } catch (error) {
+      console.warn("Falha no Firebase Auth (Offline). Acionando contingência de UUID local:", error);
+
+      if (typeof window === "undefined") {
+        finalUid = `ssr-fallback-${Date.now()}`;
+      } else {
+        // 3. Tenta recuperar a sessão offline anterior
+        let localSessionId = localStorage.getItem(OFFLINE_SESSION_KEY);
+
+        // 4. Se não existir, gera um UUID v4 (usando crypto nativo do navegador) e salva
+        if (!localSessionId) {
+          localSessionId =
+            typeof crypto !== "undefined" && crypto.randomUUID
+              ? crypto.randomUUID()
+              : `offline-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 10)}`;
+
+          localStorage.setItem(OFFLINE_SESSION_KEY, localSessionId);
         }
-        resolve({ uid: localUid });
-      }, 3000)
-    );
 
-    return await Promise.race([authPromise(), timeoutPromise]);
-  } catch {
-    let localUid = typeof window !== "undefined" ? localStorage.getItem("mayamenu_anon_uid") : null;
-    if (!localUid) {
-      localUid = `anon-${Math.random().toString(36).substring(2, 10)}`;
-      if (typeof window !== "undefined") localStorage.setItem("mayamenu_anon_uid", localUid);
+        finalUid = localSessionId;
+      }
     }
-    return { uid: localUid };
   }
+
+  // Cria objeto compatível tanto como string quanto com propriedade .uid
+  const result = new String(finalUid) as string & { uid: string };
+  result.uid = finalUid;
+  return result;
 }

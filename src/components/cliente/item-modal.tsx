@@ -88,6 +88,7 @@ export function ItemModal({ item, isOpen, onClose, corPrimaria = "#E11D48" }: It
       modificadores: modificadoresEscolhidos,
       observacoes: observacoes.trim() || undefined,
       fotoUrl: item.fotoUrl,
+      tempoPreparoEstimado: item.tempoPreparoEstimado,
     });
 
     // Reset e fecha

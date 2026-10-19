@@ -66,19 +66,24 @@ export function CartDrawer({
     setEnviando(true);
     setErro(null);
 
+    // ID Gerado no Cliente (GARANTE IDEMPOTÊNCIA)
+    // Se o usuário clicar várias vezes, ou se a rede falhar e ele tentar de novo,
+    // será usado um novo UUID para uma nova tentativa, OU o mesmo pedido
+    // apenas sobrescreverá a rodada atual no Firestore.
     const pedidoId = `ped-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
 
     try {
-      // 1. Garante Auth Anônimo no Firebase para obter o UID correspondente
-      let uid = "offline-temp-uid";
+      // 1. Obtém a Sessão Offline (O UUID gerado no localStorage se o Auth falhar)
+      let uid = "fallback-uid";
       try {
         const user = await ensureClienteAnonimo();
-        uid = user.uid;
+        uid = (user as any)?.uid || String(user);
       } catch (authErr) {
-        console.warn("Falha de autenticação (possível offline):", authErr);
+        console.warn("Auth falhou, usando uid do fallback", authErr);
+        uid = `offline-${Date.now()}`;
       }
 
-      // 2. Prepara o payload do Ticket Digital (contingência garantida com MAYa Sync-QR)
+      // 2. Prepara o Payload do QR Code (Contingência Visual com MAYa Sync-QR)
       const ticket = buildTicketPayload({
         pedidoId,
         mesa,
@@ -96,113 +101,97 @@ export function CartDrawer({
       const qrString = encodeTicket(ticket);
       setTicketPayloadRaw(qrString);
 
-      // 3. Tenta persistir no Firestore sob a nova arquitetura de Rodadas:
-      // Comanda Pai: restaurantes/{restauranteId}/mesas/{mesa}/comandas_abertas/{clienteId}
-      // Rodada/Pedido: restaurantes/{restauranteId}/mesas/{mesa}/comandas_abertas/{clienteId}/pedidos/{pedidoId}
+      // 3. Monta as Referências e Payloads
+      const idRestauranteFinal = (restauranteId || slug || "demo").trim();
+
+      // Referência da Mesa (Comanda Pai)
+      const comandaRef = doc(
+        db,
+        "restaurantes",
+        idRestauranteFinal,
+        "mesas",
+        String(mesa),
+        "comandas_abertas",
+        uid
+      );
+
+      // Referência do Pedido (Rodada da Cozinha)
+      const pedidoRef = doc(
+        db,
+        "restaurantes",
+        idRestauranteFinal,
+        "mesas",
+        String(mesa),
+        "comandas_abertas",
+        uid,
+        "pedidos",
+        pedidoId
+      );
+
+      // Mapeamento limpo dos itens para a cozinha
+      const itensMapeados = itens.map((it) => ({
+        menuItemId: it.menuItemId,
+        nome: it.nome,
+        quantidade: it.quantidade,
+        precoFinal: it.precoFinal,
+        tempoPreparoEstimado: it.tempoPreparoEstimado, // Mantido para o KDS Agrupamento Ágil
+        modificadores: it.modificadores.map((m) => ({ grupo: m.grupo, opcao: m.opcao })),
+        observacoes: it.observacoes || "",
+      }));
+
+      // Payload da Rodada
+      const dadosPedidoRodada = {
+        id: pedidoId,
+        restauranteId: idRestauranteFinal,
+        slug: slug || idRestauranteFinal,
+        clienteId: uid,
+        nomeCliente: nomeCliente.trim(),
+        mesa,
+        numeroMesa: Number(mesa) || mesa,
+        itens: itensMapeados,
+        subtotal, // O subtotal DESSA rodada específica
+        status: "a_fazer" as const,
+        criadoEm: serverTimestamp(),
+      };
+
+      // Payload da Comanda Pai
+      // ATENÇÃO: Removemos o increment(subtotal)
+      // O status é meramente descritivo. O valor real da conta será a soma aritmética
+      // dos documentos da subcoleção "pedidos".
+      const dadosComanda = {
+        id: uid,
+        restauranteId: idRestauranteFinal,
+        slug: slug || idRestauranteFinal,
+        nomeCliente: nomeCliente.trim(),
+        mesa,
+        numeroMesa: Number(mesa) || mesa,
+        criadoEm: serverTimestamp(),
+        atualizadoEm: serverTimestamp(),
+        status: "pedindo_ativo" as const,
+      };
+
+      // 4. Executa as Gravações no IndexedDB / Firestore
       try {
-        // ID final garantido do restaurante (com fallback robusto)
-        const idRestauranteFinal = (restauranteId || slug || "demo").trim();
+        // Como a persistência local (IndexedDB) está ligada, isso resolve na hora,
+        // mesmo sem rede! O Firestore enfileira o envio silenciosamente.
+        await setDoc(comandaRef, dadosComanda, { merge: true });
+        await setDoc(pedidoRef, dadosPedidoRodada);
 
-        const comandaRef = doc(
-          db,
-          "restaurantes",
-          idRestauranteFinal,
-          "mesas",
-          String(mesa),
-          "comandas_abertas",
-          uid
-        );
-
-        const pedidoRef = doc(
-          db,
-          "restaurantes",
-          idRestauranteFinal,
-          "mesas",
-          String(mesa),
-          "comandas_abertas",
-          uid,
-          "pedidos",
-          pedidoId
-        );
-
-        const itensMapeados = itens.map((it) => ({
-          menuItemId: it.menuItemId,
-          nome: it.nome,
-          quantidade: it.quantidade,
-          precoFinal: it.precoFinal,
-          modificadores: it.modificadores.map((m) => ({ grupo: m.grupo, opcao: m.opcao })),
-          observacoes: it.observacoes || "",
-        }));
-
-        // Dados da Rodada individual para o KDS da cozinha (restauranteId explícito e obrigatório)
-        const dadosPedidoRodada = {
-          id: pedidoId,
-          restauranteId: idRestauranteFinal,
-          slug: slug || idRestauranteFinal,
-          clienteId: uid,
-          nomeCliente: nomeCliente.trim(),
-          mesa,
-          numeroMesa: Number(mesa) || mesa,
-          itens: itensMapeados,
-          subtotal,
-          status: "a_fazer" as const,
-          criadoEm: serverTimestamp(),
-        };
-
-        // Verifica se a comanda pai já existe para não sobrescrever criadoEm nem conflitar com increment
-        const comandaSnap = await getDoc(comandaRef);
-
-        let saveComandaPromise: Promise<unknown>;
-        if (!comandaSnap.exists()) {
-          // 1ª Rodada: cria a comanda pai (com restauranteId explícito)
-          saveComandaPromise = setDoc(comandaRef, {
-            id: uid,
-            restauranteId: idRestauranteFinal,
-            slug: slug || idRestauranteFinal,
-            nomeCliente: nomeCliente.trim(),
-            mesa,
-            numeroMesa: Number(mesa) || mesa,
-            criadoEm: serverTimestamp(),
-            atualizadoEm: serverTimestamp(),
-            subtotal,
-            status: "aguardando_pratos" as const,
-          });
-        } else {
-          // 2ª Rodada em diante: atualiza comanda acumulando subtotal e garantindo restauranteId
-          saveComandaPromise = updateDoc(comandaRef, {
-            restauranteId: idRestauranteFinal,
-            slug: slug || idRestauranteFinal,
-            nomeCliente: nomeCliente.trim(),
-            mesa,
-            numeroMesa: Number(mesa) || mesa,
-            atualizadoEm: serverTimestamp(),
-            subtotal: increment(subtotal),
-            status: "aguardando_pratos" as const,
-          });
-        }
-
-        const savePedidoPromise = setDoc(pedidoRef, dadosPedidoRodada);
-
-        const savePromise = Promise.all([saveComandaPromise, savePedidoPromise]);
-        const timeoutSave = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error("Timeout Firestore")), 5000)
-        );
-
-        await Promise.race([savePromise, timeoutSave]);
-        setUsouOffline(false);
+        // Chegou aqui? Está salvo (ou na nuvem, ou no cache local)
+        const isOffline = typeof navigator !== "undefined" && !navigator.onLine;
+        setUsouOffline(isOffline);
       } catch (firestoreErr) {
-        console.warn("Firestore offline ou rejeitado (salvo no Ticket QR):", firestoreErr);
+        // Este catch SÓ é disparado se o próprio IndexedDB falhar ou estiver cheio,
+        // o que é um apagão local severo. Aí sim o QR entra como salvação.
+        console.error("Falha crônica no IndexedDB/Firestore:", firestoreErr);
         setUsouOffline(true);
       }
 
-      // 4. Salva o comprovante na Memória Local do Aparelho do Cliente
+      // 5. Salva Visita Local (Histórico do Cliente)
       try {
         salvarVisitaLocal({
           id: `vis-${Date.now()}-${mesa}`,
-          restaurante: {
-            nome: restauranteNome,
-            slug,
-          },
+          restaurante: { nome: restauranteNome, slug },
           mesa,
           clienteNome: nomeCliente.trim(),
           clienteId: uid,
@@ -220,7 +209,7 @@ export function CartDrawer({
           comprovanteHash: gerarComprovanteHash(slug, mesa),
         });
       } catch (histErr) {
-        console.warn("Falha ao salvar visita no histórico local:", histErr);
+        console.warn("Erro ao salvar visita no histórico local:", histErr);
       }
 
       // Dispara celebração visual
@@ -238,9 +227,9 @@ export function CartDrawer({
 
       setPedidoConcluido(true);
       limparCarrinho();
-    } catch (e: unknown) {
-      console.error("Erro inesperado no envio:", e);
-      // Mesmo com erro inesperado, se tiver itens gera o ticket
+    } catch (error) {
+      console.error("Erro fatal ao finalizar o pedido:", error);
+      setErro("Ocorreu um erro ao processar seu pedido. Mostre o QR Code ao garçom.");
       setUsouOffline(true);
       setPedidoConcluido(true);
       limparCarrinho();

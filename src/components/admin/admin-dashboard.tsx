@@ -550,6 +550,7 @@ export function AdminDashboard() {
       categoria: "Hambúrgueres",
       descricao: "",
       precoBase: 30,
+      tempoPreparoEstimado: 15,
       ativo: true,
       fotoUrl: "",
     });
@@ -645,6 +646,10 @@ export function AdminDashboard() {
         categoria: itemEmEdicao.categoria?.trim() || "Geral",
         descricao: itemEmEdicao.descricao?.trim() || "",
         precoBase: Number(itemEmEdicao.precoBase) || 0,
+        tempoPreparoEstimado:
+          itemEmEdicao.tempoPreparoEstimado !== undefined
+            ? Math.max(1, Number(itemEmEdicao.tempoPreparoEstimado))
+            : 15,
         ativo: itemEmEdicao.ativo !== undefined ? itemEmEdicao.ativo : true,
         ordem: ordemCalculada,
         fotoUrl: fotoUrlFinal,
@@ -1422,7 +1427,7 @@ export function AdminDashboard() {
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold uppercase tracking-wider text-neutral-300">
                     Categoria *
@@ -1455,10 +1460,38 @@ export function AdminDashboard() {
                     onChange={(e) =>
                       setItemEmEdicao({ ...itemEmEdicao, precoBase: parseFloat(e.target.value) || 0 })
                     }
-                    className="bg-neutral-800 border-neutral-700 text-white placeholder:text-neutral-500 rounded-xl font-mono"
+                    className="bg-neutral-800 border-neutral-700 text-white placeholder:text-neutral-500 rounded-xl font-mono text-sm h-9"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold uppercase tracking-wider text-neutral-300 flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 text-amber-400" />
+                    Preparo (min)
+                  </label>
+                  <Input
+                    type="number"
+                    min="1"
+                    max="180"
+                    placeholder="15"
+                    value={itemEmEdicao.tempoPreparoEstimado ?? ""}
+                    onChange={(e) =>
+                      setItemEmEdicao({
+                        ...itemEmEdicao,
+                        tempoPreparoEstimado: parseInt(e.target.value, 10) || undefined,
+                      })
+                    }
+                    className="bg-neutral-800 border-neutral-700 text-white placeholder:text-neutral-500 rounded-xl font-mono text-sm h-9"
                   />
                 </div>
               </div>
+
+              <p className="text-[11px] text-neutral-400 flex items-start gap-1.5 bg-neutral-900/60 p-2.5 rounded-xl border border-neutral-800">
+                <Clock className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+                <span>
+                  Tempo médio para a cozinha liberar este prato. Essencial para o KDS priorizar pedidos no Modo Agrupamento Ágil.
+                </span>
+              </p>
 
               <div className="space-y-1.5">
                 <label className="text-xs font-bold uppercase tracking-wider text-neutral-300">

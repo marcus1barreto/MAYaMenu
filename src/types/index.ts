@@ -34,6 +34,7 @@ export interface MenuItem {
   fotoUrl?: string;
   ativo: boolean; // Para pausar itens esgotados rapidamente
   ordem?: number; // Posição de ordenação tátil dentro da categoria ou cardápio
+  tempoPreparoEstimado?: number; // Em minutos para otimização de KDS/cozinha
   grupoModificadores?: GrupoModificador[];
 }
 
@@ -49,6 +50,7 @@ export interface ItemPedido {
   nome: string;
   quantidade: number;
   precoFinal: number; // Preço base + modificadores escolhidos
+  tempoPreparoEstimado?: number; // Em minutos
   modificadores?: { grupo: string; opcao: string }[]; // Ex: { grupo: "Ponto da Carne", opcao: "Bem passado" }
   observacoes?: string; // Ex: "Sem cebola"
 }
