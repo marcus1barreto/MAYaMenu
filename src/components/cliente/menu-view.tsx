@@ -15,6 +15,7 @@ import { ensureClienteAnonimo, db } from "@/lib/firebase";
 import { doc, updateDoc, serverTimestamp, onSnapshot } from "firebase/firestore";
 import { escutarCardapio, chamarGarcomFirestore } from "@/lib/restaurante-service";
 import { marcarVisitaAtualComoPaga, limparSessaoClienteLocal } from "@/lib/historico-cliente";
+import { MesaScannerModal } from "./mesa-scanner-modal";
 
 interface MenuViewProps {
   restaurante: Restaurante;
@@ -22,13 +23,15 @@ interface MenuViewProps {
   numeroMesa?: number | string;
 }
 
-export function MenuView({ restaurante, cardapio: cardapioInicial, numeroMesa = 1 }: MenuViewProps) {
-  const { totalItens, subtotal, nomeCliente, limparCarrinho } = useCart();
+export function MenuView({ restaurante, cardapio: cardapioInicial, numeroMesa: numeroMesaProp = 1 }: MenuViewProps) {
+  const { totalItens, subtotal, nomeCliente, limparCarrinho, mesa, setMesa } = useCart();
+  const numeroMesa = mesa || numeroMesaProp;
   const [cardapio, setCardapio] = useState<MenuItem[]>(cardapioInicial);
   const [itemSelecionado, setItemSelecionado] = useState<MenuItem | null>(null);
   const [carrinhoAberto, setCarrinhoAberto] = useState(false);
   const [historicoAberto, setHistoricoAberto] = useState(false);
   const [minhaComandaAberta, setMinhaComandaAberta] = useState(false);
+  const [mesaScannerAberto, setMesaScannerAberto] = useState(false);
   const [contaPagaModal, setContaPagaModal] = useState(false);
   const [sessaoFinalizada, setSessaoFinalizada] = useState(false);
   const [subtotalComandaBanco, setSubtotalComandaBanco] = useState(0);
@@ -322,19 +325,19 @@ export function MenuView({ restaurante, cardapio: cardapioInicial, numeroMesa = 
         <div className="absolute bottom-0 left-0 right-0 p-5 sm:p-8 max-w-3xl mx-auto flex flex-col justify-end">
           {/* LINHA DE STATUS E AÇÕES RÁPIDAS DA MESA */}
           <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mb-2">
-            <Badge
-              variant="outline"
-              className="bg-white/10 backdrop-blur-md text-white border-white/20 text-[11px] font-bold px-2.5 py-1 rounded-full shrink-0"
+            {/* IDENTIFICAÇÃO DA MESA COM BOTÃO ESCANEAR MESA */}
+            <button
+              type="button"
+              onClick={() => setMesaScannerAberto(true)}
+              className="bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-400/40 text-emerald-300 text-[11px] font-bold px-2.5 py-1 rounded-full transition-all flex items-center gap-1.5 shadow-sm shrink-0 active:scale-95"
+              title="Trocar ou escanear QR Code da mesa"
             >
-              <MapPin className="w-3 h-3 mr-1 text-emerald-400" />
-              Mesa {numeroMesa}
-            </Badge>
-            <Badge
-              variant="outline"
-              className="hidden xs:inline-flex bg-white/10 backdrop-blur-md text-white border-white/20 text-[11px] font-semibold px-2 py-1 rounded-full shrink-0"
-            >
-              Cardápio Digital PWA
-            </Badge>
+              <QrCode className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Mesa {numeroMesa}</span>
+              <span className="text-[9px] bg-emerald-500/30 px-1 py-0.2 rounded font-normal text-emerald-200">
+                Trocar
+              </span>
+            </button>
 
             {/* BOTÃO VER MINHA COMANDA (Acompanhamento em Tempo Real dos Pratos) */}
             <button
@@ -645,6 +648,29 @@ export function MenuView({ restaurante, cardapio: cardapioInicial, numeroMesa = 
         onPedirConta={handlePedirConta}
         pedindoConta={pedindoConta}
         contaPedidaSucesso={contaPedidaSucesso}
+      />
+
+      {/* MODAL DE LEITURA INTERNA DO QR CODE DA MESA */}
+      <MesaScannerModal
+        isOpen={mesaScannerAberto}
+        onClose={() => setMesaScannerAberto(false)}
+        mesaAtual={numeroMesa}
+        onMesaDetectada={(novaMesa) => {
+          setMesa(novaMesa);
+          try {
+            // Atualiza table_id e persistência do carrinho no localStorage
+            localStorage.setItem("table_id", String(novaMesa));
+            const cartKey = `mayamenu_cart_${restaurante.slug}`;
+            const cartExistente = localStorage.getItem(cartKey);
+            if (cartExistente) {
+              const parsed = JSON.parse(cartExistente);
+              parsed.mesa = novaMesa;
+              localStorage.setItem(cartKey, JSON.stringify(parsed));
+            }
+          } catch {
+            // Ignora erro de storage
+          }
+        }}
       />
 
       {/* MODAL DE FEEDBACK DE CONTA PAGA COM SUCESSO (Sincronia Garçom -> Cliente) */}

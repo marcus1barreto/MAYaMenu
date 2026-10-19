@@ -20,6 +20,7 @@ import {
   fixarItemNoTopo,
 } from "@/lib/restaurante-service";
 import { GuidedEmptyCardapio } from "./guided-empty-cardapio";
+import { AdminQrScannerModal } from "./admin-qr-scanner-modal";
 import { MAYA_MEDIA_LIBRARY } from "@/lib/maya-media-library";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -79,6 +80,8 @@ export function AdminDashboard() {
     restaurante?.configuracoes?.modoOperacao || "hibrido"
   );
   const [salvandoCor, setSalvandoCor] = useState(false);
+  const [scannerBalcaoAberto, setScannerBalcaoAberto] = useState(false);
+  const [feedbackBalcao, setFeedbackBalcao] = useState<string | null>(null);
 
   // Sincroniza cardápio em tempo real com o Firestore
   useEffect(() => {
@@ -299,6 +302,31 @@ export function AdminDashboard() {
         console.warn("Falha ao liberar mesa no Firestore pelo Admin:", err);
       }
     }
+  };
+
+  // Dá baixa imediata na comanda do cliente escaneada no Balcão/Caixa
+  const handleConfirmarComandaBalcao = async (payload: {
+    mesaNumero: number | string;
+    clienteId: string;
+    nomeCliente: string;
+    total: number;
+    ticket: any;
+  }) => {
+    const numMesa = Number(payload.mesaNumero) || 1;
+    if (!restaurante?.id) return;
+
+    // 1. Marca a comanda como paga
+    await handleMarcarComoPago(numMesa, payload.clienteId);
+
+    // 2. Libera a mesa / fecha comanda se estiver no modo balcão
+    if (modoOperacao === "balcao") {
+      await handleLiberarMesa(numMesa);
+    }
+
+    setFeedbackBalcao(
+      `Pagamento confirmado e comanda da Mesa ${payload.mesaNumero} (${payload.nomeCliente}) baixada com sucesso!`
+    );
+    setTimeout(() => setFeedbackBalcao(null), 5000);
   };
 
   const handleAtenderGarcom = async (mesaNumero: number, clienteId: string) => {
@@ -718,7 +746,18 @@ export function AdminDashboard() {
         </div>
 
         {/* ATALHOS RÁPIDOS */}
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* BOTÃO LEITOR DE BALCÃO / CAIXA */}
+          <Button
+            type="button"
+            onClick={() => setScannerBalcaoAberto(true)}
+            className="bg-amber-500 hover:bg-amber-400 text-neutral-950 font-black text-xs h-10 px-3.5 rounded-xl flex items-center gap-2 shadow-lg shadow-amber-950/40 transition-all active:scale-95"
+            title="Escanear comanda do cliente no balcão para baixa imediata"
+          >
+            <QrCode className="w-4 h-4 text-neutral-950" />
+            <span>Escanear Comanda (Balcão)</span>
+          </Button>
+
           <Link href="/cozinha" target="_blank">
             <Button
               variant="outline"
@@ -751,6 +790,14 @@ export function AdminDashboard() {
           </Button>
         </div>
       </header>
+
+      {/* BANNER DE FEEDBACK VISUAL DO BALCÃO */}
+      {feedbackBalcao && (
+        <div className="bg-emerald-500/20 border-b border-emerald-500/40 px-4 py-2.5 text-center text-emerald-200 text-xs font-bold flex items-center justify-center gap-2 animate-in fade-in">
+          <Check className="w-4 h-4 text-emerald-400" />
+          <span>{feedbackBalcao}</span>
+        </div>
+      )}
 
       {/* NAVEGAÇÃO DE ABAS */}
       <div className="border-b border-neutral-800 px-4 sm:px-6 bg-neutral-900/50">
@@ -1660,6 +1707,13 @@ export function AdminDashboard() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* LEITOR DE QR CODE DO BALCÃO / CAIXA */}
+      <AdminQrScannerModal
+        isOpen={scannerBalcaoAberto}
+        onClose={() => setScannerBalcaoAberto(false)}
+        onComandaConfirmada={handleConfirmarComandaBalcao}
+      />
     </div>
   );
 }
