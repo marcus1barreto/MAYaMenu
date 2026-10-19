@@ -123,14 +123,22 @@ export function QrScannerModal({ isOpen, onClose, onTicketLido }: QrScannerModal
             <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-start gap-3 text-emerald-300">
               <CheckCircle2 className="w-6 h-6 flex-shrink-0 mt-0.5 text-emerald-400" />
               <div>
-                <h4 className="text-sm font-bold text-white">Ticket Válido Reconhecido!</h4>
+                <h4 className="text-sm font-bold text-white">
+                  {ticketSucesso.tot !== undefined ? "MAYa Sync-QR (Comanda-Espelho)" : "Ticket Válido Reconhecido!"}
+                </h4>
                 <p className="text-xs text-neutral-300 mt-1">
                   Mesa <strong className="text-white">{ticketSucesso.t}</strong> • Cliente:{" "}
                   <strong className="text-white">{ticketSucesso.c.n}</strong>
                 </p>
-                <p className="text-[11px] text-neutral-400 mt-0.5">
-                  Itens no pedido: {ticketSucesso.i.reduce((acc, it) => acc + it.q, 0)}
-                </p>
+                {ticketSucesso.tot !== undefined ? (
+                  <p className="text-sm font-black text-amber-400 mt-1 font-mono">
+                    Total a Cobrar: {ticketSucesso.tot.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                  </p>
+                ) : (
+                  <p className="text-[11px] text-neutral-400 mt-0.5">
+                    Itens no pedido: {ticketSucesso.i.reduce((acc, it) => acc + it.q, 0)}
+                  </p>
+                )}
               </div>
             </div>
 
@@ -158,7 +166,9 @@ export function QrScannerModal({ isOpen, onClose, onTicketLido }: QrScannerModal
               onClick={handleConfirmarInjecao}
               className="w-full h-12 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm shadow-lg shadow-emerald-900/30"
             >
-              Injetar Pedido no Sistema
+              {ticketSucesso.tot !== undefined
+                ? `Receber & Sincronizar Mesa ${ticketSucesso.t}`
+                : "Injetar Pedido no Sistema"}
             </Button>
           </div>
         ) : (

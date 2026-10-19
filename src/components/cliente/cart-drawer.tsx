@@ -78,12 +78,13 @@ export function CartDrawer({
         console.warn("Falha de autenticação (possível offline):", authErr);
       }
 
-      // 2. Prepara o payload do Ticket Digital (contingência garantida)
+      // 2. Prepara o payload do Ticket Digital (contingência garantida com MAYa Sync-QR)
       const ticket = buildTicketPayload({
         pedidoId,
         mesa,
         clienteId: uid,
         nomeCliente,
+        total: subtotal,
         itens: itens.map((it) => ({
           menuItemId: it.menuItemId,
           quantidade: it.quantidade,

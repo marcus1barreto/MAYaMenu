@@ -16,10 +16,12 @@ import {
   Sparkles,
   Utensils,
   AlertCircle,
-  X,
   Users,
   User,
+  QrCode,
 } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
+import { buildTicketPayload, encodeTicket } from "@/lib/ticket";
 
 interface MinhaComandaModalProps {
   isOpen: boolean;
@@ -53,6 +55,8 @@ export function MinhaComandaModal({
   const [carregando, setCarregando] = useState(true);
   const [pedindoMesaToda, setPedindoMesaToda] = useState(false);
   const [mesaTodaPedidaSucesso, setMesaTodaPedidaSucesso] = useState(false);
+  const [clienteUid, setClienteUid] = useState<string>("");
+  const [mostrarSyncQr, setMostrarSyncQr] = useState<boolean>(false);
 
   useEffect(() => {
     if (!isOpen || !restauranteId) return;
@@ -61,6 +65,7 @@ export function MinhaComandaModal({
     setCarregando(true);
 
     ensureClienteAnonimo().then((user) => {
+      setClienteUid(user.uid);
       unsub = escutarPedidosCliente(restauranteId, mesaNumero, user.uid, (lista) => {
         setPedidos(lista);
         setCarregando(false);
@@ -306,6 +311,61 @@ export function MinhaComandaModal({
                 {totalGeralMesa.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
               </span>
             </div>
+          </div>
+
+          {/* PROTOCOLO MAYA SYNC-QR (Comanda-Espelho Dinâmica Descentralizada) */}
+          <div className="pt-2 border-t border-neutral-800">
+            <button
+              type="button"
+              onClick={() => setMostrarSyncQr((prev) => !prev)}
+              className="w-full py-2 px-3 rounded-xl bg-neutral-900 hover:bg-neutral-850 border border-neutral-800 text-[11px] font-bold text-amber-400 flex items-center justify-between transition-all"
+            >
+              <div className="flex items-center gap-2">
+                <QrCode className="w-3.5 h-3.5 text-amber-400" />
+                <span>MAYa Sync-QR (Comanda-Espelho Offline)</span>
+              </div>
+              <span className="text-[10px] text-neutral-400">
+                {mostrarSyncQr ? "Ocultar" : "Mostrar QR"}
+              </span>
+            </button>
+
+            {mostrarSyncQr && (
+              <div className="mt-3 p-4 bg-white rounded-2xl shadow-xl flex flex-col items-center text-center space-y-2">
+                <p className="text-[11px] font-bold text-neutral-800">
+                  Apresente este código ao garçom para fechamento sem internet
+                </p>
+                <div className="p-2 border-2 border-dashed border-neutral-300 rounded-xl">
+                  <QRCodeSVG
+                    value={encodeTicket(
+                      buildTicketPayload({
+                        pedidoId: `cmd_${mesaNumero}_${(clienteUid || "anon").slice(-4)}`,
+                        mesa: mesaNumero,
+                        clienteId: clienteUid || "anon",
+                        nomeCliente: "Cliente",
+                        total: totalCliente,
+                        itens: pedidos.flatMap((p) =>
+                          p.itens.map((it) => ({
+                            menuItemId: it.menuItemId || "item",
+                            quantidade: it.quantidade,
+                            modificadores: it.modificadores?.map((m) => ({
+                              grupo: m.grupo,
+                              opcao: m.opcao,
+                            })),
+                            observacoes: it.observacoes,
+                          }))
+                        ),
+                      })
+                    )}
+                    size={180}
+                    level="M"
+                    includeMargin={true}
+                  />
+                </div>
+                <div className="text-[10px] text-neutral-500 font-mono">
+                  Payload Compacto: Total {totalCliente.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* BOTÕES DE AÇÃO LADO A LADO */}

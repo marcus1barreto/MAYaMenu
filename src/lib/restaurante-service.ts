@@ -52,13 +52,20 @@ export async function verificarSlugDisponivel(slug: string): Promise<boolean> {
 }
 
 /**
- * Busca restaurante pelo `slug` no Firestore.
- * Se não encontrar ou ocorrer falha/offline, retorna RESTAURANTE_DEMO ajustando o slug.
+ * Busca restaurante pelo `slug` no Firestore de forma estrita (Tenant Existence Guard).
+ * Se o documento não existir, retorna null para interromper e exibir fallback.
  */
-export async function obterRestaurantePorSlug(slug: string): Promise<Restaurante> {
+export async function obterRestaurantePorSlugValido(slug: string): Promise<Restaurante | null> {
   const slugLimpo = slug.trim().toLowerCase();
+  if (!slugLimpo) return null;
+
+  // Rota sandbox/demo é sempre válida
+  if (slugLimpo === "demo") {
+    return { ...RESTAURANTE_DEMO, slug: "demo" };
+  }
 
   try {
+    // 1. Consulta por campo 'slug'
     const q = query(
       collection(db, "restaurantes"),
       where("slug", "==", slugLimpo),
@@ -66,7 +73,6 @@ export async function obterRestaurantePorSlug(slug: string): Promise<Restaurante
     );
 
     const snapshot = await getDocs(q);
-
     if (!snapshot.empty) {
       const docSnap = snapshot.docs[0];
       const data = docSnap.data();
@@ -85,7 +91,7 @@ export async function obterRestaurantePorSlug(slug: string): Promise<Restaurante
       };
     }
 
-    // Se o slug for o id direto do documento do restaurante (ex: UID)
+    // 2. Consulta pelo UID direto do documento
     const directDoc = await getDoc(doc(db, "restaurantes", slugLimpo));
     if (directDoc.exists()) {
       const data = directDoc.data();
@@ -103,14 +109,30 @@ export async function obterRestaurantePorSlug(slug: string): Promise<Restaurante
         },
       };
     }
-  } catch (err) {
-    console.warn("Falha ao buscar restaurante por slug no Firestore (usando fallback demo):", err);
-  }
 
-  // Fallback demo garantido
+    // Documento não existe
+    return null;
+  } catch (err) {
+    console.warn("Falha na checagem estrita de existência do restaurante:", err);
+    // Em caso de erro de rede (offline), permite renderizar se já tiver dados em cache local
+    return {
+      ...RESTAURANTE_DEMO,
+      slug: slugLimpo,
+    };
+  }
+}
+
+/**
+ * Busca restaurante pelo `slug` no Firestore.
+ * Se não encontrar ou ocorrer falha/offline, retorna RESTAURANTE_DEMO ajustando o slug.
+ */
+export async function obterRestaurantePorSlug(slug: string): Promise<Restaurante> {
+  const restaurante = await obterRestaurantePorSlugValido(slug);
+  if (restaurante) return restaurante;
+
   return {
     ...RESTAURANTE_DEMO,
-    slug: slugLimpo,
+    slug: slug.trim().toLowerCase(),
   };
 }
 

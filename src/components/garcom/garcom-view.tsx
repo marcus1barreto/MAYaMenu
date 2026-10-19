@@ -483,20 +483,22 @@ export function GarcomView({
     }
   };
 
-  // Injetar pedido resgatado pelo leitor de QR de contingência diretamente no Firestore
+  // Injetar pedido resgatado pelo leitor de QR de contingência diretamente no Firestore (MAYa Sync-QR)
   const handleTicketLido = async (ticket: TicketPayload) => {
     const mesaNum = Number(ticket.t) || 1;
-    const subtotalCalculado = ticket.i.reduce((acc, it) => acc + it.q * 30, 0); // estimativa base
+    // Se o ticket já possuir o total consolidado (MAYa Sync-QR), utiliza o valor exato
+    const subtotalCalculado =
+      ticket.tot !== undefined ? ticket.tot : ticket.i.reduce((acc, it) => acc + it.q * 30, 0);
 
     const novaComanda: ComandaGarcom = {
       id: ticket.c.id,
       nomeCliente: ticket.c.n,
       subtotal: subtotalCalculado,
-      status: "aguardando_pratos",
+      status: ticket.tot !== undefined ? "conta_pedida" : "aguardando_pratos",
       itens: ticket.i.map((it) => ({
         nome: `Item (${it.id})`,
         quantidade: it.q,
-        precoFinal: 30,
+        precoFinal: ticket.tot !== undefined ? ticket.tot / (ticket.i.length || 1) : 30,
         modificadores: it.m?.map(([g, o]) => ({ grupo: g, opcao: o })),
       })),
     };

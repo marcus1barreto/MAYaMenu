@@ -32,8 +32,9 @@ export interface TicketItem {
 
 export interface TicketPayload {
   v: typeof TICKET_VERSION;
-  id: string; // ID do pedido
+  id: string; // ID do pedido ou comanda (ex: cmd_987)
   t: number | string; // mesa
+  tot?: number; // total da comanda/pedido para fechamento offline instantâneo
   c: { id: string; n: string }; // cliente: clienteId + nomeCliente
   i: TicketItem[];
 }
@@ -46,12 +47,14 @@ export function buildTicketPayload(params: {
   mesa: number | string;
   clienteId: string;
   nomeCliente: string;
+  total?: number;
   itens: Pick<ItemComanda, "menuItemId" | "quantidade" | "modificadores" | "observacoes">[];
 }): TicketPayload {
   return {
     v: TICKET_VERSION,
     id: params.pedidoId,
     t: params.mesa,
+    tot: params.total !== undefined ? Number(params.total.toFixed(2)) : undefined,
     c: { id: params.clienteId, n: params.nomeCliente.trim() },
     i: params.itens.map((item) => {
       const out: TicketItem = { id: item.menuItemId, q: item.quantidade };
