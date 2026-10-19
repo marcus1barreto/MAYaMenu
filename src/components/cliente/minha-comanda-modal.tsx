@@ -368,33 +368,33 @@ export function MinhaComandaModal({
             )}
           </div>
 
-          {/* BOTÕES DE AÇÃO LADO A LADO */}
-          <div className="grid grid-cols-2 gap-2.5">
+          {/* BOTÕES DE AÇÃO: RESPONSIVOS (MOBILE: EMPILHADOS / SM: LADO A LADO) */}
+          <div className="flex flex-col sm:flex-row w-full gap-2 pt-1 pb-safe">
             {/* 1. PAGAR A MINHA PARTE */}
             <Button
               type="button"
               onClick={onPedirConta}
               disabled={pedindoConta || contaPedidaSucesso || totalCliente === 0}
-              className={`h-11 rounded-xl text-[11px] uppercase tracking-wider font-bold transition-all shadow-md flex items-center justify-center gap-1.5 ${
+              className={`w-full sm:flex-1 h-12 sm:h-11 rounded-xl text-xs sm:text-[11px] uppercase tracking-wider font-bold transition-all shadow-md flex items-center justify-center gap-1.5 ${
                 contaPedidaSucesso
                   ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
-                  : "bg-rose-600 hover:bg-rose-500 text-white shadow-rose-600/20"
+                  : "bg-rose-600 hover:bg-rose-500 text-white shadow-rose-600/20 active:scale-95"
               }`}
             >
               {contaPedidaSucesso ? (
                 <>
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                  Parte Pedida!
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                  <span>Parte Solicitada</span>
                 </>
               ) : pedindoConta ? (
                 <>
-                  <Clock className="w-3.5 h-3.5 animate-spin" />
-                  Pedindo...
+                  <Clock className="w-4 h-4 animate-spin" />
+                  <span>Pedindo...</span>
                 </>
               ) : (
                 <>
-                  <Receipt className="w-3.5 h-3.5" />
-                  Pagar Minha Parte
+                  <Receipt className="w-4 h-4" />
+                  <span>Pagar Minha Parte</span>
                 </>
               )}
             </Button>
@@ -404,26 +404,26 @@ export function MinhaComandaModal({
               type="button"
               onClick={handlePagarMesaCompleta}
               disabled={pedindoMesaToda || mesaTodaPedidaSucesso || totalGeralMesa === 0}
-              className={`h-11 rounded-xl text-[11px] uppercase tracking-wider font-bold transition-all border shadow-md flex items-center justify-center gap-1.5 ${
+              className={`w-full sm:flex-1 h-12 sm:h-11 rounded-xl text-xs sm:text-[11px] uppercase tracking-wider font-bold transition-all border shadow-md flex items-center justify-center gap-1.5 ${
                 mesaTodaPedidaSucesso
                   ? "bg-amber-500/20 text-amber-300 border-amber-500/40"
-                  : "bg-neutral-800 hover:bg-neutral-700 text-amber-300 border-amber-500/30 hover:border-amber-500/50"
+                  : "bg-neutral-800 hover:bg-neutral-700 text-amber-300 border-amber-500/30 hover:border-amber-500/50 active:scale-95"
               }`}
             >
               {mesaTodaPedidaSucesso ? (
                 <>
-                  <CheckCircle2 className="w-3.5 h-3.5 text-amber-400" />
-                  Mesa Solicitada!
+                  <CheckCircle2 className="w-4 h-4 text-amber-400" />
+                  <span>Mesa Solicitada</span>
                 </>
               ) : pedindoMesaToda ? (
                 <>
-                  <Clock className="w-3.5 h-3.5 animate-spin text-amber-400" />
-                  Solicitando...
+                  <Clock className="w-4 h-4 animate-spin text-amber-400" />
+                  <span>Pedindo...</span>
                 </>
               ) : (
                 <>
-                  <Users className="w-3.5 h-3.5 text-amber-400" />
-                  Pagar Mesa Completa
+                  <Users className="w-4 h-4 text-amber-400" />
+                  <span>Pagar Toda a Mesa</span>
                 </>
               )}
             </Button>

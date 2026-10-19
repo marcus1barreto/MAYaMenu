@@ -60,6 +60,7 @@ import {
   ArrowUp,
   ArrowDown,
   Pin,
+  Settings,
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
@@ -69,7 +70,8 @@ import { MESAS_INICIAIS, type MesaOperacional, type ComandaGarcom, TEMPO_TOLERAN
 
 export function AdminDashboard() {
   const { restaurante, logout, atualizarRestaurante } = useAuth();
-  const [abaAtiva, setAbaAtiva] = useState<"cardapio" | "config" | "mesas" | "analytics">("cardapio");
+  const [abaAtiva, setAbaAtiva] = useState<"cardapio" | "mesas" | "analytics">("cardapio");
+  const [modalConfigAberto, setModalConfigAberto] = useState(false);
   const [modalProAberto, setModalProAberto] = useState(false);
   const [itensCardapio, setItensCardapio] = useState<MenuItem[]>([]);
   const [carregandoCardapio, setCarregandoCardapio] = useState(true);
@@ -782,6 +784,17 @@ export function AdminDashboard() {
 
           <Button
             type="button"
+            variant="outline"
+            onClick={() => setModalConfigAberto(true)}
+            className="bg-neutral-800 border-neutral-700 hover:bg-neutral-700 hover:text-white text-neutral-300 font-bold text-xs h-10 px-3 rounded-xl flex items-center gap-2 transition-all"
+            title="Configurações Globais & Tematização"
+          >
+            <Settings className="w-4 h-4 text-rose-500" />
+            <span className="hidden sm:inline">Configurações</span>
+          </Button>
+
+          <Button
+            type="button"
             variant="ghost"
             onClick={logout}
             className="text-neutral-400 hover:text-white hover:bg-neutral-800 rounded-xl text-xs h-10"
@@ -826,19 +839,6 @@ export function AdminDashboard() {
           >
             <QrCode className="w-4 h-4" />
             <span>Mesas & QR Codes</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setAbaAtiva("config")}
-            className={`py-3.5 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 ${
-              abaAtiva === "config"
-                ? "border-rose-500 text-white"
-                : "border-transparent text-neutral-400 hover:text-neutral-200"
-            }`}
-          >
-            <Palette className="w-4 h-4" />
-            <span>Tematização & Capa</span>
           </button>
 
           <button
@@ -1154,110 +1154,7 @@ export function AdminDashboard() {
           </div>
         )}
 
-        {/* ABA: CONFIGURAÇÕES E TEMA */}
-        {abaAtiva === "config" && (
-          <div className="max-w-md space-y-6">
-            <div>
-              <h2 className="text-lg font-bold text-white">Personalização Visual</h2>
-              <p className="text-xs text-neutral-400">
-                Configure a cor primária que reflete a identidade da sua marca no cardápio
-              </p>
-            </div>
 
-            <div className="space-y-3 p-5 rounded-2xl bg-neutral-900 border border-neutral-800">
-              <label className="text-xs font-bold uppercase tracking-wider text-neutral-300 block">
-                Cor Primária de Destaque
-              </label>
-              <div className="flex items-center gap-3">
-                <input
-                  type="color"
-                  value={corPrimaria}
-                  onChange={(e) => setCorPrimaria(e.target.value)}
-                  className="w-12 h-12 rounded-xl bg-transparent border-0 cursor-pointer"
-                />
-                <Input
-                  value={corPrimaria}
-                  onChange={(e) => setCorPrimaria(e.target.value)}
-                  className="bg-neutral-800 border-neutral-700 text-white font-mono uppercase"
-                />
-              </div>
-
-              {/* Pré-visualização da cor */}
-              <div
-                style={{ backgroundColor: corPrimaria }}
-                className="w-full h-10 rounded-xl flex items-center justify-center text-white text-xs font-bold shadow-md"
-              >
-                Exemplo de Botão no Cardápio
-              </div>
-            </div>
-
-            {/* MODELO OPERACIONAL DO SALÃO */}
-            <div className="space-y-3 p-5 rounded-2xl bg-neutral-900 border border-neutral-800">
-              <label className="text-xs font-bold uppercase tracking-wider text-neutral-300 block">
-                Modelo Operacional do Salão
-              </label>
-              <p className="text-xs text-neutral-400">
-                Defina como os pedidos fluem entre a mesa, o garçom e a cozinha
-              </p>
-
-              <div className="grid grid-cols-1 gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={() => setModoOperacao("hibrido")}
-                  className={`p-3 rounded-xl border text-left transition-all ${
-                    modoOperacao === "hibrido"
-                      ? "bg-rose-950/40 border-rose-500 text-white"
-                      : "bg-neutral-800/50 border-neutral-700/60 text-neutral-400 hover:border-neutral-600"
-                  }`}
-                >
-                  <span className="text-xs font-bold block text-white">Híbrido / Suporte (Padrão)</span>
-                  <span className="text-[10px] text-neutral-400 block mt-0.5 leading-snug">
-                    O pedido vai direto para a cozinha. O garçom atende, entrega e recebe.
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setModoOperacao("com_garcom")}
-                  className={`p-3 rounded-xl border text-left transition-all ${
-                    modoOperacao === "com_garcom"
-                      ? "bg-rose-950/40 border-rose-500 text-white"
-                      : "bg-neutral-800/50 border-neutral-700/60 text-neutral-400 hover:border-neutral-600"
-                  }`}
-                >
-                  <span className="text-xs font-bold block text-white">Garçom Obrigatório</span>
-                  <span className="text-[10px] text-neutral-400 block mt-0.5 leading-snug">
-                    O pedido fica pendente e o garçom valida antes de liberar para a cozinha.
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setModoOperacao("balcao")}
-                  className={`p-3 rounded-xl border text-left transition-all ${
-                    modoOperacao === "balcao"
-                      ? "bg-rose-950/40 border-rose-500 text-white"
-                      : "bg-neutral-800/50 border-neutral-700/60 text-neutral-400 hover:border-neutral-600"
-                  }`}
-                >
-                  <span className="text-xs font-bold block text-white">Sem Garçom (Autoatendimento)</span>
-                  <span className="text-[10px] text-neutral-400 block mt-0.5 leading-snug">
-                    Cliente pede na mesa e retira no balcão quando pronto.
-                  </span>
-                </button>
-              </div>
-
-              <Button
-                type="button"
-                onClick={handleSalvarCor}
-                disabled={salvandoCor}
-                className="w-full bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl mt-3"
-              >
-                {salvandoCor ? "Salvando..." : "Salvar Configurações"}
-              </Button>
-            </div>
-          </div>
-        )}
 
         {/* ABA: MAYA INTELIGÊNCIA / ANALYTICS (PREMIUM UPSELL) */}
         {abaAtiva === "analytics" && (
@@ -1714,6 +1611,157 @@ export function AdminDashboard() {
         onClose={() => setScannerBalcaoAberto(false)}
         onComandaConfirmada={handleConfirmarComandaBalcao}
       />
+
+      {/* MODAL DE CONFIGURAÇÕES GLOBAIS E TEMATIZAÇÃO */}
+      <Dialog open={modalConfigAberto} onOpenChange={setModalConfigAberto}>
+        <DialogContent className="bg-neutral-900 border-neutral-800 text-white max-w-lg w-[95vw] rounded-2xl p-6 max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <div className="flex items-center gap-2 mb-1">
+              <div className="p-2 rounded-xl bg-rose-500/10 text-rose-500">
+                <Settings className="w-5 h-5" />
+              </div>
+              <div>
+                <DialogTitle className="text-lg font-black text-white">Configurações & Tematização</DialogTitle>
+                <DialogDescription className="text-xs text-neutral-400">
+                  Gerencie a identidade visual e o fluxo operacional do seu restaurante.
+                </DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+
+          <div className="space-y-6 pt-2">
+            {/* COR PRIMÁRIA */}
+            <div className="space-y-3 p-4 rounded-xl bg-neutral-950/60 border border-neutral-800">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold uppercase tracking-wider text-neutral-300 flex items-center gap-1.5">
+                  <Palette className="w-3.5 h-3.5 text-rose-500" />
+                  Cor Primária de Destaque
+                </label>
+                <span className="text-[10px] text-neutral-500 font-mono">{corPrimaria}</span>
+              </div>
+              <p className="text-xs text-neutral-400">
+                Aplica a cor da sua marca nos botões, badges e detalhes do cardápio mobile.
+              </p>
+              <div className="flex items-center gap-3">
+                <input
+                  type="color"
+                  value={corPrimaria}
+                  onChange={(e) => setCorPrimaria(e.target.value)}
+                  className="w-12 h-10 rounded-xl bg-transparent border-0 cursor-pointer shrink-0"
+                />
+                <Input
+                  value={corPrimaria}
+                  onChange={(e) => setCorPrimaria(e.target.value)}
+                  className="bg-neutral-900 border-neutral-700 text-white font-mono uppercase text-xs h-10"
+                />
+              </div>
+
+              {/* Pré-visualização da cor */}
+              <div
+                style={{ backgroundColor: corPrimaria }}
+                className="w-full h-9 rounded-xl flex items-center justify-center text-white text-xs font-bold shadow-md transition-colors"
+              >
+                Pré-visualização do Botão
+              </div>
+            </div>
+
+            {/* MODELO OPERACIONAL DO SALÃO */}
+            <div className="space-y-3 p-4 rounded-xl bg-neutral-950/60 border border-neutral-800">
+              <label className="text-xs font-bold uppercase tracking-wider text-neutral-300 block">
+                Modelo Operacional do Salão
+              </label>
+              <p className="text-xs text-neutral-400">
+                Defina como os pedidos fluem entre a mesa, o garçom e a cozinha:
+              </p>
+
+              <div className="grid grid-cols-1 gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setModoOperacao("hibrido")}
+                  className={`p-3 rounded-xl border text-left transition-all ${
+                    modoOperacao === "hibrido"
+                      ? "bg-rose-950/40 border-rose-500 text-white"
+                      : "bg-neutral-900/60 border-neutral-800 text-neutral-400 hover:border-neutral-700"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-white">Híbrido / Suporte (Padrão)</span>
+                    {modoOperacao === "hibrido" && <Check className="w-4 h-4 text-rose-500" />}
+                  </div>
+                  <span className="text-[10px] text-neutral-400 block mt-1 leading-snug">
+                    O pedido vai direto para a cozinha. O garçom atende chamados e fecha contas.
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setModoOperacao("com_garcom")}
+                  className={`p-3 rounded-xl border text-left transition-all ${
+                    modoOperacao === "com_garcom"
+                      ? "bg-rose-950/40 border-rose-500 text-white"
+                      : "bg-neutral-900/60 border-neutral-800 text-neutral-400 hover:border-neutral-700"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-white">Garçom Obrigatório</span>
+                    {modoOperacao === "com_garcom" && <Check className="w-4 h-4 text-rose-500" />}
+                  </div>
+                  <span className="text-[10px] text-neutral-400 block mt-1 leading-snug">
+                    O pedido fica pendente e o garçom valida antes de enviar para a cozinha.
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setModoOperacao("balcao")}
+                  className={`p-3 rounded-xl border text-left transition-all ${
+                    modoOperacao === "balcao"
+                      ? "bg-rose-950/40 border-rose-500 text-white"
+                      : "bg-neutral-900/60 border-neutral-800 text-neutral-400 hover:border-neutral-700"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-white">Sem Garçom (Autoatendimento)</span>
+                    {modoOperacao === "balcao" && <Check className="w-4 h-4 text-rose-500" />}
+                  </div>
+                  <span className="text-[10px] text-neutral-400 block mt-1 leading-snug">
+                    O cliente pede na mesa e retira diretamente no balcão/caixa.
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setModalConfigAberto(false)}
+                className="text-neutral-400 hover:text-white rounded-xl text-xs"
+              >
+                Fechar
+              </Button>
+              <Button
+                type="button"
+                onClick={async () => {
+                  await handleSalvarCor();
+                  setModalConfigAberto(false);
+                }}
+                disabled={salvandoCor}
+                className="bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl text-xs h-10 px-5 shadow-lg flex items-center gap-1.5"
+              >
+                {salvandoCor ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Salvando...
+                  </>
+                ) : (
+                  "Salvar Alterações"
+                )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

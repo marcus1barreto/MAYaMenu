@@ -8,9 +8,26 @@ import { ItemModal } from "./item-modal";
 import { CartDrawer } from "./cart-drawer";
 import { HistoricoVisitasModal } from "./historico-visitas-modal";
 import { MinhaComandaModal } from "./minha-comanda-modal";
-import { ShoppingBag, Sparkles, MapPin, Search, Receipt, DollarSign, CheckCircle2, Bell, Clock, PartyPopper, HeartHandshake, Utensils, QrCode } from "lucide-react";
+import {
+  ShoppingBag,
+  Sparkles,
+  MapPin,
+  Search,
+  Receipt,
+  DollarSign,
+  CheckCircle2,
+  Bell,
+  Clock,
+  PartyPopper,
+  HeartHandshake,
+  Utensils,
+  QrCode,
+  Menu as MenuIcon,
+  X,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { ensureClienteAnonimo, db } from "@/lib/firebase";
 import { doc, updateDoc, serverTimestamp, onSnapshot } from "firebase/firestore";
 import { escutarCardapio, chamarGarcomFirestore } from "@/lib/restaurante-service";
@@ -32,6 +49,8 @@ export function MenuView({ restaurante, cardapio: cardapioInicial, numeroMesa: n
   const [historicoAberto, setHistoricoAberto] = useState(false);
   const [minhaComandaAberta, setMinhaComandaAberta] = useState(false);
   const [mesaScannerAberto, setMesaScannerAberto] = useState(false);
+  const [menuLateralAberto, setMenuLateralAberto] = useState(false);
+  const [buscaAberta, setBuscaAberta] = useState(false);
   const [contaPagaModal, setContaPagaModal] = useState(false);
   const [sessaoFinalizada, setSessaoFinalizada] = useState(false);
   const [subtotalComandaBanco, setSubtotalComandaBanco] = useState(0);
@@ -310,179 +329,279 @@ export function MenuView({ restaurante, cardapio: cardapioInicial, numeroMesa: n
 
   return (
     <div className="min-h-screen bg-neutral-100/60 pb-28 text-neutral-900 antialiased selection:bg-neutral-900 selection:text-white">
-      {/* HEADER / CAPA COM EFEITO HERO */}
-      <header className="relative w-full h-56 sm:h-72 bg-neutral-900 overflow-hidden shadow-lg">
-        <Image
-          src={capaUrl}
-          alt={restaurante.nome}
-          fill
-          priority
-          sizes="100vw"
-          className="object-cover opacity-80 scale-105 transition-transform duration-700"
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-neutral-950/95 via-neutral-950/40 to-transparent" />
-
-        <div className="absolute bottom-0 left-0 right-0 p-5 sm:p-8 max-w-3xl mx-auto flex flex-col justify-end">
-          {/* LINHA DE STATUS E AÇÕES RÁPIDAS DA MESA */}
-          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mb-2">
-            {/* IDENTIFICAÇÃO DA MESA COM BOTÃO ESCANEAR MESA */}
+      {/* 1. HEADER MOBILE COMPACTO & ELEGANTE (Apenas 3 Elementos: Logo, Busca e Comanda/Carrinho) */}
+      <header className="sticky top-0 z-40 bg-neutral-950/90 backdrop-blur-md border-b border-neutral-800 text-white transition-all shadow-md">
+        <div className="max-w-3xl mx-auto px-4 h-14 flex items-center justify-between gap-3">
+          {/* ESQUERDA: MENU HAMBÚRGUER + LOGO / NOME DO ESTABELECIMENTO */}
+          <div className="flex items-center gap-2.5 min-w-0">
             <button
               type="button"
-              onClick={() => setMesaScannerAberto(true)}
-              className="bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-400/40 text-emerald-300 text-[11px] font-bold px-2.5 py-1 rounded-full transition-all flex items-center gap-1.5 shadow-sm shrink-0 active:scale-95"
-              title="Trocar ou escanear QR Code da mesa"
+              onClick={() => setMenuLateralAberto(true)}
+              className="w-9 h-9 rounded-xl bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 text-neutral-300 hover:text-white flex items-center justify-center transition-all active:scale-90 shrink-0"
+              title="Menu e Opções da Mesa"
+              aria-label="Abrir menu"
             >
-              <QrCode className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Mesa {numeroMesa}</span>
-              <span className="text-[9px] bg-emerald-500/30 px-1 py-0.2 rounded font-normal text-emerald-200">
-                Trocar
-              </span>
+              <MenuIcon className="w-4 h-4" />
             </button>
 
-            {/* BOTÃO VER MINHA COMANDA (Acompanhamento em Tempo Real dos Pratos) */}
-            <button
-              type="button"
-              onClick={() => setMinhaComandaAberta(true)}
-              className="bg-rose-600/90 hover:bg-rose-600 text-white text-[11px] font-black px-3 py-1 rounded-full transition-all flex items-center gap-1.5 shadow-md shrink-0 active:scale-95"
-            >
-              <Utensils className="w-3 h-3 text-white" />
-              <span>Minha Comanda</span>
-              {subtotalComandaBanco > 0 && (
-                <span className="bg-white/20 px-1.5 py-0.2 rounded-full font-mono text-[10px]">
-                  {subtotalComandaBanco.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
-                </span>
-              )}
-            </button>
-
-            {/* BOTÃO DA CARTEIRA / HISTÓRICO DE VISITAS */}
-            <button
-              type="button"
-              onClick={() => setHistoricoAberto(true)}
-              className="bg-white/15 hover:bg-white/25 backdrop-blur-md text-white text-[11px] font-bold px-2.5 py-1 rounded-full transition-colors flex items-center gap-1.5 shadow-sm shrink-0"
-            >
-              <Receipt className="w-3 h-3 text-rose-300" />
-              <span>Comprovantes</span>
-            </button>
-
-            {/* BOTÃO SOLICITAR GARÇOM (Oculto somente se configurado explicitamente como balcao) */}
-            {modoOperacao !== "balcao" && (
-              <button
-                type="button"
-                onClick={handleChamarGarcom}
-                disabled={chamandoGarcom || segundosCooldown > 0}
-                className={`backdrop-blur-md text-white text-[11px] font-bold px-3 py-1 rounded-full transition-all flex items-center gap-1.5 shadow-md shrink-0 ${
-                  segundosCooldown > 0
-                    ? "bg-amber-500/90 text-amber-950 font-black cursor-not-allowed"
-                    : "bg-emerald-600 hover:bg-emerald-500 text-white active:scale-95 shadow-emerald-950/40"
-                }`}
-                title={segundosCooldown > 0 ? "Aguarde o garçom chegar à sua mesa" : "Chamar garçom na mesa"}
-              >
-                {segundosCooldown > 0 ? (
-                  <>
-                    <Clock className="w-3 h-3 text-amber-950 animate-spin" />
-                    <span>Garçom a caminho ({Math.floor(segundosCooldown / 60)}:{String(segundosCooldown % 60).padStart(2, '0')})</span>
-                  </>
-                ) : (
-                  <>
-                    <Bell className="w-3 h-3 text-white animate-bounce" />
-                    <span>{chamandoGarcom ? "Chamando..." : "Chamar Garçom"}</span>
-                  </>
-                )}
-              </button>
-            )}
-
-            {/* BOTÃO PEDIR A CONTA */}
-            <button
-              type="button"
-              onClick={handlePedirConta}
-              disabled={pedindoConta || contaPedidaSucesso}
-              className={`backdrop-blur-md text-white text-[11px] font-bold px-2.5 py-1 rounded-full transition-colors flex items-center gap-1.5 shadow-sm shrink-0 ${
-                contaPedidaSucesso
-                  ? "bg-amber-500/80 text-amber-950 font-black"
-                  : "bg-rose-600/80 hover:bg-rose-600"
-              }`}
-            >
-              {contaPedidaSucesso ? (
-                <>
-                  <CheckCircle2 className="w-3 h-3 text-white" />
-                  <span>Conta Solicitada!</span>
-                </>
+            <div className="flex items-center gap-2 min-w-0">
+              {restaurante.configuracoes?.logoUrl ? (
+                <div className="relative w-7 h-7 rounded-lg overflow-hidden shrink-0 border border-neutral-700/60">
+                  <Image src={restaurante.configuracoes.logoUrl} alt={restaurante.nome} fill className="object-cover" />
+                </div>
               ) : (
-                <>
-                  <DollarSign className="w-3 h-3 text-white" />
-                  <span>{pedindoConta ? "Chamando..." : "Pedir a Conta"}</span>
-                </>
+                <div
+                  style={{ backgroundColor: corPrimaria }}
+                  className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black text-white shrink-0 shadow-sm"
+                >
+                  {restaurante.nome.charAt(0).toUpperCase()}
+                </div>
               )}
-            </button>
+              <div className="min-w-0">
+                <h1 className="text-sm font-black tracking-tight truncate leading-none text-white">
+                  {restaurante.nome}
+                </h1>
+                <span className="text-[10px] text-neutral-400 font-medium">Mesa {numeroMesa}</span>
+              </div>
+            </div>
           </div>
 
-          <h1 className="text-2xl sm:text-4xl font-black text-white tracking-tight drop-shadow-md">
-            {restaurante.nome}
-          </h1>
-          <p className="text-xs sm:text-sm text-neutral-300 font-medium mt-1">
-            Toque nos itens para personalizar seu pedido sem espera
-          </p>
+          {/* DIREITA: ÍCONE DE BUSCA + ÍCONE DA COMANDA COM BADGE */}
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Ícone de Busca Alternável */}
+            <button
+              type="button"
+              onClick={() => setBuscaAberta(!buscaAberta)}
+              className={`w-9 h-9 rounded-xl border flex items-center justify-center transition-all active:scale-90 ${
+                buscaAberta || busca.trim().length > 0
+                  ? "bg-rose-600/20 border-rose-500/40 text-rose-400"
+                  : "bg-neutral-900 hover:bg-neutral-800 border-neutral-800 text-neutral-300 hover:text-white"
+              }`}
+              title="Buscar no cardápio"
+              aria-label="Buscar pratos"
+            >
+              <Search className="w-4 h-4" />
+            </button>
 
-          {/* BANNER INFORMATIVO SE O GARÇOM FOI SOLICITADO (COM ANTI-FLOODING) */}
-          {segundosCooldown > 0 && (
-            <div className="mt-2.5 p-2.5 bg-emerald-500/20 border border-emerald-400/40 rounded-xl text-emerald-200 text-xs flex items-center justify-between backdrop-blur-md animate-in fade-in slide-in-from-top-1">
-              <div className="flex items-center gap-2">
+            {/* Ícone da Comanda / Carrinho com Badge Numérico de Itens */}
+            <button
+              type="button"
+              onClick={() => {
+                if (totalItens > 0) {
+                  setCarrinhoAberto(true);
+                } else {
+                  setMinhaComandaAberta(true);
+                }
+              }}
+              style={{ backgroundColor: (totalItens > 0 || subtotalComandaBanco > 0) ? corPrimaria : undefined }}
+              className={`relative h-9 px-3 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95 shadow-sm ${
+                (totalItens > 0 || subtotalComandaBanco > 0)
+                  ? "text-white shadow-rose-950/40"
+                  : "bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 text-neutral-300 hover:text-white"
+              }`}
+              title="Abrir Comanda e Pedidos"
+            >
+              <Utensils className="w-3.5 h-3.5" />
+              <span className="hidden xs:inline">Comanda</span>
+
+              {/* Badge Dinâmico de Quantidade de Itens */}
+              {totalItens > 0 ? (
+                <span className="ml-0.5 px-1.5 py-0.2 rounded-full bg-white text-neutral-950 text-[10px] font-black font-mono">
+                  {totalItens}
+                </span>
+              ) : subtotalComandaBanco > 0 ? (
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-                <span>Garçom avisado para a <strong>Mesa {numeroMesa}</strong>. Já está vindo atender você!</span>
-              </div>
-              <Badge variant="outline" className="text-[10px] bg-emerald-950/80 text-emerald-300 border-emerald-500/40">
-                Anti-spam: {segundosCooldown}s
-              </Badge>
-            </div>
-          )}
+              ) : null}
+            </button>
+          </div>
+        </div>
 
-          {/* BANNER INFORMATIVO SE A CONTA FOI PEDIDA */}
-          {contaPedidaSucesso && (
-            <div className="mt-2.5 p-2.5 bg-amber-500/20 border border-amber-400/40 rounded-xl text-amber-200 text-xs flex items-center gap-2 backdrop-blur-md">
-              <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
-              <span>Conta solicitada ao garçom para a <strong>Mesa {numeroMesa}</strong>. Ele virá com a maquininha!</span>
+        {/* CAMPO DE BUSCA EXPANSÍVEL */}
+        {buscaAberta && (
+          <div className="max-w-3xl mx-auto px-4 pb-3 pt-1 animate-in fade-in slide-in-from-top-2 duration-200">
+            <div className="bg-neutral-900 rounded-xl p-2 flex items-center gap-2 border border-neutral-700/80 shadow-inner">
+              <Search className="w-4 h-4 text-neutral-400 ml-1.5" />
+              <input
+                type="text"
+                autoFocus
+                value={busca}
+                onChange={(e) => setBusca(e.target.value)}
+                placeholder="Buscar pratos, porções, drinks..."
+                className="w-full text-xs font-medium bg-transparent border-none text-white focus:outline-none placeholder:text-neutral-500"
+              />
+              {busca && (
+                <button
+                  type="button"
+                  onClick={() => setBusca("")}
+                  className="p-1 text-neutral-400 hover:text-white"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
-          )}
+          </div>
+        )}
+
+        {/* 2. PÍLULAS DE CATEGORIAS COM SCROLL HORIZONTAL (GRUDADAS ABAIXO DO HEADER) */}
+        <div className="border-t border-neutral-850 bg-neutral-950/95 px-4 py-2">
+          <div className="max-w-3xl mx-auto flex items-center gap-2 overflow-x-auto no-scrollbar select-none">
+            {categorias.map((cat) => {
+              const ativa = categoriaAtiva === cat;
+              return (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => setCategoriaAtiva(cat)}
+                  style={{
+                    backgroundColor: ativa ? corPrimaria : undefined,
+                  }}
+                  className={`px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap transition-all shadow-xs active:scale-95 ${
+                    ativa
+                      ? "text-white shadow-md shadow-neutral-900/40"
+                      : "bg-neutral-900 hover:bg-neutral-850 text-neutral-400 hover:text-neutral-200 border border-neutral-800"
+                  }`}
+                >
+                  {cat}
+                </button>
+              );
+            })}
+          </div>
         </div>
       </header>
 
-      {/* BARRA DE PESQUISA / FILTRO */}
-      <div className="max-w-3xl mx-auto px-4 -mt-4 relative z-10 space-y-3">
-        <div className="bg-white rounded-2xl shadow-md p-2 flex items-center gap-2 border border-neutral-200/80">
-          <Search className="w-5 h-5 text-neutral-400 ml-2" />
-          <input
-            type="text"
-            value={busca}
-            onChange={(e) => setBusca(e.target.value)}
-            placeholder="Buscar pratos, sobremesas ou bebidas..."
-            className="w-full text-sm font-medium bg-transparent border-none focus:outline-none placeholder:text-neutral-400"
-          />
+      {/* BANNER INFORMATIVO SE O GARÇOM FOI SOLICITADO */}
+      {segundosCooldown > 0 && (
+        <div className="max-w-3xl mx-auto px-4 mt-3">
+          <div className="p-3 bg-emerald-500/15 border border-emerald-500/30 rounded-2xl text-emerald-800 text-xs flex items-center justify-between shadow-xs">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+              <span>Garçom a caminho da <strong>Mesa {numeroMesa}</strong>. Já vem atender você!</span>
+            </div>
+            <Badge variant="outline" className="text-[10px] bg-white text-emerald-700 border-emerald-300">
+              {segundosCooldown}s
+            </Badge>
+          </div>
         </div>
+      )}
 
-        {/* ABAS / PÍLULAS DE CATEGORIAS */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar select-none">
-          {categorias.map((cat) => {
-            const ativa = categoriaAtiva === cat;
-            return (
-              <button
-                key={cat}
-                type="button"
-                onClick={() => setCategoriaAtiva(cat)}
-                style={{
-                  backgroundColor: ativa ? corPrimaria : undefined,
-                }}
-                className={`px-3.5 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all shadow-xs active:scale-95 ${
-                  ativa
-                    ? "text-white shadow-md"
-                    : "bg-white text-neutral-600 hover:bg-neutral-50 border border-neutral-200/80"
-                }`}
-              >
-                {cat}
-              </button>
-            );
-          })}
+      {/* BANNER INFORMATIVO SE A CONTA FOI PEDIDA */}
+      {contaPedidaSucesso && (
+        <div className="max-w-3xl mx-auto px-4 mt-3">
+          <div className="p-3 bg-amber-500/15 border border-amber-500/30 rounded-2xl text-amber-900 text-xs flex items-center gap-2 shadow-xs">
+            <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
+            <span>Conta solicitada para a <strong>Mesa {numeroMesa}</strong>. Aguarde o fechamento!</span>
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* DRAWER / OFFCANVAS COM AÇÕES SECUNDÁRIAS (MENU HAMBÚRGUER) */}
+      <Sheet open={menuLateralAberto} onOpenChange={setMenuLateralAberto}>
+        <SheetContent side="left" className="bg-neutral-950 text-white border-neutral-800 w-[290px] p-5 flex flex-col justify-between">
+          <div className="space-y-6">
+            <SheetHeader className="text-left pb-4 border-b border-neutral-800">
+              <div className="flex items-center gap-3">
+                <div
+                  style={{ backgroundColor: corPrimaria }}
+                  className="w-10 h-10 rounded-2xl flex items-center justify-center font-black text-white text-base shadow-md"
+                >
+                  {restaurante.nome.charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <SheetTitle className="text-base font-black text-white">{restaurante.nome}</SheetTitle>
+                  <p className="text-xs text-neutral-400">Atendimento Digital</p>
+                </div>
+              </div>
+            </SheetHeader>
+
+            {/* STATUS E TROCA DE MESA */}
+            <div className="p-3.5 rounded-2xl bg-neutral-900 border border-neutral-800 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-neutral-400">Sua Mesa</span>
+                <span className="text-xs font-black text-emerald-400">Mesa {numeroMesa}</span>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setMenuLateralAberto(false);
+                  setMesaScannerAberto(true);
+                }}
+                className="w-full h-9 rounded-xl border-neutral-700 bg-neutral-850 hover:bg-neutral-800 text-white font-bold text-xs flex items-center justify-center gap-2"
+              >
+                <QrCode className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Trocar de Mesa (Escanear)</span>
+              </Button>
+            </div>
+
+            {/* AÇÕES OPERACIONAIS */}
+            <div className="space-y-2">
+              <span className="text-[10px] uppercase font-bold text-neutral-400 block tracking-wider px-1">
+                Serviços de Salão
+              </span>
+
+              {/* Botão Chamar Garçom */}
+              {modoOperacao !== "balcao" && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuLateralAberto(false);
+                    handleChamarGarcom();
+                  }}
+                  disabled={chamandoGarcom || segundosCooldown > 0}
+                  className="w-full p-3 rounded-xl bg-neutral-900 hover:bg-neutral-850 border border-neutral-800 text-left flex items-center justify-between text-xs font-bold text-white transition-all disabled:opacity-50"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 bg-emerald-500/10 text-emerald-400 rounded-lg">
+                      <Bell className="w-4 h-4" />
+                    </div>
+                    <span>{chamandoGarcom ? "Chamando..." : "Chamar Garçom"}</span>
+                  </div>
+                  {segundosCooldown > 0 && (
+                    <span className="text-[10px] text-amber-400 font-mono">{segundosCooldown}s</span>
+                  )}
+                </button>
+              )}
+
+              {/* Botão Pedir a Conta */}
+              <button
+                type="button"
+                onClick={() => {
+                  setMenuLateralAberto(false);
+                  handlePedirConta();
+                }}
+                disabled={pedindoConta || contaPedidaSucesso}
+                className="w-full p-3 rounded-xl bg-neutral-900 hover:bg-neutral-850 border border-neutral-800 text-left flex items-center justify-between text-xs font-bold text-white transition-all disabled:opacity-50"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 bg-amber-500/10 text-amber-400 rounded-lg">
+                    <DollarSign className="w-4 h-4" />
+                  </div>
+                  <span>{contaPedidaSucesso ? "Conta Solicitada" : "Pedir a Conta"}</span>
+                </div>
+              </button>
+
+              {/* Histórico / Comprovantes */}
+              <button
+                type="button"
+                onClick={() => {
+                  setMenuLateralAberto(false);
+                  setHistoricoAberto(true);
+                }}
+                className="w-full p-3 rounded-xl bg-neutral-900 hover:bg-neutral-850 border border-neutral-800 text-left flex items-center gap-2.5 text-xs font-bold text-white transition-all"
+              >
+                <div className="p-2 bg-rose-500/10 text-rose-400 rounded-lg">
+                  <Receipt className="w-4 h-4" />
+                </div>
+                <span>Comprovantes Anteriores</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="pt-4 border-t border-neutral-850 text-center">
+            <span className="text-[10px] text-neutral-500 font-mono">MAYaMenu • Autoatendimento Inteligente</span>
+          </div>
+        </SheetContent>
+      </Sheet>
 
       {/* LISTA DE ITENS DO CARDÁPIO */}
       <main className="max-w-3xl mx-auto px-4 mt-6">
