@@ -5,6 +5,7 @@ import type { MesaOperacional, ComandaGarcom } from "@/components/garcom/garcom-
 import type { MenuItem } from "@/types";
 import { CARDAPIO_DEMO } from "@/lib/mock-data";
 import { escutarPedidosMesa } from "@/lib/restaurante-service";
+import { useTotalComanda } from "@/hooks/useTotalComanda";
 import {
   Dialog,
   DialogContent,
