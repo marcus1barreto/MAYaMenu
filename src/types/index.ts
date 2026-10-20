@@ -22,6 +22,7 @@ export interface Restaurante {
     capaUrl?: string; // Se vazio, o app usa a capa padrão rústica
     modoOperacao?: ModoOperacao; // 'com_garcom' | 'hibrido' (padrão) | 'balcao'
     modoFilaKds?: ModoFilaKds; // 'sequencial' (padrão FIFO) | 'agrupamento' (Ágil / Otimizado)
+    taxaServico?: number; // Percentual da taxa de serviço (padrão: 10)
   };
 }
 

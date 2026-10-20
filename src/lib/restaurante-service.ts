@@ -89,6 +89,7 @@ export async function obterRestaurantePorSlugValido(slug: string): Promise<Resta
           capaUrl: data.configuracoes?.capaUrl || "/images/capa-padrao.webp",
           modoOperacao: data.configuracoes?.modoOperacao || "hibrido",
           modoFilaKds: data.configuracoes?.modoFilaKds || "sequencial",
+          taxaServico: typeof data.configuracoes?.taxaServico === "number" ? data.configuracoes.taxaServico : 10,
         },
       };
     }
@@ -109,6 +110,7 @@ export async function obterRestaurantePorSlugValido(slug: string): Promise<Resta
           capaUrl: data.configuracoes?.capaUrl || "/images/capa-padrao.webp",
           modoOperacao: data.configuracoes?.modoOperacao || "hibrido",
           modoFilaKds: data.configuracoes?.modoFilaKds || "sequencial",
+          taxaServico: typeof data.configuracoes?.taxaServico === "number" ? data.configuracoes.taxaServico : 10,
         },
       };
     }
@@ -914,4 +916,47 @@ export async function calcularTotalComandaFechamento(
   });
 
   return totalExato;
+}
+
+/**
+ * Fecha a conta de uma mesa de forma atômica (Batch).
+ * Marca todos os pedidos como "pago" e arquiva a comanda pai, liberando a mesa.
+ */
+export async function fecharContaMesa(
+  restauranteId: string,
+  mesa: string | number,
+  clienteId: string
+): Promise<void> {
+  const batch = writeBatch(db);
+
+  const comandaRef = doc(
+    db,
+    "restaurantes",
+    restauranteId,
+    "mesas",
+    String(mesa),
+    "comandas_abertas",
+    clienteId
+  );
+  const pedidosRef = collection(comandaRef, "pedidos");
+
+  // 1. Busca todos os pedidos atuais da mesa
+  const pedidosSnap = await getDocs(pedidosRef);
+
+  // 2. Marca cada pedido individual como 'pago'
+  pedidosSnap.forEach((pedidoDoc) => {
+    // Ao atualizar para 'pago', o pedido some automaticamente do KDS da Cozinha
+    batch.update(pedidoDoc.ref, {
+      status: "pago",
+      fechadoEm: new Date().toISOString(),
+    });
+  });
+
+  // 3. Libera a mesa excluindo a comanda pai
+  // (Nota: excluir o doc pai no Firestore NÃO apaga a subcoleção, o que preserva
+  // os pedidos no banco para auditoria/histórico, mas esvazia a mesa no salão)
+  batch.delete(comandaRef);
+
+  // 4. Executa a transação completa de uma vez só
+  await batch.commit();
 }

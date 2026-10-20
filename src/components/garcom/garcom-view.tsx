@@ -767,6 +767,7 @@ export function GarcomView({
         onClose={() => setMesaSelecionada(null)}
         slug={slug}
         restauranteId={restauranteId}
+        taxaServicoPercentual={restaurante?.configuracoes?.taxaServico}
         onMarcarPago={handleMarcarComoPago}
         onLiberarMesa={handleLiberarMesa}
         onAtenderGarcom={handleAtenderGarcom}

@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import type { MesaOperacional, ComandaGarcom } from "@/components/garcom/garcom-view";
 import type { MenuItem } from "@/types";
 import { CARDAPIO_DEMO } from "@/lib/mock-data";
-import { escutarPedidosMesa } from "@/lib/restaurante-service";
+import { escutarPedidosMesa, fecharContaMesa } from "@/lib/restaurante-service";
 import { useTotalComanda } from "@/hooks/useTotalComanda";
 import {
   Dialog,
@@ -54,6 +54,7 @@ interface MesaDetalheModalProps {
   ) => void;
   onSalvarObservacao?: (mesaNumero: number, observacao: string) => void;
   observacaoInicial?: string;
+  taxaServicoPercentual?: number;
 }
 
 export function MesaDetalheModal({
@@ -69,6 +70,7 @@ export function MesaDetalheModal({
   onLancarItem,
   onSalvarObservacao,
   observacaoInicial = "",
+  taxaServicoPercentual,
 }: MesaDetalheModalProps) {
   const [abaInterna, setAbaInterna] = useState<"comandas" | "lancar" | "qrcode">("comandas");
   const [observacao, setObservacao] = useState(observacaoInicial);
@@ -136,8 +138,12 @@ export function MesaDetalheModal({
     };
   });
 
+  // 1. Lê o percentual configurado (se não fornecido, assume 10% por padrão)
+  const percentualGorjeta = typeof taxaServicoPercentual === "number" ? taxaServicoPercentual : 10;
+
+  // 2. Cálculo dinâmico usando o percentual do restaurante
   const totalMesa = comandasComItens.reduce((acc, c) => acc + c.subtotal, 0);
-  const taxaServico = taxaServicoAtiva ? totalMesa * 0.1 : 0;
+  const taxaServico = taxaServicoAtiva ? totalMesa * (percentualGorjeta / 100) : 0;
   const totalComTaxa = totalMesa + taxaServico;
   const totalPessoas = comandasComItens.length;
   const rateioIgualitario = totalPessoas > 0 ? totalComTaxa / totalPessoas : 0;
@@ -147,6 +153,60 @@ export function MesaDetalheModal({
 
   const urlMesa = `/r/${slug}?mesa=${mesa.numero}`;
   const urlCompleta = typeof window !== "undefined" ? `${window.location.origin}${urlMesa}` : urlMesa;
+
+  const [encerrando, setEncerrando] = useState(false);
+
+  const handleEncerrarComandaMesa = async (clienteId: string, nomeCliente?: string) => {
+    const idRestauranteFinal = restauranteId || slug;
+    if (!idRestauranteFinal || !mesa?.numero || !clienteId) return;
+
+    if (!confirm(`Tem certeza que deseja fechar a conta de ${nomeCliente || "Cliente"} e liberar?`)) {
+      return;
+    }
+
+    try {
+      setEncerrando(true);
+      await fecharContaMesa(idRestauranteFinal, mesa.numero, clienteId);
+      // Notifica o estado local / pai para atualizar a visualização
+      onMarcarPago(mesa.numero, clienteId);
+      alert("Conta fechada e pedidos baixados com sucesso!");
+
+      // Se só havia essa comanda ou todas estão pagas agora, fecha o modal e libera a mesa
+      const outrasNaoPagas = comandasComItens.filter((c) => c.id !== clienteId && c.status !== "pago");
+      if (outrasNaoPagas.length === 0) {
+        onClose();
+        onLiberarMesa(mesa.numero);
+      }
+    } catch (error) {
+      console.error("Erro ao fechar conta:", error);
+      alert("Erro ao encerrar a mesa. Tente novamente.");
+    } finally {
+      setEncerrando(false);
+    }
+  };
+
+  const handleEncerrarMesaCompleta = async () => {
+    const idRestauranteFinal = restauranteId || slug;
+    if (!idRestauranteFinal || !mesa?.numero) return;
+
+    if (!confirm("Tem certeza que deseja fechar esta conta e liberar a mesa?")) return;
+
+    try {
+      setEncerrando(true);
+      // Executa o fechamento de cada comanda aberta da mesa
+      for (const comanda of comandasComItens) {
+        await fecharContaMesa(idRestauranteFinal, mesa.numero, comanda.id);
+      }
+      alert("Conta fechada e mesa liberada com sucesso!");
+      onClose();
+      onLiberarMesa(mesa.numero);
+    } catch (error) {
+      console.error("Erro ao fechar conta da mesa:", error);
+      alert("Erro ao encerrar a mesa. Tente novamente.");
+    } finally {
+      setEncerrando(false);
+    }
+  };
 
   const handleConfirmarLancamento = () => {
     if (!itemSelecionado) return;
@@ -420,17 +480,18 @@ export function MesaDetalheModal({
                         {!jaPago && !modoSomenteLeitura && (
                           <Button
                             type="button"
-                            onClick={() => onMarcarPago(mesa.numero, comanda.id)}
-                            className="w-full h-9 bg-neutral-800 hover:bg-rose-600 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-colors"
+                            disabled={encerrando}
+                            onClick={() => handleEncerrarComandaMesa(comanda.id, comanda.nomeCliente)}
+                            className="w-full h-10 bg-neutral-800 hover:bg-emerald-600 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-colors"
                           >
                             <DollarSign className="w-3.5 h-3.5" />
                             <span>
-                              Cobrar {comanda.nomeCliente} (
-                              {comanda.subtotal.toLocaleString("pt-BR", {
-                                style: "currency",
-                                currency: "BRL",
-                              })}
-                              )
+                              {encerrando
+                                ? "Processando..."
+                                : `Encerrar e Cobrar ${comanda.nomeCliente} (${comanda.subtotal.toLocaleString(
+                                    "pt-BR",
+                                    { style: "currency", currency: "BRL" }
+                                  )})`}
                             </span>
                           </Button>
                         )}
@@ -457,7 +518,7 @@ export function MesaDetalheModal({
                     </div>
 
                     <div className="flex items-center justify-between gap-2 text-neutral-300">
-                      <span className="shrink-0">Taxa de Serviço (10%):</span>
+                      <span className="shrink-0">Taxa de Serviço ({percentualGorjeta}%):</span>
                       <div className="flex items-center gap-2 ml-auto">
                         <span className="font-bold text-white">
                           {taxaServico.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
@@ -520,24 +581,20 @@ export function MesaDetalheModal({
                     <div className="pt-2 space-y-2">
                       <Button
                         type="button"
-                        disabled={!todasPagas || comandasComItens.length === 0}
-                        onClick={() => {
-                          onClose();
-                          onLiberarMesa(mesa.numero);
-                        }}
-                        className={`w-full h-11 text-xs font-bold rounded-xl flex items-center justify-center gap-2 shadow-lg transition-all ${
-                          todasPagas && comandasComItens.length > 0
-                            ? "bg-emerald-600 hover:bg-emerald-500 text-white cursor-pointer"
-                            : "bg-neutral-800 text-neutral-500 cursor-not-allowed border border-neutral-700/50"
+                        disabled={encerrando || comandasComItens.length === 0}
+                        onClick={handleEncerrarMesaCompleta}
+                        className={`w-full h-14 bg-emerald-600 hover:bg-emerald-500 text-white font-black rounded-2xl text-base sm:text-lg mt-2 flex items-center justify-center gap-2 shadow-lg transition-all ${
+                          encerrando || comandasComItens.length === 0
+                            ? "opacity-50 cursor-not-allowed"
+                            : "cursor-pointer"
                         }`}
                       >
-                        <CheckCircle2 className="w-4 h-4" />
-                        <span>Liberar / Finalizar Mesa {mesa.numero}</span>
+                        <CheckCircle2 className="w-5 h-5" />
+                        <span>{encerrando ? "Processando..." : "Encerrar e Liberar Mesa"}</span>
                       </Button>
                       {!todasPagas && comandasComItens.length > 0 && (
-                        <p className="text-[11px] text-amber-400/90 text-center flex items-center justify-center gap-1.5 font-medium">
-                          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                          <span>Finalize o pagamento de todas as comandas para liberar a mesa</span>
+                        <p className="text-[11px] text-neutral-400 text-center font-medium">
+                          Marca os pedidos como pagos de forma atômica e libera a mesa imediatamente.
                         </p>
                       )}
                     </div>

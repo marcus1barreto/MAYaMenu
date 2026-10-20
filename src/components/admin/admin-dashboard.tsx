@@ -64,6 +64,7 @@ import {
   ListOrdered,
   Layers,
   Zap,
+  Percent,
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
@@ -86,6 +87,9 @@ export function AdminDashboard() {
   );
   const [modoFilaKds, setModoFilaKds] = useState<"sequencial" | "agrupamento">(
     restaurante?.configuracoes?.modoFilaKds || "sequencial"
+  );
+  const [taxaServicoConfig, setTaxaServicoConfig] = useState<number>(
+    restaurante?.configuracoes?.taxaServico !== undefined ? restaurante.configuracoes.taxaServico : 10
   );
   const [salvandoCor, setSalvandoCor] = useState(false);
   const [scannerBalcaoAberto, setScannerBalcaoAberto] = useState(false);
@@ -733,6 +737,7 @@ export function AdminDashboard() {
           capaUrl: restaurante?.configuracoes?.capaUrl || "/images/capa-padrao.webp",
           modoOperacao,
           modoFilaKds,
+          taxaServico: Number(taxaServicoConfig) || 0,
         },
       });
     } finally {
@@ -1392,6 +1397,7 @@ export function AdminDashboard() {
         onClose={() => setModalMesaAberto(false)}
         slug={slug}
         restauranteId={restaurante?.id}
+        taxaServicoPercentual={restaurante?.configuracoes?.taxaServico}
         modoSomenteLeitura={true}
         onMarcarPago={handleMarcarComoPago}
         onLiberarMesa={handleLiberarMesa}
@@ -1428,24 +1434,28 @@ export function AdminDashboard() {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {/* 1. Categoria (Digitação livre + Sugestões) */}
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold uppercase tracking-wider text-neutral-300">
                     Categoria *
                   </label>
-                  <select
-                    value={itemEmEdicao.categoria || "Hambúrgueres"}
+                  <Input
+                    list="lista-categorias"
+                    placeholder="Ex: Combos Promocionais"
+                    value={itemEmEdicao.categoria || ""}
                     onChange={(e) => setItemEmEdicao({ ...itemEmEdicao, categoria: e.target.value })}
-                    className="w-full h-9 rounded-xl bg-neutral-800 border border-neutral-700 px-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-rose-500"
-                  >
-                    <option value="Hambúrgueres">Hambúrgueres</option>
-                    <option value="Pizzas">Pizzas</option>
-                    <option value="Bebidas">Bebidas</option>
-                    <option value="Sobremesas">Sobremesas</option>
-                    <option value="Entradas">Entradas</option>
-                    <option value="Outros">Outros</option>
-                  </select>
+                    className="bg-neutral-800 border-neutral-700 text-white placeholder:text-neutral-500 rounded-xl text-sm h-9 w-full"
+                  />
+                  <datalist id="lista-categorias">
+                    <option value="Hambúrgueres" />
+                    <option value="Pizzas" />
+                    <option value="Bebidas" />
+                    <option value="Sobremesas" />
+                    <option value="Entradas" />
+                  </datalist>
                 </div>
 
+                {/* 2. Preço Base (Aceita qualquer valor com centavos) */}
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold uppercase tracking-wider text-neutral-300">
                     Preço Base (R$) *
@@ -1453,7 +1463,7 @@ export function AdminDashboard() {
                   <Input
                     required
                     type="number"
-                    step="0.50"
+                    step="0.01"
                     min="0"
                     placeholder="29.90"
                     value={itemEmEdicao.precoBase ?? ""}
@@ -1464,6 +1474,7 @@ export function AdminDashboard() {
                   />
                 </div>
 
+                {/* 3. Tempo de Preparo Estimado (Mantido do Agrupamento Ágil) */}
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold uppercase tracking-wider text-neutral-300 flex items-center gap-1.5">
                     <Clock className="w-3.5 h-3.5 text-amber-400" />
@@ -1864,6 +1875,49 @@ export function AdminDashboard() {
                     Consolida tickets da mesma mesa e prioriza pratos com base no tempo de preparo. Essencial para não travar o salão nos horários de pico.
                   </p>
                 </label>
+              </div>
+            </div>
+
+            {/* CONFIGURAÇÃO DA TAXA DE SERVIÇO */}
+            <div className="space-y-3 p-4 rounded-xl bg-neutral-950/60 border border-neutral-800">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold uppercase tracking-wider text-neutral-300 flex items-center gap-1.5">
+                  <Percent className="w-3.5 h-3.5 text-rose-500" />
+                  Taxa de Serviço do Salão
+                </label>
+                <span className="text-xs font-mono font-bold text-rose-400">
+                  {taxaServicoConfig}%
+                </span>
+              </div>
+              <p className="text-xs text-neutral-400">
+                Percentual sugerido na conta no momento do fechamento da mesa (0% para desativar, 10% padrão, até 20%).
+              </p>
+              <div className="flex items-center gap-3">
+                <Input
+                  type="number"
+                  min="0"
+                  max="30"
+                  step="1"
+                  value={taxaServicoConfig}
+                  onChange={(e) => setTaxaServicoConfig(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                  className="bg-neutral-900 border-neutral-700 text-white font-mono text-xs h-10 w-28"
+                />
+                <div className="flex items-center gap-1.5">
+                  {[0, 10, 12, 13, 15].map((sugestao) => (
+                    <button
+                      key={sugestao}
+                      type="button"
+                      onClick={() => setTaxaServicoConfig(sugestao)}
+                      className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                        taxaServicoConfig === sugestao
+                          ? "bg-rose-600 text-white shadow-sm"
+                          : "bg-neutral-800 text-neutral-400 hover:text-white"
+                      }`}
+                    >
+                      {sugestao}%
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
 

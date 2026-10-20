@@ -11,6 +11,11 @@ export const metadata: Metadata = {
   description: "Faça seu pedido diretamente na mesa sem filas ou esperas.",
 };
 
+// Revalidação em segundo plano (Incremental Static Regeneration - ISR)
+// Permite que o Firebase App Hosting e o CDN do Google Cloud sirvam o cardápio em cache estático
+// e façam revalidação automática a cada 60 segundos se houver novas requisições.
+export const revalidate = 60;
+
 async function MenuContent({
   paramsPromise,
   searchParamsPromise,

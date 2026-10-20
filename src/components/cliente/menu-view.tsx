@@ -347,7 +347,15 @@ export function MenuView({ restaurante, cardapio: cardapioInicial, numeroMesa: n
             <div className="flex items-center gap-2 min-w-0">
               {restaurante.configuracoes?.logoUrl ? (
                 <div className="relative w-7 h-7 rounded-lg overflow-hidden shrink-0 border border-neutral-700/60">
-                  <Image src={restaurante.configuracoes.logoUrl} alt={restaurante.nome} fill className="object-cover" />
+                  <Image
+                    src={restaurante.configuracoes.logoUrl}
+                    alt={restaurante.nome}
+                    fill
+                    priority={true}
+                    fetchPriority="high"
+                    sizes="28px"
+                    className="object-cover"
+                  />
                 </div>
               ) : (
                 <div
@@ -618,53 +626,58 @@ export function MenuView({ restaurante, cardapio: cardapioInicial, numeroMesa: n
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {itensFiltrados.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => setItemSelecionado(item)}
-                className="group relative bg-white rounded-3xl p-4 border border-neutral-200/80 shadow-xs hover:shadow-md transition-all active:scale-[0.98] text-left flex gap-4 overflow-hidden"
-              >
-                {/* Informações Textuais */}
-                <div className="flex-1 min-w-0 flex flex-col justify-between">
-                  <div>
-                    <h3 className="text-base font-bold text-neutral-900 group-hover:text-neutral-950 transition-colors line-clamp-1">
-                      {item.nome}
-                    </h3>
-                    <p className="text-xs text-neutral-500 leading-relaxed mt-1 line-clamp-2">
-                      {item.descricao}
-                    </p>
-                  </div>
+            {itensFiltrados.map((item, index) => {
+              const isAboveTheFold = index < 2;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setItemSelecionado(item)}
+                  className="group relative bg-white rounded-3xl p-4 border border-neutral-200/80 shadow-xs hover:shadow-md transition-all active:scale-[0.98] text-left flex gap-4 overflow-hidden"
+                >
+                  {/* Informações Textuais */}
+                  <div className="flex-1 min-w-0 flex flex-col justify-between">
+                    <div>
+                      <h3 className="text-base font-bold text-neutral-900 group-hover:text-neutral-950 transition-colors line-clamp-1">
+                        {item.nome}
+                      </h3>
+                      <p className="text-xs text-neutral-500 leading-relaxed mt-1 line-clamp-2">
+                        {item.descricao}
+                      </p>
+                    </div>
 
-                  <div className="mt-3 flex items-baseline justify-between">
-                    <span className="text-base font-black text-neutral-900">
-                      {item.precoBase.toLocaleString("pt-BR", {
-                        style: "currency",
-                        currency: "BRL",
-                      })}
-                    </span>
-                    {item.grupoModificadores && item.grupoModificadores.length > 0 && (
-                      <span className="text-[10px] font-bold text-neutral-500 bg-neutral-100 px-2 py-0.5 rounded-full">
-                        Personalizável
+                    <div className="mt-3 flex items-baseline justify-between">
+                      <span className="text-base font-black text-neutral-900">
+                        {item.precoBase.toLocaleString("pt-BR", {
+                          style: "currency",
+                          currency: "BRL",
+                        })}
                       </span>
-                    )}
+                      {item.grupoModificadores && item.grupoModificadores.length > 0 && (
+                        <span className="text-[10px] font-bold text-neutral-500 bg-neutral-100 px-2 py-0.5 rounded-full">
+                          Personalizável
+                        </span>
+                      )}
+                    </div>
                   </div>
-                </div>
 
-                {/* Foto Otimizada */}
-                {item.fotoUrl && (
-                  <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-2xl overflow-hidden flex-shrink-0 bg-neutral-100 border border-neutral-100 shadow-inner">
-                    <Image
-                      src={item.fotoUrl}
-                      alt={item.nome}
-                      fill
-                      sizes="(max-width: 640px) 100px, 120px"
-                      className="object-cover group-hover:scale-105 transition-transform duration-300"
-                    />
-                  </div>
-                )}
-              </button>
-            ))}
+                  {/* Foto Otimizada */}
+                  {item.fotoUrl && (
+                    <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-2xl overflow-hidden flex-shrink-0 bg-neutral-100 border border-neutral-100 shadow-inner">
+                      <Image
+                        src={item.fotoUrl}
+                        alt={item.nome}
+                        fill
+                        loading={isAboveTheFold ? "eager" : "lazy"}
+                        priority={isAboveTheFold}
+                        sizes="(max-width: 640px) 96px, 112px"
+                        className="object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
+                    </div>
+                  )}
+                </button>
+              );
+            })}
           </div>
         )}
       </main>
