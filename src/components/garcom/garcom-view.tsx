@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import Link from "next/link";
 import { QrScannerModal } from "./qr-scanner-modal";
 import type { TicketPayload } from "@/lib/ticket";
 import { Badge } from "@/components/ui/badge";
@@ -172,6 +173,31 @@ export function GarcomView({
   const auth = useSafeAuth();
   const restaurante = auth?.restaurante;
   const maxMesas = (restaurante as any)?.licenca?.maxMesas || (restaurante as any)?.licenca?.limites?.maxMesas || restaurante?.maxMesas || 5;
+
+  // Trava de Autoatendimento (Modo Balcão)
+  const modoOperacao = restaurante?.configuracoes?.modoOperacao || "hibrido";
+  const ehModoAutoatendimento = modoOperacao === "balcao";
+
+  if (ehModoAutoatendimento && !isSandbox) {
+    return (
+      <div className="min-h-screen bg-neutral-950 flex flex-col items-center justify-center p-6 text-center">
+        <div className="p-4 bg-rose-600/20 rounded-full mb-4">
+          <Utensils className="w-10 h-10 text-rose-500" />
+        </div>
+        <h1 className="text-2xl font-black text-white tracking-tight mb-2">
+          Restaurante em Modo Autoatendimento
+        </h1>
+        <p className="text-sm text-neutral-400 max-w-md mb-8 leading-relaxed">
+          O atendimento por garçons está desativado para este estabelecimento. Os pedidos são gerenciados diretamente pelo KDS da Cozinha e retirados no balcão.
+        </p>
+        <Link href="/admin">
+          <Button className="h-12 px-6 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl shadow-lg shadow-rose-950/40">
+            Voltar ao Painel Admin
+          </Button>
+        </Link>
+      </div>
+    );
+  }
 
   const [mesas, setMesas] = useState<MesaOperacional[]>(() => {
     if (dadosIniciais !== undefined) return dadosIniciais;

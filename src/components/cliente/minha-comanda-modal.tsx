@@ -32,6 +32,7 @@ interface MinhaComandaModalProps {
   corPrimaria?: string;
   subtotalAcumulado?: number;
   statusComanda?: string | null;
+  ehAutoatendimento?: boolean;
   onPedirConta?: () => void;
   pedindoConta?: boolean;
   contaPedidaSucesso?: boolean;
@@ -46,6 +47,7 @@ export function MinhaComandaModal({
   corPrimaria = "#E11D48",
   subtotalAcumulado = 0,
   statusComanda,
+  ehAutoatendimento = false,
   onPedirConta,
   pedindoConta = false,
   contaPedidaSucesso = false,
@@ -172,14 +174,14 @@ export function MinhaComandaModal({
         return (
           <Badge className="bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
             <ChefHat className="w-3 h-3 animate-bounce" />
-            Pronto p/ Servir
+            {ehAutoatendimento ? "Pronto p/ Retirar" : "Pronto p/ Servir"}
           </Badge>
         );
       case "entregue":
         return (
           <Badge className="bg-neutral-800 text-neutral-400 border border-neutral-700 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
             <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-            Entregue na Mesa
+            {ehAutoatendimento ? "Retirado" : "Entregue na Mesa"}
           </Badge>
         );
       default:

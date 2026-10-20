@@ -157,9 +157,10 @@ export function MenuView({ restaurante, cardapio: cardapioInicial, numeroMesa: n
   const corPrimaria = restaurante.configuracoes?.corPrimaria || "#E11D48";
   const capaUrl = restaurante.configuracoes?.capaUrl || "/images/capa-padrao.webp";
   const modoOperacao = restaurante.configuracoes?.modoOperacao || "hibrido";
+  const ehAutoatendimento = modoOperacao === "balcao";
 
   const handleChamarGarcom = async () => {
-    if (chamandoGarcom || segundosCooldown > 0) return;
+    if (ehAutoatendimento || chamandoGarcom || segundosCooldown > 0) return;
 
     setChamandoGarcom(true);
     try {
@@ -186,7 +187,10 @@ export function MenuView({ restaurante, cardapio: cardapioInicial, numeroMesa: n
 
   const handlePedirConta = async () => {
     if (pedindoConta || contaPedidaSucesso) return;
-    const confirmou = window.confirm("Deseja pedir a conta da sua mesa ao garçom?");
+    const msgConfirmacao = ehAutoatendimento
+      ? "Deseja solicitar o fechamento da sua comanda para pagamento no balcão/caixa?"
+      : "Deseja pedir a conta da sua mesa ao garçom?";
+    const confirmou = window.confirm(msgConfirmacao);
     if (!confirmou) return;
 
     setPedindoConta(true);
@@ -291,27 +295,34 @@ export function MenuView({ restaurante, cardapio: cardapioInicial, numeroMesa: n
           </div>
         </div>
 
-        {/* RODAPÉ COM BOTÃO DE SOLICITAR GARÇOM */}
+        {/* RODAPÉ: BOTÃO DE SOLICITAR GARÇOM OU AVISO DE AUTOATENDIMENTO */}
         <div className="max-w-md mx-auto w-full pt-8 pb-4 relative z-10 text-center space-y-3">
-          <Button
-            type="button"
-            onClick={handleChamarGarcom}
-            disabled={chamandoGarcom || segundosCooldown > 0}
-            className={`w-full h-12 rounded-2xl text-xs uppercase tracking-wider font-black shadow-xl flex items-center justify-center gap-2 transition-all ${
-              garcomChamadoSucesso
-                ? "bg-amber-500 text-neutral-950"
-                : "bg-neutral-800 hover:bg-neutral-700 text-white border border-neutral-700"
-            }`}
-          >
-            <Bell className={`w-4 h-4 ${garcomChamadoSucesso ? "fill-neutral-950 animate-bounce" : "text-amber-400"}`} />
-            <span>
-              {garcomChamadoSucesso
-                ? "Garçom a Caminho da Mesa!"
-                : segundosCooldown > 0
-                ? `Aguarde (${segundosCooldown}s)`
-                : "🔔 Solicitar Garçom"}
-            </span>
-          </Button>
+          {!ehAutoatendimento ? (
+            <Button
+              type="button"
+              onClick={handleChamarGarcom}
+              disabled={chamandoGarcom || segundosCooldown > 0}
+              className={`w-full h-12 rounded-2xl text-xs uppercase tracking-wider font-black shadow-xl flex items-center justify-center gap-2 transition-all ${
+                garcomChamadoSucesso
+                  ? "bg-amber-500 text-neutral-950"
+                  : "bg-neutral-800 hover:bg-neutral-700 text-white border border-neutral-700"
+              }`}
+            >
+              <Bell className={`w-4 h-4 ${garcomChamadoSucesso ? "fill-neutral-950 animate-bounce" : "text-amber-400"}`} />
+              <span>
+                {garcomChamadoSucesso
+                  ? "Garçom a Caminho da Mesa!"
+                  : segundosCooldown > 0
+                  ? `Aguarde (${segundosCooldown}s)`
+                  : "🔔 Solicitar Garçom"}
+              </span>
+            </Button>
+          ) : (
+            <div className="p-3.5 bg-neutral-900/90 border border-neutral-800 rounded-2xl text-xs text-neutral-300 font-semibold flex items-center justify-center gap-2 shadow-sm">
+              <Utensils className="w-4 h-4 text-rose-500" />
+              <span>Modo Autoatendimento: Retire seus pedidos no balcão</span>
+            </div>
+          )}
 
           <p className="text-[10px] text-neutral-400">
             MAYaMenu • Tecnologia para Experiências Gastronômicas
@@ -478,7 +489,7 @@ export function MenuView({ restaurante, cardapio: cardapioInicial, numeroMesa: n
       </header>
 
       {/* BANNER INFORMATIVO SE O GARÇOM FOI SOLICITADO */}
-      {segundosCooldown > 0 && (
+      {!ehAutoatendimento && segundosCooldown > 0 && (
         <div className="max-w-3xl mx-auto px-4 mt-3">
           <div className="p-3 bg-emerald-500/15 border border-emerald-500/30 rounded-2xl text-emerald-800 text-xs flex items-center justify-between shadow-xs">
             <div className="flex items-center gap-2">
@@ -497,7 +508,12 @@ export function MenuView({ restaurante, cardapio: cardapioInicial, numeroMesa: n
         <div className="max-w-3xl mx-auto px-4 mt-3">
           <div className="p-3 bg-amber-500/15 border border-amber-500/30 rounded-2xl text-amber-900 text-xs flex items-center gap-2 shadow-xs">
             <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
-            <span>Conta solicitada para a <strong>Mesa {numeroMesa}</strong>. Aguarde o fechamento!</span>
+            <span>
+              {ehAutoatendimento
+                ? `Fechamento solicitado para a Mesa ${numeroMesa}. Dirija-se ao caixa/balcão para concluir o pagamento!`
+                : `Conta solicitada para a Mesa ${numeroMesa}. Aguarde o atendimento!`
+              }
+            </span>
           </div>
         </div>
       )}
@@ -547,8 +563,8 @@ export function MenuView({ restaurante, cardapio: cardapioInicial, numeroMesa: n
                 Serviços de Salão
               </span>
 
-              {/* Botão Chamar Garçom */}
-              {modoOperacao !== "balcao" && (
+              {/* Botão Chamar Garçom - Apenas se não for autoatendimento */}
+              {!ehAutoatendimento && (
                 <button
                   type="button"
                   onClick={() => {
@@ -562,7 +578,7 @@ export function MenuView({ restaurante, cardapio: cardapioInicial, numeroMesa: n
                     <div className="p-2 bg-emerald-500/10 text-emerald-400 rounded-lg">
                       <Bell className="w-4 h-4" />
                     </div>
-                    <span>{chamandoGarcom ? "Chamando..." : "Chamar Garçom"}</span>
+                    <span>{chamandoGarcom ? "Chamando..." : "Chamar Garçom na Mesa"}</span>
                   </div>
                   {segundosCooldown > 0 && (
                     <span className="text-[10px] text-amber-400 font-mono">{segundosCooldown}s</span>
@@ -584,7 +600,13 @@ export function MenuView({ restaurante, cardapio: cardapioInicial, numeroMesa: n
                   <div className="p-2 bg-amber-500/10 text-amber-400 rounded-lg">
                     <DollarSign className="w-4 h-4" />
                   </div>
-                  <span>{contaPedidaSucesso ? "Conta Solicitada" : "Pedir a Conta"}</span>
+                  <span>
+                    {contaPedidaSucesso
+                      ? "Conta Solicitada"
+                      : ehAutoatendimento
+                      ? "Pagar no Balcão / Caixa"
+                      : "Pedir a Conta"}
+                  </span>
                 </div>
               </button>
 
@@ -778,6 +800,7 @@ export function MenuView({ restaurante, cardapio: cardapioInicial, numeroMesa: n
         corPrimaria={corPrimaria}
         subtotalAcumulado={subtotalComandaBanco}
         statusComanda={comandaStatus}
+        ehAutoatendimento={ehAutoatendimento}
         onPedirConta={handlePedirConta}
         pedindoConta={pedindoConta}
         contaPedidaSucesso={contaPedidaSucesso}
