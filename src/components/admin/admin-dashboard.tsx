@@ -1451,8 +1451,8 @@ export function AdminDashboard() {
 
       {/* MODAL DE ADICIONAR / EDITAR PRATO DO CARDÁPIO */}
       <Dialog open={modalPratoAberto} onOpenChange={(open) => !open && setModalPratoAberto(false)}>
-        <DialogContent className="max-w-lg bg-neutral-900 border-neutral-800 text-white rounded-3xl p-6 shadow-2xl">
-          <DialogHeader className="mb-4">
+        <DialogContent className="max-w-xl bg-neutral-900 border-neutral-800 text-white rounded-3xl p-0 shadow-2xl max-h-[90vh] flex flex-col overflow-hidden">
+          <DialogHeader className="px-6 pt-6 pb-4 shrink-0 border-b border-neutral-800">
             <DialogTitle className="text-lg font-black text-white flex items-center gap-2">
               <UtensilsCrossed className="w-5 h-5 text-rose-500" />
               <span>{itemEmEdicao?.nome ? "Editar Prato" : "Novo Prato no Cardápio"}</span>
@@ -1463,219 +1463,222 @@ export function AdminDashboard() {
           </DialogHeader>
 
           {itemEmEdicao && (
-            <form onSubmit={handleSalvarPrato} className="space-y-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold uppercase tracking-wider text-neutral-300">
-                  Nome do Prato *
-                </label>
-                <Input
-                  required
-                  placeholder="Ex: Smash Burger Duplo"
-                  value={itemEmEdicao.nome || ""}
-                  onChange={(e) => setItemEmEdicao({ ...itemEmEdicao, nome: e.target.value })}
-                  className="bg-neutral-800 border-neutral-700 text-white placeholder:text-neutral-500 rounded-xl"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                {/* 1. Categoria (Digitação livre + Sugestões) */}
+            <form onSubmit={handleSalvarPrato} className="flex flex-col flex-1 overflow-hidden">
+              <div className="flex-1 overflow-y-auto p-6 space-y-5 custom-scrollbar">
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold uppercase tracking-wider text-neutral-300">
-                    Categoria *
-                  </label>
-                  <Input
-                    list="lista-categorias"
-                    placeholder="Ex: Combos Promocionais"
-                    value={itemEmEdicao.categoria || ""}
-                    onChange={(e) => setItemEmEdicao({ ...itemEmEdicao, categoria: e.target.value })}
-                    className="bg-neutral-800 border-neutral-700 text-white placeholder:text-neutral-500 rounded-xl text-sm h-9 w-full"
-                  />
-                  <datalist id="lista-categorias">
-                    <option value="Hambúrgueres" />
-                    <option value="Pizzas" />
-                    <option value="Bebidas" />
-                    <option value="Sobremesas" />
-                    <option value="Entradas" />
-                  </datalist>
-                </div>
-
-                {/* 2. Preço Base (Aceita qualquer valor com centavos) */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold uppercase tracking-wider text-neutral-300">
-                    Preço Base (R$) *
+                    Nome do Prato *
                   </label>
                   <Input
                     required
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    placeholder="29.90"
-                    value={itemEmEdicao.precoBase ?? ""}
-                    onChange={(e) =>
-                      setItemEmEdicao({ ...itemEmEdicao, precoBase: parseFloat(e.target.value) || 0 })
-                    }
-                    className="bg-neutral-800 border-neutral-700 text-white placeholder:text-neutral-500 rounded-xl font-mono text-sm h-9"
+                    placeholder="Ex: Smash Burger Duplo"
+                    value={itemEmEdicao.nome || ""}
+                    onChange={(e) => setItemEmEdicao({ ...itemEmEdicao, nome: e.target.value })}
+                    className="bg-neutral-800 border-neutral-700 text-white placeholder:text-neutral-500 rounded-xl"
                   />
                 </div>
 
-                {/* 3. Tempo de Preparo Estimado (Mantido do Agrupamento Ágil) */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {/* 1. Categoria (Digitação livre + Sugestões) */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold uppercase tracking-wider text-neutral-300">
+                      Categoria *
+                    </label>
+                    <Input
+                      list="lista-categorias"
+                      placeholder="Ex: Combos Promocionais"
+                      value={itemEmEdicao.categoria || ""}
+                      onChange={(e) => setItemEmEdicao({ ...itemEmEdicao, categoria: e.target.value })}
+                      className="bg-neutral-800 border-neutral-700 text-white placeholder:text-neutral-500 rounded-xl text-sm h-9 w-full"
+                    />
+                    <datalist id="lista-categorias">
+                      <option value="Hambúrgueres" />
+                      <option value="Pizzas" />
+                      <option value="Bebidas" />
+                      <option value="Sobremesas" />
+                      <option value="Entradas" />
+                    </datalist>
+                  </div>
+
+                  {/* 2. Preço Base (Aceita qualquer valor com centavos) */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold uppercase tracking-wider text-neutral-300">
+                      Preço Base (R$) *
+                    </label>
+                    <Input
+                      required
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="29.90"
+                      value={itemEmEdicao.precoBase ?? ""}
+                      onChange={(e) =>
+                        setItemEmEdicao({ ...itemEmEdicao, precoBase: parseFloat(e.target.value) || 0 })
+                      }
+                      className="bg-neutral-800 border-neutral-700 text-white placeholder:text-neutral-500 rounded-xl font-mono text-sm h-9"
+                    />
+                  </div>
+
+                  {/* 3. Tempo de Preparo Estimado (Mantido do Agrupamento Ágil) */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold uppercase tracking-wider text-neutral-300 flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-amber-400" />
+                      Preparo (min)
+                    </label>
+                    <Input
+                      type="number"
+                      min="1"
+                      max="180"
+                      placeholder="15"
+                      value={itemEmEdicao.tempoPreparoEstimado ?? ""}
+                      onChange={(e) =>
+                        setItemEmEdicao({
+                          ...itemEmEdicao,
+                          tempoPreparoEstimado: parseInt(e.target.value, 10) || undefined,
+                        })
+                      }
+                      className="bg-neutral-800 border-neutral-700 text-white placeholder:text-neutral-500 rounded-xl font-mono text-sm h-9"
+                    />
+                  </div>
+                </div>
+
+                <p className="text-[11px] text-neutral-400 flex items-start gap-1.5 bg-neutral-900/60 p-2.5 rounded-xl border border-neutral-800">
+                  <Clock className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+                  <span>
+                    Tempo médio para a cozinha liberar este prato. Essencial para o KDS priorizar pedidos no Modo Agrupamento Ágil.
+                  </span>
+                </p>
+
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold uppercase tracking-wider text-neutral-300 flex items-center gap-1.5">
-                    <Clock className="w-3.5 h-3.5 text-amber-400" />
-                    Preparo (min)
+                  <label className="text-xs font-bold uppercase tracking-wider text-neutral-300">
+                    Descrição dos Ingredientes
                   </label>
-                  <Input
-                    type="number"
-                    min="1"
-                    max="180"
-                    placeholder="15"
-                    value={itemEmEdicao.tempoPreparoEstimado ?? ""}
-                    onChange={(e) =>
-                      setItemEmEdicao({
-                        ...itemEmEdicao,
-                        tempoPreparoEstimado: parseInt(e.target.value, 10) || undefined,
-                      })
+                  <textarea
+                    rows={2}
+                    placeholder="Ex: Dois burgers de 100g, cheddar duplo, cebola caramelizada e maionese da casa."
+                    value={itemEmEdicao.descricao || ""}
+                    onChange={(e) => setItemEmEdicao({ ...itemEmEdicao, descricao: e.target.value })}
+                    className="w-full rounded-xl bg-neutral-800 border border-neutral-700 p-3 text-sm text-white placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-rose-500 resize-none"
+                  />
+                </div>
+
+                {/* CONSTRUTOR DE MODIFICADORES (COMPLEMENTOS E VARIAÇÕES) */}
+                <div className="pt-2 border-t border-neutral-800 mt-4 mb-4">
+                  <ModificadorBuilder
+                    grupos={itemEmEdicao.grupoModificadores || []}
+                    onChange={(novosGrupos) =>
+                      setItemEmEdicao({ ...itemEmEdicao, grupoModificadores: novosGrupos })
                     }
-                    className="bg-neutral-800 border-neutral-700 text-white placeholder:text-neutral-500 rounded-xl font-mono text-sm h-9"
+                  />
+                </div>
+
+                {/* FOTO DO PRATO (STORAGE UPLOAD COM PREVIEW) */}
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-neutral-300 flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <Camera className="w-3.5 h-3.5 text-rose-500" />
+                      Foto do Prato
+                    </span>
+                    <span className="text-[10px] text-neutral-400 font-normal">Máx 5MB (JPG, PNG, WebP)</span>
+                  </label>
+
+                  {/* PREVIEW DA IMAGEM SE HOUVER */}
+                  {previewFoto ? (
+                    <div className="relative w-full h-44 rounded-2xl overflow-hidden bg-neutral-950 border border-neutral-700/80 group">
+                      <Image
+                        src={previewFoto}
+                        alt="Prévia do prato"
+                        fill
+                        className="object-cover"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex items-end justify-between p-3 opacity-90 group-hover:opacity-100 transition-opacity">
+                        <span className="text-[11px] text-neutral-300 truncate max-w-[200px]">
+                          {arquivoFoto ? arquivoFoto.name : "Imagem atual do prato"}
+                        </span>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="destructive"
+                          onClick={handleRemoverFoto}
+                          className="h-8 px-2.5 bg-red-600/80 hover:bg-red-600 text-white rounded-xl text-xs flex items-center gap-1 shadow-lg"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          Remover
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    /* DROPZONE / SELETOR DE ARQUIVO */
+                    <label className="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-neutral-700 hover:border-rose-500 rounded-2xl cursor-pointer bg-neutral-800/40 hover:bg-neutral-800/80 transition-all p-3 text-center">
+                      <div className="flex flex-col items-center justify-center">
+                        <div className="p-2 bg-rose-500/10 rounded-xl text-rose-400 mb-1.5">
+                          <Upload className="w-4 h-4" />
+                        </div>
+                        <p className="text-xs font-bold text-neutral-200">
+                          Clique para enviar ou tirar foto
+                        </p>
+                        <p className="text-[10px] text-neutral-400">
+                          Upload direto para o Firebase Storage
+                        </p>
+                      </div>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleFotoSelecionada}
+                        className="hidden"
+                      />
+                    </label>
+                  )}
+
+                  {/* GALERIA MAYA MEDIA LIBRARY (OPÇÕES PROFISSIONAIS PRONTAS) */}
+                  <div className="pt-1">
+                    <span className="text-[11px] font-bold text-neutral-400 block mb-1.5">
+                      Ou selecione uma foto profissional da Galeria MAYa:
+                    </span>
+                    <div className="grid grid-cols-5 gap-2">
+                      {MAYA_MEDIA_LIBRARY.map((foto) => {
+                        const selecionada = previewFoto === foto.url;
+                        return (
+                          <button
+                            key={foto.id}
+                            type="button"
+                            onClick={() => {
+                              setArquivoFoto(null);
+                              setPreviewFoto(foto.url);
+                              if (itemEmEdicao) {
+                                setItemEmEdicao({ ...itemEmEdicao, fotoUrl: foto.url });
+                              }
+                            }}
+                            className={`relative aspect-square rounded-xl overflow-hidden border-2 transition-all group ${
+                              selecionada
+                                ? "border-rose-500 scale-105 shadow-md shadow-rose-600/30"
+                                : "border-neutral-800 hover:border-neutral-600 opacity-70 hover:opacity-100"
+                            }`}
+                          >
+                            <Image src={foto.thumbnail} alt={foto.titulo} fill className="object-cover" />
+                            {selecionada && (
+                              <div className="absolute inset-0 bg-rose-500/30 flex items-center justify-center">
+                                <Check className="w-3.5 h-3.5 text-white stroke-[3]" />
+                              </div>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between p-3 rounded-xl bg-neutral-800/60 border border-neutral-700/60">
+                  <span className="text-xs font-bold text-neutral-300">Disponível para Pedidos</span>
+                  <Switch
+                    checked={itemEmEdicao.ativo !== false}
+                    onCheckedChange={(val) => setItemEmEdicao({ ...itemEmEdicao, ativo: val })}
                   />
                 </div>
               </div>
 
-              <p className="text-[11px] text-neutral-400 flex items-start gap-1.5 bg-neutral-900/60 p-2.5 rounded-xl border border-neutral-800">
-                <Clock className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
-                <span>
-                  Tempo médio para a cozinha liberar este prato. Essencial para o KDS priorizar pedidos no Modo Agrupamento Ágil.
-                </span>
-              </p>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold uppercase tracking-wider text-neutral-300">
-                  Descrição dos Ingredientes
-                </label>
-                <textarea
-                  rows={2}
-                  placeholder="Ex: Dois burgers de 100g, cheddar duplo, cebola caramelizada e maionese da casa."
-                  value={itemEmEdicao.descricao || ""}
-                  onChange={(e) => setItemEmEdicao({ ...itemEmEdicao, descricao: e.target.value })}
-                  className="w-full rounded-xl bg-neutral-800 border border-neutral-700 p-3 text-sm text-white placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-rose-500 resize-none"
-                />
-              </div>
-
-              {/* CONSTRUTOR DE MODIFICADORES (COMPLEMENTOS E VARIAÇÕES) */}
-              <div className="pt-2 border-t border-neutral-800 mt-4 mb-4">
-                <ModificadorBuilder
-                  grupos={itemEmEdicao.grupoModificadores || []}
-                  onChange={(novosGrupos) =>
-                    setItemEmEdicao({ ...itemEmEdicao, grupoModificadores: novosGrupos })
-                  }
-                />
-              </div>
-
-              {/* FOTO DO PRATO (STORAGE UPLOAD COM PREVIEW) */}
-              <div className="space-y-2">
-                <label className="text-xs font-bold uppercase tracking-wider text-neutral-300 flex items-center justify-between">
-                  <span className="flex items-center gap-1.5">
-                    <Camera className="w-3.5 h-3.5 text-rose-500" />
-                    Foto do Prato
-                  </span>
-                  <span className="text-[10px] text-neutral-400 font-normal">Máx 5MB (JPG, PNG, WebP)</span>
-                </label>
-
-                {/* PREVIEW DA IMAGEM SE HOUVER */}
-                {previewFoto ? (
-                  <div className="relative w-full h-44 rounded-2xl overflow-hidden bg-neutral-950 border border-neutral-700/80 group">
-                    <Image
-                      src={previewFoto}
-                      alt="Prévia do prato"
-                      fill
-                      className="object-cover"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex items-end justify-between p-3 opacity-90 group-hover:opacity-100 transition-opacity">
-                      <span className="text-[11px] text-neutral-300 truncate max-w-[200px]">
-                        {arquivoFoto ? arquivoFoto.name : "Imagem atual do prato"}
-                      </span>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="destructive"
-                        onClick={handleRemoverFoto}
-                        className="h-8 px-2.5 bg-red-600/80 hover:bg-red-600 text-white rounded-xl text-xs flex items-center gap-1 shadow-lg"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                        Remover
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  /* DROPZONE / SELETOR DE ARQUIVO */
-                  <label className="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-neutral-700 hover:border-rose-500 rounded-2xl cursor-pointer bg-neutral-800/40 hover:bg-neutral-800/80 transition-all p-3 text-center">
-                    <div className="flex flex-col items-center justify-center">
-                      <div className="p-2 bg-rose-500/10 rounded-xl text-rose-400 mb-1.5">
-                        <Upload className="w-4 h-4" />
-                      </div>
-                      <p className="text-xs font-bold text-neutral-200">
-                        Clique para enviar ou tirar foto
-                      </p>
-                      <p className="text-[10px] text-neutral-400">
-                        Upload direto para o Firebase Storage
-                      </p>
-                    </div>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleFotoSelecionada}
-                      className="hidden"
-                    />
-                  </label>
-                )}
-
-                {/* GALERIA MAYA MEDIA LIBRARY (OPÇÕES PROFISSIONAIS PRONTAS) */}
-                <div className="pt-1">
-                  <span className="text-[11px] font-bold text-neutral-400 block mb-1.5">
-                    Ou selecione uma foto profissional da Galeria MAYa:
-                  </span>
-                  <div className="grid grid-cols-5 gap-2">
-                    {MAYA_MEDIA_LIBRARY.map((foto) => {
-                      const selecionada = previewFoto === foto.url;
-                      return (
-                        <button
-                          key={foto.id}
-                          type="button"
-                          onClick={() => {
-                            setArquivoFoto(null);
-                            setPreviewFoto(foto.url);
-                            if (itemEmEdicao) {
-                              setItemEmEdicao({ ...itemEmEdicao, fotoUrl: foto.url });
-                            }
-                          }}
-                          className={`relative aspect-square rounded-xl overflow-hidden border-2 transition-all group ${
-                            selecionada
-                              ? "border-rose-500 scale-105 shadow-md shadow-rose-600/30"
-                              : "border-neutral-800 hover:border-neutral-600 opacity-70 hover:opacity-100"
-                          }`}
-                        >
-                          <Image src={foto.thumbnail} alt={foto.titulo} fill className="object-cover" />
-                          {selecionada && (
-                            <div className="absolute inset-0 bg-rose-500/30 flex items-center justify-center">
-                              <Check className="w-3.5 h-3.5 text-white stroke-[3]" />
-                            </div>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between p-3 rounded-xl bg-neutral-800/60 border border-neutral-700/60">
-                <span className="text-xs font-bold text-neutral-300">Disponível para Pedidos</span>
-                <Switch
-                  checked={itemEmEdicao.ativo !== false}
-                  onCheckedChange={(val) => setItemEmEdicao({ ...itemEmEdicao, ativo: val })}
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-neutral-800">
+              {/* Rodapé fixo com os botões (shrink-0) */}
+              <div className="px-6 py-4 bg-neutral-950 border-t border-neutral-800 shrink-0 flex items-center justify-end gap-2">
                 <Button
                   type="button"
                   variant="ghost"

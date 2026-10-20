@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import type { MesaOperacional, ComandaGarcom } from "@/components/garcom/garcom-view";
 import type { MenuItem } from "@/types";
 import { CARDAPIO_DEMO } from "@/lib/mock-data";
-import { escutarPedidosMesa, fecharContaMesa } from "@/lib/restaurante-service";
+import { escutarPedidosMesa, fecharContaMesa, atualizarStatusPedido } from "@/lib/restaurante-service";
 import { useTotalComanda } from "@/hooks/useTotalComanda";
 import {
   Dialog,
@@ -31,6 +31,8 @@ import {
   CreditCard,
   Percent,
   Bell,
+  Loader2,
+  Check,
 } from "lucide-react";
 import Link from "next/link";
 import { QRCodeSVG } from "qrcode.react";
@@ -77,6 +79,23 @@ export function MesaDetalheModal({
   const [observacao, setObservacao] = useState(observacaoInicial);
   const [taxaServicoAtiva, setTaxaServicoAtiva] = useState(true);
   const [encerrando, setEncerrando] = useState(false);
+  const [atualizandoEntregaId, setAtualizandoEntregaId] = useState<string | null>(null);
+
+  const handleMarcarEntregue = async (refPath?: string) => {
+    if (!refPath) {
+      alert("Não foi possível localizar o identificador do pedido no Firestore.");
+      return;
+    }
+    setAtualizandoEntregaId(refPath);
+    try {
+      await atualizarStatusPedido(refPath, "entregue");
+    } catch (err) {
+      console.error("Erro ao marcar pedido como entregue:", err);
+      alert("Falha ao atualizar o status do pedido no Firestore. Tente novamente.");
+    } finally {
+      setAtualizandoEntregaId(null);
+    }
+  };
 
   // Estados para lançamento manual
   const [clienteDestino, setClienteDestino] = useState("");
@@ -114,7 +133,7 @@ export function MesaDetalheModal({
       (p) => p.clienteId === c.id || p.nomeCliente?.toLowerCase() === c.nomeCliente?.toLowerCase()
     );
 
-    const todosItens: typeof c.itens = [];
+    const todosItens: (typeof c.itens[number] & { refPath?: string; statusPedido?: string })[] = [];
     let subtotalCalculado = 0;
 
     pedidosDesteCliente.forEach((p) => {
@@ -130,6 +149,8 @@ export function MesaDetalheModal({
             quantidade: it.quantidade || 1,
             precoFinal: it.precoFinal || 0,
             modificadores: it.modificadores || [],
+            refPath: p.refPath,
+            statusPedido: p.status,
           });
         });
       }
@@ -452,16 +473,28 @@ export function MesaDetalheModal({
                                   })}
                                 </span>
 
-                                {/* NOVO BOTÃO DE MARCAR COMO SERVIDO */}
+                                {/* BOTÃO DE MARCAR COMO SERVIDO / ENTREGUE */}
                                 {!modoSomenteLeitura && (
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    className="h-6 px-2 text-[9px] bg-emerald-600 hover:bg-emerald-500 text-white rounded-md uppercase font-black tracking-widest"
-                                    onClick={() => alert("Função 'Marcar Entregue' no Firestore requer atualização na subcoleção do pedido específico.")}
-                                  >
-                                    Entregue
-                                  </Button>
+                                  (it as any).statusPedido === "entregue" ? (
+                                    <span className="text-[10px] text-emerald-400 font-bold flex items-center gap-1">
+                                      <Check className="w-3 h-3" />
+                                      Entregue
+                                    </span>
+                                  ) : (
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      disabled={atualizandoEntregaId === (it as any).refPath}
+                                      className="h-6 px-2 text-[9px] bg-emerald-600 hover:bg-emerald-500 text-white rounded-md uppercase font-black tracking-widest disabled:opacity-50"
+                                      onClick={() => handleMarcarEntregue((it as any).refPath)}
+                                    >
+                                      {atualizandoEntregaId === (it as any).refPath ? (
+                                        <Loader2 className="w-3 h-3 animate-spin" />
+                                      ) : (
+                                        "Entregue"
+                                      )}
+                                    </Button>
+                                  )
                                 )}
                               </div>
                             </div>

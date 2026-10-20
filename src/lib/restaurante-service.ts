@@ -453,9 +453,9 @@ export function escutarPedidosMesa(
   return onSnapshot(
     q,
     (snapshot) => {
-      const lista: PedidoRodada[] = [];
+      const lista: (PedidoRodada & { refPath?: string })[] = [];
       snapshot.forEach((d) => {
-        lista.push({ ...(d.data() as PedidoRodada), id: d.id });
+        lista.push({ ...(d.data() as PedidoRodada), id: d.id, refPath: d.ref.path });
       });
       onAtualizacao(lista);
     },
