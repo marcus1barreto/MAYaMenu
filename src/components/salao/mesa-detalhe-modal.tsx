@@ -72,9 +72,11 @@ export function MesaDetalheModal({
   observacaoInicial = "",
   taxaServicoPercentual,
 }: MesaDetalheModalProps) {
+  // ✅ 1. TODOS OS HOOKS NO TOPO ABSOLUTO (Regra dos Hooks do React - Sem early return antes)
   const [abaInterna, setAbaInterna] = useState<"comandas" | "lancar" | "qrcode">("comandas");
   const [observacao, setObservacao] = useState(observacaoInicial);
   const [taxaServicoAtiva, setTaxaServicoAtiva] = useState(true);
+  const [encerrando, setEncerrando] = useState(false);
 
   // Estados para lançamento manual
   const [clienteDestino, setClienteDestino] = useState("");
@@ -100,8 +102,10 @@ export function MesaDetalheModal({
     return () => unsub();
   }, [isOpen, mesa?.numero, restauranteId, slug]);
 
-  if (!mesa) return null;
+  // ✅ 2. EARLY RETURN SOMENTE DEPOIS DE TODOS OS HOOKS
+  if (!isOpen || !mesa) return null;
 
+  // 3. Cálculos e Lógica de Negócio
   // Mescla itens dos pedidos reais nas comandas correspondentes
   const comandasComItens = mesa.comandas.map((c) => {
     if (c.itens && c.itens.length > 0) return c; // Já possui itens lançados
@@ -153,8 +157,6 @@ export function MesaDetalheModal({
 
   const urlMesa = `/r/${slug}?mesa=${mesa.numero}`;
   const urlCompleta = typeof window !== "undefined" ? `${window.location.origin}${urlMesa}` : urlMesa;
-
-  const [encerrando, setEncerrando] = useState(false);
 
   const handleEncerrarComandaMesa = async (clienteId: string, nomeCliente?: string) => {
     const idRestauranteFinal = restauranteId || slug;
