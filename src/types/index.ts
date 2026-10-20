@@ -40,10 +40,13 @@ export interface MenuItem {
 }
 
 export interface GrupoModificador {
+  id?: string;
   nome: string; // Ex: "Ponto da Carne", "Tamanho"
   obrigatorio: boolean;
-  maxEscolhas: number;
-  opcoes: { nome: string; precoAdicional: number }[];
+  minimo?: number;
+  maxEscolhas?: number;
+  maximo?: number; // Compatibilidade com construtor
+  opcoes: { id?: string; nome: string; precoAdicional: number }[];
 }
 
 export interface ItemPedido {

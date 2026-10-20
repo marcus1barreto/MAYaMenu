@@ -21,6 +21,7 @@ import {
 } from "@/lib/restaurante-service";
 import { GuidedEmptyCardapio } from "./guided-empty-cardapio";
 import { AdminQrScannerModal } from "./admin-qr-scanner-modal";
+import { ModificadorBuilder } from "./modificador-builder";
 import { MAYA_MEDIA_LIBRARY } from "@/lib/maya-media-library";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -595,6 +596,7 @@ export function AdminDashboard() {
       tempoPreparoEstimado: 15,
       ativo: true,
       fotoUrl: "",
+      grupoModificadores: [],
     });
     setModalPratoAberto(true);
   };
@@ -1556,6 +1558,16 @@ export function AdminDashboard() {
                   value={itemEmEdicao.descricao || ""}
                   onChange={(e) => setItemEmEdicao({ ...itemEmEdicao, descricao: e.target.value })}
                   className="w-full rounded-xl bg-neutral-800 border border-neutral-700 p-3 text-sm text-white placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-rose-500 resize-none"
+                />
+              </div>
+
+              {/* CONSTRUTOR DE MODIFICADORES (COMPLEMENTOS E VARIAÇÕES) */}
+              <div className="pt-2 border-t border-neutral-800 mt-4 mb-4">
+                <ModificadorBuilder
+                  grupos={itemEmEdicao.grupoModificadores || []}
+                  onChange={(novosGrupos) =>
+                    setItemEmEdicao({ ...itemEmEdicao, grupoModificadores: novosGrupos })
+                  }
                 />
               </div>
 

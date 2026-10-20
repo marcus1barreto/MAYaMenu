@@ -141,15 +141,16 @@ export function ItemModal({ item, isOpen, onClose, corPrimaria = "#E11D48" }: It
           {/* Grupos de Modificadores */}
           {grupos.map((grupo) => {
             const selecionados = selecoesMod[grupo.nome] || [];
+            const maximoPermitido = grupo.maximo ?? grupo.maxEscolhas ?? 1;
             return (
               <div key={grupo.nome} className="space-y-3">
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="text-sm font-bold text-neutral-900">{grupo.nome}</h3>
                     <p className="text-xs text-neutral-500">
-                      {grupo.maxEscolhas === 1
+                      {maximoPermitido === 1
                         ? "Escolha 1 opção"
-                        : `Até ${grupo.maxEscolhas} opções`}
+                        : `Até ${maximoPermitido} opções`}
                     </p>
                   </div>
                   {grupo.obrigatorio && (
@@ -172,7 +173,7 @@ export function ItemModal({ item, isOpen, onClose, corPrimaria = "#E11D48" }: It
                       <button
                         key={opcao.nome}
                         type="button"
-                        onClick={() => handleToggleOpcao(grupo.nome, opcao.nome, grupo.maxEscolhas)}
+                        onClick={() => handleToggleOpcao(grupo.nome, opcao.nome, maximoPermitido)}
                         className={`w-full flex items-center justify-between p-3.5 rounded-xl border text-left transition-all ${
                           ativo
                             ? "border-neutral-900 bg-neutral-900 text-white shadow-sm"
