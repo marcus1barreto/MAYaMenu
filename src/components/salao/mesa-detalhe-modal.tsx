@@ -187,17 +187,20 @@ export function MesaDetalheModal({
     }
   };
 
-  const handleEncerrarMesaCompleta = async () => {
+  const handleEncerrarMesa = async () => {
     const idRestauranteFinal = restauranteId || slug;
     if (!idRestauranteFinal || !mesa?.numero) return;
 
+    // Confirmação de segurança dupla para o garçom
     if (!confirm("Tem certeza que deseja fechar esta conta e liberar a mesa?")) return;
 
     try {
       setEncerrando(true);
-      // Executa o fechamento de cada comanda aberta da mesa
-      for (const comanda of comandasComItens) {
-        await fecharContaMesa(idRestauranteFinal, mesa.numero, comanda.id);
+      // Se houver comandas ativas, executa o fechamento atômico de cada uma via writeBatch
+      if (comandasComItens.length > 0) {
+        for (const comanda of comandasComItens) {
+          await fecharContaMesa(idRestauranteFinal, mesa.numero, comanda.id);
+        }
       }
       alert("Conta fechada e mesa liberada com sucesso!");
       onClose();
@@ -578,27 +581,18 @@ export function MesaDetalheModal({
                     />
                   </div>
 
-                  {/* AÇÕES DE MESA */}
+                  {/* 🟢 BOTÃO DE ENCERRAR E LIBERAR MESA */}
                   {!modoSomenteLeitura && (
-                    <div className="pt-2 space-y-2">
-                      <Button
+                    <div className="mt-4">
+                      <button
                         type="button"
-                        disabled={encerrando || comandasComItens.length === 0}
-                        onClick={handleEncerrarMesaCompleta}
-                        className={`w-full h-14 bg-emerald-600 hover:bg-emerald-500 text-white font-black rounded-2xl text-base sm:text-lg mt-2 flex items-center justify-center gap-2 shadow-lg transition-all ${
-                          encerrando || comandasComItens.length === 0
-                            ? "opacity-50 cursor-not-allowed"
-                            : "cursor-pointer"
-                        }`}
+                        onClick={handleEncerrarMesa}
+                        disabled={encerrando}
+                        className="w-full h-14 bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-800 disabled:text-neutral-400 text-white font-black rounded-xl text-lg transition-colors flex items-center justify-center gap-2 shadow-lg cursor-pointer disabled:cursor-not-allowed"
                       >
                         <CheckCircle2 className="w-5 h-5" />
                         <span>{encerrando ? "Processando..." : "Encerrar e Liberar Mesa"}</span>
-                      </Button>
-                      {!todasPagas && comandasComItens.length > 0 && (
-                        <p className="text-[11px] text-neutral-400 text-center font-medium">
-                          Marca os pedidos como pagos de forma atômica e libera a mesa imediatamente.
-                        </p>
-                      )}
+                      </button>
                     </div>
                   )}
                 </div>
