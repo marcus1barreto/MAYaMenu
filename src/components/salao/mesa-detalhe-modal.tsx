@@ -231,15 +231,14 @@ export function MesaDetalheModal({
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <div
-                className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-xl shadow-lg shrink-0 ${
-                  mesa.status === "conta_pedida"
+                className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-xl shadow-lg shrink-0 ${mesa.status === "conta_pedida"
                     ? "bg-rose-600 text-white animate-pulse"
                     : mesa.status === "paga_ocupada"
-                    ? "bg-emerald-600 text-white"
-                    : mesa.status === "ocupada"
-                    ? "bg-amber-500 text-neutral-950"
-                    : "bg-neutral-800 text-neutral-400"
-                }`}
+                      ? "bg-emerald-600 text-white"
+                      : mesa.status === "ocupada"
+                        ? "bg-amber-500 text-neutral-950"
+                        : "bg-neutral-800 text-neutral-400"
+                  }`}
               >
                 {mesa.numero}
               </div>
@@ -248,23 +247,22 @@ export function MesaDetalheModal({
                   <span>Mesa {mesa.numero}</span>
                   <Badge
                     variant="outline"
-                    className={`text-[10px] uppercase font-bold tracking-wider px-2.5 py-0.5 rounded-full ${
-                      mesa.status === "conta_pedida"
+                    className={`text-[10px] uppercase font-bold tracking-wider px-2.5 py-0.5 rounded-full ${mesa.status === "conta_pedida"
                         ? "bg-rose-500/20 text-rose-400 border-rose-500/40"
                         : mesa.status === "paga_ocupada"
-                        ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/40"
-                        : mesa.status === "ocupada"
-                        ? "bg-amber-500/20 text-amber-400 border-amber-500/40"
-                        : "bg-neutral-800 text-neutral-400 border-neutral-700"
-                    }`}
+                          ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/40"
+                          : mesa.status === "ocupada"
+                            ? "bg-amber-500/20 text-amber-400 border-amber-500/40"
+                            : "bg-neutral-800 text-neutral-400 border-neutral-700"
+                      }`}
                   >
                     {mesa.status === "conta_pedida"
                       ? "Pediu a Conta"
                       : mesa.status === "paga_ocupada"
-                      ? "Paga / Aguardando Saída"
-                      : mesa.status === "ocupada"
-                      ? "Ocupada / Consumindo"
-                      : "Livre"}
+                        ? "Paga / Aguardando Saída"
+                        : mesa.status === "ocupada"
+                          ? "Ocupada / Consumindo"
+                          : "Livre"}
                   </Badge>
                 </DialogTitle>
                 <DialogDescription className="text-xs text-neutral-400 mt-0.5 flex flex-wrap items-center gap-3">
@@ -296,11 +294,10 @@ export function MesaDetalheModal({
             <button
               type="button"
               onClick={() => setAbaInterna("comandas")}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
-                abaInterna === "comandas"
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${abaInterna === "comandas"
                   ? "bg-rose-600 text-white shadow-md"
                   : "bg-neutral-800/80 text-neutral-400 hover:text-white"
-              }`}
+                }`}
             >
               <Users className="w-3.5 h-3.5" />
               <span>Comandas & Pedidos ({mesa.comandas.length})</span>
@@ -310,11 +307,10 @@ export function MesaDetalheModal({
               <button
                 type="button"
                 onClick={() => setAbaInterna("lancar")}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
-                  abaInterna === "lancar"
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${abaInterna === "lancar"
                     ? "bg-rose-600 text-white shadow-md"
                     : "bg-neutral-800/80 text-neutral-400 hover:text-white"
-                }`}
+                  }`}
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Lançar Item Manual</span>
@@ -324,11 +320,10 @@ export function MesaDetalheModal({
             <button
               type="button"
               onClick={() => setAbaInterna("qrcode")}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
-                abaInterna === "qrcode"
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${abaInterna === "qrcode"
                   ? "bg-rose-600 text-white shadow-md"
                   : "bg-neutral-800/80 text-neutral-400 hover:text-white"
-              }`}
+                }`}
             >
               <QrCode className="w-3.5 h-3.5" />
               <span>QR Code da Mesa</span>
@@ -386,11 +381,10 @@ export function MesaDetalheModal({
                     return (
                       <div
                         key={comanda.id}
-                        className={`p-4 rounded-2xl border transition-all ${
-                          jaPago
+                        className={`p-4 rounded-2xl border transition-all ${jaPago
                             ? "bg-neutral-950 border-neutral-800/80 opacity-60"
                             : "bg-neutral-950/80 border-neutral-800 hover:border-neutral-700 shadow-md"
-                        }`}
+                          }`}
                       >
                         <div className="flex items-center justify-between mb-3">
                           <div className="flex items-center gap-2">
@@ -420,19 +414,18 @@ export function MesaDetalheModal({
                               })}
                             </span>
                             <span
-                              className={`text-[9px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full inline-block ${
-                                jaPago
+                              className={`text-[9px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full inline-block ${jaPago
                                   ? "bg-emerald-500/20 text-emerald-400"
                                   : comanda.status === "conta_pedida"
-                                  ? "bg-rose-500/20 text-rose-400"
-                                  : "bg-amber-500/20 text-amber-400"
-                              }`}
+                                    ? "bg-rose-500/20 text-rose-400"
+                                    : "bg-amber-500/20 text-amber-400"
+                                }`}
                             >
                               {jaPago
                                 ? "Pago"
                                 : comanda.status === "conta_pedida"
-                                ? "Pediu Conta"
-                                : "Consumindo"}
+                                  ? "Pediu Conta"
+                                  : "Consumindo"}
                             </span>
                           </div>
                         </div>
@@ -508,9 +501,9 @@ export function MesaDetalheModal({
                               {encerrando
                                 ? "Processando..."
                                 : `Encerrar e Cobrar ${comanda.nomeCliente} (${comanda.subtotal.toLocaleString(
-                                    "pt-BR",
-                                    { style: "currency", currency: "BRL" }
-                                  )})`}
+                                  "pt-BR",
+                                  { style: "currency", currency: "BRL" }
+                                )})`}
                             </span>
                           </Button>
                         )}
@@ -545,11 +538,10 @@ export function MesaDetalheModal({
                         <button
                           type="button"
                           onClick={() => setTaxaServicoAtiva(!taxaServicoAtiva)}
-                          className={`text-[10px] px-2 py-0.5 rounded font-black transition-colors ${
-                            taxaServicoAtiva
+                          className={`text-[10px] px-2 py-0.5 rounded font-black transition-colors ${taxaServicoAtiva
                               ? "bg-rose-600/30 text-rose-300 border border-rose-500/40"
                               : "bg-neutral-800 text-neutral-500 border border-neutral-700"
-                          }`}
+                            }`}
                         >
                           {taxaServicoAtiva ? "ON" : "OFF"}
                         </button>
@@ -633,11 +625,10 @@ export function MesaDetalheModal({
                       key={c.id}
                       type="button"
                       onClick={() => setClienteDestino(c.nomeCliente)}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${
-                        clienteDestino === c.nomeCliente
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${clienteDestino === c.nomeCliente
                           ? "bg-rose-600 border-rose-500 text-white"
                           : "bg-neutral-800 border-neutral-700 text-neutral-300 hover:text-white"
-                      }`}
+                        }`}
                     >
                       {c.nomeCliente}
                     </button>
@@ -645,157 +636,158 @@ export function MesaDetalheModal({
                   <button
                     type="button"
                     onClick={() => setClienteDestino("")}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${
-                      !clienteDestino
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${!clienteDestino
                         ? "bg-rose-600 border-rose-500 text-white"
                         : "bg-neutral-800 border-neutral-700 text-neutral-300 hover:text-white"
-                    }`}
+                      }`}
                   >
                     + Novo Cliente
                   </button>
                 </div>
 
-                {!clienteDestino && (
-                  <Input
-                    placeholder="Digite o nome do novo cliente (ex: João)"
-                    onChange={(e) => setClienteDestino(e.target.value)}
-                    className="h-10 bg-neutral-950 border-neutral-800 rounded-xl text-xs"
-                  />
+                {(!clienteDestino || !mesa.comandas.some((c) => c.nomeCliente === clienteDestino)) && (
+                  <div className="pt-2">
+                    <Input
+                      value={clienteDestino}
+                      placeholder="Digite o nome do novo cliente (ex: João)"
+                      onChange={(e) => setClienteDestino(e.target.value)}
+                      className="h-10 bg-neutral-950 border-neutral-800 rounded-xl text-xs"
+                    />
+                  </div>
                 )}
               </div>
 
               {/* Seleção do Item do Cardápio */}
               <div className="space-y-2">
-                <label className="text-xs font-bold text-neutral-300">
-                  Selecione o Item do Cardápio
-                </label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-56 overflow-y-auto p-1">
-                  {CARDAPIO_DEMO.map((item) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => setItemSelecionado(item)}
-                      className={`p-3 rounded-xl border text-left flex justify-between items-center transition-all ${
-                        itemSelecionado?.id === item.id
-                          ? "bg-rose-600/20 border-rose-500 text-white"
-                          : "bg-neutral-950 border-neutral-800 text-neutral-300 hover:border-neutral-700"
-                      }`}
-                    >
-                      <div>
-                        <div className="text-xs font-bold">{item.nome}</div>
-                        <div className="text-[10px] text-neutral-400">
-                          {item.precoBase.toLocaleString("pt-BR", {
-                            style: "currency",
-                            currency: "BRL",
-                          })}
+                  <label className="text-xs font-bold text-neutral-300">
+                    Selecione o Item do Cardápio
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-56 overflow-y-auto p-1">
+                    {CARDAPIO_DEMO.map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => setItemSelecionado(item)}
+                        className={`p-3 rounded-xl border text-left flex justify-between items-center transition-all ${itemSelecionado?.id === item.id
+                            ? "bg-rose-600/20 border-rose-500 text-white"
+                            : "bg-neutral-950 border-neutral-800 text-neutral-300 hover:border-neutral-700"
+                          }`}
+                      >
+                        <div>
+                          <div className="text-xs font-bold">{item.nome}</div>
+                          <div className="text-[10px] text-neutral-400">
+                            {item.precoBase.toLocaleString("pt-BR", {
+                              style: "currency",
+                              currency: "BRL",
+                            })}
+                          </div>
                         </div>
-                      </div>
-                      {itemSelecionado?.id === item.id && (
-                        <CheckCircle2 className="w-4 h-4 text-rose-500" />
-                      )}
-                    </button>
-                  ))}
+                        {itemSelecionado?.id === item.id && (
+                          <CheckCircle2 className="w-4 h-4 text-rose-500" />
+                        )}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
 
-              {itemSelecionado && (
-                <div className="p-4 bg-neutral-950 rounded-2xl border border-neutral-800 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-white">{itemSelecionado.nome}</span>
-                    {/* Controle de Quantidade */}
-                    <div className="flex items-center gap-2 bg-neutral-900 rounded-xl p-1 border border-neutral-800">
-                      <button
-                        type="button"
-                        onClick={() => setQuantidade((q) => Math.max(1, q - 1))}
-                        className="w-7 h-7 flex items-center justify-center font-bold text-xs hover:bg-neutral-800 rounded"
-                      >
-                        -
-                      </button>
-                      <span className="w-6 text-center text-xs font-bold">{quantidade}</span>
-                      <button
-                        type="button"
-                        onClick={() => setQuantidade((q) => q + 1)}
-                        className="w-7 h-7 flex items-center justify-center font-bold text-xs hover:bg-neutral-800 rounded"
-                      >
-                        +
-                      </button>
+                {itemSelecionado && (
+                  <div className="p-4 bg-neutral-950 rounded-2xl border border-neutral-800 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-white">{itemSelecionado.nome}</span>
+                      {/* Controle de Quantidade */}
+                      <div className="flex items-center gap-2 bg-neutral-900 rounded-xl p-1 border border-neutral-800">
+                        <button
+                          type="button"
+                          onClick={() => setQuantidade((q) => Math.max(1, q - 1))}
+                          className="w-7 h-7 flex items-center justify-center font-bold text-xs hover:bg-neutral-800 rounded"
+                        >
+                          -
+                        </button>
+                        <span className="w-6 text-center text-xs font-bold">{quantidade}</span>
+                        <button
+                          type="button"
+                          onClick={() => setQuantidade((q) => q + 1)}
+                          className="w-7 h-7 flex items-center justify-center font-bold text-xs hover:bg-neutral-800 rounded"
+                        >
+                          +
+                        </button>
+                      </div>
                     </div>
+
+                    <Input
+                      placeholder="Observação (ex: Sem cebola, gelo à parte)"
+                      value={obsItem}
+                      onChange={(e) => setObsItem(e.target.value)}
+                      className="h-10 bg-neutral-900 border-neutral-800 rounded-xl text-xs"
+                    />
+
+                    <Button
+                      type="button"
+                      onClick={handleConfirmarLancamento}
+                      className="w-full h-11 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>
+                        Adicionar na Mesa (
+                        {(itemSelecionado.precoBase * quantidade).toLocaleString("pt-BR", {
+                          style: "currency",
+                          currency: "BRL",
+                        })}
+                        )
+                      </span>
+                    </Button>
+                  </div>
+                )}
+              </div>
+          )}
+
+              {/* 3. ABA: QR CODE E LINK DA MESA FÍSICA */}
+              {abaInterna === "qrcode" && (
+                <div className="max-w-md mx-auto text-center space-y-4">
+                  <div className="p-6 bg-white rounded-3xl inline-block shadow-xl">
+                    <QRCodeSVG
+                      value={urlCompleta}
+                      size={200}
+                      level="H"
+                      includeMargin={true}
+                      className="rounded-lg"
+                    />
                   </div>
 
-                  <Input
-                    placeholder="Observação (ex: Sem cebola, gelo à parte)"
-                    value={obsItem}
-                    onChange={(e) => setObsItem(e.target.value)}
-                    className="h-10 bg-neutral-900 border-neutral-800 rounded-xl text-xs"
-                  />
+                  <div>
+                    <h4 className="text-base font-bold text-white">QR Code Físico da Mesa {mesa.numero}</h4>
+                    <p className="text-xs text-neutral-400 mt-1">
+                      Imprima e cole este código na mesa física. O cliente escaneia com o celular e abre o cardápio automaticamente já vinculado à Mesa {mesa.numero}.
+                    </p>
+                  </div>
 
-                  <Button
-                    type="button"
-                    onClick={handleConfirmarLancamento}
-                    className="w-full h-11 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span>
-                      Adicionar na Mesa (
-                      {(itemSelecionado.precoBase * quantidade).toLocaleString("pt-BR", {
-                        style: "currency",
-                        currency: "BRL",
-                      })}
-                      )
-                    </span>
-                  </Button>
+                  <div className="flex justify-center gap-3 pt-2">
+                    <Link href={urlMesa} target="_blank">
+                      <Button
+                        variant="outline"
+                        className="h-10 px-4 text-xs font-bold border-neutral-700 bg-neutral-800 hover:bg-neutral-700 text-rose-400 rounded-xl flex items-center gap-2"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        <span>Testar como Cliente</span>
+                      </Button>
+                    </Link>
+
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        if (typeof window !== "undefined") {
+                          window.print();
+                        }
+                      }}
+                      className="h-10 px-4 text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white rounded-xl flex items-center gap-2"
+                    >
+                      <QrCode className="w-3.5 h-3.5" />
+                      <span>Imprimir QR Code</span>
+                    </Button>
+                  </div>
                 </div>
               )}
             </div>
-          )}
-
-          {/* 3. ABA: QR CODE E LINK DA MESA FÍSICA */}
-          {abaInterna === "qrcode" && (
-            <div className="max-w-md mx-auto text-center space-y-4">
-              <div className="p-6 bg-white rounded-3xl inline-block shadow-xl">
-                <QRCodeSVG
-                  value={urlCompleta}
-                  size={200}
-                  level="H"
-                  includeMargin={true}
-                  className="rounded-lg"
-                />
-              </div>
-
-              <div>
-                <h4 className="text-base font-bold text-white">QR Code Físico da Mesa {mesa.numero}</h4>
-                <p className="text-xs text-neutral-400 mt-1">
-                  Imprima e cole este código na mesa física. O cliente escaneia com o celular e abre o cardápio automaticamente já vinculado à Mesa {mesa.numero}.
-                </p>
-              </div>
-
-              <div className="flex justify-center gap-3 pt-2">
-                <Link href={urlMesa} target="_blank">
-                  <Button
-                    variant="outline"
-                    className="h-10 px-4 text-xs font-bold border-neutral-700 bg-neutral-800 hover:bg-neutral-700 text-rose-400 rounded-xl flex items-center gap-2"
-                  >
-                    <ExternalLink className="w-3.5 h-3.5" />
-                    <span>Testar como Cliente</span>
-                  </Button>
-                </Link>
-
-                <Button
-                  type="button"
-                  onClick={() => {
-                    if (typeof window !== "undefined") {
-                      window.print();
-                    }
-                  }}
-                  className="h-10 px-4 text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white rounded-xl flex items-center gap-2"
-                >
-                  <QrCode className="w-3.5 h-3.5" />
-                  <span>Imprimir QR Code</span>
-                </Button>
-              </div>
-            </div>
-          )}
-        </div>
       </DialogContent>
     </Dialog>
   );
