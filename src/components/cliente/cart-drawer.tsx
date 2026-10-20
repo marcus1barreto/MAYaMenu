@@ -30,6 +30,7 @@ interface CartDrawerProps {
   slug?: string;
   restauranteNome?: string;
   corPrimaria?: string;
+  taxaServicoPercentual?: number;
 }
 
 export function CartDrawer({
@@ -39,6 +40,7 @@ export function CartDrawer({
   slug = "demo",
   restauranteNome = "MAYaMenu",
   corPrimaria = "#E11D48",
+  taxaServicoPercentual,
 }: CartDrawerProps) {
   const {
     itens,
@@ -427,11 +429,25 @@ export function CartDrawer({
             {/* Rodapé de Fechamento */}
             {itens.length > 0 && (
               <div className="p-4 bg-neutral-50 border-t border-neutral-200 space-y-3">
-                <div className="flex items-baseline justify-between px-1">
-                  <span className="text-xs font-bold uppercase text-neutral-500">Subtotal</span>
-                  <span className="text-2xl font-black text-neutral-900 tracking-tight">
-                    {subtotal.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
-                  </span>
+                <div className="space-y-1.5 px-1 mb-3">
+                  <div className="flex justify-between items-center text-sm font-medium text-neutral-500">
+                    <span>Subtotal</span>
+                    <span>{subtotal.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</span>
+                  </div>
+                  {taxaServicoPercentual && taxaServicoPercentual > 0 && (
+                    <div className="flex justify-between items-center text-sm font-medium text-neutral-500">
+                      <span>Taxa de Serviço ({taxaServicoPercentual}%)</span>
+                      <span>
+                        {(subtotal * (taxaServicoPercentual / 100)).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex justify-between items-end pt-2 border-t border-neutral-200 mt-2">
+                    <span className="text-xs font-bold uppercase text-neutral-900">Total</span>
+                    <span className="text-2xl font-black text-neutral-900 tracking-tight">
+                      {(subtotal + (subtotal * ((taxaServicoPercentual || 0) / 100))).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                    </span>
+                  </div>
                 </div>
 
                 <Button

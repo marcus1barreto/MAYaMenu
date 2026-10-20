@@ -451,12 +451,26 @@ export function MesaDetalheModal({
                                   </div>
                                 )}
                               </div>
-                              <span className="font-medium text-neutral-400">
-                                {(it.precoFinal * it.quantidade).toLocaleString("pt-BR", {
-                                  style: "currency",
-                                  currency: "BRL",
-                                })}
-                              </span>
+                              <div className="flex items-center gap-3">
+                                <span className="font-medium text-neutral-400">
+                                  {(it.precoFinal * it.quantidade).toLocaleString("pt-BR", {
+                                    style: "currency",
+                                    currency: "BRL",
+                                  })}
+                                </span>
+
+                                {/* NOVO BOTÃO DE MARCAR COMO SERVIDO */}
+                                {!modoSomenteLeitura && (
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    className="h-6 px-2 text-[9px] bg-emerald-600 hover:bg-emerald-500 text-white rounded-md uppercase font-black tracking-widest"
+                                    onClick={() => alert("Função 'Marcar Entregue' no Firestore requer atualização na subcoleção do pedido específico.")}
+                                  >
+                                    Entregue
+                                  </Button>
+                                )}
+                              </div>
                             </div>
                           ))}
                         </div>
@@ -581,20 +595,18 @@ export function MesaDetalheModal({
                     />
                   </div>
 
-                  {/* 🟢 BOTÃO DE ENCERRAR E LIBERAR MESA */}
-                  {!modoSomenteLeitura && (
-                    <div className="mt-4">
-                      <button
-                        type="button"
-                        onClick={handleEncerrarMesa}
-                        disabled={encerrando}
-                        className="w-full h-14 bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-800 disabled:text-neutral-400 text-white font-black rounded-xl text-lg transition-colors flex items-center justify-center gap-2 shadow-lg cursor-pointer disabled:cursor-not-allowed"
-                      >
-                        <CheckCircle2 className="w-5 h-5" />
-                        <span>{encerrando ? "Processando..." : "Encerrar e Liberar Mesa"}</span>
-                      </button>
-                    </div>
-                  )}
+                  {/* 🟢 BOTÃO DE ENCERRAR E LIBERAR MESA (Sempre visível) */}
+                  <div className="mt-4">
+                    <button
+                      type="button"
+                      onClick={handleEncerrarMesa}
+                      disabled={encerrando}
+                      className="w-full h-14 bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-800 disabled:text-neutral-400 text-white font-black rounded-xl text-lg transition-colors flex items-center justify-center gap-2 shadow-lg cursor-pointer disabled:cursor-not-allowed"
+                    >
+                      <CheckCircle2 className="w-5 h-5" />
+                      <span>{encerrando ? "Processando..." : "Encerrar e Liberar Mesa"}</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

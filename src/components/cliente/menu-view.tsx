@@ -759,6 +759,7 @@ export function MenuView({ restaurante, cardapio: cardapioInicial, numeroMesa: n
         slug={restaurante.slug}
         restauranteNome={restaurante.nome}
         corPrimaria={corPrimaria}
+        taxaServicoPercentual={restaurante.configuracoes?.taxaServico ?? 10}
       />
 
       {/* MODAL DE HISTÓRICO / COMPROVANTES DO CLIENTE */}

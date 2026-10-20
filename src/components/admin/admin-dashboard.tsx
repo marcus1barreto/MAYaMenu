@@ -71,6 +71,44 @@ import Image from "next/image";
 import { uploadFotoPrato, excluirFotoPrato } from "@/lib/storage-service";
 import { MesaDetalheModal } from "@/components/salao/mesa-detalhe-modal";
 import { MESAS_INICIAIS, type MesaOperacional, type ComandaGarcom, TEMPO_TOLERANCIA_MINUTOS } from "@/components/garcom/garcom-view";
+import { useTotalComanda } from "@/hooks/useTotalComanda";
+
+function ValorDinamicoMesa({
+  restauranteId,
+  mesaSelecionada,
+  comandaId,
+  taxaServicoPercentual,
+}: {
+  restauranteId?: string;
+  mesaSelecionada: string | number;
+  comandaId?: string;
+  taxaServicoPercentual: number;
+}) {
+  const { totalCalculado, carregando } = useTotalComanda(
+    restauranteId,
+    mesaSelecionada,
+    comandaId
+  );
+  const totalComTaxa =
+    totalCalculado + totalCalculado * (taxaServicoPercentual / 100);
+
+  if (carregando) {
+    return (
+      <span className="text-xs text-rose-400/50 block leading-none">
+        Calculando...
+      </span>
+    );
+  }
+
+  return (
+    <span className="text-sm font-black text-rose-400 block leading-none">
+      {totalComTaxa.toLocaleString("pt-BR", {
+        style: "currency",
+        currency: "BRL",
+      })}
+    </span>
+  );
+}
 
 export function AdminDashboard() {
   const { restaurante, logout, atualizarRestaurante } = useAuth();
@@ -1149,12 +1187,16 @@ export function AdminDashboard() {
                       <span className="text-xs font-bold text-white block">Mesa {num}</span>
                       {mesa.status !== "livre" ? (
                         <div className="mt-1">
-                          <span className="text-sm font-black text-rose-400 block leading-none">
-                            {totalMesa.toLocaleString("pt-BR", {
-                              style: "currency",
-                              currency: "BRL",
-                            })}
-                          </span>
+                          {mesa.comandas.length > 0 ? (
+                            <ValorDinamicoMesa 
+                              restauranteId={restaurante?.id}
+                              mesaSelecionada={num}
+                              comandaId={mesa.comandas[0].id}
+                              taxaServicoPercentual={restaurante?.configuracoes?.taxaServico ?? 10}
+                            />
+                          ) : (
+                            <span className="text-sm font-black text-rose-400 block leading-none">R$ 0,00</span>
+                          )}
                           <span className="text-[10px] text-neutral-400 flex items-center gap-1 mt-1 font-medium">
                             <Users className="w-3 h-3 text-neutral-500" />
                             {qtdClientes} {qtdClientes === 1 ? "pessoa" : "pessoas"}
