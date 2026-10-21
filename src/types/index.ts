@@ -14,6 +14,7 @@ export interface Restaurante {
   plano?: PlanoTipo; // 'free' | 'pro' | 'enterprise'
   maxMesas?: number;
   maxPratos?: number;
+  suspenso?: boolean;
   licenca?: Partial<Licenca>;
   configuracoes: {
     corPrimaria: string; // Injetada no Tailwind
@@ -23,6 +24,7 @@ export interface Restaurante {
     modoOperacao?: ModoOperacao; // 'com_garcom' | 'hibrido' (padrão) | 'balcao'
     modoFilaKds?: ModoFilaKds; // 'sequencial' (padrão FIFO) | 'agrupamento' (Ágil / Otimizado)
     taxaServico?: number; // Percentual da taxa de serviço (padrão: 10)
+    suspenso?: boolean;
   };
 }
 

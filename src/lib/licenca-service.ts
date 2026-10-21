@@ -519,6 +519,55 @@ export async function alterarStatusLicenca(
 }
 
 /**
+ * Escuta todos os restaurantes ativos do sistema em tempo real (SuperAdmin)
+ */
+export function escutarRestaurantes(
+  onAtualizacao: (restaurantes: Restaurante[]) => void
+): Unsubscribe {
+  const colRef = collection(db, "restaurantes");
+  try {
+    return onSnapshot(
+      colRef,
+      (snapshot) => {
+        const lista: Restaurante[] = [];
+        snapshot.forEach((d) => {
+          lista.push({
+            ...(d.data() as Restaurante),
+            id: d.id,
+          });
+        });
+        onAtualizacao(lista);
+      },
+      (err) => {
+        console.warn("Listener de restaurantes indisponível:", err);
+      }
+    );
+  } catch {
+    return () => {};
+  }
+}
+
+/**
+ * Suspende ou reativa um restaurante no Firestore (SuperAdmin)
+ */
+export async function alterarStatusRestaurante(
+  restauranteId: string,
+  suspenso: boolean
+): Promise<void> {
+  try {
+    const restRef = doc(db, "restaurantes", restauranteId);
+    await updateDoc(restRef, {
+      suspenso,
+      "configuracoes.suspenso": suspenso,
+      atualizadoEm: serverTimestamp(),
+    });
+  } catch (err) {
+    console.error("Falha ao alterar status de suspensão do restaurante:", err);
+    throw err;
+  }
+}
+
+/**
  * Atualiza o plano de um restaurante diretamente (SuperAdmin) sincronizando plano e limites
  */
 export async function alterarPlanoRestaurante(

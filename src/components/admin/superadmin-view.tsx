@@ -5,11 +5,13 @@ import {
   criarNovaLicenca,
   escutarLicencas,
   escutarArquivoMorto,
+  escutarRestaurantes,
   alterarStatusLicenca,
+  alterarStatusRestaurante,
   alterarPlanoRestaurante,
   LIMITES_POR_PLANO,
 } from "@/lib/licenca-service";
-import type { Licenca, LicencaArquivada, PlanoTipo } from "@/types";
+import type { Licenca, LicencaArquivada, PlanoTipo, Restaurante } from "@/types";
 import { parseDateToMillis } from "@/lib/datas";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,7 +52,8 @@ import {
 export function SuperAdminView() {
   const [licencas, setLicencas] = useState<Licenca[]>([]);
   const [arquivoMorto, setArquivoMorto] = useState<LicencaArquivada[]>([]);
-  const [abaAtiva, setAbaAtiva] = useState<"ativas" | "arquivo_morto">("ativas");
+  const [restaurantes, setRestaurantes] = useState<Restaurante[]>([]);
+  const [abaAtiva, setAbaAtiva] = useState<"restaurantes" | "ativas" | "arquivo_morto">("restaurantes");
   const [filtro, setFiltro] = useState<string>("");
   const [planoSelecionado, setPlanoSelecionado] = useState<PlanoTipo>("free");
   const [responsavel, setResponsavel] = useState("");
@@ -73,9 +76,13 @@ export function SuperAdminView() {
     const unsubArquivo = escutarArquivoMorto((dados) => {
       setArquivoMorto(dados);
     });
+    const unsubRestaurantes = escutarRestaurantes((dados) => {
+      setRestaurantes(dados);
+    });
     return () => {
       unsubLicencas();
       unsubArquivo();
+      unsubRestaurantes();
     };
   }, []);
 
@@ -135,10 +142,54 @@ export function SuperAdminView() {
           : lic
       )
     );
+    // Atualização otimista na lista de restaurantes
+    setRestaurantes((prev) =>
+      prev.map((r) =>
+        r.id === restauranteId
+          ? {
+              ...r,
+              plano: novoPlano,
+              maxMesas: novosLimites.maxMesas,
+              maxPratos: novosLimites.maxPratos,
+              licenca: {
+                ...r.licenca,
+                plano: novoPlano,
+                limites: novosLimites,
+              },
+            }
+          : r
+      )
+    );
     try {
       await alterarPlanoRestaurante(restauranteId, novoPlano, licencaCodigo);
     } catch (err) {
       console.error("Erro ao alterar plano do restaurante:", err);
+    }
+  };
+
+  const handleAlterarSuspensaoRestaurante = async (
+    restauranteId: string,
+    suspenso: boolean
+  ) => {
+    // Atualização otimista
+    setRestaurantes((prev) =>
+      prev.map((r) =>
+        r.id === restauranteId
+          ? {
+              ...r,
+              suspenso,
+              configuracoes: {
+                ...r.configuracoes,
+                suspenso,
+              },
+            }
+          : r
+      )
+    );
+    try {
+      await alterarStatusRestaurante(restauranteId, suspenso);
+    } catch (err) {
+      console.error("Erro ao alterar suspensão do restaurante:", err);
     }
   };
 
@@ -166,9 +217,19 @@ export function SuperAdminView() {
     );
   });
 
-  const totalAtivas = licencas.filter((l) => l.status === "ativa").length;
-  const totalDisponiveis = licencas.filter((l) => l.status === "disponivel").length;
-  const totalSuspensas = licencas.filter((l) => l.status === "suspensa").length;
+  const restaurantesFiltrados = restaurantes.filter((rest) => {
+    const termo = filtro.toLowerCase();
+    return (
+      rest.nome.toLowerCase().includes(termo) ||
+      rest.slug.toLowerCase().includes(termo) ||
+      rest.id.toLowerCase().includes(termo) ||
+      (rest.plano && rest.plano.toLowerCase().includes(termo))
+    );
+  });
+
+  const totalRestaurantesAtivos = restaurantes.filter((r) => !r.suspenso && !r.configuracoes?.suspenso).length;
+  const totalRestaurantesSuspensos = restaurantes.filter((r) => r.suspenso || r.configuracoes?.suspenso).length;
+  const totalTokensDisponiveis = licencas.filter((l) => l.status === "disponivel").length;
 
   return (
     <div className="min-h-screen bg-neutral-950 text-white p-4 md:p-8 space-y-8">
@@ -192,23 +253,31 @@ export function SuperAdminView() {
 
         {/* METRICAS RÁPIDAS */}
         <div className="flex items-center gap-3">
-          <div className="px-4 py-2 bg-neutral-900 border border-neutral-800 rounded-2xl text-center">
-            <span className="block text-xs uppercase tracking-wider text-neutral-500 font-bold">
-              Ativos
+          <div
+            onClick={() => setAbaAtiva("restaurantes")}
+            className="px-4 py-2 bg-neutral-900 border border-neutral-800 rounded-2xl text-center cursor-pointer hover:border-neutral-700 transition-colors"
+          >
+            <span className="block text-xs uppercase tracking-wider text-neutral-500 font-bold flex items-center justify-center gap-1">
+              <Store className="w-3 h-3 text-emerald-400" />
+              Operação
             </span>
-            <span className="text-xl font-black text-emerald-400">{totalAtivas}</span>
+            <span className="text-xl font-black text-emerald-400">{totalRestaurantesAtivos}</span>
           </div>
-          <div className="px-4 py-2 bg-neutral-900 border border-neutral-800 rounded-2xl text-center">
-            <span className="block text-xs uppercase tracking-wider text-neutral-500 font-bold">
-              Disponíveis
+          <div
+            onClick={() => setAbaAtiva("ativas")}
+            className="px-4 py-2 bg-neutral-900 border border-neutral-800 rounded-2xl text-center cursor-pointer hover:border-neutral-700 transition-colors"
+          >
+            <span className="block text-xs uppercase tracking-wider text-neutral-500 font-bold flex items-center justify-center gap-1">
+              <KeyRound className="w-3 h-3 text-amber-400" />
+              Tokens Novos
             </span>
-            <span className="text-xl font-black text-amber-400">{totalDisponiveis}</span>
+            <span className="text-xl font-black text-amber-400">{totalTokensDisponiveis}</span>
           </div>
           <div className="px-4 py-2 bg-neutral-900 border border-neutral-800 rounded-2xl text-center">
             <span className="block text-xs uppercase tracking-wider text-neutral-500 font-bold">
               Suspensos
             </span>
-            <span className="text-xl font-black text-rose-500">{totalSuspensas}</span>
+            <span className="text-xl font-black text-rose-500">{totalRestaurantesSuspensos}</span>
           </div>
           <div
             onClick={() => setAbaAtiva("arquivo_morto")}
@@ -224,7 +293,18 @@ export function SuperAdminView() {
       </div>
 
       {/* SELETOR DE ABAS */}
-      <div className="flex items-center gap-2 border-b border-neutral-800 pb-3">
+      <div className="flex flex-wrap items-center gap-2 border-b border-neutral-800 pb-3">
+        <button
+          onClick={() => setAbaAtiva("restaurantes")}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+            abaAtiva === "restaurantes"
+              ? "bg-emerald-600 text-white shadow-lg shadow-emerald-600/30"
+              : "bg-neutral-900 text-neutral-400 hover:text-white border border-neutral-800"
+          }`}
+        >
+          <Store className="w-4 h-4" />
+          Estabelecimentos em Operação ({restaurantesFiltrados.length})
+        </button>
         <button
           onClick={() => setAbaAtiva("ativas")}
           className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
@@ -234,7 +314,7 @@ export function SuperAdminView() {
           }`}
         >
           <KeyRound className="w-4 h-4" />
-          Concessões Ativas ({licencasFiltradas.length})
+          Emissão de Licenças & Convites ({licencasFiltradas.length})
         </button>
         <button
           onClick={() => setAbaAtiva("arquivo_morto")}
@@ -249,7 +329,199 @@ export function SuperAdminView() {
         </button>
       </div>
 
-      {abaAtiva === "ativas" ? (
+      {abaAtiva === "restaurantes" ? (
+        /* ABA ESTABELECIMENTOS EM OPERAÇÃO (MUNDO 2: GESTÃO CONTÍNUA DE PLANOS) */
+        <div className="space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h2 className="text-xl font-black tracking-tight flex items-center gap-2">
+                <Store className="w-5 h-5 text-emerald-400" />
+                Estabelecimentos em Operação ({restaurantesFiltrados.length})
+              </h2>
+              <p className="text-xs text-neutral-400">
+                Gerencie versões de planos (Free, Pro, Enterprise) e status de operação dos restaurantes ativos em tempo real.
+              </p>
+            </div>
+
+            <div className="relative w-full sm:w-72">
+              <Search className="w-4 h-4 text-neutral-500 absolute left-3 top-1/2 -translate-y-1/2" />
+              <Input
+                value={filtro}
+                onChange={(e) => setFiltro(e.target.value)}
+                placeholder="Buscar restaurante, slug ou plano..."
+                className="bg-neutral-900 border-neutral-800 text-white pl-9 rounded-xl h-9 text-xs"
+              />
+            </div>
+          </div>
+
+          {restaurantesFiltrados.length === 0 ? (
+            <div className="p-16 text-center bg-neutral-900/40 border border-neutral-800 rounded-3xl space-y-3">
+              <Store className="w-12 h-12 text-neutral-600 mx-auto" />
+              <h3 className="text-sm font-bold text-neutral-300">Nenhum estabelecimento encontrado</h3>
+              <p className="text-xs text-neutral-500 max-w-sm mx-auto">
+                Assim que um cliente ativar seu link de concessão, o restaurante aparecerá automaticamente aqui.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              {restaurantesFiltrados.map((rest) => {
+                const planoAtual = rest.plano || rest.licenca?.plano || "free";
+                const isSuspenso = !!(rest.suspenso || rest.configuracoes?.suspenso);
+                const limites = rest.licenca?.limites || LIMITES_POR_PLANO[planoAtual as PlanoTipo] || LIMITES_POR_PLANO.free;
+
+                return (
+                  <div
+                    key={rest.id}
+                    className={`p-5 bg-neutral-900/90 border rounded-3xl space-y-4 shadow-lg transition-all ${
+                      isSuspenso
+                        ? "border-rose-900/60 bg-rose-950/10"
+                        : "border-neutral-800 hover:border-neutral-700"
+                    }`}
+                  >
+                    {/* TOPO: NOME E STATUS */}
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <h3 className="text-base font-black text-white flex items-center gap-2">
+                          {rest.nome}
+                        </h3>
+                        {rest.slug && (
+                          <a
+                            href={`/r/${rest.slug}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-xs font-mono text-emerald-400 hover:underline inline-block mt-0.5"
+                          >
+                            /r/{rest.slug}
+                          </a>
+                        )}
+                      </div>
+
+                      <Badge
+                        className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full ${
+                          isSuspenso
+                            ? "bg-rose-500/10 text-rose-400 border border-rose-500/30"
+                            : planoAtual === "enterprise"
+                            ? "bg-amber-500/15 text-amber-400 border border-amber-500/30"
+                            : planoAtual === "pro"
+                            ? "bg-violet-500/15 text-violet-300 border border-violet-500/30"
+                            : "bg-neutral-800 text-neutral-300 border border-neutral-700"
+                        }`}
+                      >
+                        {isSuspenso ? "Suspenso" : planoAtual}
+                      </Badge>
+                    </div>
+
+                    {/* DADOS DE CAPACIDADE / LIMITES */}
+                    <div className="grid grid-cols-2 gap-2 text-xs bg-neutral-950/80 p-3 rounded-2xl border border-neutral-800/80">
+                      <div>
+                        <span className="text-neutral-500 block text-[10px] uppercase font-bold">
+                          Capacidade Mesas
+                        </span>
+                        <span className="text-white font-bold">
+                          {limites.maxMesas >= 999 ? "Ilimitadas" : `${limites.maxMesas} mesas`}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-neutral-500 block text-[10px] uppercase font-bold">
+                          Limite Cardápio
+                        </span>
+                        <span className="text-white font-bold">
+                          {limites.maxPratos >= 999 ? "Ilimitados" : `${limites.maxPratos} itens`}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* RODAPÉ DO CARD: SEGMENTED CONTROL + SUSPENDER */}
+                    <div className="pt-2 border-t border-neutral-800 flex flex-wrap items-center justify-between gap-2">
+                      {/* 1. SEGMENTED CONTROL DE MIGRAÇÃO DE PLANO */}
+                      <div className="flex bg-neutral-950 rounded-lg p-1 border border-neutral-800 shadow-inner">
+                        <button
+                          type="button"
+                          onClick={() => handleAlterarPlano(rest.id, "free", rest.licenca?.id)}
+                          className={`px-2.5 py-1 text-[10px] sm:text-xs font-bold rounded-md transition-all ${
+                            planoAtual === "free"
+                              ? "bg-neutral-800 text-neutral-200 shadow-sm"
+                              : "text-neutral-500 hover:text-neutral-300"
+                          }`}
+                        >
+                          FREE
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleAlterarPlano(rest.id, "pro", rest.licenca?.id)}
+                          className={`px-2.5 py-1 text-[10px] sm:text-xs font-bold rounded-md transition-all ${
+                            planoAtual === "pro"
+                              ? "bg-violet-600 text-white shadow-sm shadow-violet-900/50"
+                              : "text-neutral-500 hover:text-violet-400"
+                          }`}
+                        >
+                          PRO
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleAlterarPlano(rest.id, "enterprise", rest.licenca?.id)}
+                          className={`px-2.5 py-1 text-[10px] sm:text-xs font-bold rounded-md transition-all ${
+                            planoAtual === "enterprise"
+                              ? "bg-amber-500 text-amber-950 shadow-sm shadow-amber-900/50"
+                              : "text-neutral-500 hover:text-amber-500"
+                          }`}
+                        >
+                          ENTERPRISE
+                        </button>
+                      </div>
+
+                      {/* 2. AÇÃO DESTRUTIVA OU REATIVAÇÃO */}
+                      {isSuspenso ? (
+                        <button
+                          type="button"
+                          onClick={() => handleAlterarSuspensaoRestaurante(rest.id, false)}
+                          className="px-3 py-1.5 text-[10px] sm:text-xs font-bold text-emerald-400 hover:bg-emerald-500/15 rounded-lg border border-emerald-500/30 flex items-center gap-1 transition-colors"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                          Reativar
+                        </button>
+                      ) : (
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <button
+                              type="button"
+                              className="px-2.5 py-1 text-[10px] sm:text-xs font-bold text-rose-500 hover:bg-rose-500/15 hover:text-rose-400 rounded-lg transition-colors border border-transparent hover:border-rose-500/30 flex items-center gap-1"
+                            >
+                              <Ban className="w-3.5 h-3.5" />
+                              Suspender
+                            </button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent className="bg-neutral-950 border border-neutral-800 text-white rounded-2xl max-w-sm">
+                            <AlertDialogHeader>
+                              <AlertDialogTitle className="text-rose-500">Suspender Estabelecimento?</AlertDialogTitle>
+                              <AlertDialogDescription className="text-neutral-400">
+                                Esta ação cortará imediatamente o acesso de <strong>{rest.nome}</strong> ao painel administrativo e desativará os QR Codes das mesas em operação.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter className="mt-4">
+                              <AlertDialogCancel className="bg-neutral-900 border-neutral-800 text-white hover:bg-neutral-800 hover:text-white rounded-xl">
+                                Cancelar
+                              </AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => handleAlterarSuspensaoRestaurante(rest.id, true)}
+                                className="bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold"
+                              >
+                                Sim, Suspender
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      ) : abaAtiva === "ativas" ? (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* FORMULÁRIO: GERAR NOVA CONCESSÃO */}
           <div className="lg:col-span-1">
