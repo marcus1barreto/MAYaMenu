@@ -39,14 +39,19 @@ export interface MenuItem {
   grupoModificadores?: GrupoModificador[];
 }
 
+export interface OpcaoModificador {
+  id?: string;
+  nome: string;
+  precoAdicional: number;
+}
+
 export interface GrupoModificador {
   id?: string;
   nome: string; // Ex: "Ponto da Carne", "Tamanho"
   obrigatorio: boolean;
-  minimo?: number;
-  maxEscolhas?: number;
-  maximo?: number; // Compatibilidade com construtor
-  opcoes: { id?: string; nome: string; precoAdicional: number }[];
+  minimo: number; // Mínimo de opções que o cliente precisa marcar
+  maximo: number; // Máximo de opções permitidas (1 = comportamento de "radio")
+  opcoes: OpcaoModificador[];
 }
 
 export interface ItemPedido {
@@ -55,9 +60,11 @@ export interface ItemPedido {
   quantidade: number;
   precoFinal: number; // Preço base + modificadores escolhidos
   tempoPreparoEstimado?: number; // Em minutos
-  modificadores?: { grupo: string; opcao: string }[]; // Ex: { grupo: "Ponto da Carne", opcao: "Bem passado" }
+  modificadores?: { grupo: string; opcao: string; precoAdicional?: number }[]; // Ex: { grupo: "Ponto da Carne", opcao: "Bem passado" }
   observacoes?: string; // Ex: "Sem cebola"
 }
+
+export type StatusPedido = 'a_fazer' | 'pronto' | 'entregue' | 'cancelado' | 'estornado';
 
 // Subcoleção: /restaurantes/{restId}/mesas/{mesaId}/comandas_abertas/{clienteId}/pedidos/{pedidoId}
 // Cada envio do carrinho gera uma rodada individual enviada para a cozinha
@@ -70,9 +77,12 @@ export interface PedidoRodada {
   numeroMesa?: number | string;
   itens: ItemPedido[];
   subtotal: number;
-  status: 'a_fazer' | 'pronto' | 'entregue';
+  status: StatusPedido;
   criadoEm: Timestamp;
 }
+
+// Pedido lido do Firestore: `refPath` é o caminho do documento (derivado de `d.ref.path`, nunca persistido)
+export type PedidoComRef = PedidoRodada & { refPath: string };
 
 // O "Nó Pai" da sessão do cliente na mesa:
 // /restaurantes/{restId}/mesas/{mesaId}/comandas_abertas/{clienteId}

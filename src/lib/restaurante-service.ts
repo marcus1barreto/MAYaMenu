@@ -21,8 +21,10 @@ import {
   increment,
   type Unsubscribe,
 } from "firebase/firestore";
-import type { Restaurante, MenuItem, PedidoRodada, ComandaCliente } from "@/types";
+import type { Restaurante, MenuItem, PedidoRodada, PedidoComRef, StatusPedido, ComandaCliente } from "@/types";
 import { RESTAURANTE_DEMO, CARDAPIO_DEMO } from "@/lib/mock-data";
+import { normalizarItemCardapio } from "@/lib/modificadores";
+import { millisOu } from "@/lib/datas";
 
 /**
  * Verifica se um slug já está em uso por outro restaurante no Firestore
@@ -153,7 +155,7 @@ export async function obterCardapioDoRestaurante(restauranteId: string): Promise
     if (!snap.empty) {
       const itens: MenuItem[] = [];
       snap.forEach((d) => {
-        itens.push({ id: d.id, ...(d.data() as Omit<MenuItem, "id">) });
+        itens.push(normalizarItemCardapio({ id: d.id, ...(d.data() as Omit<MenuItem, "id">) }));
       });
       // Ordenação rigorosa por 'ordem' crescente
       itens.sort((a, b) => (a.ordem ?? 9999) - (b.ordem ?? 9999));
@@ -184,7 +186,7 @@ export function escutarCardapio(
       if (!snapshot.empty) {
         const itens: MenuItem[] = [];
         snapshot.forEach((d) => {
-          itens.push({ id: d.id, ...(d.data() as Omit<MenuItem, "id">) });
+          itens.push(normalizarItemCardapio({ id: d.id, ...(d.data() as Omit<MenuItem, "id">) }));
         });
         itens.sort((a, b) => (a.ordem ?? 9999) - (b.ordem ?? 9999));
         onAtualizacao(itens);
@@ -224,7 +226,7 @@ export async function salvarItemCardapio(
   item: MenuItem
 ): Promise<void> {
   const itemRef = doc(db, "restaurantes", restauranteId, "cardapio", item.id);
-  const { id, ...resto } = item;
+  const { id, ...resto } = normalizarItemCardapio(item);
   await setDoc(itemRef, resto, { merge: true });
 }
 
@@ -338,7 +340,7 @@ export async function popularCardapioInicialSeVazio(restauranteId: string): Prom
  */
 export function escutarPedidosKds(
   restauranteIdOuSlug: string,
-  onAtualizacao: (pedidos: (PedidoRodada & { refPath: string })[]) => void,
+  onAtualizacao: (pedidos: PedidoComRef[]) => void,
   slugAlternativo?: string
 ): Unsubscribe {
   const idsParaBuscar = Array.from(
@@ -352,7 +354,7 @@ export function escutarPedidosKds(
   return onSnapshot(
     q,
     (snapshot) => {
-      const lista: (PedidoRodada & { refPath: string })[] = [];
+      const lista: PedidoComRef[] = [];
       snapshot.forEach((d) => {
         const data = d.data() as PedidoRodada;
         lista.push({
@@ -363,11 +365,7 @@ export function escutarPedidosKds(
       });
 
       // Ordena por data de criação decrescente no cliente
-      lista.sort((a, b) => {
-        const timeA = a.criadoEm?.toMillis ? a.criadoEm.toMillis() : 0;
-        const timeB = b.criadoEm?.toMillis ? b.criadoEm.toMillis() : 0;
-        return timeB - timeA;
-      });
+      lista.sort((a, b) => millisOu(b.criadoEm) - millisOu(a.criadoEm));
 
       onAtualizacao(lista);
     },
@@ -382,7 +380,7 @@ export function escutarPedidosKds(
  */
 export async function atualizarStatusPedido(
   refPath: string,
-  novoStatus: "a_fazer" | "pronto" | "entregue"
+  novoStatus: StatusPedido
 ): Promise<void> {
   const pedidoRef = doc(db, refPath);
   await updateDoc(pedidoRef, { status: novoStatus });
@@ -430,7 +428,7 @@ export function escutarComandasSalão(
 export function escutarPedidosMesa(
   restauranteIdOuSlug: string,
   mesaNumero: number | string,
-  onAtualizacao: (pedidos: PedidoRodada[]) => void,
+  onAtualizacao: (pedidos: PedidoComRef[]) => void,
   slugAlternativo?: string
 ): Unsubscribe {
   const numMesa = Number(mesaNumero) || mesaNumero;
@@ -453,7 +451,7 @@ export function escutarPedidosMesa(
   return onSnapshot(
     q,
     (snapshot) => {
-      const lista: (PedidoRodada & { refPath?: string })[] = [];
+      const lista: PedidoComRef[] = [];
       snapshot.forEach((d) => {
         lista.push({ ...(d.data() as PedidoRodada), id: d.id, refPath: d.ref.path });
       });
@@ -605,7 +603,7 @@ export async function liberarMesaFirestore(
         subtotalTotal += Number(cData.subtotal) || 0;
 
         if (cData.criadoEm) {
-          if (!abertaEmTimestamp || (cData.criadoEm.toMillis && cData.criadoEm.toMillis() < (abertaEmTimestamp.toMillis ? abertaEmTimestamp.toMillis() : Infinity))) {
+          if (!abertaEmTimestamp || millisOu(cData.criadoEm, Infinity) < millisOu(abertaEmTimestamp, Infinity)) {
             abertaEmTimestamp = cData.criadoEm;
           }
         }

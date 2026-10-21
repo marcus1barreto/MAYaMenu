@@ -16,6 +16,7 @@ import {
   type Unsubscribe,
 } from "firebase/firestore";
 import type { Licenca, PlanoTipo, LimitesPlano, Restaurante } from "@/types";
+import { parseDateToMillis, millisOu } from "@/lib/datas";
 
 export const LIMITES_POR_PLANO: Record<PlanoTipo, LimitesPlano> = {
   free: {
@@ -134,11 +135,7 @@ export function escutarLicencas(
         const mesclada = Array.from(mapa.values()).filter(
           (l) => l.status !== "utilizada"
         );
-        mesclada.sort((a, b) => {
-          const tA = a.criadaEm?.toMillis ? a.criadaEm.toMillis() : new Date(a.criadaEm || 0).getTime();
-          const tB = b.criadaEm?.toMillis ? b.criadaEm.toMillis() : new Date(b.criadaEm || 0).getTime();
-          return tB - tA;
-        });
+        mesclada.sort((a, b) => millisOu(b.criadaEm) - millisOu(a.criadaEm));
 
         onAtualizacao(mesclada);
       },
@@ -172,10 +169,8 @@ export async function validarLicencaParaAtivacao(codigo: string): Promise<{
 
     // Validação de expiração se houver
     if (lic.expiracaoEm) {
-      const expMillis = lic.expiracaoEm?.toMillis
-        ? lic.expiracaoEm.toMillis()
-        : new Date(lic.expiracaoEm).getTime();
-      if (Date.now() > expMillis) {
+      const expMillis = parseDateToMillis(lic.expiracaoEm);
+      if (expMillis !== null && Date.now() > expMillis) {
         return { valida: false, motivo: "Este convite de ativação expirou. Solicite um novo link." };
       }
     }
@@ -284,10 +279,8 @@ export async function ativarLicencaEInstanciaAtomica(params: {
         }
 
         if (licData.expiracaoEm) {
-          const expMillis = licData.expiracaoEm?.toMillis
-            ? licData.expiracaoEm.toMillis()
-            : new Date(licData.expiracaoEm).getTime();
-          if (Date.now() > expMillis) {
+          const expMillis = parseDateToMillis(licData.expiracaoEm);
+          if (expMillis !== null && Date.now() > expMillis) {
             throw new Error("Este link de ativação expirou.");
           }
         }
@@ -469,11 +462,7 @@ export function escutarArquivoMorto(
         listaFirestore.forEach((l) => mapa.set(l.id, l));
 
         const mesclada = Array.from(mapa.values());
-        mesclada.sort((a, b) => {
-          const tA = (a.arquivadoEm as any)?.toMillis ? (a.arquivadoEm as any).toMillis() : new Date(a.arquivadoEm || 0).getTime();
-          const tB = (b.arquivadoEm as any)?.toMillis ? (b.arquivadoEm as any).toMillis() : new Date(b.arquivadoEm || 0).getTime();
-          return tB - tA;
-        });
+        mesclada.sort((a, b) => millisOu(b.arquivadoEm) - millisOu(a.arquivadoEm));
 
         onAtualizacao(mesclada);
       },

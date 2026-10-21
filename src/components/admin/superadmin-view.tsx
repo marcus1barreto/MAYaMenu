@@ -9,6 +9,7 @@ import {
   LIMITES_POR_PLANO,
 } from "@/lib/licenca-service";
 import type { Licenca, LicencaArquivada, PlanoTipo } from "@/types";
+import { parseDateToMillis } from "@/lib/datas";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -560,10 +561,9 @@ export function SuperAdminView() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {arquivoMorto.map((item) => {
-                const dataFormatada = item.arquivadoEm?.toMillis
-                  ? new Date(item.arquivadoEm.toMillis()).toLocaleString("pt-BR")
-                  : item.arquivadoEm
-                  ? new Date(item.arquivadoEm).toLocaleString("pt-BR")
+                const arquivadoMillis = parseDateToMillis(item.arquivadoEm);
+                const dataFormatada = arquivadoMillis !== null
+                  ? new Date(arquivadoMillis).toLocaleString("pt-BR")
                   : "Data registrada";
 
                 return (

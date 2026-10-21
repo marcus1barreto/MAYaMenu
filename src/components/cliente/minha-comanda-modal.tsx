@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import type { PedidoRodada } from "@/types";
+import type { PedidoRodada, StatusPedido } from "@/types";
 import { escutarPedidosCliente } from "@/lib/restaurante-service";
 import { ensureClienteAnonimo, db } from "@/lib/firebase";
 import { collection, onSnapshot, doc, updateDoc, serverTimestamp } from "firebase/firestore";
@@ -161,7 +161,7 @@ export function MinhaComandaModal({
     }
   };
 
-  const getStatusBadge = (status: "a_fazer" | "pronto" | "entregue") => {
+  const getStatusBadge = (status: StatusPedido) => {
     switch (status) {
       case "a_fazer":
         return (
@@ -182,6 +182,14 @@ export function MinhaComandaModal({
           <Badge className="bg-neutral-800 text-neutral-400 border border-neutral-700 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
             <CheckCircle2 className="w-3 h-3 text-emerald-400" />
             {ehAutoatendimento ? "Retirado" : "Entregue na Mesa"}
+          </Badge>
+        );
+      case "cancelado":
+      case "estornado":
+        return (
+          <Badge className="bg-red-500/15 text-red-400 border border-red-500/30 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+            <AlertCircle className="w-3 h-3" />
+            {status === "cancelado" ? "Cancelado" : "Estornado"}
           </Badge>
         );
       default:

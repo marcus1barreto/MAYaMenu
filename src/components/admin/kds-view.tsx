@@ -148,8 +148,8 @@ export function KdsView({
             } else if (change.type === "added" || change.type === "modified") {
               const data = change.doc.data() as PedidoRodada;
 
-              // Se marcado como entregue, não polui a esteira do KDS
-              if (data.status === "entregue") {
+              // Somente 'a_fazer' e 'pronto' pertencem à esteira; entregue/cancelado/estornado saem do KDS
+              if (data.status !== "a_fazer" && data.status !== "pronto") {
                 lista = lista.filter((p) => p.id !== docId);
                 return;
               }

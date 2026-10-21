@@ -34,8 +34,7 @@ export function ItemModal({ item, isOpen, onClose, corPrimaria = "#E11D48" }: It
       const selecoesIniciais: Record<string, string[]> = {};
       if (item.grupoModificadores) {
         item.grupoModificadores.forEach((grupo) => {
-          const maxVal = grupo.maximo ?? grupo.maxEscolhas ?? 1;
-          if (grupo.obrigatorio && maxVal === 1 && grupo.opcoes.length === 1) {
+          if (grupo.obrigatorio && grupo.maximo === 1 && grupo.opcoes.length === 1) {
             selecoesIniciais[grupo.nome] = [grupo.opcoes[0].nome];
           } else {
             selecoesIniciais[grupo.nome] = [];
@@ -72,9 +71,8 @@ export function ItemModal({ item, isOpen, onClose, corPrimaria = "#E11D48" }: It
 
     // Verifica se todos os grupos atingiram o "mínimo" exigido
     for (const grupo of item.grupoModificadores) {
-      const minExigido = grupo.minimo ?? (grupo.obrigatorio ? 1 : 0);
       const qtdSelecionada = (selecoes[grupo.nome] || []).length;
-      if (qtdSelecionada < minExigido) {
+      if (qtdSelecionada < grupo.minimo) {
         return false;
       }
     }
@@ -189,8 +187,8 @@ export function ItemModal({ item, isOpen, onClose, corPrimaria = "#E11D48" }: It
           {item.grupoModificadores && item.grupoModificadores.length > 0 && (
             <div className="bg-neutral-50 pb-6">
               {item.grupoModificadores.map((grupo, gIdx) => {
-                const minVal = grupo.minimo ?? (grupo.obrigatorio ? 1 : 0);
-                const maxVal = grupo.maximo ?? grupo.maxEscolhas ?? 1;
+                const minVal = grupo.minimo;
+                const maxVal = grupo.maximo;
                 const qtdSelecionada = (selecoes[grupo.nome] || []).length;
                 const faltaMinimo = qtdSelecionada < minVal;
                 const atingiuMaximo = qtdSelecionada >= maxVal;

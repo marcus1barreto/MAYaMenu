@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import type { MesaOperacional, ComandaGarcom } from "@/components/garcom/garcom-view";
-import type { MenuItem } from "@/types";
+import type { MesaOperacional, ComandaGarcom, ItemComandaGarcom } from "@/components/garcom/garcom-view";
+import type { MenuItem, PedidoComRef } from "@/types";
 import { CARDAPIO_DEMO } from "@/lib/mock-data";
 import { escutarPedidosMesa, fecharContaMesa, atualizarStatusPedido } from "@/lib/restaurante-service";
 import { useTotalComanda } from "@/hooks/useTotalComanda";
@@ -104,7 +104,7 @@ export function MesaDetalheModal({
   const [obsItem, setObsItem] = useState("");
 
   // Escuta os pedidos/pratos reais da mesa no Firestore quando o modal está aberto
-  const [pedidosMesa, setPedidosMesa] = useState<any[]>([]);
+  const [pedidosMesa, setPedidosMesa] = useState<PedidoComRef[]>([]);
 
   useEffect(() => {
     if (!isOpen || !mesa || (!restauranteId && !slug)) return;
@@ -133,7 +133,7 @@ export function MesaDetalheModal({
       (p) => p.clienteId === c.id || p.nomeCliente?.toLowerCase() === c.nomeCliente?.toLowerCase()
     );
 
-    const todosItens: (typeof c.itens[number] & { refPath?: string; statusPedido?: string })[] = [];
+    const todosItens: ItemComandaGarcom[] = [];
     let subtotalCalculado = 0;
 
     pedidosDesteCliente.forEach((p) => {
@@ -141,7 +141,7 @@ export function MesaDetalheModal({
       if (p.status === "cancelado" || p.status === "estornado") return;
 
       if (Array.isArray(p.itens)) {
-        p.itens.forEach((it: any) => {
+        p.itens.forEach((it) => {
           const valorLinha = (it.precoFinal || 0) * (it.quantidade || 1);
           subtotalCalculado += valorLinha;
           todosItens.push({
@@ -475,7 +475,7 @@ export function MesaDetalheModal({
 
                                 {/* BOTÃO DE MARCAR COMO SERVIDO / ENTREGUE */}
                                 {!modoSomenteLeitura && (
-                                  (it as any).statusPedido === "entregue" ? (
+                                  it.statusPedido === "entregue" ? (
                                     <span className="text-[10px] text-emerald-400 font-bold flex items-center gap-1">
                                       <Check className="w-3 h-3" />
                                       Entregue
@@ -484,11 +484,11 @@ export function MesaDetalheModal({
                                     <Button
                                       type="button"
                                       size="sm"
-                                      disabled={atualizandoEntregaId === (it as any).refPath}
+                                      disabled={atualizandoEntregaId === it.refPath}
                                       className="h-6 px-2 text-[9px] bg-emerald-600 hover:bg-emerald-500 text-white rounded-md uppercase font-black tracking-widest disabled:opacity-50"
-                                      onClick={() => handleMarcarEntregue((it as any).refPath)}
+                                      onClick={() => handleMarcarEntregue(it.refPath)}
                                     >
-                                      {atualizandoEntregaId === (it as any).refPath ? (
+                                      {atualizandoEntregaId === it.refPath ? (
                                         <Loader2 className="w-3 h-3 animate-spin" />
                                       ) : (
                                         "Entregue"

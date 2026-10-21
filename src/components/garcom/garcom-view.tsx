@@ -31,7 +31,9 @@ import { MesaDetalheModal } from "@/components/salao/mesa-detalhe-modal";
 import { useSafeAuth } from "@/context/auth-context";
 import { db } from "@/lib/firebase";
 import { collectionGroup, query, where, onSnapshot } from "firebase/firestore";
-import type { ComandaCliente, PedidoRodada } from "@/types";
+import type { ComandaCliente, PedidoRodada, PedidoComRef, StatusPedido } from "@/types";
+import { getLimitesLicenca } from "@/lib/licenca-limites";
+import { parseDateToMillis, millisOu } from "@/lib/datas";
 import {
   escutarComandasSalão,
   marcarComandaPagaFirestore,
@@ -42,17 +44,23 @@ import {
   atualizarStatusPedido,
 } from "@/lib/restaurante-service";
 
+// Item de comanda exibido no salão. `refPath` e `statusPedido` vêm do pedido (rodada) de origem
+// e permitem marcar o item como entregue diretamente no Firestore.
+export interface ItemComandaGarcom {
+  nome: string;
+  quantidade: number;
+  precoFinal: number;
+  modificadores?: { grupo: string; opcao: string; precoAdicional?: number }[];
+  refPath?: string;
+  statusPedido?: StatusPedido;
+}
+
 export interface ComandaGarcom {
   id: string; // clienteId
   nomeCliente: string;
   subtotal: number;
   status: "pedindo" | "aguardando_pratos" | "conta_pedida" | "pago";
-  itens: {
-    nome: string;
-    quantidade: number;
-    precoFinal: number;
-    modificadores?: { grupo: string; opcao: string }[];
-  }[];
+  itens: ItemComandaGarcom[];
   chamadoGarcom?: {
     ativo: boolean;
     solicitadoEm?: any;
@@ -172,32 +180,12 @@ export function GarcomView({
 }) {
   const auth = useSafeAuth();
   const restaurante = auth?.restaurante;
-  const maxMesas = (restaurante as any)?.licenca?.maxMesas || (restaurante as any)?.licenca?.limites?.maxMesas || restaurante?.maxMesas || 5;
+  const { maxMesas } = getLimitesLicenca(restaurante);
 
-  // Trava de Autoatendimento (Modo Balcão)
+  // Trava de Autoatendimento (Modo Balcão): apenas sinaliza; o retorno visual ocorre após todos os hooks
   const modoOperacao = restaurante?.configuracoes?.modoOperacao || "hibrido";
   const ehModoAutoatendimento = modoOperacao === "balcao";
-
-  if (ehModoAutoatendimento && !isSandbox) {
-    return (
-      <div className="min-h-screen bg-neutral-950 flex flex-col items-center justify-center p-6 text-center">
-        <div className="p-4 bg-rose-600/20 rounded-full mb-4">
-          <Utensils className="w-10 h-10 text-rose-500" />
-        </div>
-        <h1 className="text-2xl font-black text-white tracking-tight mb-2">
-          Restaurante em Modo Autoatendimento
-        </h1>
-        <p className="text-sm text-neutral-400 max-w-md mb-8 leading-relaxed">
-          O atendimento por garçons está desativado para este estabelecimento. Os pedidos são gerenciados diretamente pelo KDS da Cozinha e retirados no balcão.
-        </p>
-        <Link href="/admin">
-          <Button className="h-12 px-6 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl shadow-lg shadow-rose-950/40">
-            Voltar ao Painel Admin
-          </Button>
-        </Link>
-      </div>
-    );
-  }
+  const bloqueadoPorAutoatendimento = ehModoAutoatendimento && !isSandbox;
 
   const [mesas, setMesas] = useState<MesaOperacional[]>(() => {
     if (dadosIniciais !== undefined) return dadosIniciais;
@@ -213,11 +201,12 @@ export function GarcomView({
   const [scannerAberto, setScannerAberto] = useState(false);
   const [feedbackInjecao, setFeedbackInjecao] = useState<string | null>(null);
 
-  const [pedidosProntos, setPedidosProntos] = useState<(PedidoRodada & { refPath: string })[]>([]);
+  const [pedidosProntos, setPedidosProntos] = useState<PedidoComRef[]>([]);
   const [atualizandoPedidoId, setAtualizandoPedidoId] = useState<string | null>(null);
 
   // 1. Escuta todas as comandas abertas do salão em tempo real com expurgo explícito de 'removed'
   useEffect(() => {
+    if (bloqueadoPorAutoatendimento) return;
     const idBusca = restauranteId || restaurante?.id || slug || restaurante?.slug;
     if (!idBusca) return;
 
@@ -292,13 +281,7 @@ export function GarcomView({
                 mesaAtual.status = "paga_ocupada";
 
                 // Registra o momento em que a conta foi paga a partir de atualizadoEm
-                const millisPago = (c.atualizadoEm as any)?.toMillis
-                  ? (c.atualizadoEm as any).toMillis()
-                  : (c.atualizadoEm as any)?.toDate
-                  ? (c.atualizadoEm as any).toDate().getTime()
-                  : c.atualizadoEm
-                  ? new Date(c.atualizadoEm as any).getTime()
-                  : null;
+                const millisPago = parseDateToMillis(c.atualizadoEm);
 
                 if (millisPago) {
                   if (!mesaAtual.pagoEm || millisPago > mesaAtual.pagoEm) {
@@ -340,10 +323,11 @@ export function GarcomView({
     );
 
     return () => unsub();
-  }, [restauranteId, restaurante?.id, slug, restaurante?.slug, maxMesas]);
+  }, [restauranteId, restaurante?.id, slug, restaurante?.slug, maxMesas, bloqueadoPorAutoatendimento]);
 
   // 2. Escuta pedidos prontos na cozinha (Bandeja / Avisos de Entrega) em tempo real
   useEffect(() => {
+    if (bloqueadoPorAutoatendimento) return;
     const idBusca = restauranteId || restaurante?.id || slug || restaurante?.slug;
     if (!idBusca) return;
 
@@ -358,7 +342,7 @@ export function GarcomView({
     const unsub = onSnapshot(
       q,
       (snapshot) => {
-        const prontos: (PedidoRodada & { refPath: string })[] = [];
+        const prontos: PedidoComRef[] = [];
         snapshot.forEach((docSnap) => {
           const data = docSnap.data() as PedidoRodada;
           if (data.status === "pronto") {
@@ -371,11 +355,7 @@ export function GarcomView({
         });
 
         // Ordena por data de criação (mais antigos primeiro para agilizar a entrega)
-        prontos.sort((a, b) => {
-          const timeA = a.criadoEm?.toMillis ? a.criadoEm.toMillis() : 0;
-          const timeB = b.criadoEm?.toMillis ? b.criadoEm.toMillis() : 0;
-          return timeA - timeB;
-        });
+        prontos.sort((a, b) => millisOu(a.criadoEm) - millisOu(b.criadoEm));
 
         setPedidosProntos(prontos);
       },
@@ -385,7 +365,7 @@ export function GarcomView({
     );
 
     return () => unsub();
-  }, [restauranteId, restaurante?.id, slug, restaurante?.slug]);
+  }, [restauranteId, restaurante?.id, slug, restaurante?.slug, bloqueadoPorAutoatendimento]);
 
   // Carimbar pedido como entregue
   const handleMarcarEntregue = async (refPath: string, pedidoId: string) => {
@@ -570,6 +550,27 @@ export function GarcomView({
   };
 
   const mesasComContaPedida = mesas.filter((m) => m.status === "conta_pedida").length;
+
+  if (bloqueadoPorAutoatendimento) {
+    return (
+      <div className="min-h-screen bg-neutral-950 flex flex-col items-center justify-center p-6 text-center">
+        <div className="p-4 bg-rose-600/20 rounded-full mb-4">
+          <Utensils className="w-10 h-10 text-rose-500" />
+        </div>
+        <h1 className="text-2xl font-black text-white tracking-tight mb-2">
+          Restaurante em Modo Autoatendimento
+        </h1>
+        <p className="text-sm text-neutral-400 max-w-md mb-8 leading-relaxed">
+          O atendimento por garçons está desativado para este estabelecimento. Os pedidos são gerenciados diretamente pelo KDS da Cozinha e retirados no balcão.
+        </p>
+        <Link href="/admin">
+          <Button className="h-12 px-6 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl shadow-lg shadow-rose-950/40">
+            Voltar ao Painel Admin
+          </Button>
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-neutral-950 text-white p-4 sm:p-6 flex flex-col">

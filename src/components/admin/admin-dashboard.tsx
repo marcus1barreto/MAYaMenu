@@ -4,6 +4,8 @@ import React, { useState, useEffect } from "react";
 import { useAuth } from "@/context/auth-context";
 import { CARDAPIO_DEMO } from "@/lib/mock-data";
 import type { MenuItem, ComandaCliente } from "@/types";
+import { getLimitesLicenca, getPlanoRestaurante } from "@/lib/licenca-limites";
+import { parseDateToMillis } from "@/lib/datas";
 import { db } from "@/lib/firebase";
 import { collectionGroup, query, where, onSnapshot } from "firebase/firestore";
 import {
@@ -148,7 +150,7 @@ export function AdminDashboard() {
   }, [restaurante?.id]);
 
   // Controle de Mesas do Salão (sincronizadas com Firestore conforme o limite do plano)
-  const maxMesas = (restaurante as any)?.licenca?.maxMesas || (restaurante as any)?.licenca?.limites?.maxMesas || restaurante?.maxMesas || 5;
+  const { maxMesas } = getLimitesLicenca(restaurante);
   const [mesas, setMesas] = useState<MesaOperacional[]>(() => {
     const mapaLimpo: MesaOperacional[] = [];
     for (let i = 1; i <= maxMesas; i++) {
@@ -233,13 +235,7 @@ export function AdminDashboard() {
                 mesaAtual.status = "paga_ocupada";
 
                 // Registra o momento em que a conta foi paga a partir de atualizadoEm
-                const millisPago = (c as any).atualizadoEm?.toMillis
-                  ? (c as any).atualizadoEm.toMillis()
-                  : (c as any).atualizadoEm?.toDate
-                  ? (c as any).atualizadoEm.toDate().getTime()
-                  : (c as any).atualizadoEm
-                  ? new Date((c as any).atualizadoEm).getTime()
-                  : null;
+                const millisPago = parseDateToMillis(c.atualizadoEm);
 
                 if (millisPago) {
                   if (!mesaAtual.pagoEm || millisPago > mesaAtual.pagoEm) {
@@ -636,7 +632,7 @@ export function AdminDashboard() {
     if (!itemEmEdicao || !itemEmEdicao.nome?.trim() || !restaurante?.id) return;
 
     // Bloqueio de limite de pratos conforme o plano
-    const maxPratos = (restaurante as any)?.licenca?.maxPratos || (restaurante as any)?.licenca?.limites?.maxPratos || restaurante?.maxPratos || 15;
+    const { maxPratos } = getLimitesLicenca(restaurante);
     if (!itemEmEdicao.id && itensCardapio.length >= maxPratos) {
       alert(`O seu plano permite no máximo ${maxPratos} pratos. Faça upgrade!`);
       return;
@@ -1222,8 +1218,8 @@ export function AdminDashboard() {
           <div className="relative min-h-[640px] rounded-3xl overflow-hidden border border-neutral-800 bg-neutral-950/60 p-4 sm:p-8">
             {/* CONTEÚDO DOS RELATÓRIOS (Desfocado apenas se for plano Free) */}
             {(() => {
-              const planoAtual = (restaurante as any)?.licenca?.plano || restaurante?.plano;
-              const isFree = !planoAtual || planoAtual === "free";
+              const planoAtual = getPlanoRestaurante(restaurante);
+              const isFree = planoAtual === "free";
 
               return (
                 <>

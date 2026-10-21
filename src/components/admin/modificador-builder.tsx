@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import type { GrupoModificador } from "@/types";
+import { normalizarGrupoModificador } from "@/lib/modificadores";
 
 type OpcaoModificador = GrupoModificador["opcoes"][number];
 
@@ -24,7 +25,6 @@ export function ModificadorBuilder({ grupos, onChange }: ModificadorBuilderProps
     obrigatorio: false,
     minimo: 0,
     maximo: 1,
-    maxEscolhas: 1,
     opcoes: [],
   });
 
@@ -36,7 +36,6 @@ export function ModificadorBuilder({ grupos, onChange }: ModificadorBuilderProps
       obrigatorio: false,
       minimo: 0,
       maximo: 1,
-      maxEscolhas: 1,
       opcoes: [{ id: `opt-${Date.now()}`, nome: "", precoAdicional: 0 }],
     });
   };
@@ -47,18 +46,13 @@ export function ModificadorBuilder({ grupos, onChange }: ModificadorBuilderProps
       return;
     }
 
-    const maxVal = grupoAtual.maximo ?? grupoAtual.maxEscolhas ?? 1;
-    const grupoSincronizado: GrupoModificador = {
-      ...grupoAtual,
-      maximo: maxVal,
-      maxEscolhas: maxVal,
-    };
+    const grupoValidado: GrupoModificador = normalizarGrupoModificador(grupoAtual);
 
     const novaLista = [...grupos];
     if (editandoIndex !== null && editandoIndex < novaLista.length) {
-      novaLista[editandoIndex] = grupoSincronizado;
+      novaLista[editandoIndex] = grupoValidado;
     } else {
-      novaLista.push(grupoSincronizado);
+      novaLista.push(grupoValidado);
     }
 
     onChange(novaLista);
@@ -125,7 +119,7 @@ export function ModificadorBuilder({ grupos, onChange }: ModificadorBuilderProps
                     )}
                   </div>
                   <p className="text-[10px] text-neutral-400 mt-1">
-                    {grp.opcoes.length} opções • Mín: {grp.minimo ?? 0} / Máx: {grp.maximo ?? grp.maxEscolhas ?? 1}
+                    {grp.opcoes.length} opções • Mín: {grp.minimo} / Máx: {grp.maximo}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -199,7 +193,7 @@ export function ModificadorBuilder({ grupos, onChange }: ModificadorBuilderProps
             <Input
               type="number"
               min="0"
-              value={grupoAtual.minimo ?? 0}
+              value={grupoAtual.minimo}
               onChange={(e) =>
                 setGrupoAtual({ ...grupoAtual, minimo: Math.max(0, parseInt(e.target.value) || 0) })
               }
@@ -211,10 +205,10 @@ export function ModificadorBuilder({ grupos, onChange }: ModificadorBuilderProps
             <Input
               type="number"
               min="1"
-              value={grupoAtual.maximo ?? grupoAtual.maxEscolhas ?? 1}
+              value={grupoAtual.maximo}
               onChange={(e) => {
                 const val = Math.max(1, parseInt(e.target.value) || 1);
-                setGrupoAtual({ ...grupoAtual, maximo: val, maxEscolhas: val });
+                setGrupoAtual({ ...grupoAtual, maximo: val });
               }}
               className="h-9 bg-neutral-950 border-neutral-800 text-xs"
             />
@@ -232,7 +226,7 @@ export function ModificadorBuilder({ grupos, onChange }: ModificadorBuilderProps
               setGrupoAtual((prev) => ({
                 ...prev,
                 obrigatorio: val,
-                minimo: val && (prev.minimo === 0 || prev.minimo === undefined) ? 1 : prev.minimo,
+                minimo: val && prev.minimo === 0 ? 1 : prev.minimo,
               }));
             }}
           />

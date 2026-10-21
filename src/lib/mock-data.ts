@@ -29,7 +29,8 @@ export const CARDAPIO_DEMO: MenuItem[] = [
       {
         nome: "Ponto da Carne",
         obrigatorio: true,
-        maxEscolhas: 1,
+        minimo: 1,
+        maximo: 1,
         opcoes: [
           { nome: "Ao Ponto", precoAdicional: 0 },
           { nome: "Bem Passado", precoAdicional: 0 },
@@ -39,7 +40,8 @@ export const CARDAPIO_DEMO: MenuItem[] = [
       {
         nome: "Adicionais do Chef",
         obrigatorio: false,
-        maxEscolhas: 3,
+        minimo: 0,
+        maximo: 3,
         opcoes: [
           { nome: "Bacon Crocante Duplo", precoAdicional: 6.0 },
           { nome: "Queijo Extra", precoAdicional: 4.5 },
@@ -60,7 +62,8 @@ export const CARDAPIO_DEMO: MenuItem[] = [
       {
         nome: "Borda Recheada",
         obrigatorio: false,
-        maxEscolhas: 1,
+        minimo: 0,
+        maximo: 1,
         opcoes: [
           { nome: "Catupiry Original", precoAdicional: 8.0 },
           { nome: "Cheddar Cremoso", precoAdicional: 7.0 },
@@ -80,7 +83,8 @@ export const CARDAPIO_DEMO: MenuItem[] = [
       {
         nome: "Versão",
         obrigatorio: true,
-        maxEscolhas: 1,
+        minimo: 1,
+        maximo: 1,
         opcoes: [
           { nome: "Com Álcool (Gin Artesanal)", precoAdicional: 0 },
           { nome: "Sem Álcool (Mocktail)", precoAdicional: -4.0 },
@@ -100,7 +104,8 @@ export const CARDAPIO_DEMO: MenuItem[] = [
       {
         nome: "Cobertura Adicional",
         obrigatorio: false,
-        maxEscolhas: 2,
+        minimo: 0,
+        maximo: 2,
         opcoes: [
           { nome: "Farofa Crocante de Castanhas", precoAdicional: 3.5 },
           { nome: "Chantilly Fresco", precoAdicional: 2.5 },
