@@ -6,6 +6,7 @@ import {
   escutarLicencas,
   escutarArquivoMorto,
   alterarStatusLicenca,
+  alterarPlanoRestaurante,
   LIMITES_POR_PLANO,
 } from "@/lib/licenca-service";
 import type { Licenca, LicencaArquivada, PlanoTipo } from "@/types";
@@ -14,6 +15,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import {
   ShieldCheck,
   KeyRound,
@@ -106,6 +118,27 @@ export function SuperAdminView() {
       await alterarStatusLicenca(codigo, novoStatus);
     } catch (err) {
       console.warn("Falha ao alterar status remoto da licença:", err);
+    }
+  };
+
+  const handleAlterarPlano = async (
+    restauranteId: string,
+    novoPlano: PlanoTipo,
+    licencaCodigo?: string
+  ) => {
+    const novosLimites = LIMITES_POR_PLANO[novoPlano];
+    // Atualização otimista na lista de concessões
+    setLicencas((prev) =>
+      prev.map((lic) =>
+        lic.restauranteId === restauranteId || (licencaCodigo && lic.id === licencaCodigo)
+          ? { ...lic, plano: novoPlano, limites: novosLimites }
+          : lic
+      )
+    );
+    try {
+      await alterarPlanoRestaurante(restauranteId, novoPlano, licencaCodigo);
+    } catch (err) {
+      console.error("Erro ao alterar plano do restaurante:", err);
     }
   };
 
@@ -493,16 +526,80 @@ export function SuperAdminView() {
                       )}
 
                       {ativa && (
-                        <div className="pt-2 flex gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleAlterarStatus(lic.id, "suspensa")}
-                            className="w-full bg-neutral-800 hover:bg-rose-950/40 text-rose-400 border-neutral-700 hover:border-rose-500/50 rounded-xl text-[10px] font-bold uppercase tracking-wider h-8"
-                          >
-                            <Ban className="w-3.5 h-3.5 mr-1" />
-                            Suspender Concessão
-                          </Button>
+                        <div className="mt-4 pt-4 border-t border-neutral-800 flex flex-wrap items-center justify-between gap-3">
+                          {/* 1. SEGMENTED CONTROL (Mudança Silenciosa e Rápida) */}
+                          <div className="flex bg-neutral-950 rounded-lg p-1 border border-neutral-800 shadow-inner">
+                            {/* Botão FREE */}
+                            <button
+                              type="button"
+                              onClick={() => handleAlterarPlano(lic.restauranteId || lic.id, "free", lic.id)}
+                              className={`px-3 py-1.5 text-[10px] sm:text-xs font-bold rounded-md transition-all ${
+                                lic.plano === "free"
+                                  ? "bg-neutral-800 text-neutral-200 shadow-sm"
+                                  : "text-neutral-500 hover:text-neutral-300"
+                              }`}
+                            >
+                              FREE
+                            </button>
+
+                            {/* Botão PRO */}
+                            <button
+                              type="button"
+                              onClick={() => handleAlterarPlano(lic.restauranteId || lic.id, "pro", lic.id)}
+                              className={`px-3 py-1.5 text-[10px] sm:text-xs font-bold rounded-md transition-all ${
+                                lic.plano === "pro"
+                                  ? "bg-violet-600 text-white shadow-sm shadow-violet-900/50"
+                                  : "text-neutral-500 hover:text-violet-400"
+                              }`}
+                            >
+                              PRO
+                            </button>
+
+                            {/* Botão ENTERPRISE */}
+                            <button
+                              type="button"
+                              onClick={() => handleAlterarPlano(lic.restauranteId || lic.id, "enterprise", lic.id)}
+                              className={`px-3 py-1.5 text-[10px] sm:text-xs font-bold rounded-md transition-all ${
+                                lic.plano === "enterprise"
+                                  ? "bg-amber-500 text-amber-950 shadow-sm shadow-amber-900/50"
+                                  : "text-neutral-500 hover:text-amber-500"
+                              }`}
+                            >
+                              ENTERPRISE
+                            </button>
+                          </div>
+
+                          {/* 2. BOTÃO DESTRUTIVO COM FRICÇÃO (Shadcn Alert Dialog) */}
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <button
+                                type="button"
+                                className="px-3 py-1.5 text-[10px] sm:text-xs font-bold text-rose-500 hover:bg-rose-500/15 hover:text-rose-400 rounded-lg transition-colors border border-transparent hover:border-rose-500/30 flex items-center gap-1.5"
+                              >
+                                <Ban className="w-3.5 h-3.5" />
+                                Suspender
+                              </button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent className="bg-neutral-950 border border-neutral-800 text-white rounded-2xl max-w-sm">
+                              <AlertDialogHeader>
+                                <AlertDialogTitle className="text-rose-500">Suspender Estabelecimento?</AlertDialogTitle>
+                                <AlertDialogDescription className="text-neutral-400">
+                                  Esta ação cortará imediatamente o acesso do restaurante <strong>{lic.restauranteNome || lic.id}</strong> ao painel administrativo e desativará todos os QR Codes das mesas em operação.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter className="mt-4">
+                                <AlertDialogCancel className="bg-neutral-900 border-neutral-800 text-white hover:bg-neutral-800 hover:text-white rounded-xl">
+                                  Cancelar
+                                </AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => handleAlterarStatus(lic.id, "suspensa")}
+                                  className="bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold"
+                                >
+                                  Sim, Suspender
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
                         </div>
                       )}
 

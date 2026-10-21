@@ -518,6 +518,53 @@ export async function alterarStatusLicenca(
   }
 }
 
+/**
+ * Atualiza o plano de um restaurante diretamente (SuperAdmin) sincronizando plano e limites
+ */
+export async function alterarPlanoRestaurante(
+  restauranteId: string,
+  novoPlano: PlanoTipo,
+  licencaCodigo?: string
+): Promise<void> {
+  const novosLimites = LIMITES_POR_PLANO[novoPlano];
+
+  // 1. Atualiza no documento do restaurante
+  try {
+    const restRef = doc(db, "restaurantes", restauranteId);
+    await updateDoc(restRef, {
+      plano: novoPlano,
+      maxMesas: novosLimites.maxMesas,
+      maxPratos: novosLimites.maxPratos,
+      "licenca.plano": novoPlano,
+      "licenca.limites": novosLimites,
+    });
+  } catch (err) {
+    console.warn("Falha ao atualizar plano no restaurante:", err);
+  }
+
+  // 2. Se houver licença vinculada, atualiza também a concessão
+  if (licencaCodigo) {
+    const codigoFormatado = licencaCodigo.trim().toUpperCase();
+    try {
+      const licRef = doc(db, "concessoes", codigoFormatado);
+      await updateDoc(licRef, {
+        plano: novoPlano,
+        limites: novosLimites,
+      });
+    } catch {
+      // Ignora se for licença já utilizada / arquivada
+    }
+
+    const locais = obterLicencasLocais();
+    const atualizadas = locais.map((l) =>
+      l.id === codigoFormatado ? { ...l, plano: novoPlano, limites: novosLimites } : l
+    );
+    if (typeof window !== "undefined") {
+      localStorage.setItem("mayamenu_concessoes_locais", JSON.stringify(atualizadas));
+    }
+  }
+}
+
 // Persistência local resiliente
 function salvarLicencaLocal(licenca: Licenca): void {
   if (typeof window === "undefined") return;
