@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import type { Metadata } from "next";
 import { SuperAdminView } from "@/components/admin/superadmin-view";
 
@@ -7,5 +8,17 @@ export const metadata: Metadata = {
 };
 
 export default function SuperAdminPage() {
-  return <SuperAdminView />;
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-neutral-950 flex items-center justify-center text-white">
+          <div className="text-sm font-semibold tracking-wider uppercase animate-pulse">
+            Carregando Painel SuperAdmin...
+          </div>
+        </div>
+      }
+    >
+      <SuperAdminView />
+    </Suspense>
+  );
 }

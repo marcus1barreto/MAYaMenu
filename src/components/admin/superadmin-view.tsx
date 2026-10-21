@@ -247,13 +247,17 @@ export function SuperAdminView() {
     }
   };
 
-  const agoraMillis = Date.now();
+  const [agoraMillis, setAgoraMillis] = useState<number | null>(null);
+
+  useEffect(() => {
+    setAgoraMillis(Date.now());
+  }, []);
 
   const isLicencaVencida = (lic: Licenca) => {
     if (lic.status === "utilizada" || lic.status === "ativa") return false;
     if (!lic.expiracaoEm) return false;
     const expMillis = parseDateToMillis(lic.expiracaoEm);
-    return expMillis !== null && expMillis < agoraMillis;
+    return expMillis !== null && agoraMillis !== null && expMillis < agoraMillis;
   };
 
   const licencasFiltradas = licencas.filter((lic) => {
