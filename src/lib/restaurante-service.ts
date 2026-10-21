@@ -600,7 +600,6 @@ export async function liberarMesaFirestore(
       if (snapComanda.exists()) {
         const cData = snapComanda.data();
         quantidadePagantes++;
-        subtotalTotal += Number(cData.subtotal) || 0;
 
         if (cData.criadoEm) {
           if (!abertaEmTimestamp || millisOu(cData.criadoEm, Infinity) < millisOu(abertaEmTimestamp, Infinity)) {
@@ -610,6 +609,35 @@ export async function liberarMesaFirestore(
         if (cData.atualizadoEm) {
           pagaEmTimestamp = cData.atualizadoEm;
         }
+
+        // Busca pedidos filhos para somar ao histórico e apagá-los evitando órfãos no KDS
+        let subtotalComandaCalculado = 0;
+        try {
+          const pedidosCol = collection(
+            db,
+            "restaurantes",
+            restauranteId,
+            "mesas",
+            String(mesaNumero),
+            "comandas_abertas",
+            cId,
+            "pedidos"
+          );
+          const snapPedidos = await getDocs(pedidosCol);
+          snapPedidos.forEach((pDoc) => {
+            const pData = pDoc.data();
+            if (pData.status !== "cancelado" && pData.status !== "estornado") {
+              subtotalComandaCalculado += Number(pData.subtotal) || 0;
+            }
+            // Apaga os pedidos ativos para limpar o KDS
+            batch.delete(pDoc.ref);
+          });
+        } catch (e) {
+          console.warn("Falha ao buscar pedidos da comanda para baixa em lote:", e);
+        }
+
+        // Se houver pedidos filhos reais, usa a soma dos pedidos; caso contrário, usa o subtotal da comanda pai
+        subtotalTotal += subtotalComandaCalculado > 0 ? subtotalComandaCalculado : (Number(cData.subtotal) || 0);
       }
     } catch (e) {
       console.warn(`Aviso ao ler comanda ${cId} para consolidar histórico da mesa:`, e);
@@ -617,27 +645,6 @@ export async function liberarMesaFirestore(
 
     // Apaga a comanda ativa após copiar para o histórico
     batch.delete(comandaRef);
-
-    // Busca pedidos filhos para exclusão evitando órfãos no KDS
-    try {
-      const pedidosCol = collection(
-        db,
-        "restaurantes",
-        restauranteId,
-        "mesas",
-        String(mesaNumero),
-        "comandas_abertas",
-        cId,
-        "pedidos"
-      );
-      const snapPedidos = await getDocs(pedidosCol);
-      snapPedidos.forEach((pDoc) => {
-        // Apaga os pedidos ativos para limpar o KDS
-        batch.delete(pDoc.ref);
-      });
-    } catch (e) {
-      console.warn("Falha ao buscar pedidos da comanda para baixa em lote:", e);
-    }
   }
 
   // 2. Gravação atômica do documento histórico de sessão

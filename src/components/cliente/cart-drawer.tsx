@@ -169,7 +169,7 @@ export function CartDrawer({
         numeroMesa: Number(mesa) || mesa,
         criadoEm: serverTimestamp(),
         atualizadoEm: serverTimestamp(),
-        status: "pedindo_ativo" as const,
+        status: "aguardando_pratos" as const,
       };
 
       // 4. Executa as Gravações no IndexedDB / Firestore

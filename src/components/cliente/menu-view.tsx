@@ -30,7 +30,7 @@ import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { ensureClienteAnonimo, db } from "@/lib/firebase";
 import { doc, updateDoc, serverTimestamp, onSnapshot } from "firebase/firestore";
-import { escutarCardapio, chamarGarcomFirestore } from "@/lib/restaurante-service";
+import { escutarCardapio, chamarGarcomFirestore, escutarPedidosCliente } from "@/lib/restaurante-service";
 import { marcarVisitaAtualComoPaga, limparSessaoClienteLocal } from "@/lib/historico-cliente";
 import { MesaScannerModal } from "./mesa-scanner-modal";
 
@@ -77,7 +77,8 @@ export function MenuView({ restaurante, cardapio: cardapioInicial, numeroMesa: n
 
   // Escuta o status da comanda do cliente nesta mesa em tempo real
   useEffect(() => {
-    let unsubSnapshot: (() => void) | null = null;
+    let unsubComanda: (() => void) | null = null;
+    let unsubPedidos: (() => void) | null = null;
 
     ensureClienteAnonimo().then((user) => {
       const comandaRef = doc(
@@ -90,33 +91,36 @@ export function MenuView({ restaurante, cardapio: cardapioInicial, numeroMesa: n
         user.uid
       );
 
-      unsubSnapshot = onSnapshot(
+      // 1. Escuta status da comanda pai
+      unsubComanda = onSnapshot(
         comandaRef,
         (snap) => {
           if (snap.exists()) {
             const data = snap.data() as ComandaCliente;
             setComandaStatus(data.status);
-            setSubtotalComandaBanco(data.subtotal || 0);
 
             if (data.status === "conta_pedida") {
               setContaPedidaSucesso(true);
             } else if (data.status === "pago") {
-              // 1. Mata o listener imediatamente para evitar o loop infinito!
-              if (unsubSnapshot) {
-                unsubSnapshot();
-                unsubSnapshot = null;
+              // Mata os listeners imediatamente para evitar loop
+              if (unsubComanda) {
+                unsubComanda();
+                unsubComanda = null;
+              }
+              if (unsubPedidos) {
+                unsubPedidos();
+                unsubPedidos = null;
               }
 
-              // 2. Feedback visual imediato
+              // Feedback visual imediato
               marcarVisitaAtualComoPaga(restaurante.slug, numeroMesa);
               setContaPedidaSucesso(false);
               setContaPagaModal(true);
               setMinhaComandaAberta(false);
               setCarrinhoAberto(false);
 
-              // 3. Limpeza Nuclear (LocalStorage + Contexto React)
+              // Limpeza Local
               limparSessaoClienteLocal(restaurante.slug);
-
               if (typeof limparCarrinho === "function") {
                 limparCarrinho();
               }
@@ -127,10 +131,27 @@ export function MenuView({ restaurante, cardapio: cardapioInicial, numeroMesa: n
           console.error("Erro no listener da comanda do cliente:", err);
         }
       );
+
+      // 2. Escuta pedidos reais para subtotal exato e dinâmico na barra flutuante
+      unsubPedidos = escutarPedidosCliente(
+        restaurante.id,
+        numeroMesa,
+        user.uid,
+        (lista) => {
+          const totalAtivo = lista.reduce((acc, p) => {
+            if (p.status !== "cancelado" && p.status !== "estornado") {
+              return acc + (p.subtotal || 0);
+            }
+            return acc;
+          }, 0);
+          setSubtotalComandaBanco(totalAtivo);
+        }
+      );
     });
 
     return () => {
-      if (unsubSnapshot) unsubSnapshot();
+      if (unsubComanda) unsubComanda();
+      if (unsubPedidos) unsubPedidos();
     };
   }, [restaurante.id, restaurante.slug, numeroMesa]);
 

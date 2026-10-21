@@ -209,23 +209,18 @@ export function MesaDetalheModal({
   };
 
   const handleEncerrarMesa = async () => {
-    const idRestauranteFinal = restauranteId || slug;
-    if (!idRestauranteFinal || !mesa?.numero) return;
+    if (!mesa?.numero) return;
 
     // Confirmação de segurança dupla para o garçom
     if (!confirm("Tem certeza que deseja fechar esta conta e liberar a mesa?")) return;
 
     try {
       setEncerrando(true);
-      // Se houver comandas ativas, executa o fechamento atômico de cada uma via writeBatch
-      if (comandasComItens.length > 0) {
-        for (const comanda of comandasComItens) {
-          await fecharContaMesa(idRestauranteFinal, mesa.numero, comanda.id);
-        }
-      }
+      // Delega a liberação para o pai (garcom-view ou admin-dashboard), que chama liberarMesaFirestore,
+      // apagando as comandas e os pedidos e gerando o registro histórico de faturamento atômico.
+      onLiberarMesa(mesa.numero);
       alert("Conta fechada e mesa liberada com sucesso!");
       onClose();
-      onLiberarMesa(mesa.numero);
     } catch (error) {
       console.error("Erro ao fechar conta da mesa:", error);
       alert("Erro ao encerrar a mesa. Tente novamente.");
