@@ -799,9 +799,11 @@ export function AdminDashboard() {
 
   const slug = restaurante?.slug || "demo";
   const urlPublica = `/r/${slug}`;
+  const defTemaAtual = TEMAS_DISPONIVEIS.find((t) => t.id === temaSelecionado);
+  const classeTemaAtual = defTemaAtual?.classe || "";
 
   return (
-    <div className="min-h-screen bg-neutral-950 text-white flex flex-col">
+    <div className={`min-h-screen ${classeTemaAtual} bg-background text-foreground flex flex-col transition-colors duration-200`}>
       {/* BARRA SUPERIOR DO PAINEL */}
       <header className="p-4 sm:p-6 bg-neutral-900 border-b border-neutral-800 flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
@@ -850,6 +852,42 @@ export function AdminDashboard() {
               <ExternalLink className="w-3 h-3 opacity-60" />
             </Button>
           </Link>
+
+          {/* SELETOR RÁPIDO DE TEMA DO RESTAURANTE */}
+          <div className="flex items-center gap-1.5 bg-neutral-800/90 border border-neutral-700/80 rounded-xl px-2 h-10 shadow-sm">
+            <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+            <select
+              value={temaSelecionado}
+              onChange={async (e) => {
+                const novoTema = e.target.value as any;
+                const defTema = TEMAS_DISPONIVEIS.find((t) => t.id === novoTema);
+                setTemaSelecionado(novoTema);
+                if (defTema) setCorPrimaria(defTema.corPrimaria);
+                try {
+                  await atualizarRestaurante({
+                    configuracoes: {
+                      tema: novoTema,
+                      corPrimaria: defTema?.corPrimaria || corPrimaria,
+                      capaUrl: restaurante?.configuracoes?.capaUrl || "/images/capa-padrao.webp",
+                      modoOperacao,
+                      modoFilaKds,
+                      taxaServico: Number(taxaServicoConfig) || 0,
+                    },
+                  });
+                } catch (err) {
+                  console.warn("Falha ao salvar tema rápido:", err);
+                }
+              }}
+              className="bg-transparent text-white font-bold text-xs outline-none cursor-pointer pr-1"
+              title="Trocar tema visual do restaurante por completo"
+            >
+              {TEMAS_DISPONIVEIS.map((t) => (
+                <option key={t.id} value={t.id} className="bg-neutral-900 text-white">
+                  {t.nome}
+                </option>
+              ))}
+            </select>
+          </div>
 
           <Button
             type="button"

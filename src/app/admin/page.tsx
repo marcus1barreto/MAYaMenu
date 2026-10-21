@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from "@/context/auth-context";
 import { AdminLoginForm } from "@/components/admin/admin-login-form";
 import { AdminDashboard } from "@/components/admin/admin-dashboard";
 import { EstabelecimentoSuspensoView } from "@/components/admin/estabelecimento-suspenso-view";
+import { resolverClasseTemaRestaurante } from "@/lib/tema";
 
 function AdminPageContent() {
   const { user, restaurante, carregando } = useAuth();
@@ -32,7 +33,13 @@ function AdminPageContent() {
     return <EstabelecimentoSuspensoView restaurante={restaurante} />;
   }
 
-  return <AdminDashboard />;
+  const classeTema = resolverClasseTemaRestaurante(restaurante);
+
+  return (
+    <div className={`min-h-screen ${classeTema} bg-background text-foreground transition-colors duration-200`}>
+      <AdminDashboard />
+    </div>
+  );
 }
 
 export default function AdminPage() {

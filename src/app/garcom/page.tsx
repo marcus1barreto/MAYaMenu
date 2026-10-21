@@ -5,6 +5,7 @@ import { GarcomView } from "@/components/garcom/garcom-view";
 import { AdminLoginForm } from "@/components/admin/admin-login-form";
 
 import { PinLockGuard } from "@/components/salao/pin-lock-guard";
+import { resolverClasseTemaRestaurante } from "@/lib/tema";
 
 function GarcomPageContent() {
   const { user, restaurante, carregando } = useAuth();
@@ -31,14 +32,18 @@ function GarcomPageContent() {
     );
   }
 
+  const classeTema = resolverClasseTemaRestaurante(restaurante);
+
   return (
-    <PinLockGuard role="garcom">
-      <GarcomView
-        restauranteId={restaurante?.id}
-        slug={restaurante?.slug}
-        nomeRestaurante={restaurante?.nome || "MAYaMenu"}
-      />
-    </PinLockGuard>
+    <div className={`min-h-screen ${classeTema} bg-background text-foreground transition-colors duration-200`}>
+      <PinLockGuard role="garcom">
+        <GarcomView
+          restauranteId={restaurante?.id}
+          slug={restaurante?.slug}
+          nomeRestaurante={restaurante?.nome || "MAYaMenu"}
+        />
+      </PinLockGuard>
+    </div>
   );
 }
 
