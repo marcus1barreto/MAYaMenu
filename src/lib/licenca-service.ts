@@ -614,6 +614,102 @@ export async function alterarPlanoRestaurante(
   }
 }
 
+/**
+ * Renova o prazo de expiração de uma licença não utilizada (SuperAdmin)
+ */
+export async function renovarValidadeLicenca(
+  codigo: string,
+  horasAdicionais = 48
+): Promise<Date> {
+  const codigoFormatado = codigo.trim().toUpperCase();
+  const novaExpiracao = new Date(Date.now() + horasAdicionais * 60 * 60 * 1000);
+
+  // 1. Atualiza no Firestore
+  try {
+    const licRef = doc(db, "concessoes", codigoFormatado);
+    await updateDoc(licRef, {
+      expiracaoEm: novaExpiracao,
+      status: "disponivel",
+    });
+  } catch (err) {
+    console.warn("Falha ao renovar expiração no Firestore (salvo local):", err);
+  }
+
+  // 2. Atualiza localmente
+  const locais = obterLicencasLocais();
+  const atualizadas = locais.map((l) =>
+    l.id === codigoFormatado
+      ? { ...l, expiracaoEm: novaExpiracao, status: "disponivel" as const }
+      : l
+  );
+  if (typeof window !== "undefined") {
+    localStorage.setItem("mayamenu_concessoes_locais", JSON.stringify(atualizadas));
+  }
+
+  return novaExpiracao;
+}
+
+/**
+ * Revoga e exclui uma licença não utilizada (SuperAdmin)
+ */
+export async function revogarLicenca(codigo: string): Promise<void> {
+  const codigoFormatado = codigo.trim().toUpperCase();
+
+  // 1. Remove do Firestore
+  try {
+    const { deleteDoc } = await import("firebase/firestore");
+    const licRef = doc(db, "concessoes", codigoFormatado);
+    await deleteDoc(licRef);
+  } catch (err) {
+    console.warn("Falha ao revogar licença no Firestore:", err);
+  }
+
+  // 2. Remove do cache local
+  removerLicencaLocal(codigoFormatado);
+}
+
+/**
+ * Transfere uma licença vencida para o Arquivo Morto com motivo 'expirada'
+ */
+export async function arquivarLicencaExpirada(licenca: Licenca): Promise<void> {
+  const codigoFormatado = licenca.id.trim().toUpperCase();
+  const arquivoMortoRef = doc(db, "arquivo_morto_licencas", codigoFormatado);
+  const licencaRef = doc(db, "concessoes", codigoFormatado);
+
+  const dadosConsolidados: Licenca = {
+    ...licenca,
+    status: "revogada",
+  };
+
+  const arquivoMortoDoc = {
+    id: codigoFormatado,
+    codigo: codigoFormatado,
+    arquivadoEm: serverTimestamp(),
+    motivo: "expirada",
+    restauranteId: licenca.restauranteId || "nao_ativada",
+    restauranteNome: licenca.restauranteNome || licenca.responsavel || "Licença Expirada sem Uso",
+    slug: licenca.slug || "",
+    ownerId: licenca.ownerId || "",
+    snapshotJson: JSON.stringify(dadosConsolidados, null, 2),
+    dadosLicenca: dadosConsolidados,
+  };
+
+  try {
+    const { deleteDoc } = await import("firebase/firestore");
+    await setDoc(arquivoMortoRef, arquivoMortoDoc);
+    await deleteDoc(licencaRef);
+  } catch (err) {
+    console.warn("Falha ao arquivar licença expirada no Firestore:", err);
+  }
+
+  salvarArquivoMortoLocal({
+    ...arquivoMortoDoc,
+    arquivadoEm: new Date(),
+    motivo: "expirada",
+  });
+  removerLicencaLocal(codigoFormatado);
+}
+
 // Persistência local resiliente
 function salvarLicencaLocal(licenca: Licenca): void {
   if (typeof window === "undefined") return;

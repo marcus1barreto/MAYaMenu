@@ -9,6 +9,9 @@ import {
   alterarStatusLicenca,
   alterarStatusRestaurante,
   alterarPlanoRestaurante,
+  renovarValidadeLicenca,
+  revogarLicenca,
+  arquivarLicencaExpirada,
   LIMITES_POR_PLANO,
 } from "@/lib/licenca-service";
 import type { Licenca, LicencaArquivada, PlanoTipo, Restaurante } from "@/types";
@@ -47,13 +50,16 @@ import {
   Download,
   Eye,
   X,
+  ClockAlert,
+  CalendarPlus,
+  Trash2,
 } from "lucide-react";
 
 export function SuperAdminView() {
   const [licencas, setLicencas] = useState<Licenca[]>([]);
   const [arquivoMorto, setArquivoMorto] = useState<LicencaArquivada[]>([]);
   const [restaurantes, setRestaurantes] = useState<Restaurante[]>([]);
-  const [abaAtiva, setAbaAtiva] = useState<"restaurantes" | "ativas" | "arquivo_morto">("restaurantes");
+  const [abaAtiva, setAbaAtiva] = useState<"restaurantes" | "ativas" | "vencidas" | "arquivo_morto">("restaurantes");
   const [filtro, setFiltro] = useState<string>("");
   const [planoSelecionado, setPlanoSelecionado] = useState<PlanoTipo>("free");
   const [responsavel, setResponsavel] = useState("");
@@ -207,14 +213,69 @@ export function SuperAdminView() {
     setTimeout(() => setCopiadoLinkId(null), 2500);
   };
 
+  const handleRenovarLicenca = async (codigo: string) => {
+    const novaData = new Date(Date.now() + 48 * 60 * 60 * 1000);
+    setLicencas((prev) =>
+      prev.map((l) =>
+        l.id === codigo
+          ? { ...l, expiracaoEm: novaData, status: "disponivel" as const }
+          : l
+      )
+    );
+    try {
+      await renovarValidadeLicenca(codigo, 48);
+    } catch (err) {
+      console.error("Erro ao renovar validade da licença:", err);
+    }
+  };
+
+  const handleRevogarLicenca = async (codigo: string) => {
+    setLicencas((prev) => prev.filter((l) => l.id !== codigo));
+    try {
+      await revogarLicenca(codigo);
+    } catch (err) {
+      console.error("Erro ao revogar licença:", err);
+    }
+  };
+
+  const handleArquivarExpirada = async (lic: Licenca) => {
+    setLicencas((prev) => prev.filter((l) => l.id !== lic.id));
+    try {
+      await arquivarLicencaExpirada(lic);
+    } catch (err) {
+      console.error("Erro ao arquivar licença expirada:", err);
+    }
+  };
+
+  const agoraMillis = Date.now();
+
+  const isLicencaVencida = (lic: Licenca) => {
+    if (lic.status === "utilizada" || lic.status === "ativa") return false;
+    if (!lic.expiracaoEm) return false;
+    const expMillis = parseDateToMillis(lic.expiracaoEm);
+    return expMillis !== null && expMillis < agoraMillis;
+  };
+
   const licencasFiltradas = licencas.filter((lic) => {
     const termo = filtro.toLowerCase();
-    return (
+    const matchTermo = (
       lic.id.toLowerCase().includes(termo) ||
       (lic.restauranteNome && lic.restauranteNome.toLowerCase().includes(termo)) ||
       (lic.responsavel && lic.responsavel.toLowerCase().includes(termo)) ||
       lic.plano.toLowerCase().includes(termo)
     );
+    // Na aba 'ativas' (emissão), mostramos apenas as NÃO vencidas
+    return matchTermo && !isLicencaVencida(lic);
+  });
+
+  const licencasVencidas = licencas.filter((lic) => {
+    const termo = filtro.toLowerCase();
+    const matchTermo = (
+      lic.id.toLowerCase().includes(termo) ||
+      (lic.responsavel && lic.responsavel.toLowerCase().includes(termo)) ||
+      lic.plano.toLowerCase().includes(termo)
+    );
+    return matchTermo && isLicencaVencida(lic);
   });
 
   const restaurantesFiltrados = restaurantes.filter((rest) => {
@@ -229,7 +290,8 @@ export function SuperAdminView() {
 
   const totalRestaurantesAtivos = restaurantes.filter((r) => !r.suspenso && !r.configuracoes?.suspenso).length;
   const totalRestaurantesSuspensos = restaurantes.filter((r) => r.suspenso || r.configuracoes?.suspenso).length;
-  const totalTokensDisponiveis = licencas.filter((l) => l.status === "disponivel").length;
+  const totalTokensDisponiveis = licencas.filter((l) => l.status === "disponivel" && !isLicencaVencida(l)).length;
+  const totalTokensVencidos = licencas.filter((l) => isLicencaVencida(l)).length;
 
   return (
     <div className="min-h-screen bg-neutral-950 text-white p-4 md:p-8 space-y-8">
@@ -269,9 +331,19 @@ export function SuperAdminView() {
           >
             <span className="block text-xs uppercase tracking-wider text-neutral-500 font-bold flex items-center justify-center gap-1">
               <KeyRound className="w-3 h-3 text-amber-400" />
-              Tokens Novos
+              Disponíveis
             </span>
             <span className="text-xl font-black text-amber-400">{totalTokensDisponiveis}</span>
+          </div>
+          <div
+            onClick={() => setAbaAtiva("vencidas")}
+            className="px-4 py-2 bg-neutral-900 border border-neutral-800 rounded-2xl text-center cursor-pointer hover:border-neutral-700 transition-colors"
+          >
+            <span className="block text-xs uppercase tracking-wider text-neutral-500 font-bold flex items-center justify-center gap-1">
+              <ClockAlert className="w-3 h-3 text-orange-400" />
+              Vencidas
+            </span>
+            <span className="text-xl font-black text-orange-400">{totalTokensVencidos}</span>
           </div>
           <div className="px-4 py-2 bg-neutral-900 border border-neutral-800 rounded-2xl text-center">
             <span className="block text-xs uppercase tracking-wider text-neutral-500 font-bold">
@@ -314,7 +386,18 @@ export function SuperAdminView() {
           }`}
         >
           <KeyRound className="w-4 h-4" />
-          Emissão de Licenças & Convites ({licencasFiltradas.length})
+          Emissão & Convites Disponíveis ({licencasFiltradas.length})
+        </button>
+        <button
+          onClick={() => setAbaAtiva("vencidas")}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+            abaAtiva === "vencidas"
+              ? "bg-orange-600 text-white shadow-lg shadow-orange-600/30"
+              : "bg-neutral-900 text-neutral-400 hover:text-white border border-neutral-800"
+          }`}
+        >
+          <ClockAlert className="w-4 h-4" />
+          Licenças Vencidas ({licencasVencidas.length})
         </button>
         <button
           onClick={() => setAbaAtiva("arquivo_morto")}
@@ -894,6 +977,132 @@ export function SuperAdminView() {
               </div>
             )}
           </div>
+        </div>
+      ) : abaAtiva === "vencidas" ? (
+        /* ABA LICENÇAS VENCIDAS (EMITIDAS MAS NÃO UTILIZADAS) */
+        <div className="space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h2 className="text-xl font-black tracking-tight flex items-center gap-2">
+                <ClockAlert className="w-5 h-5 text-orange-400" />
+                Licenças Vencidas ({licencasVencidas.length})
+              </h2>
+              <p className="text-xs text-neutral-400">
+                Tokens emitidos que ultrapassaram o prazo de validade sem ativação por nenhum lojista.
+              </p>
+            </div>
+
+            <div className="relative w-full sm:w-72">
+              <Search className="w-4 h-4 text-neutral-500 absolute left-3 top-1/2 -translate-y-1/2" />
+              <Input
+                value={filtro}
+                onChange={(e) => setFiltro(e.target.value)}
+                placeholder="Buscar token ou contato..."
+                className="bg-neutral-900 border-neutral-800 text-white pl-9 rounded-xl h-9 text-xs"
+              />
+            </div>
+          </div>
+
+          {licencasVencidas.length === 0 ? (
+            <div className="p-16 text-center bg-neutral-900/40 border border-neutral-800 rounded-3xl space-y-3">
+              <ClockAlert className="w-12 h-12 text-neutral-600 mx-auto" />
+              <h3 className="text-sm font-bold text-neutral-300">Nenhuma licença vencida</h3>
+              <p className="text-xs text-neutral-500 max-w-sm mx-auto">
+                Todos os convites emitidos estão dentro do prazo ou já foram ativados com sucesso pelos clientes.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {licencasVencidas.map((lic) => {
+                const expMillis = parseDateToMillis(lic.expiracaoEm);
+                const expirouEmStr = expMillis ? new Date(expMillis).toLocaleString("pt-BR") : "Prazo encerrado";
+
+                return (
+                  <div
+                    key={lic.id}
+                    className="p-5 bg-neutral-900/90 border border-orange-900/40 rounded-3xl space-y-3.5 shadow-md relative overflow-hidden"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-mono text-sm font-black text-orange-300 bg-orange-950/60 border border-orange-800/60 px-2.5 py-1 rounded-xl tracking-wider">
+                        {lic.id}
+                      </span>
+                      <Badge className="bg-orange-500/10 text-orange-400 border border-orange-500/30 text-[10px] uppercase font-bold">
+                        Vencida
+                      </Badge>
+                    </div>
+
+                    <div className="space-y-1 text-xs">
+                      <div>
+                        <span className="text-neutral-500 block text-[10px] uppercase font-bold">
+                          Destinatário Previsto
+                        </span>
+                        <span className="text-white font-bold text-sm">
+                          {lic.responsavel || "Não informado"}
+                        </span>
+                      </div>
+                      {lic.notas && (
+                        <p className="text-[11px] text-neutral-400 italic">“{lic.notas}”</p>
+                      )}
+                      <div className="pt-1 text-[11px] text-orange-400/90 flex items-center gap-1 font-mono">
+                        <ClockAlert className="w-3.5 h-3.5" />
+                        Expirou em: {expirouEmStr}
+                      </div>
+                    </div>
+
+                    {/* DETALHES DO PLANO */}
+                    <div className="flex items-center gap-3 pt-2 border-t border-neutral-800 text-[11px] text-neutral-400">
+                      <div className="flex items-center gap-1 font-bold uppercase text-neutral-300">
+                        <Layers className="w-3.5 h-3.5 text-rose-500" />
+                        {lic.plano}
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <UtensilsCrossed className="w-3.5 h-3.5 text-neutral-500" />
+                        {lic.limites.maxPratos} pratos
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <LayoutGrid className="w-3.5 h-3.5 text-neutral-500" />
+                        {lic.limites.maxMesas} mesas
+                      </div>
+                    </div>
+
+                    {/* AÇÕES: RENOVAR, ARQUIVAR OU REVOGAR */}
+                    <div className="pt-2 border-t border-neutral-800 flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        onClick={() => handleRenovarLicenca(lic.id)}
+                        className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] h-8 rounded-xl font-bold flex items-center justify-center gap-1.5 shadow-sm"
+                        title="Renova o prazo por mais 48 horas"
+                      >
+                        <CalendarPlus className="w-3.5 h-3.5" />
+                        Renovar +48h
+                      </Button>
+
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleArquivarExpirada(lic)}
+                        className="bg-neutral-800 hover:bg-purple-950/40 text-purple-300 hover:text-white border-neutral-700 hover:border-purple-500/50 text-[11px] h-8 px-2.5 rounded-xl font-bold flex items-center gap-1"
+                        title="Mover para Arquivo Morto com status expirada"
+                      >
+                        <Archive className="w-3.5 h-3.5" />
+                        Arquivar
+                      </Button>
+
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleRevogarLicenca(lic.id)}
+                        className="bg-neutral-800 hover:bg-rose-950/40 text-rose-400 border-neutral-700 hover:border-rose-500/50 text-[11px] h-8 px-2.5 rounded-xl font-bold"
+                        title="Descartar e excluir token permanentemente"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       ) : (
         /* ABA ARQUIVO MORTO / REGISTROS EM JSON */
