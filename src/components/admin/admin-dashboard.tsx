@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "@/context/auth-context";
 import { CARDAPIO_DEMO } from "@/lib/mock-data";
-import type { MenuItem, ComandaCliente } from "@/types";
+import type { MenuItem, ComandaCliente, HistoricoSessaoMesa } from "@/types";
 import { getLimitesLicenca, getPlanoRestaurante } from "@/lib/licenca-limites";
 import { parseDateToMillis } from "@/lib/datas";
 import { db } from "@/lib/firebase";
@@ -11,6 +11,7 @@ import { collectionGroup, query, where, onSnapshot } from "firebase/firestore";
 import {
   escutarCardapio,
   escutarComandasSalão,
+  escutarHistoricoSessoesMesas,
   marcarComandaPagaFirestore,
   alternarDisponibilidadePrato,
   salvarItemCardapio,
@@ -135,6 +136,17 @@ export function AdminDashboard() {
   const [salvandoCor, setSalvandoCor] = useState(false);
   const [scannerBalcaoAberto, setScannerBalcaoAberto] = useState(false);
   const [feedbackBalcao, setFeedbackBalcao] = useState<string | null>(null);
+  const [subAbaAnalytics, setSubAbaAnalytics] = useState<"geral" | "laboratorio">("geral");
+  const [sessoesHistorico, setSessoesHistorico] = useState<HistoricoSessaoMesa[]>([]);
+
+  // Escuta o histórico de sessões encerradas no Firestore para dados reais de faturamento e giro
+  useEffect(() => {
+    if (!restaurante?.id) return;
+    const unsub = escutarHistoricoSessoesMesas(restaurante.id, (dados) => {
+      setSessoesHistorico(dados);
+    });
+    return () => unsub();
+  }, [restaurante?.id]);
 
   // Sincroniza cardápio em tempo real com o Firestore
   useEffect(() => {
@@ -1230,81 +1242,206 @@ export function AdminDashboard() {
                         : "opacity-100"
                     }`}
                   >
-                    {/* Header do Relatório */}
-                    <div className="flex justify-between items-center pb-4 border-b border-neutral-800">
+                    {/* Sub-Navegação: Geral vs Laboratório de Salão */}
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-neutral-800">
                       <div>
-                        <h3 className="text-lg font-black text-white">Relatório de Desempenho e Eficiência do Salão</h3>
-                        <p className="text-xs text-neutral-400">Últimos 30 dias • Comparativo por turno e rotatividade</p>
+                        <h3 className="text-lg font-black text-white flex items-center gap-2">
+                          <BarChart3 className="w-5 h-5 text-rose-500" />
+                          MAYa Inteligência Operacional
+                        </h3>
+                        <p className="text-xs text-neutral-400">
+                          {subAbaAnalytics === "geral"
+                            ? "Métricas reais de faturamento consolidado, ticket médio e giro do salão"
+                            : "Diagnóstico espacial de ociosidade e atratividade mesa a mesa"}
+                        </p>
                       </div>
-                      <div className="flex gap-2">
-                        <div className="h-8 w-24 bg-neutral-800 rounded-lg" />
-                        <div className="h-8 w-28 bg-neutral-800 rounded-lg" />
+
+                      <div className="flex bg-neutral-900 border border-neutral-800 p-1 rounded-xl">
+                        <button
+                          type="button"
+                          onClick={() => setSubAbaAnalytics("geral")}
+                          className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                            subAbaAnalytics === "geral"
+                              ? "bg-rose-600 text-white shadow-sm"
+                              : "text-neutral-400 hover:text-white"
+                          }`}
+                        >
+                          Visão Geral
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSubAbaAnalytics("laboratorio")}
+                          className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 ${
+                            subAbaAnalytics === "laboratorio"
+                              ? "bg-purple-600 text-white shadow-sm"
+                              : "text-neutral-400 hover:text-purple-300"
+                          }`}
+                        >
+                          <Zap className="w-3.5 h-3.5" />
+                          Laboratório de Salão
+                        </button>
                       </div>
                     </div>
 
-                    {/* Grid dos 3 Cards Principais */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                      {/* 1. Eficiência do Salão */}
-                      <div className="bg-neutral-900 border border-neutral-800 p-5 rounded-2xl space-y-3">
-                        <div className="flex justify-between items-start">
-                          <span className="text-xs font-bold text-neutral-400 uppercase">Eficiência do Salão</span>
-                          <span className="text-xs text-emerald-400 font-bold">+18.4%</span>
+                    {/* ESTADO VAZIO (ZERO SESSÕES CONCLUÍDAS) */}
+                    {sessoesHistorico.length === 0 ? (
+                      <div className="p-12 text-center bg-neutral-900/40 border border-neutral-800 rounded-3xl space-y-3">
+                        <div className="w-12 h-12 rounded-2xl bg-neutral-800 flex items-center justify-center text-neutral-500 mx-auto">
+                          <BarChart3 className="w-6 h-6" />
                         </div>
-                        <div className="text-3xl font-black text-white">84.2%</div>
-                        <div className="h-2 w-full bg-neutral-800 rounded-full overflow-hidden">
-                          <div className="h-full bg-rose-500 w-[84%]" />
-                        </div>
-                        <p className="text-[11px] text-neutral-400">Giro médio: 4.2 clientes por mesa / noite</p>
+                        <h4 className="text-sm font-bold text-neutral-200">
+                          Inteligência em Calibração
+                        </h4>
+                        <p className="text-xs text-neutral-500 max-w-md mx-auto leading-relaxed">
+                          Nenhuma comanda foi encerrada ainda. Conforme as mesas forem ocupadas e fechadas pelos garçons ou clientes, os dados de giro, faturamento real e mapa de calor do salão surgirão aqui sem dados fictícios.
+                        </p>
                       </div>
+                    ) : subAbaAnalytics === "geral" ? (
+                      /* SUB-ABA 1: VISÃO GERAL BASEADA EM DADOS REAIS */
+                      (() => {
+                        const totalFaturado = sessoesHistorico.reduce((acc, s) => acc + (Number(s.subtotalTotal) || 0), 0);
+                        const totalSessoes = sessoesHistorico.length;
+                        const ticketMedio = totalSessoes > 0 ? totalFaturado / totalSessoes : 0;
+                        const totalClientes = sessoesHistorico.reduce((acc, s) => acc + (Number(s.quantidadePagantes) || 1), 0);
 
-                      {/* 2. Mapa de Calor das Mesas */}
-                      <div className="bg-neutral-900 border border-neutral-800 p-5 rounded-2xl space-y-3">
-                        <div className="flex justify-between items-start">
-                          <span className="text-xs font-bold text-neutral-400 uppercase">Mapa de Calor das Mesas</span>
-                          <span className="text-xs text-amber-400 font-bold">Mesa 4 & 7 no topo</span>
-                        </div>
-                        <div className="text-3xl font-black text-amber-400">R$ 14.850</div>
-                        <div className="grid grid-cols-6 gap-1 pt-1">
-                          {[90, 45, 60, 100, 30, 85, 95, 70, 40, 80, 55, 65].map((v, i) => (
-                            <div
-                              key={i}
-                              className={`h-6 rounded flex items-center justify-center text-[9px] font-bold ${
-                                v > 80 ? "bg-rose-500 text-white" : v > 50 ? "bg-amber-500/80 text-black" : "bg-neutral-800 text-neutral-400"
-                              }`}
-                            >
-                              {i + 1}
+                        return (
+                          <div className="space-y-6">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                              {/* 1. Faturamento Total Histórico */}
+                              <div className="bg-neutral-900 border border-neutral-800 p-5 rounded-2xl space-y-2">
+                                <div className="flex justify-between items-start">
+                                  <span className="text-xs font-bold text-neutral-400 uppercase">Faturamento Concluído</span>
+                                  <Badge className="bg-emerald-500/10 text-emerald-400 text-[10px]">Real</Badge>
+                                </div>
+                                <div className="text-3xl font-black text-white">
+                                  {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(totalFaturado)}
+                                </div>
+                                <p className="text-[11px] text-neutral-500">{totalSessoes} comandas encerradas no total</p>
+                              </div>
+
+                              {/* 2. Ticket Médio Real */}
+                              <div className="bg-neutral-900 border border-neutral-800 p-5 rounded-2xl space-y-2">
+                                <div className="flex justify-between items-start">
+                                  <span className="text-xs font-bold text-neutral-400 uppercase">Ticket Médio por Mesa</span>
+                                  <Badge className="bg-rose-500/10 text-rose-400 text-[10px]">Média</Badge>
+                                </div>
+                                <div className="text-3xl font-black text-rose-400">
+                                  {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(ticketMedio)}
+                                </div>
+                                <p className="text-[11px] text-neutral-500">{totalClientes} pagantes registrados</p>
+                              </div>
+
+                              {/* 3. Giro das Mesas */}
+                              <div className="bg-neutral-900 border border-neutral-800 p-5 rounded-2xl space-y-2">
+                                <div className="flex justify-between items-start">
+                                  <span className="text-xs font-bold text-neutral-400 uppercase">Atendimentos Concluídos</span>
+                                  <Badge className="bg-blue-500/10 text-blue-400 text-[10px]">Salão</Badge>
+                                </div>
+                                <div className="text-3xl font-black text-white">{totalSessoes}</div>
+                                <p className="text-[11px] text-neutral-500">Média de {(totalSessoes / Math.max(mesas.length, 1)).toFixed(1)} giros por mesa</p>
+                              </div>
                             </div>
-                          ))}
-                        </div>
-                        <p className="text-[11px] text-neutral-400">Taxa de ociosidade média: 14.8 minutos</p>
-                      </div>
+                          </div>
+                        );
+                      })()
+                    ) : (
+                      /* SUB-ABA 2: LABORATÓRIO DE SALÃO (MAPA DE CALOR E DIAGNÓSTICO ESPACIAL) */
+                      (() => {
+                        // Agrupa faturamento e frequência por mesa
+                        const mapaMesas = new Map<number, { faturamento: number; vezesOcupada: number }>();
+                        for (let i = 1; i <= maxMesas; i++) {
+                          mapaMesas.set(i, { faturamento: 0, vezesOcupada: 0 });
+                        }
 
-                      {/* 3. Tempo Médio da Cozinha */}
-                      <div className="bg-neutral-900 border border-neutral-800 p-5 rounded-2xl space-y-3">
-                        <div className="flex justify-between items-start">
-                          <span className="text-xs font-bold text-neutral-400 uppercase">Tempo Médio da Cozinha</span>
-                          <span className="text-xs text-emerald-400 font-bold">-4 min hoje</span>
-                        </div>
-                        <div className="text-3xl font-black text-white">12m 45s</div>
-                        <div className="h-2 w-full bg-neutral-800 rounded-full overflow-hidden">
-                          <div className="h-full bg-emerald-500 w-[65%]" />
-                        </div>
-                        <p className="text-[11px] text-neutral-400">Do envio ao primeiro prato servido</p>
-                      </div>
-                    </div>
+                        sessoesHistorico.forEach((s) => {
+                          const num = Number(s.mesa);
+                          if (num && mapaMesas.has(num)) {
+                            const atual = mapaMesas.get(num)!;
+                            atual.faturamento += Number(s.subtotalTotal) || 0;
+                            atual.vezesOcupada += 1;
+                          }
+                        });
 
-                    {/* Gráfico Simulado */}
-                    <div className="bg-neutral-900 border border-neutral-800 p-6 rounded-2xl space-y-4">
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs font-bold text-neutral-300">Faturamento por Hora x Tempo de Permanência</span>
-                        <span className="text-xs text-neutral-500">Pico: 20h30 às 22h00</span>
-                      </div>
-                      <div className="h-44 flex items-end gap-2 pt-6">
-                        {[20, 35, 45, 75, 100, 90, 85, 60, 40, 25].map((h, i) => (
-                          <div key={i} className="flex-1 bg-gradient-to-t from-rose-600 to-rose-400 rounded-t-lg" style={{ height: `${h}%` }} />
-                        ))}
-                      </div>
-                    </div>
+                        const arrayMesas = Array.from(mapaMesas.entries()).map(([numero, dados]) => ({
+                          numero,
+                          faturamento: dados.faturamento,
+                          vezesOcupada: dados.vezesOcupada,
+                        }));
+
+                        const maxFaturamento = Math.max(...arrayMesas.map((m) => m.faturamento), 1);
+                        const maisOcupada = [...arrayMesas].sort((a, b) => b.vezesOcupada - a.vezesOcupada)[0];
+                        const menosOcupada = [...arrayMesas].sort((a, b) => a.vezesOcupada - b.vezesOcupada)[0];
+
+                        return (
+                          <div className="space-y-6">
+                            {/* Diagnóstico dos Extremos */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div className="p-4 bg-emerald-950/20 border border-emerald-800/40 rounded-2xl space-y-1">
+                                <span className="text-[10px] font-bold uppercase text-emerald-400 flex items-center gap-1">
+                                  🔥 Ponto Quente (Mais Procurada)
+                                </span>
+                                <div className="text-base font-bold text-white">
+                                  Mesa {maisOcupada?.numero || 1} • {maisOcupada?.vezesOcupada || 0} rotações
+                                </div>
+                                <p className="text-[11px] text-neutral-400">
+                                  Esta mesa atrai o maior fluxo de clientes do salão, faturando {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(maisOcupada?.faturamento || 0)}.
+                                </p>
+                              </div>
+
+                              <div className="p-4 bg-purple-950/20 border border-purple-800/40 rounded-2xl space-y-1">
+                                <span className="text-[10px] font-bold uppercase text-purple-400 flex items-center gap-1">
+                                  ❄️ Ponto Frio (Diagnóstico Espacial)
+                                </span>
+                                <div className="text-base font-bold text-white">
+                                  Mesa {menosOcupada?.numero || 1} • {menosOcupada?.vezesOcupada || 0} rotações
+                                </div>
+                                <p className="text-[11px] text-neutral-400">
+                                  Atenção: Mesa com menor frequência. Avalie posicionamento, acústica, corrente de ar ou visibilidade pelos garçons.
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* Grid do Mapa de Calor das Mesas */}
+                            <div className="p-5 bg-neutral-900 border border-neutral-800 rounded-2xl space-y-4">
+                              <div className="flex justify-between items-center">
+                                <span className="text-xs font-bold text-neutral-300 uppercase">
+                                  Mapa de Calor do Salão (Giro por Ponto)
+                                </span>
+                                <span className="text-[11px] text-neutral-500">
+                                  Intensidade proporcional ao faturamento acumulado
+                                </span>
+                              </div>
+
+                              <div className="grid grid-cols-3 sm:grid-cols-6 md:grid-cols-8 gap-2.5">
+                                {arrayMesas.map((m) => {
+                                  const proporcao = m.faturamento / maxFaturamento;
+                                  const corCalor =
+                                    m.vezesOcupada === 0
+                                      ? "bg-neutral-800/60 text-neutral-500 border-neutral-700/40"
+                                      : proporcao > 0.7
+                                      ? "bg-rose-600 text-white border-rose-500 shadow-md shadow-rose-900/30"
+                                      : proporcao > 0.3
+                                      ? "bg-amber-500/80 text-black border-amber-400"
+                                      : "bg-neutral-800 text-neutral-300 border-neutral-700";
+
+                                  return (
+                                    <div
+                                      key={m.numero}
+                                      className={`p-3 rounded-xl border text-center transition-all ${corCalor}`}
+                                    >
+                                      <div className="text-xs font-black">Mesa {m.numero}</div>
+                                      <div className="text-[10px] font-mono mt-0.5 opacity-90">
+                                        {m.vezesOcupada}x
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()
+                    )}
                   </div>
 
                   {/* Só mostra o cadeado e o overlay se for plano 'free' (ou undefined) */}

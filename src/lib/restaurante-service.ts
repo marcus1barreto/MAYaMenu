@@ -689,6 +689,44 @@ export async function liberarMesaFirestore(
 }
 
 /**
+ * Escuta as sessões encerradas no histórico para a inteligência de salão (Heatmap & Faturamento Real)
+ */
+export function escutarHistoricoSessoesMesas(
+  restauranteId: string,
+  onAtualizacao: (sessoes: import("@/types").HistoricoSessaoMesa[]) => void
+): Unsubscribe {
+  const colRef = collection(
+    db,
+    "restaurantes",
+    restauranteId,
+    "historico_sessoes_mesas"
+  );
+  const q = query(colRef, orderBy("liberadaEm", "desc"), limit(100));
+
+  try {
+    return onSnapshot(
+      q,
+      (snapshot) => {
+        const lista: import("@/types").HistoricoSessaoMesa[] = [];
+        snapshot.forEach((d) => {
+          lista.push({
+            ...(d.data() as import("@/types").HistoricoSessaoMesa),
+            id: d.id,
+          });
+        });
+        onAtualizacao(lista);
+      },
+      (err) => {
+        console.warn("Falha ao escutar histórico de sessões das mesas:", err);
+        onAtualizacao([]);
+      }
+    );
+  } catch {
+    return () => {};
+  }
+}
+
+/**
  * Injeta o Ticket lido por QR Code na contingência diretamente no Firestore.
  */
 export async function injetarTicketContingencia(
