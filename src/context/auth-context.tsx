@@ -51,40 +51,61 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (currentUser && !currentUser.isAnonymous) {
         try {
-          const { onSnapshot } = await import("firebase/firestore");
+          const { onSnapshot, collection, query, where, getDocs } = await import("firebase/firestore");
           const restRef = doc(db, "restaurantes", currentUser.uid);
 
           unsubRestaurante = onSnapshot(
             restRef,
-            (snap) => {
+            async (snap) => {
               if (snap.exists()) {
                 setRestaurante({ id: snap.id, ...snap.data() } as Restaurante);
+                setCarregando(false);
               } else {
-                const restLocalSalvo = localStorage.getItem(`mayamenu_rest_${currentUser.uid}`);
-                if (restLocalSalvo) {
-                  setRestaurante(JSON.parse(restLocalSalvo));
-                } else {
-                  setRestaurante(null);
+                // Se não encontrar diretamente pelo doc(uid), busca por ownerId
+                try {
+                  const q = query(collection(db, "restaurantes"), where("ownerId", "==", currentUser.uid));
+                  const querySnap = await getDocs(q);
+                  if (!querySnap.empty) {
+                    const firstDoc = querySnap.docs[0];
+                    setRestaurante({ id: firstDoc.id, ...firstDoc.data() } as Restaurante);
+                  } else {
+                    const restLocalSalvo = localStorage.getItem(`mayamenu_rest_${currentUser.uid}`);
+                    if (restLocalSalvo) {
+                      setRestaurante(JSON.parse(restLocalSalvo));
+                    } else {
+                      setRestaurante(null);
+                    }
+                  }
+                } catch {
+                  const restLocalSalvo = localStorage.getItem(`mayamenu_rest_${currentUser.uid}`);
+                  setRestaurante(restLocalSalvo ? JSON.parse(restLocalSalvo) : null);
                 }
+                setCarregando(false);
               }
-              setCarregando(false);
             },
-            (err) => {
-              console.warn("Falha no listener do restaurante (usando cache local):", err);
-              const restLocalSalvo = localStorage.getItem(`mayamenu_rest_${currentUser.uid}`);
-              if (restLocalSalvo) {
-                setRestaurante(JSON.parse(restLocalSalvo));
+            async (err) => {
+              console.warn("Falha no listener do restaurante (usando busca por ownerId ou cache):", err);
+              try {
+                const { collection, query, where, getDocs } = await import("firebase/firestore");
+                const q = query(collection(db, "restaurantes"), where("ownerId", "==", currentUser.uid));
+                const querySnap = await getDocs(q);
+                if (!querySnap.empty) {
+                  const firstDoc = querySnap.docs[0];
+                  setRestaurante({ id: firstDoc.id, ...firstDoc.data() } as Restaurante);
+                } else {
+                  const restLocalSalvo = localStorage.getItem(`mayamenu_rest_${currentUser.uid}`);
+                  setRestaurante(restLocalSalvo ? JSON.parse(restLocalSalvo) : null);
+                }
+              } catch {
+                const restLocalSalvo = localStorage.getItem(`mayamenu_rest_${currentUser.uid}`);
+                setRestaurante(restLocalSalvo ? JSON.parse(restLocalSalvo) : null);
               }
               setCarregando(false);
             }
           );
         } catch {
           const restLocalSalvo = localStorage.getItem(`mayamenu_rest_${currentUser.uid}`);
-          if (restLocalSalvo) {
-            setRestaurante(JSON.parse(restLocalSalvo));
-          } else {
-            setRestaurante(null);
-          }
+          setRestaurante(restLocalSalvo ? JSON.parse(restLocalSalvo) : null);
           setCarregando(false);
         }
       } else {
@@ -139,6 +160,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const snap = await getDoc(restRef);
         if (snap.exists()) {
           setRestaurante({ id: snap.id, ...snap.data() } as Restaurante);
+        } else {
+          const { collection, query, where, getDocs } = await import("firebase/firestore");
+          const q = query(collection(db, "restaurantes"), where("ownerId", "==", uid));
+          const querySnap = await getDocs(q);
+          if (!querySnap.empty) {
+            const firstDoc = querySnap.docs[0];
+            setRestaurante({ id: firstDoc.id, ...firstDoc.data() } as Restaurante);
+          }
         }
       } catch (err) {
         console.warn("Consulta do restaurante falhou, checando cache local:", err);

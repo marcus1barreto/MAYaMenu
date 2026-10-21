@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { obterRestaurantePorSlugValido, obterCardapioDoRestaurante } from "@/lib/restaurante-service";
+import { resolverClasseTemaRestaurante } from "@/lib/tema";
 import { MenuView } from "@/components/cliente/menu-view";
 import { CartProvider } from "@/context/cart-context";
 import { Store, ArrowLeft } from "lucide-react";
@@ -74,15 +75,18 @@ async function MenuContent({
   }
 
   const cardapio = await obterCardapioDoRestaurante(restaurante.id);
+  const classeTema = resolverClasseTemaRestaurante(restaurante);
 
   return (
-    <CartProvider slug={slug} mesaInicial={numeroMesa}>
-      <MenuView
-        restaurante={restaurante}
-        cardapio={cardapio}
-        numeroMesa={numeroMesa}
-      />
-    </CartProvider>
+    <div className={`min-h-screen ${classeTema} bg-background text-foreground transition-colors duration-200`}>
+      <CartProvider slug={slug} mesaInicial={numeroMesa}>
+        <MenuView
+          restaurante={restaurante}
+          cardapio={cardapio}
+          numeroMesa={numeroMesa}
+        />
+      </CartProvider>
+    </div>
   );
 }
 

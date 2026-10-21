@@ -26,6 +26,7 @@ import { GuidedEmptyCardapio } from "./guided-empty-cardapio";
 import { AdminQrScannerModal } from "./admin-qr-scanner-modal";
 import { ModificadorBuilder } from "./modificador-builder";
 import { MAYA_MEDIA_LIBRARY } from "@/lib/maya-media-library";
+import { TEMAS_DISPONIVEIS } from "@/lib/tema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -124,6 +125,9 @@ export function AdminDashboard() {
   const [corPrimaria, setCorPrimaria] = useState(
     restaurante?.configuracoes?.corPrimaria || "#E11D48"
   );
+  const [temaSelecionado, setTemaSelecionado] = useState<
+    "white-label" | "dark-elegante" | "brasa-fogo" | "fresh-nature" | "neon-pub"
+  >((restaurante?.configuracoes?.tema as any) || "white-label");
   const [modoOperacao, setModoOperacao] = useState<"com_garcom" | "hibrido" | "balcao">(
     restaurante?.configuracoes?.modoOperacao || "hibrido"
   );
@@ -780,7 +784,7 @@ export function AdminDashboard() {
     try {
       await atualizarRestaurante({
         configuracoes: {
-          tema: "light",
+          tema: temaSelecionado,
           corPrimaria,
           capaUrl: restaurante?.configuracoes?.capaUrl || "/images/capa-padrao.webp",
           modoOperacao,
@@ -1871,6 +1875,58 @@ export function AdminDashboard() {
           </DialogHeader>
 
           <div className="space-y-6 pt-2">
+            {/* SELETOR DE TEMAS ELEGANTES (WHITE-LABEL + 4 VARIAÇÕES) */}
+            <div className="space-y-3 p-4 rounded-xl bg-neutral-950/60 border border-neutral-800">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold uppercase tracking-wider text-neutral-300 flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                  Tema Visual do Cardápio & App
+                </label>
+                <Badge className="bg-neutral-800 text-neutral-300 border-neutral-700 text-[10px]">
+                  {TEMAS_DISPONIVEIS.find((t) => t.id === temaSelecionado)?.nome || "Padrão"}
+                </Badge>
+              </div>
+              <p className="text-xs text-neutral-400">
+                Selecione a identidade visual do seu cardápio com proteção visual e carregamento seguro:
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                {TEMAS_DISPONIVEIS.map((tema) => {
+                  const isAtivo = temaSelecionado === tema.id;
+                  return (
+                    <button
+                      key={tema.id}
+                      type="button"
+                      onClick={() => {
+                        setTemaSelecionado(tema.id);
+                        setCorPrimaria(tema.corPrimaria);
+                      }}
+                      className={`p-3 rounded-xl border text-left transition-all relative flex flex-col justify-between gap-2 ${
+                        isAtivo
+                          ? "bg-neutral-900 border-rose-500 shadow-md ring-1 ring-rose-500/50"
+                          : "bg-neutral-900/50 border-neutral-800 hover:border-neutral-700 text-neutral-400"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between w-full">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="w-4 h-4 rounded-full border border-neutral-700 shrink-0 shadow-sm"
+                            style={{ backgroundColor: tema.corAmostra }}
+                          />
+                          <span className={`text-xs font-bold ${isAtivo ? "text-white" : "text-neutral-300"}`}>
+                            {tema.nome}
+                          </span>
+                        </div>
+                        {isAtivo && <Check className="w-3.5 h-3.5 text-rose-500 shrink-0" />}
+                      </div>
+                      <p className="text-[10px] text-neutral-400 leading-tight">
+                        {tema.descricao}
+                      </p>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
             {/* COR PRIMÁRIA */}
             <div className="space-y-3 p-4 rounded-xl bg-neutral-950/60 border border-neutral-800">
               <div className="flex items-center justify-between">
