@@ -220,6 +220,40 @@
   --sidebar-ring: hsl(262.1 83.3% 57.8%);
 }
 
+/* ----------------------------------------------------
+   6. TEMA: DESCANSO VISUAL (Warm Sepia & Paper)
+   Foco: Luz âmbar/quente, zero fadiga ocular, papel artesanal
+----------------------------------------------------- */
+.theme-descanso-visual {
+  --background: hsl(38 35% 93%); /* Bege papel quente suave */
+  --foreground: hsl(30 20% 18%); /* Marrom café profundo, sem contraste agressivo */
+  --card: hsl(38 40% 96%); /* Cartão pergaminho sutil */
+  --card-foreground: hsl(30 20% 18%);
+  --popover: hsl(38 40% 96%);
+  --popover-foreground: hsl(30 20% 18%);
+  --primary: hsl(32 80% 45%); /* Âmbar terracota quente e acolhedor */
+  --primary-foreground: hsl(38 35% 98%);
+  --secondary: hsl(36 25% 88%);
+  --secondary-foreground: hsl(30 20% 18%);
+  --muted: hsl(36 25% 88%);
+  --muted-foreground: hsl(30 15% 42%);
+  --accent: hsl(36 25% 88%);
+  --accent-foreground: hsl(30 20% 18%);
+  --destructive: hsl(0 65% 50%);
+  --destructive-foreground: hsl(38 35% 98%);
+  --border: hsl(35 25% 82%);
+  --input: hsl(35 25% 82%);
+  --ring: hsl(32 80% 45%);
+  --sidebar: hsl(38 40% 96%);
+  --sidebar-foreground: hsl(30 20% 18%);
+  --sidebar-primary: hsl(32 80% 45%);
+  --sidebar-primary-foreground: hsl(38 35% 98%);
+  --sidebar-accent: hsl(36 25% 88%);
+  --sidebar-accent-foreground: hsl(30 20% 18%);
+  --sidebar-border: hsl(35 25% 82%);
+  --sidebar-ring: hsl(32 80% 45%);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

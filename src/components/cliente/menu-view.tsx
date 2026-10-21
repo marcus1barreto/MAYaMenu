@@ -24,6 +24,9 @@ import {
   QrCode,
   Menu as MenuIcon,
   X,
+  Sun,
+  Moon,
+  Coffee,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -59,6 +62,29 @@ export function MenuView({ restaurante, cardapio: cardapioInicial, numeroMesa: n
   const [contaPedidaSucesso, setContaPedidaSucesso] = useState(false);
   const [comandaStatus, setComandaStatus] = useState<string | null>(null);
   const [categoriaAtiva, setCategoriaAtiva] = useState<string>("Todas");
+  const [modoVisualCliente, setModoVisualCliente] = useState<"padrao" | "dia" | "noite" | "descanso">("padrao");
+
+  // Carrega preferência pessoal de visualização do cliente (Dia, Noite, Descanso Visual ou Padrão do Restaurante)
+  useEffect(() => {
+    const salvo = localStorage.getItem("mayamenu_modo_visual") as any;
+    if (salvo && ["padrao", "dia", "noite", "descanso"].includes(salvo)) {
+      setModoVisualCliente(salvo);
+    }
+  }, []);
+
+  const alternarModoVisual = (novoModo: "padrao" | "dia" | "noite" | "descanso") => {
+    setModoVisualCliente(novoModo);
+    localStorage.setItem("mayamenu_modo_visual", novoModo);
+  };
+
+  const classeModoVisual =
+    modoVisualCliente === "dia"
+      ? "" // Herda :root branco puro
+      : modoVisualCliente === "noite"
+      ? "theme-dark-elegante"
+      : modoVisualCliente === "descanso"
+      ? "theme-descanso-visual"
+      : ""; // 'padrao' herda o tema configurado pelo restaurante no container pai
 
   // Categorias únicas disponíveis no cardápio na ordem em que aparecem no cardápio ordenado
   const categorias = [
@@ -360,16 +386,16 @@ export function MenuView({ restaurante, cardapio: cardapioInicial, numeroMesa: n
   }
 
   return (
-    <div className="min-h-screen bg-neutral-100/60 pb-28 text-neutral-900 antialiased selection:bg-neutral-900 selection:text-white">
-      {/* 1. HEADER MOBILE COMPACTO & ELEGANTE (Apenas 3 Elementos: Logo, Busca e Comanda/Carrinho) */}
-      <header className="sticky top-0 z-40 bg-neutral-950/90 backdrop-blur-md border-b border-neutral-800 text-white transition-all shadow-md">
+    <div className={`min-h-screen ${classeModoVisual} bg-background pb-28 text-foreground antialiased selection:bg-primary selection:text-primary-foreground transition-colors duration-200`}>
+      {/* 1. HEADER MOBILE COMPACTO & ELEGANTE */}
+      <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-md border-b border-border text-foreground transition-all shadow-xs">
         <div className="max-w-3xl mx-auto px-4 h-14 flex items-center justify-between gap-3">
           {/* ESQUERDA: MENU HAMBÚRGUER + LOGO / NOME DO ESTABELECIMENTO */}
           <div className="flex items-center gap-2.5 min-w-0">
             <button
               type="button"
               onClick={() => setMenuLateralAberto(true)}
-              className="w-9 h-9 rounded-xl bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 text-neutral-300 hover:text-white flex items-center justify-center transition-all active:scale-90 shrink-0"
+              className="w-9 h-9 rounded-xl bg-card hover:bg-muted border border-border text-foreground flex items-center justify-center transition-all active:scale-90 shrink-0 shadow-xs"
               title="Menu e Opções da Mesa"
               aria-label="Abrir menu"
             >
@@ -378,7 +404,7 @@ export function MenuView({ restaurante, cardapio: cardapioInicial, numeroMesa: n
 
             <div className="flex items-center gap-2 min-w-0">
               {restaurante.configuracoes?.logoUrl ? (
-                <div className="relative w-7 h-7 rounded-lg overflow-hidden shrink-0 border border-neutral-700/60">
+                <div className="relative w-7 h-7 rounded-lg overflow-hidden shrink-0 border border-border">
                   <Image
                     src={restaurante.configuracoes.logoUrl}
                     alt={restaurante.nome}
@@ -392,16 +418,16 @@ export function MenuView({ restaurante, cardapio: cardapioInicial, numeroMesa: n
               ) : (
                 <div
                   style={{ backgroundColor: corPrimaria }}
-                  className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black text-white shrink-0 shadow-sm"
+                  className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black text-white shrink-0 shadow-xs"
                 >
                   {restaurante.nome.charAt(0).toUpperCase()}
                 </div>
               )}
               <div className="min-w-0">
-                <h1 className="text-sm font-black tracking-tight truncate leading-none text-white">
+                <h1 className="text-sm font-black tracking-tight truncate leading-none text-foreground">
                   {restaurante.nome}
                 </h1>
-                <span className="text-[10px] text-neutral-400 font-medium">Mesa {numeroMesa}</span>
+                <span className="text-[10px] text-muted-foreground font-medium">Mesa {numeroMesa}</span>
               </div>
             </div>
           </div>
@@ -414,8 +440,8 @@ export function MenuView({ restaurante, cardapio: cardapioInicial, numeroMesa: n
               onClick={() => setBuscaAberta(!buscaAberta)}
               className={`w-9 h-9 rounded-xl border flex items-center justify-center transition-all active:scale-90 ${
                 buscaAberta || busca.trim().length > 0
-                  ? "bg-rose-600/20 border-rose-500/40 text-rose-400"
-                  : "bg-neutral-900 hover:bg-neutral-800 border-neutral-800 text-neutral-300 hover:text-white"
+                  ? "bg-primary/15 border-primary/40 text-primary"
+                  : "bg-card hover:bg-muted border-border text-muted-foreground hover:text-foreground"
               }`}
               title="Buscar no cardápio"
               aria-label="Buscar pratos"
@@ -436,8 +462,8 @@ export function MenuView({ restaurante, cardapio: cardapioInicial, numeroMesa: n
               style={{ backgroundColor: (totalItens > 0 || subtotalComandaBanco > 0) ? corPrimaria : undefined }}
               className={`relative h-9 px-3 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95 shadow-sm ${
                 (totalItens > 0 || subtotalComandaBanco > 0)
-                  ? "text-white shadow-rose-950/40"
-                  : "bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 text-neutral-300 hover:text-white"
+                  ? "text-white shadow-sm"
+                  : "bg-card hover:bg-muted border border-border text-muted-foreground hover:text-foreground"
               }`}
               title="Abrir Comanda e Pedidos"
             >
@@ -459,21 +485,21 @@ export function MenuView({ restaurante, cardapio: cardapioInicial, numeroMesa: n
         {/* CAMPO DE BUSCA EXPANSÍVEL */}
         {buscaAberta && (
           <div className="max-w-3xl mx-auto px-4 pb-3 pt-1 animate-in fade-in slide-in-from-top-2 duration-200">
-            <div className="bg-neutral-900 rounded-xl p-2 flex items-center gap-2 border border-neutral-700/80 shadow-inner">
-              <Search className="w-4 h-4 text-neutral-400 ml-1.5" />
+            <div className="bg-card rounded-xl p-2 flex items-center gap-2 border border-border shadow-inner">
+              <Search className="w-4 h-4 text-muted-foreground ml-1.5" />
               <input
                 type="text"
                 autoFocus
                 value={busca}
                 onChange={(e) => setBusca(e.target.value)}
                 placeholder="Buscar pratos, porções, drinks..."
-                className="w-full text-xs font-medium bg-transparent border-none text-white focus:outline-none placeholder:text-neutral-500"
+                className="w-full text-xs font-medium bg-transparent border-none text-foreground focus:outline-none placeholder:text-muted-foreground"
               />
               {busca && (
                 <button
                   type="button"
                   onClick={() => setBusca("")}
-                  className="p-1 text-neutral-400 hover:text-white"
+                  className="p-1 text-muted-foreground hover:text-foreground"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
@@ -483,7 +509,7 @@ export function MenuView({ restaurante, cardapio: cardapioInicial, numeroMesa: n
         )}
 
         {/* 2. PÍLULAS DE CATEGORIAS COM SCROLL HORIZONTAL (GRUDADAS ABAIXO DO HEADER) */}
-        <div className="border-t border-neutral-850 bg-neutral-950/95 px-4 py-2">
+        <div className="border-t border-border bg-background/95 px-4 py-2">
           <div className="max-w-3xl mx-auto flex items-center gap-2 overflow-x-auto no-scrollbar select-none">
             {categorias.map((cat) => {
               const ativa = categoriaAtiva === cat;
@@ -497,8 +523,8 @@ export function MenuView({ restaurante, cardapio: cardapioInicial, numeroMesa: n
                   }}
                   className={`px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap transition-all shadow-xs active:scale-95 ${
                     ativa
-                      ? "text-white shadow-md shadow-neutral-900/40"
-                      : "bg-neutral-900 hover:bg-neutral-850 text-neutral-400 hover:text-neutral-200 border border-neutral-800"
+                      ? "text-white shadow-sm"
+                      : "bg-card hover:bg-muted text-muted-foreground hover:text-foreground border border-border"
                   }`}
                 >
                   {cat}
@@ -559,10 +585,10 @@ export function MenuView({ restaurante, cardapio: cardapioInicial, numeroMesa: n
             </SheetHeader>
 
             {/* STATUS E TROCA DE MESA */}
-            <div className="p-3.5 rounded-2xl bg-neutral-900 border border-neutral-800 space-y-2">
+            <div className="p-3.5 rounded-2xl bg-card border border-border space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-neutral-400">Sua Mesa</span>
-                <span className="text-xs font-black text-emerald-400">Mesa {numeroMesa}</span>
+                <span className="text-xs font-bold text-muted-foreground">Sua Mesa</span>
+                <span className="text-xs font-black text-emerald-500">Mesa {numeroMesa}</span>
               </div>
               <Button
                 type="button"
@@ -571,16 +597,16 @@ export function MenuView({ restaurante, cardapio: cardapioInicial, numeroMesa: n
                   setMenuLateralAberto(false);
                   setMesaScannerAberto(true);
                 }}
-                className="w-full h-9 rounded-xl border-neutral-700 bg-neutral-850 hover:bg-neutral-800 text-white font-bold text-xs flex items-center justify-center gap-2"
+                className="w-full h-9 rounded-xl border-border bg-muted/60 hover:bg-muted text-foreground font-bold text-xs flex items-center justify-center gap-2"
               >
-                <QrCode className="w-3.5 h-3.5 text-emerald-400" />
+                <QrCode className="w-3.5 h-3.5 text-emerald-500" />
                 <span>Trocar de Mesa (Escanear)</span>
               </Button>
             </div>
 
             {/* AÇÕES OPERACIONAIS */}
             <div className="space-y-2">
-              <span className="text-[10px] uppercase font-bold text-neutral-400 block tracking-wider px-1">
+              <span className="text-[10px] uppercase font-bold text-muted-foreground block tracking-wider px-1">
                 Serviços de Salão
               </span>
 
@@ -593,16 +619,16 @@ export function MenuView({ restaurante, cardapio: cardapioInicial, numeroMesa: n
                     handleChamarGarcom();
                   }}
                   disabled={chamandoGarcom || segundosCooldown > 0}
-                  className="w-full p-3 rounded-xl bg-neutral-900 hover:bg-neutral-850 border border-neutral-800 text-left flex items-center justify-between text-xs font-bold text-white transition-all disabled:opacity-50"
+                  className="w-full p-3 rounded-xl bg-card hover:bg-muted border border-border text-left flex items-center justify-between text-xs font-bold text-foreground transition-all disabled:opacity-50"
                 >
                   <div className="flex items-center gap-2.5">
-                    <div className="p-2 bg-emerald-500/10 text-emerald-400 rounded-lg">
+                    <div className="p-2 bg-emerald-500/10 text-emerald-500 rounded-lg">
                       <Bell className="w-4 h-4" />
                     </div>
                     <span>{chamandoGarcom ? "Chamando..." : "Chamar Garçom na Mesa"}</span>
                   </div>
                   {segundosCooldown > 0 && (
-                    <span className="text-[10px] text-amber-400 font-mono">{segundosCooldown}s</span>
+                    <span className="text-[10px] text-amber-500 font-mono">{segundosCooldown}s</span>
                   )}
                 </button>
               )}
@@ -615,10 +641,10 @@ export function MenuView({ restaurante, cardapio: cardapioInicial, numeroMesa: n
                   handlePedirConta();
                 }}
                 disabled={pedindoConta || contaPedidaSucesso}
-                className="w-full p-3 rounded-xl bg-neutral-900 hover:bg-neutral-850 border border-neutral-800 text-left flex items-center justify-between text-xs font-bold text-white transition-all disabled:opacity-50"
+                className="w-full p-3 rounded-xl bg-card hover:bg-muted border border-border text-left flex items-center justify-between text-xs font-bold text-foreground transition-all disabled:opacity-50"
               >
                 <div className="flex items-center gap-2.5">
-                  <div className="p-2 bg-amber-500/10 text-amber-400 rounded-lg">
+                  <div className="p-2 bg-amber-500/10 text-amber-500 rounded-lg">
                     <DollarSign className="w-4 h-4" />
                   </div>
                   <span>
@@ -638,13 +664,74 @@ export function MenuView({ restaurante, cardapio: cardapioInicial, numeroMesa: n
                   setMenuLateralAberto(false);
                   setHistoricoAberto(true);
                 }}
-                className="w-full p-3 rounded-xl bg-neutral-900 hover:bg-neutral-850 border border-neutral-800 text-left flex items-center gap-2.5 text-xs font-bold text-white transition-all"
+                className="w-full p-3 rounded-xl bg-card hover:bg-muted border border-border text-left flex items-center gap-2.5 text-xs font-bold text-foreground transition-all"
               >
-                <div className="p-2 bg-rose-500/10 text-rose-400 rounded-lg">
+                <div className="p-2 bg-primary/10 text-primary rounded-lg">
                   <Receipt className="w-4 h-4" />
                 </div>
                 <span>Comprovantes Anteriores</span>
               </button>
+
+              {/* CONFORTO VISUAL & ILUMINAÇÃO (TENDÊNCIA UX: DIA / NOITE / DESCANSO) */}
+              <div className="pt-2 space-y-2">
+                <span className="text-[10px] uppercase font-bold text-muted-foreground block tracking-wider px-1">
+                  Conforto Visual da Tela
+                </span>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => alternarModoVisual("padrao")}
+                    className={`p-2.5 rounded-xl border text-left flex items-center gap-2 transition-all ${
+                      modoVisualCliente === "padrao"
+                        ? "bg-primary/15 border-primary text-primary font-bold shadow-xs"
+                        : "bg-card hover:bg-muted border-border text-muted-foreground"
+                    }`}
+                  >
+                    <Sparkles className="w-3.5 h-3.5 shrink-0" />
+                    <span className="text-xs">Original</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => alternarModoVisual("dia")}
+                    className={`p-2.5 rounded-xl border text-left flex items-center gap-2 transition-all ${
+                      modoVisualCliente === "dia"
+                        ? "bg-primary/15 border-primary text-primary font-bold shadow-xs"
+                        : "bg-card hover:bg-muted border-border text-muted-foreground"
+                    }`}
+                  >
+                    <Sun className="w-3.5 h-3.5 shrink-0 text-amber-500" />
+                    <span className="text-xs">Modo Dia</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => alternarModoVisual("noite")}
+                    className={`p-2.5 rounded-xl border text-left flex items-center gap-2 transition-all ${
+                      modoVisualCliente === "noite"
+                        ? "bg-primary/15 border-primary text-primary font-bold shadow-xs"
+                        : "bg-card hover:bg-muted border-border text-muted-foreground"
+                    }`}
+                  >
+                    <Moon className="w-3.5 h-3.5 shrink-0 text-indigo-400" />
+                    <span className="text-xs">Modo Noite</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => alternarModoVisual("descanso")}
+                    className={`p-2.5 rounded-xl border text-left flex items-center gap-2 transition-all ${
+                      modoVisualCliente === "descanso"
+                        ? "bg-amber-600/20 border-amber-500 text-amber-600 dark:text-amber-400 font-bold shadow-xs"
+                        : "bg-card hover:bg-muted border-border text-muted-foreground"
+                    }`}
+                    title="Luz âmbar suave inspirada em papel artesanal para leitura noturna sem cansaço"
+                  >
+                    <Coffee className="w-3.5 h-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
+                    <span className="text-xs">Descanso</span>
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -676,28 +763,28 @@ export function MenuView({ restaurante, cardapio: cardapioInicial, numeroMesa: n
                   key={item.id}
                   type="button"
                   onClick={() => setItemSelecionado(item)}
-                  className="group relative bg-white rounded-3xl p-4 border border-neutral-200/80 shadow-xs hover:shadow-md transition-all active:scale-[0.98] text-left flex gap-4 overflow-hidden"
+                  className="group relative bg-card text-card-foreground rounded-3xl p-4 border border-border shadow-xs hover:shadow-md transition-all active:scale-[0.98] text-left flex gap-4 overflow-hidden"
                 >
                   {/* Informações Textuais */}
                   <div className="flex-1 min-w-0 flex flex-col justify-between">
                     <div>
-                      <h3 className="text-base font-bold text-neutral-900 group-hover:text-neutral-950 transition-colors line-clamp-1">
+                      <h3 className="text-base font-bold text-foreground group-hover:text-primary transition-colors line-clamp-1">
                         {item.nome}
                       </h3>
-                      <p className="text-xs text-neutral-500 leading-relaxed mt-1 line-clamp-2">
+                      <p className="text-xs text-muted-foreground leading-relaxed mt-1 line-clamp-2">
                         {item.descricao}
                       </p>
                     </div>
 
                     <div className="mt-3 flex items-baseline justify-between">
-                      <span className="text-base font-black text-neutral-900">
+                      <span className="text-base font-black text-foreground">
                         {item.precoBase.toLocaleString("pt-BR", {
                           style: "currency",
                           currency: "BRL",
                         })}
                       </span>
                       {item.grupoModificadores && item.grupoModificadores.length > 0 && (
-                        <span className="text-[10px] font-bold text-neutral-500 bg-neutral-100 px-2 py-0.5 rounded-full">
+                        <span className="text-[10px] font-bold text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
                           Personalizável
                         </span>
                       )}
@@ -706,7 +793,7 @@ export function MenuView({ restaurante, cardapio: cardapioInicial, numeroMesa: n
 
                   {/* Foto Otimizada */}
                   {item.fotoUrl && (
-                    <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-2xl overflow-hidden flex-shrink-0 bg-neutral-100 border border-neutral-100 shadow-inner">
+                    <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-2xl overflow-hidden flex-shrink-0 bg-muted border border-border shadow-inner">
                       <Image
                         src={item.fotoUrl}
                         alt={item.nome}

@@ -5,7 +5,8 @@ export type TemaId =
   | "dark-elegante"
   | "brasa-fogo"
   | "fresh-nature"
-  | "neon-pub";
+  | "neon-pub"
+  | "descanso-visual";
 
 export interface TemaDef {
   id: TemaId;
@@ -57,6 +58,14 @@ export const TEMAS_DISPONIVEIS: TemaDef[] = [
     corAmostra: "#020617",
     corPrimaria: "#8B5CF6",
   },
+  {
+    id: "descanso-visual",
+    nome: "Descanso Visual",
+    descricao: "Modo leitura acolhedor, tons quentes de pergaminho/sépia e zero fadiga ocular",
+    classe: "theme-descanso-visual",
+    corAmostra: "#F5EFE6",
+    corPrimaria: "#C26D2B",
+  },
 ];
 
 /**
@@ -78,6 +87,9 @@ export function obterClasseTema(tema?: string | null): string {
   }
   if (tema === "neon-pub") {
     return "theme-neon-pub";
+  }
+  if (tema === "descanso-visual") {
+    return "theme-descanso-visual";
   }
   return "";
 }
