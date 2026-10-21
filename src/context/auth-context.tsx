@@ -37,33 +37,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [restaurante, setRestaurante] = useState<Restaurante | null>(null);
   const [carregando, setCarregando] = useState(true);
 
-  // Monitora estado do Auth
+  // Monitora estado do Auth e escuta o documento do restaurante em tempo real
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (currentUser) => {
+    let unsubRestaurante: (() => void) | null = null;
+
+    const unsubAuth = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
+
+      if (unsubRestaurante) {
+        unsubRestaurante();
+        unsubRestaurante = null;
+      }
 
       if (currentUser && !currentUser.isAnonymous) {
         try {
+          const { onSnapshot } = await import("firebase/firestore");
           const restRef = doc(db, "restaurantes", currentUser.uid);
-          const snap = await getDoc(restRef);
 
-          if (snap.exists()) {
-            setRestaurante({ id: snap.id, ...snap.data() } as Restaurante);
-          } else {
-            // Se for login simulado demo
-            const sessaoSimulada = localStorage.getItem("mayamenu_mock_auth");
-            if (sessaoSimulada) {
-              setRestaurante(RESTAURANTE_DEMO);
-            } else {
-              // Carrega restaurante local criado offline se existir
+          unsubRestaurante = onSnapshot(
+            restRef,
+            (snap) => {
+              if (snap.exists()) {
+                setRestaurante({ id: snap.id, ...snap.data() } as Restaurante);
+              } else {
+                const restLocalSalvo = localStorage.getItem(`mayamenu_rest_${currentUser.uid}`);
+                if (restLocalSalvo) {
+                  setRestaurante(JSON.parse(restLocalSalvo));
+                } else {
+                  setRestaurante(null);
+                }
+              }
+              setCarregando(false);
+            },
+            (err) => {
+              console.warn("Falha no listener do restaurante (usando cache local):", err);
               const restLocalSalvo = localStorage.getItem(`mayamenu_rest_${currentUser.uid}`);
               if (restLocalSalvo) {
                 setRestaurante(JSON.parse(restLocalSalvo));
-              } else {
-                setRestaurante(null);
               }
+              setCarregando(false);
             }
-          }
+          );
         } catch {
           const restLocalSalvo = localStorage.getItem(`mayamenu_rest_${currentUser.uid}`);
           if (restLocalSalvo) {
@@ -71,6 +85,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           } else {
             setRestaurante(null);
           }
+          setCarregando(false);
         }
       } else {
         // Verifica se há sessão simulada puramente demo
@@ -85,11 +100,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } else {
           setRestaurante(null);
         }
+        setCarregando(false);
       }
-      setCarregando(false);
     });
 
-    return () => unsub();
+    return () => {
+      unsubAuth();
+      if (unsubRestaurante) unsubRestaurante();
+    };
   }, []);
 
   const login = async (email: string, pass: string) => {

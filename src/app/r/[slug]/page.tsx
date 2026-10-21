@@ -52,6 +52,27 @@ async function MenuContent({
     );
   }
 
+  // Guard de Suspensão de Estabelecimento: bloqueia pedidos nas mesas se o restaurante estiver suspenso
+  if (restaurante.suspenso || restaurante.configuracoes?.suspenso) {
+    return (
+      <main className="min-h-screen bg-neutral-950 text-white flex flex-col items-center justify-center p-6 text-center antialiased">
+        <div className="max-w-md w-full bg-neutral-900/80 border border-rose-900/40 p-8 rounded-3xl backdrop-blur-md shadow-2xl flex flex-col items-center space-y-5">
+          <div className="w-16 h-16 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-500 flex items-center justify-center">
+            <Store className="w-8 h-8" />
+          </div>
+          <div className="space-y-2">
+            <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+              {restaurante.nome}
+            </h1>
+            <p className="text-xs sm:text-sm text-neutral-400 leading-relaxed">
+              O atendimento digital deste estabelecimento está temporariamente pausado. Por favor, solicite atendimento diretamente à equipe no local.
+            </p>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
   const cardapio = await obterCardapioDoRestaurante(restaurante.id);
 
   return (

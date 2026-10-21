@@ -3,9 +3,10 @@
 import { AuthProvider, useAuth } from "@/context/auth-context";
 import { AdminLoginForm } from "@/components/admin/admin-login-form";
 import { AdminDashboard } from "@/components/admin/admin-dashboard";
+import { EstabelecimentoSuspensoView } from "@/components/admin/estabelecimento-suspenso-view";
 
 function AdminPageContent() {
-  const { user, carregando } = useAuth();
+  const { user, restaurante, carregando } = useAuth();
 
   if (carregando) {
     return (
@@ -24,6 +25,11 @@ function AdminPageContent() {
         <AdminLoginForm />
       </div>
     );
+  }
+
+  // Guard de Suspensão de Estabelecimento em Tempo Real
+  if (restaurante && (restaurante.suspenso || restaurante.configuracoes?.suspenso)) {
+    return <EstabelecimentoSuspensoView restaurante={restaurante} />;
   }
 
   return <AdminDashboard />;

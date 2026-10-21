@@ -84,6 +84,11 @@ export async function obterRestaurantePorSlugValido(slug: string): Promise<Resta
         ownerId: data.ownerId || docSnap.id,
         slug: data.slug || slugLimpo,
         nome: data.nome || "Restaurante",
+        plano: data.plano,
+        maxMesas: data.maxMesas,
+        maxPratos: data.maxPratos,
+        suspenso: data.suspenso,
+        licenca: data.licenca,
         configuracoes: {
           corPrimaria: data.configuracoes?.corPrimaria || "#E11D48",
           tema: data.configuracoes?.tema || "light",
@@ -92,6 +97,7 @@ export async function obterRestaurantePorSlugValido(slug: string): Promise<Resta
           modoOperacao: data.configuracoes?.modoOperacao || "hibrido",
           modoFilaKds: data.configuracoes?.modoFilaKds || "sequencial",
           taxaServico: typeof data.configuracoes?.taxaServico === "number" ? data.configuracoes.taxaServico : 10,
+          suspenso: data.configuracoes?.suspenso,
         },
       };
     }
@@ -105,6 +111,11 @@ export async function obterRestaurantePorSlugValido(slug: string): Promise<Resta
         ownerId: data.ownerId || directDoc.id,
         slug: data.slug || slugLimpo,
         nome: data.nome || "Restaurante",
+        plano: data.plano,
+        maxMesas: data.maxMesas,
+        maxPratos: data.maxPratos,
+        suspenso: data.suspenso,
+        licenca: data.licenca,
         configuracoes: {
           corPrimaria: data.configuracoes?.corPrimaria || "#E11D48",
           tema: data.configuracoes?.tema || "light",
@@ -113,6 +124,7 @@ export async function obterRestaurantePorSlugValido(slug: string): Promise<Resta
           modoOperacao: data.configuracoes?.modoOperacao || "hibrido",
           modoFilaKds: data.configuracoes?.modoFilaKds || "sequencial",
           taxaServico: typeof data.configuracoes?.taxaServico === "number" ? data.configuracoes.taxaServico : 10,
+          suspenso: data.configuracoes?.suspenso,
         },
       };
     }
