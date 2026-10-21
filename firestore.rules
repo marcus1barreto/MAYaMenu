@@ -63,7 +63,20 @@ service cloud.firestore {
       
       // Criação inicial via runTransaction de ativação
       allow create: if isNonAnonymous() && request.resource.data.ownerId == request.auth.uid;
-      allow update, delete: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      
+      // Permite atualização pelo dono OU governança de plano/suspensão via SuperAdmin
+      allow update: if (isSignedIn() && resource.data.ownerId == request.auth.uid)
+        || (isNonAnonymous() && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'plano',
+            'maxMesas',
+            'maxPratos',
+            'licenca',
+            'suspenso',
+            'configuracoes',
+            'atualizadoEm'
+          ]));
+
+      allow delete: if isSignedIn() && resource.data.ownerId == request.auth.uid;
 
       // Cardápio
       match /cardapio/{itemId} {
