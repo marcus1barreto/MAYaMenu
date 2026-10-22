@@ -26,7 +26,7 @@ import { GuidedEmptyCardapio } from "./guided-empty-cardapio";
 import { AdminQrScannerModal } from "./admin-qr-scanner-modal";
 import { ModificadorBuilder } from "./modificador-builder";
 import { MAYA_MEDIA_LIBRARY } from "@/lib/maya-media-library";
-import { TEMAS_DISPONIVEIS } from "@/lib/tema";
+import { TEMAS_DISPONIVEIS, FAMILIAS_TEMAS, type TemaId } from "@/lib/tema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -125,9 +125,9 @@ export function AdminDashboard() {
   const [corPrimaria, setCorPrimaria] = useState(
     restaurante?.configuracoes?.corPrimaria || "#E11D48"
   );
-  const [temaSelecionado, setTemaSelecionado] = useState<
-    "white-label" | "dark-elegante" | "brasa-fogo" | "fresh-nature" | "neon-pub"
-  >((restaurante?.configuracoes?.tema as any) || "white-label");
+  const [temaSelecionado, setTemaSelecionado] = useState<TemaId>(
+    (restaurante?.configuracoes?.tema as TemaId) || "white-label"
+  );
   const [modoOperacao, setModoOperacao] = useState<"com_garcom" | "hibrido" | "balcao">(
     restaurante?.configuracoes?.modoOperacao || "hibrido"
   );
@@ -881,10 +881,14 @@ export function AdminDashboard() {
               className="bg-transparent text-white font-bold text-xs outline-none cursor-pointer pr-1"
               title="Trocar tema visual do restaurante por completo"
             >
-              {TEMAS_DISPONIVEIS.map((t) => (
-                <option key={t.id} value={t.id} className="bg-neutral-900 text-white">
-                  {t.nome}
-                </option>
+              {FAMILIAS_TEMAS.map((familia) => (
+                <optgroup key={familia.id} label={`${familia.icone} ${familia.nome}`} className="bg-neutral-900 text-neutral-400 font-bold">
+                  {familia.temas.map((t) => (
+                    <option key={t.id} value={t.id} className="bg-neutral-900 text-white font-normal">
+                      {t.nome}
+                    </option>
+                  ))}
+                </optgroup>
               ))}
             </select>
           </div>
@@ -1913,56 +1917,130 @@ export function AdminDashboard() {
           </DialogHeader>
 
           <div className="space-y-6 pt-2">
-            {/* SELETOR DE TEMAS ELEGANTES (WHITE-LABEL + 4 VARIAÇÕES) */}
-            <div className="space-y-3 p-4 rounded-xl bg-neutral-950/60 border border-neutral-800">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-bold uppercase tracking-wider text-neutral-300 flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                  Tema Visual do Cardápio & App
-                </label>
-                <Badge className="bg-neutral-800 text-neutral-300 border-neutral-700 text-[10px]">
-                  {TEMAS_DISPONIVEIS.find((t) => t.id === temaSelecionado)?.nome || "Padrão"}
+            {/* CATÁLOGO DE IDENTIDADES: AS 5 GRANDES FAMÍLIAS DE ESTILOS */}
+            <div className="space-y-4 p-4 rounded-2xl bg-neutral-950/70 border border-neutral-800">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-neutral-800/80 pb-3">
+                <div>
+                  <label className="text-xs font-black uppercase tracking-wider text-neutral-200 flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-amber-400" />
+                    Cards de Identidade Visual (5 Famílias de Estilo)
+                  </label>
+                  <p className="text-[11px] text-neutral-400 mt-0.5">
+                    Substituímos seletores caóticos por blocos semânticos com psicologia das cores e tipografia de alto impacto.
+                  </p>
+                </div>
+                <Badge className="bg-rose-500/20 text-rose-300 border-rose-500/40 text-[11px] font-bold self-start sm:self-auto">
+                  Ativo: {TEMAS_DISPONIVEIS.find((t) => t.id === temaSelecionado)?.nome || "Padrão"}
                 </Badge>
               </div>
-              <p className="text-xs text-neutral-400">
-                Selecione a identidade visual do seu cardápio com proteção visual e carregamento seguro:
-              </p>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
-                {TEMAS_DISPONIVEIS.map((tema) => {
-                  const isAtivo = temaSelecionado === tema.id;
-                  return (
-                    <button
-                      key={tema.id}
-                      type="button"
-                      onClick={() => {
-                        setTemaSelecionado(tema.id);
-                        setCorPrimaria(tema.corPrimaria);
-                      }}
-                      className={`p-3 rounded-xl border text-left transition-all relative flex flex-col justify-between gap-2 ${
-                        isAtivo
-                          ? "bg-neutral-900 border-rose-500 shadow-md ring-1 ring-rose-500/50"
-                          : "bg-neutral-900/50 border-neutral-800 hover:border-neutral-700 text-neutral-400"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between w-full">
+              {/* ITERAÇÃO PELAS 5 GRANDES FAMÍLIAS */}
+              <div className="space-y-5 pt-1">
+                {FAMILIAS_TEMAS.map((familia) => (
+                  <div
+                    key={familia.id}
+                    className="p-3.5 rounded-xl bg-neutral-900/60 border border-neutral-800/90 space-y-3"
+                  >
+                    {/* Cabeçalho da Família Semântica */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="space-y-0.5">
                         <div className="flex items-center gap-2">
-                          <span
-                            className="w-4 h-4 rounded-full border border-neutral-700 shrink-0 shadow-sm"
-                            style={{ backgroundColor: tema.corAmostra }}
-                          />
-                          <span className={`text-xs font-bold ${isAtivo ? "text-white" : "text-neutral-300"}`}>
-                            {tema.nome}
-                          </span>
+                          <span className="text-lg">{familia.icone}</span>
+                          <h4 className="text-xs font-black uppercase tracking-wider text-white">
+                            {familia.nome}
+                          </h4>
                         </div>
-                        {isAtivo && <Check className="w-3.5 h-3.5 text-rose-500 shrink-0" />}
+                        <p className="text-[11px] text-neutral-400 font-medium leading-snug">
+                          <strong>Público:</strong> {familia.publico}
+                        </p>
+                        <p className="text-[10px] text-neutral-500 italic">
+                          💡 {familia.psicologia}
+                        </p>
                       </div>
-                      <p className="text-[10px] text-neutral-400 leading-tight">
-                        {tema.descricao}
-                      </p>
-                    </button>
-                  );
-                })}
+                    </div>
+
+                    {/* Cards de Identidade (Sub-temas da Família) */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                      {familia.temas.map((tema) => {
+                        const isAtivo = temaSelecionado === tema.id;
+                        return (
+                          <button
+                            key={tema.id}
+                            type="button"
+                            onClick={() => {
+                              setTemaSelecionado(tema.id);
+                              setCorPrimaria(tema.corPrimaria);
+                            }}
+                            className={`p-3.5 rounded-xl border text-left transition-all relative flex flex-col justify-between gap-3 group ${
+                              isAtivo
+                                ? "bg-neutral-900 border-rose-500 shadow-xl ring-2 ring-rose-500/50 scale-[1.01]"
+                                : "bg-neutral-950/60 border-neutral-800 hover:border-neutral-700 text-neutral-300 hover:bg-neutral-900/40"
+                            }`}
+                          >
+                            {/* Preview Mockup em Miniatura */}
+                            <div
+                              className="w-full h-14 rounded-lg p-2.5 flex items-center justify-between border shadow-inner transition-transform group-hover:scale-[1.01]"
+                              style={{
+                                backgroundColor: tema.corAmostra,
+                                borderColor: isAtivo ? tema.corPrimaria : "rgba(255,255,255,0.1)",
+                              }}
+                            >
+                              <div className="space-y-0.5">
+                                <span
+                                  className={`text-xs block font-bold leading-none ${
+                                    tema.fonteTitulo === "serif" ? "font-serif italic" : "font-sans"
+                                  }`}
+                                  style={{ color: tema.corTexto }}
+                                >
+                                  {tema.nome}
+                                </span>
+                                <span
+                                  className="text-[9px] block opacity-75 font-mono"
+                                  style={{ color: tema.corTexto }}
+                                >
+                                  R$ 38,90
+                                </span>
+                              </div>
+
+                              {/* Mini Botão de Ação CTA */}
+                              <div
+                                className="px-2.5 py-1 rounded-md text-[9px] font-black uppercase tracking-wider shadow-sm flex items-center gap-1"
+                                style={{
+                                  backgroundColor: tema.corPrimaria,
+                                  color: tema.id === "premium-asfalto" || tema.id === "boemia-marinho" ? "#020617" : "#FFFFFF",
+                                }}
+                              >
+                                Pedir
+                              </div>
+                            </div>
+
+                            {/* Informações Textuais & Selos */}
+                            <div className="space-y-1 w-full">
+                              <div className="flex items-center justify-between w-full">
+                                <span className={`text-xs font-black ${isAtivo ? "text-white" : "text-neutral-200"}`}>
+                                  {tema.subtitulo}
+                                </span>
+                                {isAtivo ? (
+                                  <Badge className="bg-rose-500 text-white font-black text-[9px] h-4 px-1.5 flex items-center gap-1">
+                                    <Check className="w-2.5 h-2.5" />
+                                    Ativo
+                                  </Badge>
+                                ) : tema.badge ? (
+                                  <span className="text-[9px] font-bold text-amber-400 bg-amber-400/10 px-1.5 py-0.5 rounded">
+                                    {tema.badge}
+                                  </span>
+                                ) : null}
+                              </div>
+                              <p className="text-[11px] text-neutral-400 leading-relaxed">
+                                {tema.descricao}
+                              </p>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
             {/* COR PRIMÁRIA */}

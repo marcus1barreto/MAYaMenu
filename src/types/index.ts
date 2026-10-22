@@ -18,7 +18,20 @@ export interface Restaurante {
   licenca?: Partial<Licenca>;
   configuracoes: {
     corPrimaria: string; // Injetada no Tailwind
-    tema: 'light' | 'dark' | 'white-label' | 'dark-elegante' | 'brasa-fogo' | 'fresh-nature' | 'neon-pub' | 'descanso-visual';
+    tema:
+      | 'light'
+      | 'dark'
+      | 'white-label'
+      | 'fast-carbono'
+      | 'brisa-areia'
+      | 'boemia-marinho'
+      | 'premium-asfalto'
+      | 'acessibilidade-sepia'
+      | 'dark-elegante'
+      | 'brasa-fogo'
+      | 'fresh-nature'
+      | 'neon-pub'
+      | 'descanso-visual';
     logoUrl?: string;
     capaUrl?: string; // Se vazio, o app usa a capa padrão rústica
     modoOperacao?: ModoOperacao; // 'com_garcom' | 'hibrido' (padrão) | 'balcao'

@@ -7,9 +7,10 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
+  --font-sans: var(--font-inter, var(--font-geist-sans), sans-serif);
+  --font-serif: var(--font-playfair, Georgia, serif);
   --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-sans);
+  --font-heading: var(--font-heading-choice, var(--font-sans));
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -50,11 +51,11 @@
 
 :root {
   /* ----------------------------------------------------
-     1. TEMA PADRÃO: WHITE-LABEL (Ifood Style) 
-     Foco: Claro, limpo, botão vermelho chama-fome
+     BASE DE OURO: WHITE-LABEL (iFood Style) & ACESSIBILIDADE
+     Fundo: #FFFFFF | Botão: #E11D48 Vermelho Carmesim
   ----------------------------------------------------- */
-  --background: hsl(0 0% 100%); /* Branco absoluto */
-  --foreground: hsl(240 10% 3.9%); /* Texto: Zinc 950 */
+  --background: hsl(0 0% 100%);
+  --foreground: hsl(240 10% 3.9%); /* Zinc 950 */
   --card: hsl(0 0% 100%);
   --card-foreground: hsl(240 10% 3.9%);
   --popover: hsl(0 0% 100%);
@@ -72,7 +73,8 @@
   --border: hsl(240 5.9% 90%);
   --input: hsl(240 5.9% 90%);
   --ring: hsl(346.8 77.2% 49.8%);
-  --radius: 0.75rem; /* Bordas arredondadas e amigáveis */
+  --radius: 0.875rem;
+  --font-heading-choice: var(--font-sans);
   --sidebar: hsl(0 0% 98%);
   --sidebar-foreground: hsl(240 10% 3.9%);
   --sidebar-primary: hsl(346.8 77.2% 49.8%);
@@ -84,19 +86,128 @@
 }
 
 /* ----------------------------------------------------
-   2. TEMA: DARK ELEGANTE (Alta Gastronomia) 
-   Foco: Fundo chumbo, zero preto puro, botões dourados
+   FAMÍLIA 1: FAST & FURIOUS (Alta Rotação)
+   Fundo: Carbono Quente #1C1917 | Ação: Laranja Fogo #F97316
 ----------------------------------------------------- */
+.theme-fast-carbono,
+.theme-brasa-fogo {
+  --background: hsl(24 10% 10%); /* Carbono Quente #1C1917 */
+  --foreground: hsl(30 30% 98%);
+  --card: hsl(24 9% 15%);
+  --card-foreground: hsl(30 30% 98%);
+  --popover: hsl(24 9% 15%);
+  --popover-foreground: hsl(30 30% 98%);
+  --primary: hsl(24.6 95% 53.1%); /* Laranja Fogo / Brasa */
+  --primary-foreground: hsl(60 9.1% 97.8%);
+  --secondary: hsl(20 8% 20%);
+  --secondary-foreground: hsl(30 30% 98%);
+  --muted: hsl(20 8% 20%);
+  --muted-foreground: hsl(24 8% 65%);
+  --accent: hsl(20 8% 20%);
+  --accent-foreground: hsl(30 30% 98%);
+  --destructive: hsl(0 62.8% 30.6%);
+  --destructive-foreground: hsl(60 9.1% 97.8%);
+  --border: hsl(24 8% 22%);
+  --input: hsl(24 8% 22%);
+  --ring: hsl(24.6 95% 53.1%);
+  --font-heading-choice: var(--font-sans);
+  --sidebar: hsl(24 9% 15%);
+  --sidebar-foreground: hsl(30 30% 98%);
+  --sidebar-primary: hsl(24.6 95% 53.1%);
+  --sidebar-primary-foreground: hsl(60 9.1% 97.8%);
+  --sidebar-accent: hsl(20 8% 20%);
+  --sidebar-accent-foreground: hsl(30 30% 98%);
+  --sidebar-border: hsl(24 8% 22%);
+  --sidebar-ring: hsl(24.6 95% 53.1%);
+}
+
+/* ----------------------------------------------------
+   FAMÍLIA 2: BRISA & NATUREZA (Leveza & Dia)
+   Fundo: Areia #FAFAF9 | Ação: Verde Esmeralda #059669 | Textos: Café Suave
+----------------------------------------------------- */
+.theme-brisa-areia,
+.theme-fresh-nature {
+  --background: hsl(60 9.1% 97.8%); /* Areia/Bege suave #FAFAF9 */
+  --foreground: hsl(24 9.8% 10%); /* Café escuro em vez de preto puro */
+  --card: hsl(0 0% 100%);
+  --card-foreground: hsl(24 9.8% 10%);
+  --popover: hsl(0 0% 100%);
+  --popover-foreground: hsl(24 9.8% 10%);
+  --primary: hsl(142.1 76.2% 36.3%); /* Verde Esmeralda 600 */
+  --primary-foreground: hsl(355.7 100% 97.3%);
+  --secondary: hsl(60 4.8% 94%);
+  --secondary-foreground: hsl(24 9.8% 10%);
+  --muted: hsl(60 4.8% 94%);
+  --muted-foreground: hsl(25 10% 40%); /* Marrom suave */
+  --accent: hsl(60 4.8% 94%);
+  --accent-foreground: hsl(24 9.8% 10%);
+  --destructive: hsl(0 84.2% 60.2%);
+  --destructive-foreground: hsl(0 0% 98%);
+  --border: hsl(40 10% 88%);
+  --input: hsl(40 10% 88%);
+  --ring: hsl(142.1 76.2% 36.3%);
+  --font-heading-choice: var(--font-sans);
+  --sidebar: hsl(0 0% 100%);
+  --sidebar-foreground: hsl(24 9.8% 10%);
+  --sidebar-primary: hsl(142.1 76.2% 36.3%);
+  --sidebar-primary-foreground: hsl(355.7 100% 97.3%);
+  --sidebar-accent: hsl(60 4.8% 94%);
+  --sidebar-accent-foreground: hsl(24 9.8% 10%);
+  --sidebar-border: hsl(40 10% 88%);
+  --sidebar-ring: hsl(142.1 76.2% 36.3%);
+}
+
+/* ----------------------------------------------------
+   FAMÍLIA 3: BOEMIA NOTURNA (Conforto na Penumbra)
+   Fundo: Azul Marinho Profundo #020617 | Ação: Ciano Neon Contido #06B6D4
+----------------------------------------------------- */
+.theme-boemia-marinho,
+.theme-neon-pub {
+  --background: hsl(222.2 84% 4.9%); /* Azul Marinho Profundo #020617 */
+  --foreground: hsl(210 40% 98%);
+  --card: hsl(222.2 45% 10%);
+  --card-foreground: hsl(210 40% 98%);
+  --popover: hsl(222.2 45% 10%);
+  --popover-foreground: hsl(210 40% 98%);
+  --primary: hsl(188.7 94.5% 42.7%); /* Ciano Neon Contido */
+  --primary-foreground: hsl(222.2 84% 4.9%);
+  --secondary: hsl(217.2 32.6% 16%);
+  --secondary-foreground: hsl(210 40% 98%);
+  --muted: hsl(217.2 32.6% 16%);
+  --muted-foreground: hsl(215 15% 65%); /* Cinza médio, não cega */
+  --accent: hsl(217.2 32.6% 16%);
+  --accent-foreground: hsl(210 40% 98%);
+  --destructive: hsl(0 62.8% 30.6%);
+  --destructive-foreground: hsl(210 40% 98%);
+  --border: hsl(217.2 32.6% 16%);
+  --input: hsl(217.2 32.6% 16%);
+  --ring: hsl(188.7 94.5% 42.7%);
+  --font-heading-choice: var(--font-sans);
+  --sidebar: hsl(222.2 45% 10%);
+  --sidebar-foreground: hsl(210 40% 98%);
+  --sidebar-primary: hsl(188.7 94.5% 42.7%);
+  --sidebar-primary-foreground: hsl(222.2 84% 4.9%);
+  --sidebar-accent: hsl(217.2 32.6% 16%);
+  --sidebar-accent-foreground: hsl(210 40% 98%);
+  --sidebar-border: hsl(217.2 32.6% 16%);
+  --sidebar-ring: hsl(188.7 94.5% 42.7%);
+}
+
+/* ----------------------------------------------------
+   FAMÍLIA 4: PREMIUM & TRADIÇÃO (Alto Ticket)
+   Fundo: Asfalto Elegante #09090B | Ação: Ouro Nobre #D97706 | Título: Serif
+----------------------------------------------------- */
+.theme-premium-asfalto,
 .theme-dark-elegante,
 .dark {
-  --background: hsl(240 10% 3.9%); /* Zinc 950 */
+  --background: hsl(240 10% 3.9%); /* Preto Asfalto Elegante #09090B */
   --foreground: hsl(0 0% 98%);
-  --card: hsl(240 5% 9%); /* Levemente mais claro que o fundo */
+  --card: hsl(240 5% 9%);
   --card-foreground: hsl(0 0% 98%);
   --popover: hsl(240 5% 9%);
   --popover-foreground: hsl(0 0% 98%);
-  --primary: hsl(43 96% 56%); /* Dourado/Âmbar */
-  --primary-foreground: hsl(240 10% 3.9%); /* Texto escuro no botão dourado */
+  --primary: hsl(37.7 92.1% 50.2%); /* Dourado / Âmbar Nobre */
+  --primary-foreground: hsl(240 10% 3.9%);
   --secondary: hsl(240 3.7% 15.9%);
   --secondary-foreground: hsl(0 0% 98%);
   --muted: hsl(240 3.7% 15.9%);
@@ -105,153 +216,54 @@
   --accent-foreground: hsl(0 0% 98%);
   --destructive: hsl(0 62.8% 30.6%);
   --destructive-foreground: hsl(0 0% 98%);
-  --border: hsl(240 3.7% 15.9%);
-  --input: hsl(240 3.7% 15.9%);
-  --ring: hsl(43 96% 56%);
+  --border: hsl(240 4% 18%);
+  --input: hsl(240 4% 18%);
+  --ring: hsl(37.7 92.1% 50.2%);
+  --font-heading-choice: var(--font-serif); /* Serif clássico e requintado */
   --sidebar: hsl(240 5% 9%);
   --sidebar-foreground: hsl(0 0% 98%);
-  --sidebar-primary: hsl(43 96% 56%);
+  --sidebar-primary: hsl(37.7 92.1% 50.2%);
   --sidebar-primary-foreground: hsl(240 10% 3.9%);
   --sidebar-accent: hsl(240 3.7% 15.9%);
   --sidebar-accent-foreground: hsl(0 0% 98%);
-  --sidebar-border: hsl(240 3.7% 15.9%);
-  --sidebar-ring: hsl(43 96% 56%);
+  --sidebar-border: hsl(240 4% 18%);
+  --sidebar-ring: hsl(37.7 92.1% 50.2%);
 }
 
 /* ----------------------------------------------------
-   3. TEMA: BRASA & FOGO (Fast Food e Burgers)
-   Foco: Fundo carbono, botão laranja agressivo
+   FAMÍLIA 5: ACESSIBILIDADE & FOCO (Descanso de Vista)
+   Fundo: Solarized Paper #FDF6E3 | Ação: Terracota #C26D2B | -80% Luz Azul
 ----------------------------------------------------- */
-.theme-brasa-fogo {
-  --background: hsl(20 14.3% 4.1%); /* Marrom/Carbono muito escuro */
-  --foreground: hsl(60 9.1% 97.8%);
-  --card: hsl(24 9.8% 10%);
-  --card-foreground: hsl(60 9.1% 97.8%);
-  --popover: hsl(24 9.8% 10%);
-  --popover-foreground: hsl(60 9.1% 97.8%);
-  --primary: hsl(24.6 95% 53.1%); /* Laranja Fogo */
-  --primary-foreground: hsl(60 9.1% 97.8%);
-  --secondary: hsl(12 6.5% 15.1%);
-  --secondary-foreground: hsl(60 9.1% 97.8%);
-  --muted: hsl(12 6.5% 15.1%);
-  --muted-foreground: hsl(24 5.4% 63.9%);
-  --accent: hsl(12 6.5% 15.1%);
-  --accent-foreground: hsl(60 9.1% 97.8%);
-  --destructive: hsl(0 62.8% 30.6%);
-  --destructive-foreground: hsl(60 9.1% 97.8%);
-  --border: hsl(12 6.5% 15.1%);
-  --input: hsl(12 6.5% 15.1%);
-  --ring: hsl(24.6 95% 53.1%);
-  --sidebar: hsl(24 9.8% 10%);
-  --sidebar-foreground: hsl(60 9.1% 97.8%);
-  --sidebar-primary: hsl(24.6 95% 53.1%);
-  --sidebar-primary-foreground: hsl(60 9.1% 97.8%);
-  --sidebar-accent: hsl(12 6.5% 15.1%);
-  --sidebar-accent-foreground: hsl(60 9.1% 97.8%);
-  --sidebar-border: hsl(12 6.5% 15.1%);
-  --sidebar-ring: hsl(24.6 95% 53.1%);
-}
-
-/* ----------------------------------------------------
-   4. TEMA: FRESH & NATURE (Saudável, Orgânico)
-   Foco: Fundo areia, botões verde esmeralda
------------------------------------------------------ */
-.theme-fresh-nature {
-  --background: hsl(60 9.1% 97.8%); /* Stone 50 (Areia) */
-  --foreground: hsl(24 9.8% 10%); /* Stone 900 */
-  --card: hsl(0 0% 100%);
-  --card-foreground: hsl(24 9.8% 10%);
-  --popover: hsl(0 0% 100%);
-  --popover-foreground: hsl(24 9.8% 10%);
-  --primary: hsl(142.1 76.2% 36.3%); /* Verde Esmeralda 600 */
-  --primary-foreground: hsl(355.7 100% 97.3%);
-  --secondary: hsl(60 4.8% 95.9%);
-  --secondary-foreground: hsl(24 9.8% 10%);
-  --muted: hsl(60 4.8% 95.9%);
-  --muted-foreground: hsl(25 5.3% 44.7%);
-  --accent: hsl(60 4.8% 95.9%);
-  --accent-foreground: hsl(24 9.8% 10%);
-  --destructive: hsl(0 84.2% 60.2%);
-  --destructive-foreground: hsl(0 0% 98%);
-  --border: hsl(20 5.9% 90%);
-  --input: hsl(20 5.9% 90%);
-  --ring: hsl(142.1 76.2% 36.3%);
-  --sidebar: hsl(0 0% 100%);
-  --sidebar-foreground: hsl(24 9.8% 10%);
-  --sidebar-primary: hsl(142.1 76.2% 36.3%);
-  --sidebar-primary-foreground: hsl(355.7 100% 97.3%);
-  --sidebar-accent: hsl(60 4.8% 95.9%);
-  --sidebar-accent-foreground: hsl(24 9.8% 10%);
-  --sidebar-border: hsl(20 5.9% 90%);
-  --sidebar-ring: hsl(142.1 76.2% 36.3%);
-}
-
-/* ----------------------------------------------------
-   5. TEMA: NEON PUB (Baladas e Food Trucks)
-   Foco: Fundo azul marinho profundo, ação em roxo vivo
------------------------------------------------------ */
-.theme-neon-pub {
-  --background: hsl(222.2 84% 4.9%); /* Slate 950 */
-  --foreground: hsl(210 40% 98%);
-  --card: hsl(222.2 47.4% 11.2%);
-  --card-foreground: hsl(210 40% 98%);
-  --popover: hsl(222.2 47.4% 11.2%);
-  --popover-foreground: hsl(210 40% 98%);
-  --primary: hsl(262.1 83.3% 57.8%); /* Roxo Violeta Brilhante */
-  --primary-foreground: hsl(210 40% 98%);
-  --secondary: hsl(217.2 32.6% 17.5%);
-  --secondary-foreground: hsl(210 40% 98%);
-  --muted: hsl(217.2 32.6% 17.5%);
-  --muted-foreground: hsl(215 20.2% 65.1%);
-  --accent: hsl(217.2 32.6% 17.5%);
-  --accent-foreground: hsl(210 40% 98%);
-  --destructive: hsl(0 62.8% 30.6%);
-  --destructive-foreground: hsl(210 40% 98%);
-  --border: hsl(217.2 32.6% 17.5%);
-  --input: hsl(217.2 32.6% 17.5%);
-  --ring: hsl(262.1 83.3% 57.8%);
-  --sidebar: hsl(222.2 47.4% 11.2%);
-  --sidebar-foreground: hsl(210 40% 98%);
-  --sidebar-primary: hsl(262.1 83.3% 57.8%);
-  --sidebar-primary-foreground: hsl(210 40% 98%);
-  --sidebar-accent: hsl(217.2 32.6% 17.5%);
-  --sidebar-accent-foreground: hsl(210 40% 98%);
-  --sidebar-border: hsl(217.2 32.6% 17.5%);
-  --sidebar-ring: hsl(262.1 83.3% 57.8%);
-}
-
-/* ----------------------------------------------------
-   6. TEMA: DESCANSO VISUAL (Warm Sepia & Paper)
-   Foco: Luz âmbar/quente, zero fadiga ocular, papel artesanal
------------------------------------------------------ */
+.theme-acessibilidade-sepia,
 .theme-descanso-visual {
-  --background: hsl(38 35% 93%); /* Bege papel quente suave */
-  --foreground: hsl(30 20% 18%); /* Marrom café profundo, sem contraste agressivo */
-  --card: hsl(38 40% 96%); /* Cartão pergaminho sutil */
-  --card-foreground: hsl(30 20% 18%);
-  --popover: hsl(38 40% 96%);
-  --popover-foreground: hsl(30 20% 18%);
-  --primary: hsl(32 80% 45%); /* Âmbar terracota quente e acolhedor */
-  --primary-foreground: hsl(38 35% 98%);
-  --secondary: hsl(36 25% 88%);
-  --secondary-foreground: hsl(30 20% 18%);
-  --muted: hsl(36 25% 88%);
+  --background: hsl(44 87% 94%); /* Solarized Base #FDF6E3 */
+  --foreground: hsl(30 25% 15%); /* Marrom café profundo, zero estresse */
+  --card: hsl(44 70% 97%);
+  --card-foreground: hsl(30 25% 15%);
+  --popover: hsl(44 70% 97%);
+  --popover-foreground: hsl(30 25% 15%);
+  --primary: hsl(26 65% 46%); /* Terracota âmbar acolhedor */
+  --primary-foreground: hsl(44 87% 98%);
+  --secondary: hsl(42 35% 88%);
+  --secondary-foreground: hsl(30 25% 15%);
+  --muted: hsl(42 35% 88%);
   --muted-foreground: hsl(30 15% 42%);
-  --accent: hsl(36 25% 88%);
-  --accent-foreground: hsl(30 20% 18%);
+  --accent: hsl(42 35% 88%);
+  --accent-foreground: hsl(30 25% 15%);
   --destructive: hsl(0 65% 50%);
-  --destructive-foreground: hsl(38 35% 98%);
-  --border: hsl(35 25% 82%);
-  --input: hsl(35 25% 82%);
-  --ring: hsl(32 80% 45%);
-  --sidebar: hsl(38 40% 96%);
-  --sidebar-foreground: hsl(30 20% 18%);
-  --sidebar-primary: hsl(32 80% 45%);
-  --sidebar-primary-foreground: hsl(38 35% 98%);
-  --sidebar-accent: hsl(36 25% 88%);
-  --sidebar-accent-foreground: hsl(30 20% 18%);
-  --sidebar-border: hsl(35 25% 82%);
-  --sidebar-ring: hsl(32 80% 45%);
+  --destructive-foreground: hsl(44 87% 98%);
+  --border: hsl(38 30% 82%);
+  --input: hsl(38 30% 82%);
+  --ring: hsl(26 65% 46%);
+  --font-heading-choice: var(--font-sans);
+  --sidebar: hsl(44 70% 97%);
+  --sidebar-foreground: hsl(30 25% 15%);
+  --sidebar-primary: hsl(26 65% 46%);
+  --sidebar-primary-foreground: hsl(44 87% 98%);
+  --sidebar-accent: hsl(42 35% 88%);
+  --sidebar-accent-foreground: hsl(30 25% 15%);
+  --sidebar-border: hsl(38 30% 82%);
+  --sidebar-ring: hsl(26 65% 46%);
 }
 
 @layer base {

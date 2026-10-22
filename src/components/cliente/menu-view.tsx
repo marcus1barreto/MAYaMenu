@@ -79,11 +79,11 @@ export function MenuView({ restaurante, cardapio: cardapioInicial, numeroMesa: n
 
   const classeModoVisual =
     modoVisualCliente === "dia"
-      ? "" // Herda :root branco puro
+      ? "" // Herda :root branco puro (iFood Style)
       : modoVisualCliente === "noite"
-      ? "theme-dark-elegante"
+      ? "theme-boemia-marinho"
       : modoVisualCliente === "descanso"
-      ? "theme-descanso-visual"
+      ? "theme-acessibilidade-sepia"
       : ""; // 'padrao' herda o tema configurado pelo restaurante no container pai
 
   // Categorias únicas disponíveis no cardápio na ordem em que aparecem no cardápio ordenado
@@ -768,23 +768,23 @@ export function MenuView({ restaurante, cardapio: cardapioInicial, numeroMesa: n
                   {/* Informações Textuais */}
                   <div className="flex-1 min-w-0 flex flex-col justify-between">
                     <div>
-                      <h3 className="text-base font-bold text-foreground group-hover:text-primary transition-colors line-clamp-1">
+                      <h3 className="text-[17px] sm:text-lg font-bold font-heading text-foreground group-hover:text-primary transition-colors line-clamp-1 tracking-tight">
                         {item.nome}
                       </h3>
-                      <p className="text-xs text-muted-foreground leading-relaxed mt-1 line-clamp-2">
+                      <p className="text-sm text-muted-foreground leading-relaxed mt-1 line-clamp-2">
                         {item.descricao}
                       </p>
                     </div>
 
                     <div className="mt-3 flex items-baseline justify-between">
-                      <span className="text-base font-black text-foreground">
+                      <span className="text-[18px] sm:text-[20px] font-black text-foreground tracking-tight">
                         {item.precoBase.toLocaleString("pt-BR", {
                           style: "currency",
                           currency: "BRL",
                         })}
                       </span>
                       {item.grupoModificadores && item.grupoModificadores.length > 0 && (
-                        <span className="text-[10px] font-bold text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+                        <span className="text-[11px] font-bold text-muted-foreground bg-muted px-2.5 py-0.5 rounded-full">
                           Personalizável
                         </span>
                       )}
