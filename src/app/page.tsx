@@ -36,16 +36,16 @@ export const metadata: Metadata = {
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-white text-neutral-900 flex flex-col selection:bg-rose-600 selection:text-white antialiased font-sans">
+    <div className="min-h-screen bg-white text-neutral-900 flex flex-col selection:bg-rose-600 selection:text-white antialiased font-sans overflow-x-hidden">
       {/* 1. NAVBAR CLARA & PROFISSIONAL (IFOOD STYLE) */}
       <header className="sticky top-0 z-50 w-full border-b border-neutral-200/80 bg-white/95 backdrop-blur-md">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2.5 group">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-rose-600 to-red-600 flex items-center justify-center shadow-md shadow-rose-600/20 group-hover:scale-105 transition-transform duration-300">
-              <Sparkles className="w-5 h-5 text-white" />
+        <div className="max-w-7xl mx-auto px-3.5 sm:px-6 h-16 flex items-center justify-between gap-2">
+          <Link href="/" className="flex items-center gap-2 shrink-0 group">
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-br from-rose-600 to-red-600 flex items-center justify-center shadow-md shadow-rose-600/20 group-hover:scale-105 transition-transform duration-300">
+              <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
             </div>
             <div className="flex flex-col">
-              <span className="font-black text-lg tracking-tight text-neutral-950 flex items-center gap-1.5">
+              <span className="font-black text-base sm:text-lg tracking-tight text-neutral-950 flex items-center gap-1.5">
                 MAYaMenu
                 <span className="text-[10px] uppercase font-bold tracking-widest px-1.5 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200">
                   B2B
@@ -66,32 +66,32 @@ export default function LandingPage() {
             </a>
           </nav>
 
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
             <Link
               href="/admin"
-              className="inline-flex items-center gap-2 px-3.5 py-2 text-xs sm:text-sm font-semibold text-neutral-700 hover:text-neutral-950 rounded-xl hover:bg-neutral-100 border border-neutral-200 transition-all"
+              className="inline-flex items-center gap-1.5 px-2.5 sm:px-3.5 py-2 text-xs sm:text-sm font-semibold text-neutral-700 hover:text-neutral-950 rounded-xl hover:bg-neutral-100 border border-neutral-200 transition-all"
             >
-              <LogIn className="w-4 h-4 text-neutral-500" />
-              <span>Acesso / Login</span>
+              <LogIn className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-neutral-500" />
+              <span>Login</span>
             </Link>
             <Link
               href="#precos"
-              className="inline-flex items-center justify-center px-4 py-2 text-xs sm:text-sm font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-sm hover:shadow-md active:scale-95 transition-all"
+              className="inline-flex items-center justify-center px-3 sm:px-4 py-2 text-xs sm:text-sm font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-sm hover:shadow-md active:scale-95 transition-all whitespace-nowrap"
             >
-              Garanta a Solução
+              Começar Agora
             </Link>
           </div>
         </div>
       </header>
 
-      <main className="flex-1">
+      <main className="flex-1 overflow-x-hidden">
         {/* 2. HERO SECTION (M3 DISPLAY & HEADLINE ESCANEÁVEL EM SMARTPHONES) */}
-        <section className="relative overflow-hidden pt-10 sm:pt-16 md:pt-20 pb-16 md:pb-24 border-b border-neutral-200/70 bg-gradient-to-b from-rose-50/30 via-white to-white">
+        <section className="relative overflow-hidden pt-8 sm:pt-16 md:pt-20 pb-14 md:pb-24 border-b border-neutral-200/70 bg-gradient-to-b from-rose-50/30 via-white to-white">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-8 items-center">
             {/* Texto à Esquerda (7 cols) */}
             <div className="lg:col-span-7 flex flex-col items-start text-left z-10">
               {/* Badge Superior */}
-              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-rose-50 border border-rose-200 text-xs font-bold text-rose-700 mb-5 shadow-xs">
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-rose-50 border border-rose-200 text-xs font-bold text-rose-700 mb-4 sm:mb-5 shadow-xs">
                 <Sparkles className="w-3.5 h-3.5 text-rose-600 shrink-0" />
                 <span>✨ Vagas Abertas para Membros Fundadores</span>
               </div>
@@ -105,50 +105,50 @@ export default function LandingPage() {
               </h1>
 
               {/* Subtítulo M3 Body Large */}
-              <p className="mt-5 text-base sm:text-lg lg:text-xl text-neutral-600 max-w-2xl font-normal leading-relaxed">
+              <p className="mt-4 sm:mt-5 text-base sm:text-lg lg:text-xl text-neutral-600 max-w-2xl font-normal leading-relaxed">
                 Por apenas <strong className="text-neutral-950 font-bold">R$ 0,26 diários por mesa</strong>,
                 organize a sua cozinha, acabe com a confusão nos pedidos e aumente o faturamento. Tecnologia limpa feita para quem vive a realidade do salão.
               </p>
 
               {/* CTAs de Conversão (Áreas de toque mínimas de 44px) */}
-              <div className="mt-8 flex flex-col sm:flex-row items-stretch sm:items-center gap-3.5 w-full sm:w-auto">
+              <div className="mt-7 sm:mt-8 flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
                 <a
                   href="#precos"
-                  className="inline-flex items-center justify-center gap-2 px-7 py-3.5 text-base font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-lg shadow-rose-600/25 active:scale-95 transition-all group"
+                  className="inline-flex items-center justify-center gap-2 px-6 sm:px-7 py-3.5 text-sm sm:text-base font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-lg shadow-rose-600/25 active:scale-95 transition-all group text-center"
                 >
                   <span>Garanta a Solução para o seu Negócio</span>
-                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform shrink-0" />
                 </a>
 
                 <Link
                   href="/admin"
-                  className="inline-flex items-center justify-center gap-2 px-6 py-3.5 text-base font-semibold text-neutral-800 hover:text-neutral-950 bg-neutral-100 hover:bg-neutral-200/80 border border-neutral-200 rounded-xl transition-all"
+                  className="inline-flex items-center justify-center gap-2 px-5 sm:px-6 py-3.5 text-sm sm:text-base font-semibold text-neutral-800 hover:text-neutral-950 bg-neutral-100 hover:bg-neutral-200/80 border border-neutral-200 rounded-xl transition-all text-center"
                 >
-                  <LogIn className="w-4 h-4 text-neutral-600" />
+                  <LogIn className="w-4 h-4 text-neutral-600 shrink-0" />
                   <span>Painel do Restaurante</span>
                 </Link>
               </div>
 
               {/* Micro-aviso de confiança (M3 Label) */}
-              <div className="mt-6 flex flex-wrap items-center gap-4 text-xs font-medium text-neutral-600">
+              <div className="mt-6 flex flex-wrap items-center gap-3 sm:gap-4 text-xs font-medium text-neutral-600">
                 <span className="flex items-center gap-1.5">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                   Sem fidelidade ou multas
                 </span>
                 <span className="flex items-center gap-1.5">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                  Funciona no celular de qualquer cliente
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  Funciona no celular do cliente
                 </span>
                 <span className="flex items-center gap-1.5">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                   Tarifa flexível em meses fracos
                 </span>
               </div>
             </div>
 
             {/* Imagem / Mascote à Direita (5 cols) */}
-            <div className="lg:col-span-5 relative flex items-center justify-center">
-              <div className="relative w-full max-w-[460px] aspect-[16/10] sm:aspect-[16/9] lg:aspect-[4/3] rounded-3xl overflow-hidden border border-neutral-200 bg-neutral-100 p-2.5 sm:p-3 shadow-xl shadow-neutral-200/60 group">
+            <div className="lg:col-span-5 relative flex items-center justify-center w-full">
+              <div className="relative w-full max-w-[460px] aspect-[16/10] sm:aspect-[16/9] lg:aspect-[4/3] rounded-3xl overflow-hidden border border-neutral-200 bg-neutral-100 p-2 sm:p-3 shadow-xl shadow-neutral-200/60 group">
                 <div className="relative w-full h-full rounded-2xl overflow-hidden bg-white flex items-center justify-center">
                   <Image
                     src="/chef-mayamenu.png"
@@ -161,15 +161,15 @@ export default function LandingPage() {
                 </div>
 
                 {/* Card Flutuante de Custo Diário */}
-                <div className="absolute -bottom-3 -left-3 sm:bottom-4 sm:-left-4 bg-white/95 border border-neutral-200 p-3.5 rounded-2xl backdrop-blur-md shadow-lg flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-600">
-                    <Store className="w-5 h-5" />
+                <div className="absolute bottom-2 left-2 sm:bottom-4 sm:left-4 bg-white/95 border border-neutral-200 p-2.5 sm:p-3.5 rounded-2xl backdrop-blur-md shadow-lg flex items-center gap-2.5 sm:gap-3">
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-600 shrink-0">
+                    <Store className="w-4 h-4 sm:w-5 sm:h-5" />
                   </div>
                   <div>
-                    <div className="text-xs text-neutral-500 font-semibold">Custo diário</div>
-                    <div className="text-sm font-black text-neutral-950 flex items-baseline gap-1">
+                    <div className="text-[11px] sm:text-xs text-neutral-500 font-semibold leading-tight">Custo diário</div>
+                    <div className="text-xs sm:text-sm font-black text-neutral-950 flex items-baseline gap-1">
                       <span>R$ 0,26</span>
-                      <span className="text-xs text-neutral-500 font-normal">/ mesa</span>
+                      <span className="text-[10px] sm:text-xs text-neutral-500 font-normal">/ mesa</span>
                     </div>
                   </div>
                 </div>
