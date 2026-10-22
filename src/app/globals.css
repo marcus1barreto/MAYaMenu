@@ -236,39 +236,46 @@
 
 /* ----------------------------------------------------
    FAMÍLIA 5: ACESSIBILIDADE & FOCO (Descanso de Vista)
-   Fundo: Solarized Paper #FDF6E3 | Ação: Terracota #C26D2B | -80% Luz Azul
+   Fundo: Sépia (#FDF6E3) | Card: Bege areia denso | Ação: Terracota terroso
 ----------------------------------------------------- */
 .theme-acessibilidade-sepia,
 .theme-descanso-vista,
 .theme-descanso-visual {
-  --background: hsl(44 87% 94%); /* Solarized Base #FDF6E3 */
-  --foreground: hsl(30 25% 15%); /* Marrom café profundo, zero estresse */
-  --card: hsl(44 70% 97%);
-  --card-foreground: hsl(30 25% 15%);
-  --popover: hsl(44 70% 97%);
-  --popover-foreground: hsl(30 25% 15%);
-  --primary: hsl(26 65% 46%); /* Terracota âmbar acolhedor */
-  --primary-foreground: hsl(44 87% 98%);
-  --secondary: hsl(42 35% 88%);
-  --secondary-foreground: hsl(30 25% 15%);
-  --muted: hsl(42 35% 88%);
-  --muted-foreground: hsl(30 15% 42%);
-  --accent: hsl(42 35% 88%);
-  --accent-foreground: hsl(30 25% 15%);
-  --destructive: hsl(0 65% 50%);
-  --destructive-foreground: hsl(44 87% 98%);
-  --border: hsl(38 30% 82%);
-  --input: hsl(38 30% 82%);
-  --ring: hsl(26 65% 46%);
+  --background: hsl(44 69% 94%); /* Fundo Sépia (#FDF6E3) */
+  --foreground: hsl(24 10% 25%); /* Texto base: Marrom Escuro / Cinza Quente */
+  
+  /* CARDS: Um bege levemente mais denso que o fundo para dar destaque sem chocar */
+  --card: hsl(44 40% 88%);
+  --card-foreground: hsl(24 10% 25%);
+  
+  --popover: hsl(44 40% 88%);
+  --popover-foreground: hsl(24 10% 25%);
+  
+  /* BOTÕES (Primary): Tom terroso acolhedor (Terracota) */
+  --primary: hsl(15 40% 40%);
+  --primary-foreground: hsl(44 69% 94%);
+  
+  --secondary: hsl(44 30% 80%);
+  --secondary-foreground: hsl(24 10% 20%);
+  
+  --muted: hsl(44 20% 85%);
+  --muted-foreground: hsl(24 10% 45%);
+  
+  --destructive: hsl(0 60% 45%);
+  --destructive-foreground: hsl(44 69% 94%);
+  
+  --border: hsl(44 30% 80%);
+  --input: hsl(44 30% 80%);
+  --ring: hsl(15 40% 40%);
   --font-heading-choice: var(--font-sans);
-  --sidebar: hsl(44 70% 97%);
-  --sidebar-foreground: hsl(30 25% 15%);
-  --sidebar-primary: hsl(26 65% 46%);
-  --sidebar-primary-foreground: hsl(44 87% 98%);
-  --sidebar-accent: hsl(42 35% 88%);
-  --sidebar-accent-foreground: hsl(30 25% 15%);
-  --sidebar-border: hsl(38 30% 82%);
-  --sidebar-ring: hsl(26 65% 46%);
+  --sidebar: hsl(44 40% 88%);
+  --sidebar-foreground: hsl(24 10% 25%);
+  --sidebar-primary: hsl(15 40% 40%);
+  --sidebar-primary-foreground: hsl(44 69% 94%);
+  --sidebar-accent: hsl(44 30% 80%);
+  --sidebar-accent-foreground: hsl(24 10% 20%);
+  --sidebar-border: hsl(44 30% 80%);
+  --sidebar-ring: hsl(15 40% 40%);
 }
 
 @layer base {

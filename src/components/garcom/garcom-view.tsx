@@ -714,8 +714,8 @@ export function GarcomView({
                     : ehPagaOcupada
                     ? "bg-emerald-950/30 border-emerald-500 ring-1 ring-emerald-500/40 shadow-lg shadow-emerald-950/50 hover:border-emerald-400"
                     : ehOcupada
-                    ? "bg-neutral-900 border-amber-500/60 hover:border-amber-500"
-                    : "bg-neutral-900/40 border-neutral-800/60"
+                    ? "bg-card border-amber-500/60 hover:border-amber-500 shadow-xs"
+                    : "bg-card/40 border-border"
                 }`}
               >
                 <div className="flex items-start justify-between">
@@ -729,7 +729,7 @@ export function GarcomView({
                         ? "bg-emerald-600 text-white"
                         : ehOcupada
                         ? "bg-amber-500 text-neutral-950"
-                        : "bg-neutral-800 text-neutral-400"
+                        : "bg-muted text-muted-foreground"
                     }`}
                   >
                     {m.numero}
@@ -767,13 +767,13 @@ export function GarcomView({
                 <div>
                   {m.comandas.length > 0 ? (
                     <>
-                      <div className="flex items-center gap-1.5 text-xs text-neutral-400 font-medium">
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium">
                         <Users className="w-3.5 h-3.5" />
                         <span>
                           {m.comandas.length} {m.comandas.length === 1 ? "pessoa" : "pessoas"}
                         </span>
                       </div>
-                      <span className="text-base font-black text-white block mt-1 tracking-tight">
+                      <span className="text-base font-black text-foreground block mt-1 tracking-tight">
                         {totalMesa.toLocaleString("pt-BR", {
                           style: "currency",
                           currency: "BRL",
@@ -781,7 +781,7 @@ export function GarcomView({
                       </span>
                     </>
                   ) : (
-                    <span className="text-xs text-neutral-600 font-bold block">Mesa Livre</span>
+                    <span className="text-xs text-muted-foreground font-bold block">Mesa Livre</span>
                   )}
                 </div>
               </div>

@@ -328,61 +328,61 @@ export function SuperAdminView() {
           </div>
           <div
             onClick={() => setAbaAtiva("restaurantes")}
-            className="px-4 py-2 bg-neutral-900 border border-neutral-800 rounded-2xl text-center cursor-pointer hover:border-neutral-700 transition-colors"
+            className="px-4 py-2 bg-card border border-border rounded-2xl text-center cursor-pointer hover:border-primary/50 transition-colors shadow-xs"
           >
-            <span className="block text-xs uppercase tracking-wider text-neutral-500 font-bold flex items-center justify-center gap-1">
-              <Store className="w-3 h-3 text-emerald-400" />
+            <span className="block text-xs uppercase tracking-wider text-muted-foreground font-bold flex items-center justify-center gap-1">
+              <Store className="w-3 h-3 text-emerald-500" />
               Operação
             </span>
-            <span className="text-xl font-black text-emerald-400">{totalRestaurantesAtivos}</span>
+            <span className="text-xl font-black text-emerald-500">{totalRestaurantesAtivos}</span>
           </div>
           <div
             onClick={() => setAbaAtiva("ativas")}
-            className="px-4 py-2 bg-neutral-900 border border-neutral-800 rounded-2xl text-center cursor-pointer hover:border-neutral-700 transition-colors"
+            className="px-4 py-2 bg-card border border-border rounded-2xl text-center cursor-pointer hover:border-primary/50 transition-colors shadow-xs"
           >
-            <span className="block text-xs uppercase tracking-wider text-neutral-500 font-bold flex items-center justify-center gap-1">
-              <KeyRound className="w-3 h-3 text-amber-400" />
+            <span className="block text-xs uppercase tracking-wider text-muted-foreground font-bold flex items-center justify-center gap-1">
+              <KeyRound className="w-3 h-3 text-amber-500" />
               Disponíveis
             </span>
-            <span className="text-xl font-black text-amber-400">{totalTokensDisponiveis}</span>
+            <span className="text-xl font-black text-amber-500">{totalTokensDisponiveis}</span>
           </div>
           <div
             onClick={() => setAbaAtiva("vencidas")}
-            className="px-4 py-2 bg-neutral-900 border border-neutral-800 rounded-2xl text-center cursor-pointer hover:border-neutral-700 transition-colors"
+            className="px-4 py-2 bg-card border border-border rounded-2xl text-center cursor-pointer hover:border-primary/50 transition-colors shadow-xs"
           >
-            <span className="block text-xs uppercase tracking-wider text-neutral-500 font-bold flex items-center justify-center gap-1">
-              <ClockAlert className="w-3 h-3 text-orange-400" />
+            <span className="block text-xs uppercase tracking-wider text-muted-foreground font-bold flex items-center justify-center gap-1">
+              <ClockAlert className="w-3 h-3 text-orange-500" />
               Vencidas
             </span>
-            <span className="text-xl font-black text-orange-400">{totalTokensVencidos}</span>
+            <span className="text-xl font-black text-orange-500">{totalTokensVencidos}</span>
           </div>
-          <div className="px-4 py-2 bg-neutral-900 border border-neutral-800 rounded-2xl text-center">
-            <span className="block text-xs uppercase tracking-wider text-neutral-500 font-bold">
+          <div className="px-4 py-2 bg-card border border-border rounded-2xl text-center shadow-xs">
+            <span className="block text-xs uppercase tracking-wider text-muted-foreground font-bold">
               Suspensos
             </span>
             <span className="text-xl font-black text-rose-500">{totalRestaurantesSuspensos}</span>
           </div>
           <div
             onClick={() => setAbaAtiva("arquivo_morto")}
-            className="px-4 py-2 bg-neutral-900 border border-neutral-800 rounded-2xl text-center cursor-pointer hover:border-neutral-700 transition-colors"
+            className="px-4 py-2 bg-card border border-border rounded-2xl text-center cursor-pointer hover:border-primary/50 transition-colors shadow-xs"
           >
-            <span className="block text-xs uppercase tracking-wider text-neutral-500 font-bold flex items-center justify-center gap-1">
-              <Archive className="w-3 h-3 text-purple-400" />
+            <span className="block text-xs uppercase tracking-wider text-muted-foreground font-bold flex items-center justify-center gap-1">
+              <Archive className="w-3 h-3 text-purple-500" />
               Arquivo Morto
             </span>
-            <span className="text-xl font-black text-purple-400">{arquivoMorto.length}</span>
+            <span className="text-xl font-black text-purple-500">{arquivoMorto.length}</span>
           </div>
         </div>
       </div>
 
       {/* SELETOR DE ABAS */}
-      <div className="flex flex-wrap items-center gap-2 border-b border-neutral-800 pb-3">
+      <div className="flex flex-wrap items-center gap-2 border-b border-border pb-3">
         <button
           onClick={() => setAbaAtiva("restaurantes")}
           className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
             abaAtiva === "restaurantes"
-              ? "bg-emerald-600 text-white shadow-lg shadow-emerald-600/30"
-              : "bg-neutral-900 text-neutral-400 hover:text-white border border-neutral-800"
+              ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/30"
+              : "bg-card text-muted-foreground hover:text-foreground border border-border"
           }`}
         >
           <Store className="w-4 h-4" />
@@ -392,8 +392,8 @@ export function SuperAdminView() {
           onClick={() => setAbaAtiva("ativas")}
           className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
             abaAtiva === "ativas"
-              ? "bg-rose-600 text-white shadow-lg shadow-rose-600/30"
-              : "bg-neutral-900 text-neutral-400 hover:text-white border border-neutral-800"
+              ? "bg-rose-600 text-white shadow-md shadow-rose-600/30"
+              : "bg-card text-muted-foreground hover:text-foreground border border-border"
           }`}
         >
           <KeyRound className="w-4 h-4" />
@@ -403,8 +403,8 @@ export function SuperAdminView() {
           onClick={() => setAbaAtiva("vencidas")}
           className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
             abaAtiva === "vencidas"
-              ? "bg-orange-600 text-white shadow-lg shadow-orange-600/30"
-              : "bg-neutral-900 text-neutral-400 hover:text-white border border-neutral-800"
+              ? "bg-orange-600 text-white shadow-md shadow-orange-600/30"
+              : "bg-card text-muted-foreground hover:text-foreground border border-border"
           }`}
         >
           <ClockAlert className="w-4 h-4" />
@@ -414,8 +414,8 @@ export function SuperAdminView() {
           onClick={() => setAbaAtiva("arquivo_morto")}
           className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
             abaAtiva === "arquivo_morto"
-              ? "bg-purple-600 text-white shadow-lg shadow-purple-600/30"
-              : "bg-neutral-900 text-neutral-400 hover:text-white border border-neutral-800"
+              ? "bg-purple-600 text-white shadow-md shadow-purple-600/30"
+              : "bg-card text-muted-foreground hover:text-foreground border border-border"
           }`}
         >
           <Archive className="w-4 h-4" />
@@ -466,16 +466,16 @@ export function SuperAdminView() {
                 return (
                   <div
                     key={rest.id}
-                    className={`p-5 bg-neutral-900/90 border rounded-3xl space-y-4 shadow-lg transition-all ${
+                    className={`p-5 bg-card border rounded-3xl space-y-4 shadow-sm transition-all ${
                       isSuspenso
-                        ? "border-rose-900/60 bg-rose-950/10"
-                        : "border-neutral-800 hover:border-neutral-700"
+                        ? "border-rose-500/40 bg-rose-500/5"
+                        : "border-border hover:border-primary/40"
                     }`}
                   >
                     {/* TOPO: NOME E STATUS */}
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <h3 className="text-base font-black text-white flex items-center gap-2">
+                        <h3 className="text-base font-black text-foreground flex items-center gap-2">
                           {rest.nome}
                         </h3>
                         {rest.slug && (
@@ -483,7 +483,7 @@ export function SuperAdminView() {
                             href={`/r/${rest.slug}`}
                             target="_blank"
                             rel="noreferrer"
-                            className="text-xs font-mono text-emerald-400 hover:underline inline-block mt-0.5"
+                            className="text-xs font-mono text-emerald-600 dark:text-emerald-400 hover:underline inline-block mt-0.5"
                           >
                             /r/{rest.slug}
                           </a>
@@ -493,12 +493,12 @@ export function SuperAdminView() {
                       <Badge
                         className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full ${
                           isSuspenso
-                            ? "bg-rose-500/10 text-rose-400 border border-rose-500/30"
+                            ? "bg-rose-500/10 text-rose-500 border border-rose-500/30"
                             : planoAtual === "enterprise"
-                            ? "bg-amber-500/15 text-amber-400 border border-amber-500/30"
+                            ? "bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30"
                             : planoAtual === "pro"
-                            ? "bg-violet-500/15 text-violet-300 border border-violet-500/30"
-                            : "bg-neutral-800 text-neutral-300 border border-neutral-700"
+                            ? "bg-violet-500/15 text-violet-600 dark:text-violet-300 border border-violet-500/30"
+                            : "bg-muted text-muted-foreground border border-border"
                         }`}
                       >
                         {isSuspenso ? "Suspenso" : planoAtual}
@@ -506,36 +506,36 @@ export function SuperAdminView() {
                     </div>
 
                     {/* DADOS DE CAPACIDADE / LIMITES */}
-                    <div className="grid grid-cols-2 gap-2 text-xs bg-neutral-950/80 p-3 rounded-2xl border border-neutral-800/80">
+                    <div className="grid grid-cols-2 gap-2 text-xs bg-muted/40 p-3 rounded-2xl border border-border">
                       <div>
-                        <span className="text-neutral-500 block text-[10px] uppercase font-bold">
+                        <span className="text-muted-foreground block text-[10px] uppercase font-bold">
                           Capacidade Mesas
                         </span>
-                        <span className="text-white font-bold">
+                        <span className="text-foreground font-bold">
                           {limites.maxMesas >= 999 ? "Ilimitadas" : `${limites.maxMesas} mesas`}
                         </span>
                       </div>
                       <div>
-                        <span className="text-neutral-500 block text-[10px] uppercase font-bold">
+                        <span className="text-muted-foreground block text-[10px] uppercase font-bold">
                           Limite Cardápio
                         </span>
-                        <span className="text-white font-bold">
+                        <span className="text-foreground font-bold">
                           {limites.maxPratos >= 999 ? "Ilimitados" : `${limites.maxPratos} itens`}
                         </span>
                       </div>
                     </div>
 
                     {/* RODAPÉ DO CARD: SEGMENTED CONTROL + SUSPENDER */}
-                    <div className="pt-2 border-t border-neutral-800 flex flex-wrap items-center justify-between gap-2">
+                    <div className="pt-2 border-t border-border flex flex-wrap items-center justify-between gap-2">
                       {/* 1. SEGMENTED CONTROL DE MIGRAÇÃO DE PLANO */}
-                      <div className="flex bg-neutral-950 rounded-lg p-1 border border-neutral-800 shadow-inner">
+                      <div className="flex bg-muted rounded-lg p-1 border border-border shadow-inner">
                         <button
                           type="button"
                           onClick={() => handleAlterarPlano(rest.id, "free", rest.licenca?.id)}
                           className={`px-2.5 py-1 text-[10px] sm:text-xs font-bold rounded-md transition-all ${
                             planoAtual === "free"
-                              ? "bg-neutral-800 text-neutral-200 shadow-sm"
-                              : "text-neutral-500 hover:text-neutral-300"
+                              ? "bg-card text-foreground shadow-xs"
+                              : "text-muted-foreground hover:text-foreground"
                           }`}
                         >
                           FREE
@@ -619,9 +619,9 @@ export function SuperAdminView() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* FORMULÁRIO: GERAR NOVA CONCESSÃO */}
           <div className="lg:col-span-1">
-            <Card className="bg-neutral-900 border-neutral-800 text-white rounded-3xl overflow-hidden shadow-xl">
-              <CardHeader className="bg-neutral-800/40 border-b border-neutral-800 pb-4">
-                <CardTitle className="text-base font-black flex items-center gap-2 text-rose-400">
+            <Card className="bg-card border-border text-card-foreground rounded-3xl overflow-hidden shadow-sm">
+              <CardHeader className="bg-muted/40 border-b border-border pb-4">
+                <CardTitle className="text-base font-black flex items-center gap-2 text-primary">
                   <KeyRound className="w-5 h-5" />
                   Emitir Nova Licença / Token
                 </CardTitle>
@@ -630,7 +630,7 @@ export function SuperAdminView() {
                 <form onSubmit={handleCriarLicenca} className="space-y-4">
                   {/* PLANO */}
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold uppercase tracking-wider text-neutral-400">
+                    <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                       Plano & Camada de Concessão
                     </label>
                     <div className="grid grid-cols-3 gap-2">
@@ -643,8 +643,8 @@ export function SuperAdminView() {
                             onClick={() => setPlanoSelecionado(p)}
                             className={`p-2.5 rounded-2xl text-xs font-black uppercase tracking-wider border transition-all ${
                               ativo
-                                ? "bg-rose-600 border-rose-500 text-white shadow-lg shadow-rose-600/30"
-                                : "bg-neutral-800/60 border-neutral-700/60 text-neutral-400 hover:text-white"
+                                ? "bg-primary border-primary text-primary-foreground shadow-xs"
+                                : "bg-muted/50 border-border text-muted-foreground hover:text-foreground"
                             }`}
                           >
                             {p}
@@ -652,13 +652,13 @@ export function SuperAdminView() {
                         );
                       })}
                     </div>
-                    <div className="text-[11px] text-neutral-400 bg-neutral-950/60 p-2.5 rounded-xl border border-neutral-800 mt-2">
+                    <div className="text-[11px] text-muted-foreground bg-muted/40 p-2.5 rounded-xl border border-border mt-2">
                       Padrão {planoSelecionado.toUpperCase()}:{" "}
-                      <span className="text-white font-bold">
+                      <span className="text-foreground font-bold">
                         {LIMITES_POR_PLANO[planoSelecionado].maxPratos} pratos
                       </span>{" "}
                       •{" "}
-                      <span className="text-white font-bold">
+                      <span className="text-foreground font-bold">
                         {LIMITES_POR_PLANO[planoSelecionado].maxMesas} mesas
                       </span>
                     </div>
@@ -666,14 +666,14 @@ export function SuperAdminView() {
 
                   {/* DESTINATÁRIO / RESPONSÁVEL */}
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold uppercase tracking-wider text-neutral-400">
+                    <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                       Destinatário / Contato
                     </label>
                     <Input
                       value={responsavel}
                       onChange={(e) => setResponsavel(e.target.value)}
                       placeholder="Ex: Marcus Barreto (WhatsApp / Restaurante X)"
-                      className="bg-neutral-800 border-neutral-700 text-white rounded-xl h-10 text-xs"
+                      className="bg-card border-border text-foreground rounded-xl h-10 text-xs"
                     />
                   </div>
 
@@ -753,25 +753,25 @@ export function SuperAdminView() {
           <div className="lg:col-span-2 space-y-4">
             <div className="flex items-center justify-between gap-4">
               <h2 className="text-lg font-black tracking-tight flex items-center gap-2">
-                <Store className="w-5 h-5 text-neutral-400" />
+                <Store className="w-5 h-5 text-muted-foreground" />
                 Concessões Registradas ({licencasFiltradas.length})
               </h2>
 
               <div className="relative w-64">
-                <Search className="w-4 h-4 text-neutral-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                <Search className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
                 <Input
                   value={filtro}
                   onChange={(e) => setFiltro(e.target.value)}
                   placeholder="Buscar código, nome..."
-                  className="bg-neutral-900 border-neutral-800 text-white pl-9 rounded-xl h-9 text-xs"
+                  className="bg-card border-border text-foreground pl-9 rounded-xl h-9 text-xs"
                 />
               </div>
             </div>
 
             {licencasFiltradas.length === 0 ? (
-              <div className="p-12 text-center bg-neutral-900/50 border border-neutral-800/80 rounded-3xl space-y-3">
-                <KeyRound className="w-10 h-10 text-neutral-600 mx-auto" />
-                <p className="text-neutral-400 text-xs">
+              <div className="p-12 text-center bg-card/60 border border-border rounded-3xl space-y-3">
+                <KeyRound className="w-10 h-10 text-muted-foreground mx-auto" />
+                <p className="text-muted-foreground text-xs">
                   Nenhuma licença ativa encontrada. Todas as licenças ativadas foram transferidas automaticamente para o Arquivo Morto.
                 </p>
               </div>
@@ -785,21 +785,21 @@ export function SuperAdminView() {
                   return (
                     <div
                       key={lic.id}
-                      className="p-5 bg-neutral-900/90 border border-neutral-800 rounded-3xl space-y-3 shadow-md hover:border-neutral-700 transition-colors"
+                      className="p-5 bg-card border border-border rounded-3xl space-y-3 shadow-xs hover:border-primary/40 transition-colors"
                     >
                       {/* TOPO: TOKEN E STATUS */}
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-2">
-                          <span className="font-mono text-sm font-black text-white bg-neutral-800 px-2.5 py-1 rounded-xl tracking-wider">
+                          <span className="font-mono text-sm font-black text-foreground bg-muted px-2.5 py-1 rounded-xl tracking-wider">
                             {lic.id}
                           </span>
                           <button
                             onClick={() => handleCopiar(lic.id)}
-                            className="p-1.5 hover:bg-neutral-800 text-neutral-400 hover:text-white rounded-lg transition-colors"
+                            className="p-1.5 hover:bg-muted text-muted-foreground hover:text-foreground rounded-lg transition-colors"
                             title="Copiar código"
                           >
                             {copiadoId === lic.id ? (
-                              <Check className="w-4 h-4 text-emerald-400" />
+                              <Check className="w-4 h-4 text-emerald-500" />
                             ) : (
                               <Copy className="w-4 h-4" />
                             )}
@@ -809,10 +809,10 @@ export function SuperAdminView() {
                         <Badge
                           className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full ${
                             disponivel
-                              ? "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                              ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
                               : ativa
-                              ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                              : "bg-rose-500/10 text-rose-400 border border-rose-500/20"
+                              ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+                              : "bg-rose-500/10 text-rose-500 border border-rose-500/20"
                           }`}
                         >
                           {lic.status}
@@ -823,36 +823,36 @@ export function SuperAdminView() {
                       <div className="space-y-1 text-xs">
                         {lic.restauranteNome ? (
                           <div>
-                            <span className="text-neutral-500 block text-[10px] uppercase font-bold">
+                            <span className="text-muted-foreground block text-[10px] uppercase font-bold">
                               Restaurante Vinculado
                             </span>
-                            <span className="text-white font-bold text-sm">
+                            <span className="text-foreground font-bold text-sm">
                               {lic.restauranteNome}
                             </span>
                             {lic.slug && (
-                              <span className="text-rose-400 block text-[11px] font-mono">
+                              <span className="text-primary block text-[11px] font-mono">
                                 /r/{lic.slug}
                               </span>
                             )}
                           </div>
                         ) : (
                           <div>
-                            <span className="text-neutral-500 block text-[10px] uppercase font-bold">
+                            <span className="text-muted-foreground block text-[10px] uppercase font-bold">
                               Destinatário Previsto
                             </span>
-                            <span className="text-neutral-300">
+                            <span className="text-muted-foreground">
                               {lic.responsavel || "Aguardando ativação por novo estabelecimento"}
                             </span>
                           </div>
                         )}
 
                         {lic.notas && (
-                          <p className="text-[11px] text-neutral-400 italic">“{lic.notas}”</p>
+                          <p className="text-[11px] text-muted-foreground italic">“{lic.notas}”</p>
                         )}
                       </div>
 
                       {/* LIMITES E DETALHES DO PLANO */}
-                      <div className="flex items-center gap-3 pt-2 border-t border-neutral-800/80 text-[11px] text-neutral-400">
+                      <div className="flex items-center gap-3 pt-2 border-t border-border text-[11px] text-muted-foreground">
                         <div className="flex items-center gap-1 font-semibold uppercase text-neutral-300">
                           <Layers className="w-3.5 h-3.5 text-rose-500" />
                           {lic.plano}
