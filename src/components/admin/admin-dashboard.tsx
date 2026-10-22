@@ -1317,39 +1317,39 @@ export function AdminDashboard() {
 
                         return (
                           <div className="space-y-6">
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                               {/* 1. Faturamento Total Histórico */}
-                              <div className="bg-card border border-border p-5 rounded-2xl space-y-2 shadow-xs">
+                              <div className="bg-white border-2 border-neutral-200/90 p-5 rounded-2xl space-y-2 shadow-sm hover:shadow-md transition-all">
                                 <div className="flex justify-between items-start">
-                                  <span className="text-xs font-bold text-muted-foreground uppercase">Faturamento Concluído</span>
-                                  <Badge className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-[10px]">Real</Badge>
+                                  <span className="text-xs font-black text-neutral-600 uppercase tracking-wider">Faturamento Concluído</span>
+                                  <Badge className="bg-emerald-100 text-emerald-800 border border-emerald-300 text-[10px] font-black">Real</Badge>
                                 </div>
-                                <div className="text-3xl font-black text-foreground">
+                                <div className="text-3xl font-black text-neutral-950">
                                   {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(totalFaturado)}
                                 </div>
-                                <p className="text-[11px] text-muted-foreground">{totalSessoes} comandas encerradas no total</p>
+                                <p className="text-[11px] text-neutral-500 font-medium">{totalSessoes} comandas encerradas no total</p>
                               </div>
 
                               {/* 2. Ticket Médio Real */}
-                              <div className="bg-card border border-border p-5 rounded-2xl space-y-2 shadow-xs">
+                              <div className="bg-white border-2 border-neutral-200/90 p-5 rounded-2xl space-y-2 shadow-sm hover:shadow-md transition-all">
                                 <div className="flex justify-between items-start">
-                                  <span className="text-xs font-bold text-muted-foreground uppercase">Ticket Médio por Mesa</span>
-                                  <Badge className="bg-primary/10 text-primary border border-primary/20 text-[10px]">Média</Badge>
+                                  <span className="text-xs font-black text-neutral-600 uppercase tracking-wider">Ticket Médio por Mesa</span>
+                                  <Badge className="bg-rose-100 text-rose-800 border border-rose-300 text-[10px] font-black">Média</Badge>
                                 </div>
-                                <div className="text-3xl font-black text-primary">
+                                <div className="text-3xl font-black text-rose-600">
                                   {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(ticketMedio)}
                                 </div>
-                                <p className="text-[11px] text-muted-foreground">{totalClientes} pagantes registrados</p>
+                                <p className="text-[11px] text-neutral-500 font-medium">{totalClientes} pagantes registrados</p>
                               </div>
 
                               {/* 3. Giro das Mesas */}
-                              <div className="bg-card border border-border p-5 rounded-2xl space-y-2 shadow-xs">
+                              <div className="bg-white border-2 border-neutral-200/90 p-5 rounded-2xl space-y-2 shadow-sm hover:shadow-md transition-all">
                                 <div className="flex justify-between items-start">
-                                  <span className="text-xs font-bold text-muted-foreground uppercase">Atendimentos Concluídos</span>
-                                  <Badge className="bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 text-[10px]">Salão</Badge>
+                                  <span className="text-xs font-black text-neutral-600 uppercase tracking-wider">Atendimentos Concluídos</span>
+                                  <Badge className="bg-blue-100 text-blue-800 border border-blue-300 text-[10px] font-black">Salão</Badge>
                                 </div>
-                                <div className="text-3xl font-black text-foreground">{totalSessoes}</div>
-                                <p className="text-[11px] text-muted-foreground">Média de {(totalSessoes / Math.max(mesas.length, 1)).toFixed(1)} giros por mesa</p>
+                                <div className="text-3xl font-black text-neutral-950">{totalSessoes}</div>
+                                <p className="text-[11px] text-neutral-500 font-medium">Média de {(totalSessoes / Math.max(mesas.length, 1)).toFixed(1)} giros por mesa</p>
                               </div>
                             </div>
                           </div>
@@ -1384,41 +1384,41 @@ export function AdminDashboard() {
                         const menosOcupada = [...arrayMesas].sort((a, b) => a.vezesOcupada - b.vezesOcupada)[0];
 
                         return (
-                          <div className="space-y-6">
+                          <div className="space-y-4">
                             {/* Diagnóstico dos Extremos */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              <div className="p-4 bg-emerald-950/20 border border-emerald-800/40 rounded-2xl space-y-1">
-                                <span className="text-[10px] font-bold uppercase text-emerald-400 flex items-center gap-1">
+                              <div className="p-4 bg-emerald-50 border-2 border-emerald-200/90 rounded-2xl space-y-1 shadow-xs">
+                                <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800 flex items-center gap-1">
                                   🔥 Ponto Quente (Mais Procurada)
                                 </span>
-                                <div className="text-base font-bold text-white">
+                                <div className="text-base font-black text-neutral-950">
                                   Mesa {maisOcupada?.numero || 1} • {maisOcupada?.vezesOcupada || 0} rotações
                                 </div>
-                                <p className="text-[11px] text-neutral-400">
+                                <p className="text-[11px] text-neutral-600 leading-relaxed">
                                   Esta mesa atrai o maior fluxo de clientes do salão, faturando {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(maisOcupada?.faturamento || 0)}.
                                 </p>
                               </div>
 
-                              <div className="p-4 bg-purple-950/20 border border-purple-800/40 rounded-2xl space-y-1">
-                                <span className="text-[10px] font-bold uppercase text-purple-400 flex items-center gap-1">
+                              <div className="p-4 bg-purple-50 border-2 border-purple-200/90 rounded-2xl space-y-1 shadow-xs">
+                                <span className="text-[10px] font-black uppercase tracking-wider text-purple-800 flex items-center gap-1">
                                   ❄️ Ponto Frio (Diagnóstico Espacial)
                                 </span>
-                                <div className="text-base font-bold text-white">
+                                <div className="text-base font-black text-neutral-950">
                                   Mesa {menosOcupada?.numero || 1} • {menosOcupada?.vezesOcupada || 0} rotações
                                 </div>
-                                <p className="text-[11px] text-neutral-400">
+                                <p className="text-[11px] text-neutral-600 leading-relaxed">
                                   Atenção: Mesa com menor frequência. Avalie posicionamento, acústica, corrente de ar ou visibilidade pelos garçons.
                                 </p>
                               </div>
                             </div>
 
                             {/* Grid do Mapa de Calor das Mesas */}
-                            <div className="p-5 bg-neutral-900 border border-neutral-800 rounded-2xl space-y-4">
-                              <div className="flex justify-between items-center">
-                                <span className="text-xs font-bold text-neutral-300 uppercase">
+                            <div className="p-5 bg-white border-2 border-neutral-200/90 rounded-2xl space-y-3.5 shadow-sm">
+                              <div className="flex flex-wrap justify-between items-center gap-2">
+                                <span className="text-xs font-black text-neutral-950 uppercase tracking-wider">
                                   Mapa de Calor do Salão (Giro por Ponto)
                                 </span>
-                                <span className="text-[11px] text-neutral-500">
+                                <span className="text-[11px] text-neutral-500 font-medium">
                                   Intensidade proporcional ao faturamento acumulado
                                 </span>
                               </div>
@@ -1428,17 +1428,17 @@ export function AdminDashboard() {
                                   const proporcao = m.faturamento / maxFaturamento;
                                   const corCalor =
                                     m.vezesOcupada === 0
-                                      ? "bg-neutral-800/60 text-neutral-500 border-neutral-700/40"
+                                      ? "bg-neutral-50 text-neutral-500 border-2 border-neutral-200"
                                       : proporcao > 0.7
-                                      ? "bg-rose-600 text-white border-rose-500 shadow-md shadow-rose-900/30"
+                                      ? "bg-rose-600 text-white border-2 border-rose-600 shadow-md shadow-rose-600/30"
                                       : proporcao > 0.3
-                                      ? "bg-amber-500/80 text-black border-amber-400"
-                                      : "bg-neutral-800 text-neutral-300 border-neutral-700";
+                                      ? "bg-amber-100 text-amber-950 border-2 border-amber-300 font-bold"
+                                      : "bg-neutral-100 text-neutral-800 border-2 border-neutral-200";
 
                                   return (
                                     <div
                                       key={m.numero}
-                                      className={`p-3 rounded-xl border text-center transition-all ${corCalor}`}
+                                      className={`p-3 rounded-xl border-2 text-center transition-all ${corCalor}`}
                                     >
                                       <div className="text-xs font-black">Mesa {m.numero}</div>
                                       <div className="text-[10px] font-mono mt-0.5 opacity-90">
