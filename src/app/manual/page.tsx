@@ -470,7 +470,7 @@ export default function ManualPage() {
               M
             </div>
             <span className="font-bold text-white">MAYaMenu Sistema de Salão & KDS</span>
-            <span>• © {new Date().getFullYear()} Todos os direitos reservados</span>
+            <span>• © 2026 Todos os direitos reservados</span>
           </div>
 
           <div className="flex items-center gap-6">
