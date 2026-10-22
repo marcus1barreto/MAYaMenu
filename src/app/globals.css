@@ -289,3 +289,41 @@
     @apply font-sans;
   }
 }
+
+/* ----------------------------------------------------
+   PORTA-CONTA DE RESTAURANTE (CARTEIRA DE COURO & COSTURA)
+----------------------------------------------------- */
+.carteira-couro-marrom {
+  background: radial-gradient(circle at 50% 20%, #3e2719 0%, #22150c 100%);
+  color: #f7eedb;
+  border-left: 2px solid #5a3822;
+  box-shadow: -8px 0 25px rgba(0, 0, 0, 0.7);
+}
+
+.carteira-preto-fosco {
+  background: radial-gradient(circle at 50% 20%, #202022 0%, #0d0d0e 100%);
+  color: #f3f3f5;
+  border-left: 2px solid #333336;
+  box-shadow: -8px 0 25px rgba(0, 0, 0, 0.85);
+}
+
+/* Costura pespontada realista de alfaiataria em couro */
+.costura-carteira {
+  position: relative;
+}
+.costura-carteira::after {
+  content: "";
+  position: absolute;
+  inset: 5px;
+  border: 1px dashed rgba(212, 175, 55, 0.4); /* Ponto de costura dourado / bege */
+  border-radius: inherit;
+  pointer-events: none;
+}
+.costura-carteira-preto::after {
+  content: "";
+  position: absolute;
+  inset: 5px;
+  border: 1px dashed rgba(255, 255, 255, 0.25); /* Ponto de costura linha branca / cinza */
+  border-radius: inherit;
+  pointer-events: none;
+}

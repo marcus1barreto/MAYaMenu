@@ -59,6 +59,27 @@ export function MinhaComandaModal({
   const [mesaTodaPedidaSucesso, setMesaTodaPedidaSucesso] = useState(false);
   const [clienteUid, setClienteUid] = useState<string>("");
   const [mostrarSyncQr, setMostrarSyncQr] = useState<boolean>(false);
+  const [estiloCarteira, setEstiloCarteira] = useState<"couro-marrom" | "preto-fosco">("couro-marrom");
+
+  useEffect(() => {
+    try {
+      const salvo = localStorage.getItem("mayamenu_estilo_carteira") as any;
+      if (salvo === "preto-fosco" || salvo === "couro-marrom") {
+        setEstiloCarteira(salvo);
+      }
+    } catch {
+      // Ignora erro de localStorage
+    }
+  }, []);
+
+  const alternarEstiloCarteira = (novoEstilo: "couro-marrom" | "preto-fosco") => {
+    setEstiloCarteira(novoEstilo);
+    try {
+      localStorage.setItem("mayamenu_estilo_carteira", novoEstilo);
+    } catch {
+      // Ignora erro de localStorage
+    }
+  };
 
   useEffect(() => {
     if (!isOpen || !restauranteId) return;
@@ -201,26 +222,91 @@ export function MinhaComandaModal({
     <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <SheetContent
         side="right"
-        className="w-full sm:max-w-md bg-neutral-950 border-neutral-800 text-white p-0 flex flex-col h-full shadow-2xl"
+        className={`w-full sm:max-w-md p-0 flex flex-col h-full shadow-2xl transition-all duration-300 border-l ${
+          estiloCarteira === "couro-marrom"
+            ? "carteira-couro-marrom costura-carteira border-amber-900/60"
+            : "carteira-preto-fosco costura-carteira-preto border-neutral-700/60"
+        }`}
       >
-        {/* CABEÇALHO */}
-        <SheetHeader className="p-5 bg-neutral-900 border-b border-neutral-800 flex flex-col gap-1">
+        {/* CABEÇALHO DA CARTEIRA DE CONTA */}
+        <SheetHeader
+          className={`p-5 border-b flex flex-col gap-2 transition-colors ${
+            estiloCarteira === "couro-marrom"
+              ? "bg-[#2b180d]/90 border-amber-800/40"
+              : "bg-neutral-900/90 border-neutral-800"
+          }`}
+        >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
-              <div className="p-2 rounded-xl bg-rose-600/20 border border-rose-500/30 text-rose-500">
+              <div
+                className={`p-2 rounded-xl border shadow-inner ${
+                  estiloCarteira === "couro-marrom"
+                    ? "bg-amber-900/40 border-amber-700/50 text-amber-300"
+                    : "bg-neutral-800 border-neutral-700 text-neutral-300"
+                }`}
+              >
                 <Receipt className="w-5 h-5" />
               </div>
               <div>
-                <SheetTitle className="text-base font-black text-white flex items-center gap-2">
-                  Minha Comanda
-                  <Badge className="bg-white/10 text-neutral-300 text-[10px] font-mono">
+                <SheetTitle
+                  className={`text-base font-black flex items-center gap-2 tracking-tight ${
+                    estiloCarteira === "couro-marrom" ? "text-amber-100" : "text-white"
+                  }`}
+                >
+                  Porta-Conta da Mesa
+                  <Badge
+                    className={`text-[10px] font-mono px-2 py-0.5 rounded-full border ${
+                      estiloCarteira === "couro-marrom"
+                        ? "bg-amber-950/60 text-amber-300 border-amber-700/50"
+                        : "bg-neutral-800 text-neutral-300 border-neutral-700"
+                    }`}
+                  >
                     Mesa {mesaNumero}
                   </Badge>
                 </SheetTitle>
-                <p className="text-xs text-neutral-400">
-                  Acompanhe seus pratos e o total acumulado
+                <p
+                  className={`text-xs ${
+                    estiloCarteira === "couro-marrom" ? "text-amber-200/60" : "text-neutral-400"
+                  }`}
+                >
+                  Extrato e encerramento de despesas
                 </p>
               </div>
+            </div>
+
+            {/* SELETOR DE ACABAMENTO DO COURO (PRETO FOSCO VS COURO MARROM) */}
+            <div
+              className={`flex items-center p-0.5 rounded-xl border text-[10px] font-bold ${
+                estiloCarteira === "couro-marrom"
+                  ? "bg-black/30 border-amber-800/50"
+                  : "bg-black/40 border-neutral-700"
+              }`}
+              title="Escolha o acabamento da carteira de conta"
+            >
+              <button
+                type="button"
+                onClick={() => alternarEstiloCarteira("couro-marrom")}
+                className={`px-2 py-1 rounded-lg transition-all flex items-center gap-1 ${
+                  estiloCarteira === "couro-marrom"
+                    ? "bg-amber-800/80 text-amber-100 shadow-sm font-black"
+                    : "text-amber-300/60 hover:text-amber-200"
+                }`}
+              >
+                <span className="w-2 h-2 rounded-full bg-[#78350f] inline-block border border-amber-400" />
+                <span>Couro</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => alternarEstiloCarteira("preto-fosco")}
+                className={`px-2 py-1 rounded-lg transition-all flex items-center gap-1 ${
+                  estiloCarteira === "preto-fosco"
+                    ? "bg-neutral-800 text-white shadow-sm font-black"
+                    : "text-neutral-400 hover:text-white"
+                }`}
+              >
+                <span className="w-2 h-2 rounded-full bg-neutral-900 inline-block border border-neutral-500" />
+                <span>Preto</span>
+              </button>
             </div>
           </div>
         </SheetHeader>
@@ -229,15 +315,31 @@ export function MinhaComandaModal({
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
           {carregando ? (
             <div className="p-12 text-center text-xs text-neutral-400 space-y-2">
-              <Clock className="w-8 h-8 text-rose-500 animate-spin mx-auto opacity-70" />
+              <Clock className="w-8 h-8 text-amber-500 animate-spin mx-auto opacity-70" />
               <p>Consultando seus pratos no sistema...</p>
             </div>
           ) : pedidos.length === 0 ? (
-            <div className="p-10 text-center bg-neutral-900/60 border border-neutral-800 rounded-3xl space-y-3">
-              <Utensils className="w-10 h-10 text-neutral-600 mx-auto" />
-              <h4 className="text-sm font-bold text-neutral-300">Nenhum pedido enviado ainda</h4>
-              <p className="text-xs text-neutral-500">
-                Escolha seus itens favoritos no cardápio e envie o pedido para ver o acompanhamento da cozinha aqui.
+            <div
+              className={`p-10 text-center rounded-3xl space-y-3 border-2 border-dashed ${
+                estiloCarteira === "couro-marrom"
+                  ? "bg-amber-950/20 border-amber-800/40 text-amber-200/70"
+                  : "bg-neutral-900/60 border-neutral-800 text-neutral-400"
+              }`}
+            >
+              <Utensils
+                className={`w-10 h-10 mx-auto ${
+                  estiloCarteira === "couro-marrom" ? "text-amber-700" : "text-neutral-600"
+                }`}
+              />
+              <h4
+                className={`text-sm font-bold ${
+                  estiloCarteira === "couro-marrom" ? "text-amber-100" : "text-neutral-200"
+                }`}
+              >
+                Nenhum pedido lançado nesta comanda
+              </h4>
+              <p className="text-xs opacity-75">
+                Peça pratos ou bebidas no cardápio para acompanhar os valores da sua mesa aqui.
               </p>
             </div>
           ) : (
@@ -245,11 +347,25 @@ export function MinhaComandaModal({
               {pedidos.map((pedido, idx) => (
                 <div
                   key={pedido.id || idx}
-                  className="p-4 bg-neutral-900/90 border border-neutral-800 rounded-2xl space-y-2.5 shadow-sm"
+                  className={`p-4 rounded-2xl space-y-2.5 transition-all shadow-md border ${
+                    estiloCarteira === "couro-marrom"
+                      ? "bg-[#29170c]/90 border-amber-900/50 shadow-black/40 text-amber-50"
+                      : "bg-[#161618]/90 border-neutral-800 shadow-black/50 text-neutral-100"
+                  }`}
                 >
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-black uppercase tracking-wider text-neutral-400 flex items-center gap-1.5">
-                      <Sparkles className="w-3 h-3 text-rose-500" />
+                  <div className="flex items-center justify-between border-b pb-2 ${
+                    estiloCarteira === 'couro-marrom' ? 'border-amber-900/40' : 'border-neutral-800/80'
+                  }">
+                    <span
+                      className={`text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 ${
+                        estiloCarteira === "couro-marrom" ? "text-amber-300" : "text-neutral-300"
+                      }`}
+                    >
+                      <Sparkles
+                        className={`w-3 h-3 ${
+                          estiloCarteira === "couro-marrom" ? "text-amber-400" : "text-neutral-400"
+                        }`}
+                      />
                       Rodada #{idx + 1}
                     </span>
                     {getStatusBadge(pedido.status)}
@@ -259,21 +375,41 @@ export function MinhaComandaModal({
                     {pedido.itens.map((it, itemIdx) => (
                       <div key={itemIdx} className="flex items-start justify-between text-xs">
                         <div className="min-w-0 pr-2">
-                          <span className="font-bold text-white">
+                          <span
+                            className={`font-bold ${
+                              estiloCarteira === "couro-marrom" ? "text-amber-100" : "text-white"
+                            }`}
+                          >
                             {it.quantidade}x {it.nome}
                           </span>
                           {it.observacoes && (
-                            <p className="text-[10px] text-neutral-400 italic">
+                            <p
+                              className={`text-[10px] italic ${
+                                estiloCarteira === "couro-marrom"
+                                  ? "text-amber-200/60"
+                                  : "text-neutral-400"
+                              }`}
+                            >
                               Obs: {it.observacoes}
                             </p>
                           )}
                           {it.modificadores && it.modificadores.length > 0 && (
-                            <p className="text-[10px] text-rose-400">
+                            <p
+                              className={`text-[10px] ${
+                                estiloCarteira === "couro-marrom"
+                                  ? "text-amber-400 font-medium"
+                                  : "text-rose-400 font-medium"
+                              }`}
+                            >
                               + {it.modificadores.map((m) => m.opcao).join(", ")}
                             </p>
                           )}
                         </div>
-                        <span className="font-mono text-neutral-300 font-semibold shrink-0">
+                        <span
+                          className={`font-mono font-semibold shrink-0 ${
+                            estiloCarteira === "couro-marrom" ? "text-amber-200" : "text-neutral-300"
+                          }`}
+                        >
                           {((it.precoFinal || 0) * it.quantidade).toLocaleString("pt-BR", {
                             style: "currency",
                             currency: "BRL",
@@ -283,9 +419,27 @@ export function MinhaComandaModal({
                     ))}
                   </div>
 
-                  <div className="pt-2 border-t border-neutral-800/80 flex justify-between items-center text-[11px]">
-                    <span className="text-neutral-500 font-semibold">Subtotal da rodada</span>
-                    <span className="font-mono font-bold text-neutral-200">
+                  <div
+                    className={`pt-2 border-t flex justify-between items-center text-[11px] ${
+                      estiloCarteira === "couro-marrom"
+                        ? "border-amber-900/40"
+                        : "border-neutral-800/80"
+                    }`}
+                  >
+                    <span
+                      className={
+                        estiloCarteira === "couro-marrom"
+                          ? "text-amber-300/70 font-semibold"
+                          : "text-neutral-500 font-semibold"
+                      }
+                    >
+                      Subtotal da rodada
+                    </span>
+                    <span
+                      className={`font-mono font-bold ${
+                        estiloCarteira === "couro-marrom" ? "text-amber-200" : "text-neutral-200"
+                      }`}
+                    >
                       {pedido.subtotal.toLocaleString("pt-BR", {
                         style: "currency",
                         currency: "BRL",
@@ -298,23 +452,59 @@ export function MinhaComandaModal({
           )}
         </div>
 
-        {/* RODAPÉ COM DIVISÃO DE CONTAS (RATEIO) & BOTÕES DE AÇÃO */}
-        <div className="p-5 bg-neutral-900 border-t border-neutral-800 space-y-3.5">
-          {/* RESUMO FINANCEIRO EM DUAS LINHAS */}
-          <div className="space-y-2 p-3 bg-neutral-950/70 border border-neutral-800/80 rounded-2xl">
+        {/* RODAPÉ: O TALÃO DA CONTA INSERIDO NO BOLSO DA CARTEIRA */}
+        <div
+          className={`p-5 border-t space-y-3.5 transition-colors relative z-10 ${
+            estiloCarteira === "couro-marrom"
+              ? "bg-[#1d1008] border-amber-900/60"
+              : "bg-[#0f0f10] border-neutral-800"
+          }`}
+        >
+          {/* TALÃO / EXTRATO DE DESPESA (SIMULANDO O PAPEL TÉRMICO / NOTA DA CONTA) */}
+          <div
+            className={`space-y-2 p-3.5 rounded-2xl border shadow-inner transition-all ${
+              estiloCarteira === "couro-marrom"
+                ? "bg-[#25140b] border-amber-800/60 shadow-black/50"
+                : "bg-neutral-900 border-neutral-700/60 shadow-black/60"
+            }`}
+          >
             <div className="flex items-center justify-between">
-              <span className="text-xs uppercase font-bold tracking-wider text-neutral-400 flex items-center gap-1.5">
-                <User className="w-3.5 h-3.5 text-rose-400" />
+              <span
+                className={`text-xs uppercase font-bold tracking-wider flex items-center gap-1.5 ${
+                  estiloCarteira === "couro-marrom" ? "text-amber-200/80" : "text-neutral-300"
+                }`}
+              >
+                <User
+                  className={`w-3.5 h-3.5 ${
+                    estiloCarteira === "couro-marrom" ? "text-amber-400" : "text-rose-400"
+                  }`}
+                />
                 A Minha Comanda:
               </span>
-              <span className="text-base font-black text-rose-400 font-mono">
+              <span
+                className={`text-base font-black font-mono ${
+                  estiloCarteira === "couro-marrom" ? "text-amber-300" : "text-rose-400"
+                }`}
+              >
                 {totalCliente.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
               </span>
             </div>
 
-            <div className="flex items-center justify-between pt-1.5 border-t border-neutral-800/60">
-              <span className="text-xs uppercase font-bold tracking-wider text-neutral-400 flex items-center gap-1.5">
-                <Users className="w-3.5 h-3.5 text-amber-400" />
+            <div
+              className={`flex items-center justify-between pt-2 border-t ${
+                estiloCarteira === "couro-marrom" ? "border-amber-900/50" : "border-neutral-800"
+              }`}
+            >
+              <span
+                className={`text-xs uppercase font-bold tracking-wider flex items-center gap-1.5 ${
+                  estiloCarteira === "couro-marrom" ? "text-amber-200/80" : "text-neutral-300"
+                }`}
+              >
+                <Users
+                  className={`w-3.5 h-3.5 ${
+                    estiloCarteira === "couro-marrom" ? "text-amber-400" : "text-amber-400"
+                  }`}
+                />
                 Total da Mesa:
               </span>
               <span className="text-base font-black text-amber-400 font-mono">
@@ -324,17 +514,29 @@ export function MinhaComandaModal({
           </div>
 
           {/* PROTOCOLO MAYA SYNC-QR (Comanda-Espelho Dinâmica Descentralizada) */}
-          <div className="pt-2 border-t border-neutral-800">
+          <div
+            className={`pt-2 border-t ${
+              estiloCarteira === "couro-marrom" ? "border-amber-900/40" : "border-neutral-800"
+            }`}
+          >
             <button
               type="button"
               onClick={() => setMostrarSyncQr((prev) => !prev)}
-              className="w-full py-2 px-3 rounded-xl bg-neutral-900 hover:bg-neutral-850 border border-neutral-800 text-[11px] font-bold text-amber-400 flex items-center justify-between transition-all"
+              className={`w-full py-2 px-3 rounded-xl border text-[11px] font-bold flex items-center justify-between transition-all ${
+                estiloCarteira === "couro-marrom"
+                  ? "bg-amber-950/40 hover:bg-amber-950/70 border-amber-800/50 text-amber-300"
+                  : "bg-neutral-900 hover:bg-neutral-800 border-neutral-700/80 text-amber-400"
+              }`}
             >
               <div className="flex items-center gap-2">
                 <QrCode className="w-3.5 h-3.5 text-amber-400" />
                 <span>MAYa Sync-QR (Comanda-Espelho Offline)</span>
               </div>
-              <span className="text-[10px] text-neutral-400">
+              <span
+                className={`text-[10px] ${
+                  estiloCarteira === "couro-marrom" ? "text-amber-300/60" : "text-neutral-400"
+                }`}
+              >
                 {mostrarSyncQr ? "Ocultar" : "Mostrar QR"}
               </span>
             </button>
@@ -372,13 +574,14 @@ export function MinhaComandaModal({
                   />
                 </div>
                 <div className="text-[10px] text-neutral-500 font-mono">
-                  Payload Compacto: Total {totalCliente.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                  Payload Compacto: Total{" "}
+                  {totalCliente.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
                 </div>
               </div>
             )}
           </div>
 
-          {/* BOTÕES DE AÇÃO: RESPONSIVOS (MOBILE: EMPILHADOS / SM: LADO A LADO) */}
+          {/* BOTÕES DE AÇÃO: BOTÕES COM ESTILO DE FIVELA / PORTA-CARTÃO */}
           <div className="flex flex-col sm:flex-row w-full gap-2 pt-1 pb-safe">
             {/* 1. PAGAR A MINHA PARTE */}
             <Button
@@ -388,7 +591,9 @@ export function MinhaComandaModal({
               className={`w-full sm:flex-1 h-12 sm:h-11 rounded-xl text-xs sm:text-[11px] uppercase tracking-wider font-bold transition-all shadow-md flex items-center justify-center gap-1.5 ${
                 contaPedidaSucesso
                   ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
-                  : "bg-rose-600 hover:bg-rose-500 text-white shadow-rose-600/20 active:scale-95"
+                  : estiloCarteira === "couro-marrom"
+                  ? "bg-gradient-to-r from-amber-700 to-amber-600 hover:from-amber-600 hover:to-amber-500 text-amber-50 shadow-amber-900/50 active:scale-95 border border-amber-500/40"
+                  : "bg-neutral-800 hover:bg-neutral-700 text-white shadow-black/40 active:scale-95 border border-neutral-600"
               }`}
             >
               {contaPedidaSucesso ? (
@@ -417,7 +622,9 @@ export function MinhaComandaModal({
               className={`w-full sm:flex-1 h-12 sm:h-11 rounded-xl text-xs sm:text-[11px] uppercase tracking-wider font-bold transition-all border shadow-md flex items-center justify-center gap-1.5 ${
                 mesaTodaPedidaSucesso
                   ? "bg-amber-500/20 text-amber-300 border-amber-500/40"
-                  : "bg-neutral-800 hover:bg-neutral-700 text-amber-300 border-amber-500/30 hover:border-amber-500/50 active:scale-95"
+                  : estiloCarteira === "couro-marrom"
+                  ? "bg-black/40 hover:bg-black/60 text-amber-300 border-amber-700/60 hover:border-amber-500 active:scale-95"
+                  : "bg-black/60 hover:bg-black/80 text-amber-300 border-neutral-700 hover:border-neutral-500 active:scale-95"
               }`}
             >
               {mesaTodaPedidaSucesso ? (
