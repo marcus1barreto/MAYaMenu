@@ -90,6 +90,7 @@
    Fundo: Carbono Quente #1C1917 | Ação: Laranja Fogo #F97316
 ----------------------------------------------------- */
 .theme-fast-carbono,
+.theme-fast-furious,
 .theme-brasa-fogo {
   --background: hsl(24 10% 10%); /* Carbono Quente #1C1917 */
   --foreground: hsl(30 30% 98%);
@@ -126,6 +127,7 @@
    Fundo: Areia #FAFAF9 | Ação: Verde Esmeralda #059669 | Textos: Café Suave
 ----------------------------------------------------- */
 .theme-brisa-areia,
+.theme-brisa-natureza,
 .theme-fresh-nature {
   --background: hsl(60 9.1% 97.8%); /* Areia/Bege suave #FAFAF9 */
   --foreground: hsl(24 9.8% 10%); /* Café escuro em vez de preto puro */
@@ -162,6 +164,7 @@
    Fundo: Azul Marinho Profundo #020617 | Ação: Ciano Neon Contido #06B6D4
 ----------------------------------------------------- */
 .theme-boemia-marinho,
+.theme-boemia-noturna,
 .theme-neon-pub {
   --background: hsl(222.2 84% 4.9%); /* Azul Marinho Profundo #020617 */
   --foreground: hsl(210 40% 98%);
@@ -198,6 +201,7 @@
    Fundo: Asfalto Elegante #09090B | Ação: Ouro Nobre #D97706 | Título: Serif
 ----------------------------------------------------- */
 .theme-premium-asfalto,
+.theme-premium-tradicao,
 .theme-dark-elegante,
 .dark {
   --background: hsl(240 10% 3.9%); /* Preto Asfalto Elegante #09090B */
@@ -235,6 +239,7 @@
    Fundo: Solarized Paper #FDF6E3 | Ação: Terracota #C26D2B | -80% Luz Azul
 ----------------------------------------------------- */
 .theme-acessibilidade-sepia,
+.theme-descanso-vista,
 .theme-descanso-visual {
   --background: hsl(44 87% 94%); /* Solarized Base #FDF6E3 */
   --foreground: hsl(30 25% 15%); /* Marrom café profundo, zero estresse */

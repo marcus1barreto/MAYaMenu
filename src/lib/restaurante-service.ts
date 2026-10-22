@@ -62,11 +62,6 @@ export async function obterRestaurantePorSlugValido(slug: string): Promise<Resta
   const slugLimpo = slug.trim().toLowerCase();
   if (!slugLimpo) return null;
 
-  // Rota sandbox/demo é sempre válida
-  if (slugLimpo === "demo") {
-    return { ...RESTAURANTE_DEMO, slug: "demo" };
-  }
-
   try {
     // 1. Consulta por campo 'slug'
     const q = query(
@@ -130,6 +125,9 @@ export async function obterRestaurantePorSlugValido(slug: string): Promise<Resta
     }
 
     // Documento não existe
+    if (slugLimpo === "demo") {
+      return { ...RESTAURANTE_DEMO, slug: "demo" };
+    }
     return null;
   } catch (err) {
     console.warn("Falha na checagem estrita de existência do restaurante:", err);
@@ -139,6 +137,55 @@ export async function obterRestaurantePorSlugValido(slug: string): Promise<Resta
       slug: slugLimpo,
     };
   }
+}
+
+/**
+ * Escuta os dados e configurações do restaurante em tempo real com onSnapshot (usado pelo MenuView do Cliente).
+ */
+export function escutarRestaurante(
+  restauranteId: string,
+  onAtualizacao: (restaurante: Restaurante) => void
+): Unsubscribe {
+  const isDemo = restauranteId === "rest-demo-alpha" || restauranteId === "demo";
+  const restRef = doc(db, "restaurantes", restauranteId);
+
+  return onSnapshot(
+    restRef,
+    (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data();
+        onAtualizacao({
+          id: snapshot.id,
+          ownerId: data.ownerId || snapshot.id,
+          slug: data.slug || "demo",
+          nome: data.nome || "Restaurante",
+          plano: data.plano,
+          maxMesas: data.maxMesas,
+          maxPratos: data.maxPratos,
+          suspenso: data.suspenso,
+          licenca: data.licenca,
+          configuracoes: {
+            corPrimaria: data.configuracoes?.corPrimaria || "#E11D48",
+            tema: data.configuracoes?.tema || "light",
+            logoUrl: data.configuracoes?.logoUrl,
+            capaUrl: data.configuracoes?.capaUrl || "/images/capa-padrao.webp",
+            modoOperacao: data.configuracoes?.modoOperacao || "hibrido",
+            modoFilaKds: data.configuracoes?.modoFilaKds || "sequencial",
+            taxaServico: typeof data.configuracoes?.taxaServico === "number" ? data.configuracoes.taxaServico : 10,
+            suspenso: data.configuracoes?.suspenso,
+          },
+        });
+      } else if (isDemo) {
+        onAtualizacao(RESTAURANTE_DEMO);
+      }
+    },
+    (err) => {
+      console.warn("Listener do restaurante em tempo real indisponível:", err);
+      if (isDemo) {
+        onAtualizacao(RESTAURANTE_DEMO);
+      }
+    }
+  );
 }
 
 /**

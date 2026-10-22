@@ -15,6 +15,12 @@ export type TemaId =
   | "premium-asfalto"
   | "acessibilidade-sepia"
   // Aliases / retrocompatibilidade
+  | "padrao"
+  | "fast-furious"
+  | "boemia-noturna"
+  | "premium-tradicao"
+  | "brisa-natureza"
+  | "descanso-vista"
   | "dark-elegante"
   | "brasa-fogo"
   | "fresh-nature"
@@ -178,23 +184,23 @@ export const TEMAS_DISPONIVEIS: TemaDef[] = FAMILIAS_TEMAS.flatMap((f) => f.tema
  * Se nenhum tema estiver configurado ou for 'light'/'white-label', retorna string vazia (usando :root).
  */
 export function obterClasseTema(tema?: string | null): string {
-  if (!tema || tema === "white-label" || tema === "light") {
+  if (!tema || tema === "white-label" || tema === "padrao" || tema === "light") {
     return "";
   }
   // Mapeamentos novos das 5 Famílias
-  if (tema === "fast-carbono" || tema === "brasa-fogo") {
+  if (tema === "fast-carbono" || tema === "fast-furious" || tema === "brasa-fogo") {
     return "theme-fast-carbono";
   }
-  if (tema === "brisa-areia" || tema === "fresh-nature") {
+  if (tema === "brisa-areia" || tema === "brisa-natureza" || tema === "fresh-nature") {
     return "theme-brisa-areia";
   }
-  if (tema === "boemia-marinho" || tema === "neon-pub") {
+  if (tema === "boemia-marinho" || tema === "boemia-noturna" || tema === "neon-pub") {
     return "theme-boemia-marinho";
   }
-  if (tema === "premium-asfalto" || tema === "dark-elegante" || tema === "dark") {
+  if (tema === "premium-asfalto" || tema === "premium-tradicao" || tema === "dark-elegante" || tema === "dark") {
     return "theme-premium-asfalto";
   }
-  if (tema === "acessibilidade-sepia" || tema === "descanso-visual") {
+  if (tema === "acessibilidade-sepia" || tema === "descanso-vista" || tema === "descanso-visual") {
     return "theme-acessibilidade-sepia";
   }
 

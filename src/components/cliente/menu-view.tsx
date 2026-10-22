@@ -33,7 +33,8 @@ import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { ensureClienteAnonimo, db } from "@/lib/firebase";
 import { doc, updateDoc, serverTimestamp, onSnapshot } from "firebase/firestore";
-import { escutarCardapio, chamarGarcomFirestore, escutarPedidosCliente } from "@/lib/restaurante-service";
+import { escutarCardapio, escutarRestaurante, chamarGarcomFirestore, escutarPedidosCliente } from "@/lib/restaurante-service";
+import { resolverClasseTemaRestaurante } from "@/lib/tema";
 import { marcarVisitaAtualComoPaga, limparSessaoClienteLocal } from "@/lib/historico-cliente";
 import { MesaScannerModal } from "./mesa-scanner-modal";
 
@@ -43,9 +44,10 @@ interface MenuViewProps {
   numeroMesa?: number | string;
 }
 
-export function MenuView({ restaurante, cardapio: cardapioInicial, numeroMesa: numeroMesaProp = 1 }: MenuViewProps) {
+export function MenuView({ restaurante: restauranteInicial, cardapio: cardapioInicial, numeroMesa: numeroMesaProp = 1 }: MenuViewProps) {
   const { totalItens, subtotal, nomeCliente, limparCarrinho, mesa, setMesa } = useCart();
   const numeroMesa = mesa || numeroMesaProp;
+  const [restaurante, setRestaurante] = useState<Restaurante>(restauranteInicial);
   const [cardapio, setCardapio] = useState<MenuItem[]>(cardapioInicial);
   const [itemSelecionado, setItemSelecionado] = useState<MenuItem | null>(null);
   const [carrinhoAberto, setCarrinhoAberto] = useState(false);
@@ -84,13 +86,22 @@ export function MenuView({ restaurante, cardapio: cardapioInicial, numeroMesa: n
       ? "theme-boemia-marinho"
       : modoVisualCliente === "descanso"
       ? "theme-acessibilidade-sepia"
-      : ""; // 'padrao' herda o tema configurado pelo restaurante no container pai
+      : resolverClasseTemaRestaurante(restaurante); // 'padrao' aplica a classe do restaurante em tempo real
 
   // Categorias únicas disponíveis no cardápio na ordem em que aparecem no cardápio ordenado
   const categorias = [
     "Todas",
     ...Array.from(new Set(cardapio.map((i) => i.categoria || "Geral"))),
   ];
+
+  // Escuta o restaurante em tempo real (mudança de tema, logo, cores)
+  useEffect(() => {
+    if (!restauranteInicial?.id) return;
+    const unsub = escutarRestaurante(restauranteInicial.id, (novoRest) => {
+      setRestaurante(novoRest);
+    });
+    return () => unsub();
+  }, [restauranteInicial?.id]);
 
   // Escuta o cardápio em tempo real (mudança de preço, pausa de esgotados)
   useEffect(() => {
@@ -567,9 +578,9 @@ export function MenuView({ restaurante, cardapio: cardapioInicial, numeroMesa: n
 
       {/* DRAWER / OFFCANVAS COM AÇÕES SECUNDÁRIAS (MENU HAMBÚRGUER) */}
       <Sheet open={menuLateralAberto} onOpenChange={setMenuLateralAberto}>
-        <SheetContent side="left" className="bg-neutral-950 text-white border-neutral-800 w-[290px] p-5 flex flex-col justify-between">
+        <SheetContent side="left" className={`bg-background text-foreground border-border w-[290px] p-5 flex flex-col justify-between ${classeModoVisual}`}>
           <div className="space-y-6">
-            <SheetHeader className="text-left pb-4 border-b border-neutral-800">
+            <SheetHeader className="text-left pb-4 border-b border-border">
               <div className="flex items-center gap-3">
                 <div
                   style={{ backgroundColor: corPrimaria }}
@@ -578,8 +589,8 @@ export function MenuView({ restaurante, cardapio: cardapioInicial, numeroMesa: n
                   {restaurante.nome.charAt(0).toUpperCase()}
                 </div>
                 <div>
-                  <SheetTitle className="text-base font-black text-white">{restaurante.nome}</SheetTitle>
-                  <p className="text-xs text-neutral-400">Atendimento Digital</p>
+                  <SheetTitle className="text-base font-black text-foreground">{restaurante.nome}</SheetTitle>
+                  <p className="text-xs text-muted-foreground">Atendimento Digital</p>
                 </div>
               </div>
             </SheetHeader>
@@ -735,8 +746,8 @@ export function MenuView({ restaurante, cardapio: cardapioInicial, numeroMesa: n
             </div>
           </div>
 
-          <div className="pt-4 border-t border-neutral-850 text-center">
-            <span className="text-[10px] text-neutral-500 font-mono">MAYaMenu • Autoatendimento Inteligente</span>
+          <div className="pt-4 border-t border-border text-center">
+            <span className="text-[10px] text-muted-foreground font-mono">MAYaMenu • Autoatendimento Inteligente</span>
           </div>
         </SheetContent>
       </Sheet>
