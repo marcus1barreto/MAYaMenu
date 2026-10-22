@@ -796,40 +796,40 @@ export function AdminDashboard() {
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col transition-colors duration-200">
-      {/* BARRA SUPERIOR DO PAINEL */}
-      <header className="p-4 sm:p-6 bg-card border-b border-border flex flex-wrap items-center justify-between gap-4">
+      {/* BARRA SUPERIOR DO PAINEL (COMPACTA PARA ELEVAR OS CARDS) */}
+      <header className="px-4 sm:px-6 py-3 sm:py-3.5 bg-card border-b border-border flex flex-wrap items-center justify-between gap-3 shadow-xs">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-rose-600 flex items-center justify-center font-black text-white shadow-md">
+          <div className="w-9 h-9 rounded-xl bg-rose-600 flex items-center justify-center font-black text-white shadow-md">
             M
           </div>
           <div>
-            <h1 className="text-lg sm:text-xl font-black tracking-tight leading-tight">
+            <h1 className="text-base sm:text-lg font-black tracking-tight leading-tight">
               {restaurante?.nome || "Painel MAYaMenu"}
             </h1>
-            <p className="text-xs text-muted-foreground">Administração & Operação Alpha</p>
+            <p className="text-[11px] text-muted-foreground">Administração & Operação</p>
           </div>
         </div>
 
         {/* ATALHOS RÁPIDOS */}
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2">
           {/* BOTÃO LEITOR DE BALCÃO / CAIXA */}
           <Button
             type="button"
             onClick={() => setScannerBalcaoAberto(true)}
-            className="bg-amber-500 hover:bg-amber-400 text-neutral-950 font-black text-xs h-10 px-3.5 rounded-xl flex items-center gap-2 shadow-xs transition-all active:scale-95"
+            className="bg-amber-500 hover:bg-amber-400 text-neutral-950 font-black text-xs h-9 px-3 rounded-xl flex items-center gap-1.5 shadow-xs transition-all active:scale-95"
             title="Escanear comanda do cliente no balcão para baixa imediata"
           >
-            <QrCode className="w-4 h-4 text-neutral-950" />
-            <span>Escanear Comanda (Balcão)</span>
+            <QrCode className="w-3.5 h-3.5 text-neutral-950" />
+            <span className="hidden sm:inline">Escanear Comanda</span>
           </Button>
 
           <Link href="/cozinha" target="_blank">
             <Button
               variant="outline"
-              className="bg-card border-border hover:bg-muted text-amber-500 font-bold text-xs h-10 rounded-xl flex items-center gap-2"
+              className="bg-card border-border hover:bg-muted text-amber-500 font-bold text-xs h-9 px-3 rounded-xl flex items-center gap-1.5"
             >
-              <ChefHat className="w-4 h-4" />
-              <span>Abrir KDS Cozinha</span>
+              <ChefHat className="w-3.5 h-3.5" />
+              <span>KDS Cozinha</span>
               <ExternalLink className="w-3 h-3 opacity-60" />
             </Button>
           </Link>
@@ -837,10 +837,10 @@ export function AdminDashboard() {
           <Link href={`${urlPublica}?mesa=1`} target="_blank">
             <Button
               variant="outline"
-              className="bg-card border-border hover:bg-muted text-foreground font-bold text-xs h-10 rounded-xl flex items-center gap-2"
+              className="bg-card border-border hover:bg-muted text-foreground font-bold text-xs h-9 px-3 rounded-xl flex items-center gap-1.5"
             >
-              <Smartphone className="w-4 h-4 text-rose-500" />
-              <span>Ver Cardápio PWA</span>
+              <Smartphone className="w-3.5 h-3.5 text-rose-500" />
+              <span>Cardápio PWA</span>
               <ExternalLink className="w-3 h-3 opacity-60" />
             </Button>
           </Link>
@@ -848,11 +848,11 @@ export function AdminDashboard() {
           <Link href="/manual" target="_blank">
             <Button
               variant="outline"
-              className="bg-card border-border hover:bg-muted text-foreground font-bold text-xs h-10 rounded-xl flex items-center gap-2"
+              className="bg-card border-border hover:bg-muted text-foreground font-bold text-xs h-9 px-3 rounded-xl flex items-center gap-1.5"
               title="Abrir Central de Ajuda, Guia Rápido e FAQ"
             >
-              <BookOpen className="w-4 h-4 text-rose-600" />
-              <span className="hidden sm:inline">Manual & Ajuda</span>
+              <BookOpen className="w-3.5 h-3.5 text-rose-600" />
+              <span className="hidden sm:inline">Manual</span>
               <ExternalLink className="w-3 h-3 opacity-60" />
             </Button>
           </Link>
@@ -861,29 +861,29 @@ export function AdminDashboard() {
             type="button"
             variant="outline"
             onClick={() => setModalConfigAberto(true)}
-            className="bg-card border-border hover:bg-muted text-foreground font-bold text-xs h-10 px-3.5 rounded-xl flex items-center gap-2 shadow-xs transition-all"
+            className="bg-card border-border hover:bg-muted text-foreground font-bold text-xs h-9 px-3 rounded-xl flex items-center gap-1.5 shadow-xs transition-all"
             title="Configurações da Loja"
           >
-            <Settings className="w-4 h-4 text-primary" />
-            <span className="hidden sm:inline">Configurações</span>
+            <Settings className="w-3.5 h-3.5 text-primary" />
+            <span className="hidden sm:inline">Config</span>
           </Button>
 
           <Button
             type="button"
             variant="ghost"
             onClick={logout}
-            className="text-muted-foreground hover:text-foreground hover:bg-muted rounded-xl text-xs h-10 px-3 transition-colors"
+            className="text-muted-foreground hover:text-foreground hover:bg-muted rounded-xl text-xs h-9 px-2.5 transition-colors"
             title="Sair do Painel"
           >
-            <LogOut className="w-4 h-4" />
+            <LogOut className="w-3.5 h-3.5" />
           </Button>
         </div>
       </header>
 
       {/* BANNER DE FEEDBACK VISUAL DO BALCÃO */}
       {feedbackBalcao && (
-        <div className="bg-emerald-500/20 border-b border-emerald-500/40 px-4 py-2.5 text-center text-emerald-200 text-xs font-bold flex items-center justify-center gap-2 animate-in fade-in">
-          <Check className="w-4 h-4 text-emerald-400" />
+        <div className="bg-emerald-50 border-b border-emerald-200 px-4 py-2 text-center text-emerald-800 text-xs font-bold flex items-center justify-center gap-2 animate-in fade-in">
+          <Check className="w-3.5 h-3.5 text-emerald-600" />
           <span>{feedbackBalcao}</span>
         </div>
       )}
@@ -894,7 +894,7 @@ export function AdminDashboard() {
           <button
             type="button"
             onClick={() => setAbaAtiva("cardapio")}
-            className={`py-3.5 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 ${
+            className={`py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all flex items-center gap-2 ${
               abaAtiva === "cardapio"
                 ? "border-primary text-primary"
                 : "border-transparent text-muted-foreground hover:text-foreground"
@@ -907,7 +907,7 @@ export function AdminDashboard() {
           <button
             type="button"
             onClick={() => setAbaAtiva("mesas")}
-            className={`py-3.5 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 ${
+            className={`py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all flex items-center gap-2 ${
               abaAtiva === "mesas"
                 ? "border-primary text-primary"
                 : "border-transparent text-muted-foreground hover:text-foreground"
@@ -920,7 +920,7 @@ export function AdminDashboard() {
           <button
             type="button"
             onClick={() => setAbaAtiva("analytics")}
-            className={`py-3.5 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 relative ${
+            className={`py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all flex items-center gap-2 relative ${
               abaAtiva === "analytics"
                 ? "border-primary text-primary"
                 : "border-transparent text-muted-foreground hover:text-foreground"
@@ -937,11 +937,11 @@ export function AdminDashboard() {
         </div>
       </div>
 
-      {/* CONTEÚDO PRINCIPAL */}
-      <main className="flex-1 p-4 sm:p-6 max-w-5xl w-full mx-auto">
+      {/* CONTEÚDO PRINCIPAL (MAIS ACIMA NO VIEWPORT) */}
+      <main className="flex-1 px-4 sm:px-6 py-3.5 sm:py-4 max-w-5xl w-full mx-auto">
         {/* ABA: CARDÁPIO */}
         {abaAtiva === "cardapio" && (
-          <div className="space-y-6">
+          <div className="space-y-4">
             {carregandoCardapio ? (
               <div className="py-20 flex flex-col items-center justify-center space-y-3">
                 <Loader2 className="w-8 h-8 text-rose-500 animate-spin" />
@@ -957,10 +957,10 @@ export function AdminDashboard() {
               />
             ) : (
               <div className="space-y-6">
-                <div className="flex flex-wrap items-center justify-between gap-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <h2 className="text-lg font-bold text-white">Gestão & Ordenação de Pratos</h2>
-                    <p className="text-xs text-neutral-400">
+                    <h2 className="text-base sm:text-lg font-black text-neutral-950">Gestão & Ordenação de Pratos</h2>
+                    <p className="text-xs text-neutral-500">
                       Organize a ordem dos seus pratos de forma tátil, ajuste preços ou pause esgotados.
                     </p>
                   </div>
@@ -968,7 +968,7 @@ export function AdminDashboard() {
                   <Button
                     type="button"
                     onClick={handleAbrirNovoPrato}
-                    className="bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs h-10 px-4 rounded-xl flex items-center gap-2 shadow-lg"
+                    className="bg-rose-600 hover:bg-rose-500 text-white font-black text-xs h-9 px-4 rounded-xl flex items-center gap-1.5 shadow-md shadow-rose-600/20"
                   >
                     <Plus className="w-4 h-4" />
                     <span>+ Adicionar Novo Item</span>
@@ -982,10 +982,10 @@ export function AdminDashboard() {
                     .sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0));
 
                   return (
-                    <div key={catNome} className="space-y-3">
+                    <div key={catNome} className="space-y-2.5">
                       <div className="flex items-center gap-2 px-1">
-                        <span className="w-2 h-2 rounded-full bg-rose-500" />
-                        <h3 className="text-xs font-black uppercase tracking-wider text-neutral-300">
+                        <span className="w-2 h-2 rounded-full bg-rose-600" />
+                        <h3 className="text-xs font-black uppercase tracking-wider text-neutral-900">
                           {catNome} ({itensDaCat.length})
                         </h3>
                       </div>
@@ -998,29 +998,29 @@ export function AdminDashboard() {
                           return (
                             <div
                               key={item.id}
-                              className={`p-3.5 sm:p-4 rounded-2xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs ${
+                              className={`p-3.5 sm:p-4 rounded-2xl border-2 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
                                 item.ativo
-                                  ? "bg-card border-border hover:border-primary/40"
-                                  : "bg-card/40 border-border/50 opacity-60"
+                                  ? "bg-white border-neutral-200/90 hover:border-neutral-300 shadow-sm hover:shadow-md"
+                                  : "bg-neutral-50 border-neutral-200/70 opacity-60"
                               }`}
                             >
                               <div className="flex items-center gap-3 min-w-0">
                                 {item.fotoUrl && (
-                                  <div className="relative w-14 h-14 rounded-xl overflow-hidden bg-muted flex-shrink-0 border border-border">
+                                  <div className="relative w-14 h-14 rounded-xl overflow-hidden bg-neutral-100 flex-shrink-0 border-2 border-neutral-200 shadow-xs">
                                     <Image src={item.fotoUrl} alt={item.nome} fill className="object-cover" />
                                   </div>
                                 )}
                                 <div className="min-w-0">
                                   <div className="flex items-center gap-2">
-                                    <h4 className="text-sm font-bold text-foreground truncate">{item.nome}</h4>
-                                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-muted text-muted-foreground border border-border">
+                                    <h4 className="text-sm font-black text-neutral-950 truncate">{item.nome}</h4>
+                                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-600 border border-neutral-200 font-bold">
                                       #{idx + 1}
                                     </span>
                                   </div>
-                                  <p className="text-xs text-muted-foreground truncate max-w-md mt-0.5">
+                                  <p className="text-xs text-neutral-500 truncate max-w-md mt-0.5">
                                     {item.descricao}
                                   </p>
-                                  <span className="text-xs font-black text-primary mt-1 block">
+                                  <span className="text-xs font-black text-rose-600 mt-1 block">
                                     {item.precoBase.toLocaleString("pt-BR", {
                                       style: "currency",
                                       currency: "BRL",
@@ -1125,7 +1125,7 @@ export function AdminDashboard() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3.5">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
               {mesas.map((mesa) => {
                 const num = mesa.numero;
                 const ehChamado = Boolean(mesa.chamandoGarcom);
@@ -1136,16 +1136,16 @@ export function AdminDashboard() {
                   <div
                     key={num}
                     onClick={() => handleAbrirMesa(num)}
-                    className={`p-4 rounded-2xl border text-left transition-all flex flex-col justify-between min-h-[140px] group relative overflow-hidden cursor-pointer select-none active:scale-[0.98] shadow-xs ${
+                    className={`p-3.5 sm:p-4 rounded-2xl border-2 text-left transition-all flex flex-col justify-between min-h-[140px] group relative overflow-hidden cursor-pointer select-none active:scale-[0.98] ${
                       ehChamado
-                        ? "bg-amber-950/40 border-amber-400 ring-2 ring-amber-400/50 shadow-xl shadow-amber-950/60 animate-pulse"
+                        ? "bg-amber-50 border-amber-500 ring-2 ring-amber-400/50 shadow-md shadow-amber-500/10 animate-pulse"
                         : mesa.status === "conta_pedida"
-                        ? "bg-rose-950/20 border-rose-500/60 hover:border-rose-400 shadow-md"
+                        ? "bg-rose-50/90 border-rose-500 hover:border-rose-600 shadow-md shadow-rose-600/10"
                         : mesa.status === "paga_ocupada"
-                        ? "bg-emerald-950/20 border-emerald-500/80 ring-1 ring-emerald-500/40 shadow-md hover:border-emerald-400"
+                        ? "bg-emerald-50/90 border-emerald-500 shadow-md shadow-emerald-600/10"
                         : mesa.status === "ocupada"
-                        ? "bg-card border-amber-500/50 hover:border-amber-500"
-                        : "bg-card/40 border-border hover:border-primary/40"
+                        ? "bg-amber-50/70 border-amber-400 hover:border-amber-500 shadow-sm"
+                        : "bg-white border-neutral-200/90 hover:border-neutral-400 shadow-sm hover:shadow-md"
                     }`}
                   >
                     {/* Indicador de Status Superior */}
@@ -1160,7 +1160,7 @@ export function AdminDashboard() {
                             ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/40"
                             : mesa.status === "ocupada"
                             ? "bg-amber-500 text-neutral-950 font-black shadow-md"
-                            : "bg-muted text-muted-foreground group-hover:bg-muted/80"
+                            : "bg-neutral-100 text-neutral-900 border border-neutral-200 group-hover:bg-neutral-200/70"
                         }`}
                       >
                         {num}
@@ -1176,14 +1176,14 @@ export function AdminDashboard() {
 
                         <Badge
                           variant="outline"
-                          className={`text-[9px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full ${
+                          className={`text-[9px] uppercase font-black tracking-wider px-2 py-0.5 rounded-full ${
                             mesa.status === "conta_pedida"
-                              ? "bg-rose-500/20 text-rose-500 border-rose-500/40"
+                              ? "bg-rose-100 text-rose-700 border-rose-300 font-black"
                               : mesa.status === "paga_ocupada"
-                              ? "bg-emerald-500/20 text-emerald-600 dark:text-emerald-300 border-emerald-500/40 font-black"
+                              ? "bg-emerald-100 text-emerald-800 border-emerald-300 font-black"
                               : mesa.status === "ocupada"
-                              ? "bg-amber-500/20 text-amber-600 dark:text-amber-300 border-amber-500/40"
-                              : "bg-muted text-muted-foreground border-border"
+                              ? "bg-amber-100 text-amber-900 border-amber-300 font-black"
+                              : "bg-neutral-100 text-neutral-600 border-neutral-200 font-bold"
                           }`}
                         >
                           {mesa.status === "conta_pedida"
@@ -1196,8 +1196,8 @@ export function AdminDashboard() {
                         </Badge>
 
                         {mesa.alertaUpsell && (
-                          <Badge className="bg-purple-900/90 text-purple-200 border border-purple-500/50 text-[9px] font-black uppercase tracking-wider px-2 py-0.5 shadow-md flex items-center gap-1 animate-pulse">
-                            ⏳ +15m parada (Sugerir Upsell?)
+                          <Badge className="bg-purple-100 text-purple-900 border border-purple-300 text-[9px] font-black uppercase tracking-wider px-2 py-0.5 shadow-xs flex items-center gap-1 animate-pulse">
+                            ⏳ +15m parada
                           </Badge>
                         )}
                       </div>
@@ -1205,7 +1205,7 @@ export function AdminDashboard() {
 
                     {/* Resumo da Mesa */}
                     <div className="mt-3">
-                      <span className="text-xs font-bold text-foreground block">Mesa {num}</span>
+                      <span className="text-xs font-black text-neutral-950 block">Mesa {num}</span>
                       {mesa.status !== "livre" ? (
                         <div className="mt-1">
                           {mesa.comandas.length > 0 ? (
@@ -1216,15 +1216,15 @@ export function AdminDashboard() {
                               taxaServicoPercentual={restaurante?.configuracoes?.taxaServico ?? 10}
                             />
                           ) : (
-                            <span className="text-sm font-black text-primary block leading-none">R$ 0,00</span>
+                            <span className="text-sm font-black text-rose-600 block leading-none">R$ 0,00</span>
                           )}
-                          <span className="text-[10px] text-neutral-400 flex items-center gap-1 mt-1 font-medium">
+                          <span className="text-[10px] text-neutral-500 flex items-center gap-1 mt-1 font-semibold">
                             <Users className="w-3 h-3 text-neutral-500" />
                             {qtdClientes} {qtdClientes === 1 ? "pessoa" : "pessoas"}
                           </span>
                         </div>
                       ) : (
-                        <span className="text-[10px] text-neutral-500 block mt-1">Disponível</span>
+                        <span className="text-[10px] text-emerald-600 font-bold block mt-1">● Disponível</span>
                       )}
                     </div>
                   </div>
@@ -1457,59 +1457,59 @@ export function AdminDashboard() {
 
                   {/* Só mostra o cadeado e o overlay se for plano 'free' (ou undefined) */}
                   {isFree && (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center bg-neutral-950/70 backdrop-blur-md z-20">
-                <div className="w-16 h-16 rounded-3xl bg-gradient-to-tr from-amber-500/20 to-rose-500/20 border border-amber-500/40 flex items-center justify-center mb-5 shadow-2xl shadow-amber-500/20 animate-pulse">
-                  <Lock className="w-8 h-8 text-amber-400" />
-                </div>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center bg-white/85 backdrop-blur-md z-20 animate-in fade-in">
+                      <div className="w-16 h-16 rounded-3xl bg-rose-50 border-2 border-rose-200 text-rose-600 flex items-center justify-center mb-4 shadow-lg shadow-rose-600/10 animate-pulse">
+                        <Lock className="w-8 h-8" />
+                      </div>
 
-                <Badge className="bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-black uppercase tracking-widest px-3 py-1 mb-3">
-                  Módulo Exclusivo MAYaMenu PRO
-                </Badge>
+                      <Badge className="bg-rose-100 text-rose-800 border border-rose-200 text-[10px] font-black uppercase tracking-widest px-3 py-1 mb-3 shadow-xs">
+                        Módulo Exclusivo MAYaMenu PRO
+                      </Badge>
 
-                <h2 className="text-2xl sm:text-3xl font-black text-white max-w-xl tracking-tight leading-tight">
-                  Descubra onde o seu restaurante <span className="text-rose-500">perde dinheiro</span>.
-                </h2>
+                      <h2 className="text-2xl sm:text-3xl font-black text-neutral-950 max-w-xl tracking-tight leading-tight">
+                        Descubra onde o seu restaurante <span className="text-rose-600">perde dinheiro</span>.
+                      </h2>
 
-                <p className="text-xs sm:text-sm text-neutral-400 max-w-lg mt-3 leading-relaxed">
-                  Monitore a <strong>taxa de ociosidade das mesas</strong>, tempo médio de preparo do KDS, pratos mais lucrativos e ticket médio em tempo real com o poder da Inteligência MAYa.
-                </p>
+                      <p className="text-xs sm:text-sm text-neutral-600 max-w-lg mt-3 leading-relaxed">
+                        Monitore a <strong>taxa de ociosidade das mesas</strong>, tempo médio de preparo do KDS, pratos mais lucrativos e ticket médio em tempo real com o poder da Inteligência MAYa.
+                      </p>
 
-                <div className="flex flex-col sm:flex-row items-center gap-3 mt-6">
-                  <Button
-                    type="button"
-                    onClick={() => setModalProAberto(true)}
-                    className="h-12 px-6 bg-gradient-to-r from-amber-500 to-rose-600 hover:from-amber-400 hover:to-rose-500 text-white font-black text-xs uppercase tracking-wider rounded-2xl shadow-xl shadow-rose-950/60 flex items-center gap-2 transform active:scale-95 transition-all"
-                  >
-                    <Sparkles className="w-4 h-4" />
-                    <span>Desbloquear MAYaMenu PRO</span>
-                    <ArrowUpRight className="w-4 h-4 ml-1" />
-                  </Button>
+                      <div className="flex flex-col sm:flex-row items-center gap-3 mt-6">
+                        <Button
+                          type="button"
+                          onClick={() => setModalProAberto(true)}
+                          className="h-11 px-6 bg-rose-600 hover:bg-rose-500 text-white font-black text-xs uppercase tracking-wider rounded-2xl shadow-lg shadow-rose-600/25 flex items-center gap-2 transform active:scale-95 transition-all"
+                        >
+                          <Sparkles className="w-4 h-4" />
+                          <span>Desbloquear MAYaMenu PRO</span>
+                          <ArrowUpRight className="w-4 h-4 ml-1" />
+                        </Button>
 
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setModalProAberto(true)}
-                    className="h-12 px-5 border-neutral-700 bg-neutral-900/80 hover:bg-neutral-800 text-neutral-300 font-bold text-xs rounded-2xl"
-                  >
-                    Falar com Consultor
-                  </Button>
-                </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => setModalProAberto(true)}
+                          className="h-11 px-5 border-2 border-neutral-300 bg-white hover:bg-neutral-100 text-neutral-800 font-bold text-xs rounded-2xl"
+                        >
+                          Falar com Consultor
+                        </Button>
+                      </div>
 
-                <div className="flex items-center gap-4 mt-6 text-[11px] text-neutral-500">
-                  <span className="flex items-center gap-1">
-                    <Check className="w-3.5 h-3.5 text-emerald-400" /> Sem taxa de adesão
-                  </span>
-                  <span>•</span>
-                  <span className="flex items-center gap-1">
-                    <Check className="w-3.5 h-3.5 text-emerald-400" /> Ativação instantânea
-                  </span>
-                  <span>•</span>
-                  <span className="flex items-center gap-1">
-                    <Check className="w-3.5 h-3.5 text-emerald-400" /> Suporte 24/7
-                  </span>
-                </div>
-              </div>
-            )}
+                      <div className="flex items-center gap-4 mt-6 text-xs text-neutral-600 font-semibold">
+                        <span className="flex items-center gap-1.5">
+                          <Check className="w-4 h-4 text-emerald-600 stroke-[3]" /> Sem taxa de adesão
+                        </span>
+                        <span>•</span>
+                        <span className="flex items-center gap-1.5">
+                          <Check className="w-4 h-4 text-emerald-600 stroke-[3]" /> Ativação instantânea
+                        </span>
+                        <span>•</span>
+                        <span className="flex items-center gap-1.5">
+                          <Check className="w-4 h-4 text-emerald-600 stroke-[3]" /> Suporte 24/7
+                        </span>
+                      </div>
+                    </div>
+                  )}
           </>
         );
       })()}
