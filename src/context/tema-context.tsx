@@ -14,8 +14,8 @@ interface TemaUsuarioContextData {
 
 const TemaUsuarioContext = createContext<TemaUsuarioContextData | undefined>(undefined);
 
-// Padrão solicitado: Inicia sempre no modo Descanso de Vista (Sépia/Solarized)
-export const TEMA_PADRAO_SISTEMA: TemaId = "acessibilidade-sepia";
+// Padrão oficial: Tema Único Claro iFood Style
+export const TEMA_PADRAO_SISTEMA: TemaId = "white-label";
 
 interface TemaUsuarioProviderProps {
   children: React.ReactNode;
@@ -26,55 +26,32 @@ interface TemaUsuarioProviderProps {
 export function TemaUsuarioProvider({
   children,
   scope,
-  fallbackTemaRestaurante,
 }: TemaUsuarioProviderProps) {
-  const chaveStorage = `mayamenu_tema_${scope}`;
-
-  const [tema, setTema] = useState<TemaId>(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const salvo = localStorage.getItem(chaveStorage) as TemaId | null;
-        if (salvo) return salvo;
-      } catch {
-        // Ignora erro de SSR/Storage
-      }
-    }
-    // Se o lojista definiu um tema e estamos no escopo do cliente e ele quer padrão do restaurante:
-    if (fallbackTemaRestaurante && scope === "cliente") {
-      return (fallbackTemaRestaurante as TemaId);
-    }
-    return TEMA_PADRAO_SISTEMA;
-  });
-
+  // Limpa resquícios de temas antigos gravados no navegador
   useEffect(() => {
     try {
-      const salvo = localStorage.getItem(chaveStorage) as TemaId | null;
-      if (salvo) {
-        setTema(salvo);
-      } else {
-        // Se ainda não salvou, inicializa com descanso de vista
-        setTema(TEMA_PADRAO_SISTEMA);
-        localStorage.setItem(chaveStorage, TEMA_PADRAO_SISTEMA);
-      }
+      localStorage.removeItem(`mayamenu_tema_${scope}`);
+      localStorage.removeItem("mayamenu_modo_visual");
+      localStorage.removeItem("mayamenu_estilo_carteira");
     } catch {
       // Ignora erro de localStorage
     }
-  }, [chaveStorage]);
+  }, [scope]);
 
-  const definirTema = (novoTema: TemaId) => {
-    setTema(novoTema);
-    try {
-      localStorage.setItem(chaveStorage, novoTema);
-    } catch {
-      // Ignora erro de localStorage
-    }
+  const definirTema = (_novoTema: TemaId) => {
+    // Operação no-op em modo tema único
   };
 
-  const classeTema = obterClasseTema(tema);
-
   return (
-    <TemaUsuarioContext.Provider value={{ tema, classeTema, definirTema, scope }}>
-      <div className={`min-h-screen ${classeTema} bg-background text-foreground transition-colors duration-200`}>
+    <TemaUsuarioContext.Provider
+      value={{
+        tema: TEMA_PADRAO_SISTEMA,
+        classeTema: "",
+        definirTema,
+        scope,
+      }}
+    >
+      <div className="min-h-screen bg-background text-foreground antialiased">
         {children}
       </div>
     </TemaUsuarioContext.Provider>
@@ -84,10 +61,9 @@ export function TemaUsuarioProvider({
 export function useTemaUsuario() {
   const ctx = useContext(TemaUsuarioContext);
   if (!ctx) {
-    // Fallback seguro caso usado fora do provider
     return {
       tema: TEMA_PADRAO_SISTEMA,
-      classeTema: obterClasseTema(TEMA_PADRAO_SISTEMA),
+      classeTema: "",
       definirTema: () => {},
       scope: "cliente" as AppScope,
     };

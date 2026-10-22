@@ -34,7 +34,6 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { ensureClienteAnonimo, db } from "@/lib/firebase";
 import { doc, updateDoc, serverTimestamp, onSnapshot } from "firebase/firestore";
 import { escutarCardapio, escutarRestaurante, chamarGarcomFirestore, escutarPedidosCliente } from "@/lib/restaurante-service";
-import { resolverClasseTemaRestaurante } from "@/lib/tema";
 import { marcarVisitaAtualComoPaga, limparSessaoClienteLocal } from "@/lib/historico-cliente";
 import { MesaScannerModal } from "./mesa-scanner-modal";
 
@@ -64,33 +63,14 @@ export function MenuView({ restaurante: restauranteInicial, cardapio: cardapioIn
   const [contaPedidaSucesso, setContaPedidaSucesso] = useState(false);
   const [comandaStatus, setComandaStatus] = useState<string | null>(null);
   const [categoriaAtiva, setCategoriaAtiva] = useState<string>("Todas");
-  const [modoVisualCliente, setModoVisualCliente] = useState<"padrao" | "dia" | "noite" | "descanso">("descanso");
-
-  // Carrega preferência pessoal de visualização do cliente (Padrão: Descanso de Tela / Conforto Visual)
+  // Limpa resquícios de temas antigos do cliente
   useEffect(() => {
-    const salvo = localStorage.getItem("mayamenu_modo_visual") as any;
-    if (salvo && ["padrao", "dia", "noite", "descanso"].includes(salvo)) {
-      setModoVisualCliente(salvo);
-    } else {
-      // Padrão do sistema para o cliente: descanso de tela
-      setModoVisualCliente("descanso");
-      localStorage.setItem("mayamenu_modo_visual", "descanso");
+    try {
+      localStorage.removeItem("mayamenu_modo_visual");
+    } catch {
+      // Ignora erro de localStorage
     }
   }, []);
-
-  const alternarModoVisual = (novoModo: "padrao" | "dia" | "noite" | "descanso") => {
-    setModoVisualCliente(novoModo);
-    localStorage.setItem("mayamenu_modo_visual", novoModo);
-  };
-
-  const classeModoVisual =
-    modoVisualCliente === "dia"
-      ? "" // Herda :root branco puro (iFood Style)
-      : modoVisualCliente === "noite"
-      ? "theme-boemia-marinho"
-      : modoVisualCliente === "descanso"
-      ? "theme-acessibilidade-sepia"
-      : resolverClasseTemaRestaurante(restaurante); // 'padrao' aplica a classe do restaurante em tempo real
 
   // Categorias únicas disponíveis no cardápio na ordem em que aparecem no cardápio ordenado
   const categorias = [
@@ -322,35 +302,31 @@ export function MenuView({ restaurante: restauranteInicial, cardapio: cardapioIn
 
   if (sessaoFinalizada) {
     return (
-      <div className="min-h-screen bg-neutral-950 text-white flex flex-col justify-between p-6 antialiased selection:bg-rose-500 selection:text-white relative overflow-hidden">
-        {/* Glow de fundo */}
-        <div className="absolute -top-32 -left-32 w-80 h-80 bg-rose-600/20 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-32 -right-32 w-80 h-80 bg-emerald-600/15 rounded-full blur-3xl pointer-events-none" />
-
-        {/* TOPO: STATUS E AGRADECIMENTO */}
+      <div className="min-h-screen bg-background text-foreground flex flex-col justify-between p-6 antialiased selection:bg-primary selection:text-white relative overflow-hidden">
+        {/* TOPO: STATUS E AGRADECIMENTO (M3 HEADLINE & DISPLAY) */}
         <div className="max-w-md mx-auto w-full pt-10 sm:pt-16 text-center space-y-6 relative z-10">
-          <div className="w-20 h-20 rounded-3xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 mx-auto flex items-center justify-center shadow-2xl shadow-emerald-950/50">
+          <div className="w-20 h-20 rounded-3xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 mx-auto flex items-center justify-center shadow-lg">
             <CheckCircle2 className="w-10 h-10 animate-bounce" />
           </div>
 
           <div className="space-y-3">
-            <Badge className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-full">
+            <Badge className="bg-emerald-500/15 text-emerald-700 border border-emerald-500/30 text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-full">
               Mesa {numeroMesa} • Encerrada
             </Badge>
-            <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+            <h1 className="text-2xl sm:text-3xl font-black text-foreground tracking-tight">
               Conta Paga!
             </h1>
-            <p className="text-sm text-neutral-300 leading-relaxed font-medium">
-              Obrigado por visitar o <strong className="text-white">{restaurante.nome}</strong>. Foi um enorme prazer recebê-lo!
+            <p className="text-sm text-muted-foreground leading-relaxed font-medium">
+              Obrigado por visitar o <strong className="text-foreground">{restaurante.nome}</strong>. Foi um enorme prazer recebê-lo!
             </p>
           </div>
 
-          <div className="p-4 bg-neutral-900/80 border border-neutral-800 rounded-2xl text-xs text-neutral-400 space-y-2">
-            <div className="flex items-center justify-center gap-1.5 text-rose-400 font-bold">
+          <div className="p-4 bg-muted/40 border border-border rounded-2xl text-xs text-muted-foreground space-y-2">
+            <div className="flex items-center justify-center gap-1.5 text-primary font-bold">
               <QrCode className="w-4 h-4" />
               <span>Deseja pedir mais alguma coisa?</span>
             </div>
-            <p className="text-[11px] text-neutral-400">
+            <p className="text-xs text-muted-foreground leading-relaxed">
               Para reabrir a sua comanda, escaneie o QR Code da mesa novamente com a câmera do seu celular.
             </p>
           </div>
@@ -359,27 +335,12 @@ export function MenuView({ restaurante: restauranteInicial, cardapio: cardapioIn
           <Button
             type="button"
             onClick={() => setHistoricoAberto(true)}
-            className="h-11 px-5 bg-neutral-900 hover:bg-neutral-800 text-neutral-300 border border-neutral-800 hover:border-neutral-700 font-bold rounded-xl text-xs flex items-center justify-center gap-2 mx-auto transition-all shadow-sm"
+            variant="outline"
+            className="h-11 px-5 border border-border font-bold rounded-xl text-xs flex items-center justify-center gap-2 mx-auto shadow-xs"
           >
-            <Receipt className="w-4 h-4 text-rose-400" />
+            <Receipt className="w-4 h-4 text-primary" />
             <span>Ver Comprovantes Anteriores</span>
           </Button>
-
-          {/* BANNER DE ADS B2B (Patrocinador / Fornecedor) */}
-          <div className="p-5 bg-gradient-to-r from-neutral-900 via-neutral-800/80 to-neutral-900 border border-neutral-800/80 rounded-3xl text-center space-y-2.5 shadow-xl relative overflow-hidden group">
-            <div className="absolute -top-10 -right-10 w-24 h-24 bg-rose-500/10 rounded-full blur-xl group-hover:bg-rose-500/20 transition-all" />
-            <span className="text-[9px] font-black uppercase tracking-widest text-neutral-500 block">
-              Parceiro Oficial • Espaço B2B
-            </span>
-            <div className="py-3 px-4 bg-neutral-950/70 border border-neutral-800/60 rounded-2xl">
-              <span className="text-xs font-bold text-neutral-200 block">
-                Espaço para Patrocinador / Fornecedor
-              </span>
-              <p className="text-[10px] text-neutral-400 mt-0.5">
-                Conecte a sua marca a milhares de clientes no momento da refeição.
-              </p>
-            </div>
-          </div>
         </div>
 
         {/* RODAPÉ: BOTÃO DE SOLICITAR GARÇOM OU AVISO DE AUTOATENDIMENTO */}
@@ -389,13 +350,13 @@ export function MenuView({ restaurante: restauranteInicial, cardapio: cardapioIn
               type="button"
               onClick={handleChamarGarcom}
               disabled={chamandoGarcom || segundosCooldown > 0}
-              className={`w-full h-12 rounded-2xl text-xs uppercase tracking-wider font-black shadow-xl flex items-center justify-center gap-2 transition-all ${
+              className={`w-full h-12 rounded-2xl text-xs uppercase tracking-wider font-black shadow-md flex items-center justify-center gap-2 transition-all ${
                 garcomChamadoSucesso
                   ? "bg-amber-500 text-neutral-950"
-                  : "bg-neutral-800 hover:bg-neutral-700 text-white border border-neutral-700"
+                  : "bg-primary hover:bg-primary/90 text-white"
               }`}
             >
-              <Bell className={`w-4 h-4 ${garcomChamadoSucesso ? "fill-neutral-950 animate-bounce" : "text-amber-400"}`} />
+              <Bell className={`w-4 h-4 ${garcomChamadoSucesso ? "fill-neutral-950 animate-bounce" : "text-white"}`} />
               <span>
                 {garcomChamadoSucesso
                   ? "Garçom a Caminho da Mesa!"
@@ -405,13 +366,13 @@ export function MenuView({ restaurante: restauranteInicial, cardapio: cardapioIn
               </span>
             </Button>
           ) : (
-            <div className="p-3.5 bg-neutral-900/90 border border-neutral-800 rounded-2xl text-xs text-neutral-300 font-semibold flex items-center justify-center gap-2 shadow-sm">
-              <Utensils className="w-4 h-4 text-rose-500" />
+            <div className="p-3.5 bg-muted border border-border rounded-2xl text-xs text-foreground font-semibold flex items-center justify-center gap-2 shadow-xs">
+              <Utensils className="w-4 h-4 text-primary" />
               <span>Modo Autoatendimento: Retire seus pedidos no balcão</span>
             </div>
           )}
 
-          <p className="text-[10px] text-neutral-400">
+          <p className="text-xs text-muted-foreground">
             MAYaMenu • Tecnologia para Experiências Gastronômicas
           </p>
         </div>
@@ -426,7 +387,7 @@ export function MenuView({ restaurante: restauranteInicial, cardapio: cardapioIn
   }
 
   return (
-    <div className={`min-h-screen ${classeModoVisual} bg-background pb-28 text-foreground antialiased selection:bg-primary selection:text-primary-foreground transition-colors duration-200`}>
+    <div className="min-h-screen bg-background pb-28 text-foreground antialiased selection:bg-primary selection:text-white transition-colors duration-200">
       {/* 1. HEADER MOBILE COMPACTO & ELEGANTE */}
       <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-md border-b border-border text-foreground transition-all shadow-xs">
         <div className="max-w-3xl mx-auto px-4 h-14 flex items-center justify-between gap-3">
@@ -607,7 +568,7 @@ export function MenuView({ restaurante: restauranteInicial, cardapio: cardapioIn
 
       {/* DRAWER / OFFCANVAS COM AÇÕES SECUNDÁRIAS (MENU HAMBÚRGUER) */}
       <Sheet open={menuLateralAberto} onOpenChange={setMenuLateralAberto}>
-        <SheetContent side="left" className={`bg-background text-foreground border-border w-[290px] p-5 flex flex-col justify-between ${classeModoVisual}`}>
+        <SheetContent side="left" className="bg-background text-foreground border-border w-[290px] p-5 flex flex-col justify-between">
           <div className="space-y-6">
             <SheetHeader className="text-left pb-4 border-b border-border">
               <div className="flex items-center gap-3">
@@ -712,66 +673,6 @@ export function MenuView({ restaurante: restauranteInicial, cardapio: cardapioIn
                 <span>Comprovantes Anteriores</span>
               </button>
 
-              {/* CONFORTO VISUAL & ILUMINAÇÃO (TENDÊNCIA UX: DIA / NOITE / DESCANSO) */}
-              <div className="pt-2 space-y-2">
-                <span className="text-[10px] uppercase font-bold text-muted-foreground block tracking-wider px-1">
-                  Conforto Visual da Tela
-                </span>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => alternarModoVisual("padrao")}
-                    className={`p-2.5 rounded-xl border text-left flex items-center gap-2 transition-all ${
-                      modoVisualCliente === "padrao"
-                        ? "bg-primary/15 border-primary text-primary font-bold shadow-xs"
-                        : "bg-card hover:bg-muted border-border text-muted-foreground"
-                    }`}
-                  >
-                    <Sparkles className="w-3.5 h-3.5 shrink-0" />
-                    <span className="text-xs">Original</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => alternarModoVisual("dia")}
-                    className={`p-2.5 rounded-xl border text-left flex items-center gap-2 transition-all ${
-                      modoVisualCliente === "dia"
-                        ? "bg-primary/15 border-primary text-primary font-bold shadow-xs"
-                        : "bg-card hover:bg-muted border-border text-muted-foreground"
-                    }`}
-                  >
-                    <Sun className="w-3.5 h-3.5 shrink-0 text-amber-500" />
-                    <span className="text-xs">Modo Dia</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => alternarModoVisual("noite")}
-                    className={`p-2.5 rounded-xl border text-left flex items-center gap-2 transition-all ${
-                      modoVisualCliente === "noite"
-                        ? "bg-primary/15 border-primary text-primary font-bold shadow-xs"
-                        : "bg-card hover:bg-muted border-border text-muted-foreground"
-                    }`}
-                  >
-                    <Moon className="w-3.5 h-3.5 shrink-0 text-indigo-400" />
-                    <span className="text-xs">Modo Noite</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => alternarModoVisual("descanso")}
-                    className={`p-2.5 rounded-xl border text-left flex items-center gap-2 transition-all ${
-                      modoVisualCliente === "descanso"
-                        ? "bg-amber-600/20 border-amber-500 text-amber-600 dark:text-amber-400 font-bold shadow-xs"
-                        : "bg-card hover:bg-muted border-border text-muted-foreground"
-                    }`}
-                    title="Luz âmbar suave inspirada em papel artesanal para leitura noturna sem cansaço"
-                  >
-                    <Coffee className="w-3.5 h-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
-                    <span className="text-xs">Descanso</span>
-                  </button>
-                </div>
-              </div>
             </div>
           </div>
 

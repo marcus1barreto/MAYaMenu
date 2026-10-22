@@ -1913,25 +1913,15 @@ export function AdminDashboard() {
                 <Settings className="w-5 h-5" />
               </div>
               <div>
-                <DialogTitle className="text-lg font-black text-white">Configurações & Tematização</DialogTitle>
+                <DialogTitle className="text-lg font-black text-white">Configurações da Loja</DialogTitle>
                 <DialogDescription className="text-xs text-neutral-400">
-                  Gerencie a identidade visual e o fluxo operacional do seu restaurante.
+                  Gerencie o fluxo operacional e parâmetros do seu restaurante.
                 </DialogDescription>
               </div>
             </div>
           </DialogHeader>
 
           <div className="space-y-6 pt-2">
-            {/* CATÁLOGO CONSULTIVO DE TEMAS POR ESTABELECIMENTO */}
-            <div className="p-4 rounded-2xl bg-neutral-950/70 border border-neutral-800">
-              <SeletorDeTemas
-                temaAtualSalvo={temaSelecionado}
-                onSalvarTema={(novoId, novaCor) => {
-                  setTemaSelecionado(novoId);
-                  setCorPrimaria(novaCor);
-                }}
-              />
-            </div>
             {/* COR PRIMÁRIA */}
             <div className="space-y-3 p-4 rounded-xl bg-neutral-950/60 border border-neutral-800">
               <div className="flex items-center justify-between">
