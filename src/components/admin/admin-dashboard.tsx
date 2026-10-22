@@ -26,9 +26,7 @@ import { GuidedEmptyCardapio } from "./guided-empty-cardapio";
 import { AdminQrScannerModal } from "./admin-qr-scanner-modal";
 import { ModificadorBuilder } from "./modificador-builder";
 import { MAYA_MEDIA_LIBRARY } from "@/lib/maya-media-library";
-import { TEMAS_DISPONIVEIS, FAMILIAS_TEMAS, type TemaId } from "@/lib/tema";
-import { SeletorDeTemas } from "./seletor-de-temas";
-import { SeletorTemaRapido } from "@/components/ui/seletor-tema-rapido";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -49,7 +47,6 @@ import {
   Plus,
   QrCode,
   DollarSign,
-  Palette,
   Check,
   Users,
   Clock,
@@ -124,12 +121,6 @@ export function AdminDashboard() {
   const [modalProAberto, setModalProAberto] = useState(false);
   const [itensCardapio, setItensCardapio] = useState<MenuItem[]>([]);
   const [carregandoCardapio, setCarregandoCardapio] = useState(true);
-  const [corPrimaria, setCorPrimaria] = useState(
-    restaurante?.configuracoes?.corPrimaria || "#E11D48"
-  );
-  const [temaSelecionado, setTemaSelecionado] = useState<TemaId>(
-    (restaurante?.configuracoes?.tema as TemaId) || "white-label"
-  );
   const [modoOperacao, setModoOperacao] = useState<"com_garcom" | "hibrido" | "balcao">(
     restaurante?.configuracoes?.modoOperacao || "hibrido"
   );
@@ -139,7 +130,7 @@ export function AdminDashboard() {
   const [taxaServicoConfig, setTaxaServicoConfig] = useState<number>(
     restaurante?.configuracoes?.taxaServico !== undefined ? restaurante.configuracoes.taxaServico : 10
   );
-  const [salvandoCor, setSalvandoCor] = useState(false);
+  const [salvandoConfig, setSalvandoConfig] = useState(false);
   const [scannerBalcaoAberto, setScannerBalcaoAberto] = useState(false);
   const [feedbackBalcao, setFeedbackBalcao] = useState<string | null>(null);
   const [subAbaAnalytics, setSubAbaAnalytics] = useState<"geral" | "laboratorio">("geral");
@@ -781,13 +772,13 @@ export function AdminDashboard() {
     }
   };
 
-  const handleSalvarCor = async () => {
-    setSalvandoCor(true);
+  const handleSalvarConfiguracoes = async () => {
+    setSalvandoConfig(true);
     try {
       await atualizarRestaurante({
         configuracoes: {
-          tema: temaSelecionado,
-          corPrimaria,
+          tema: "white-label",
+          corPrimaria: "#EA1D2C",
           capaUrl: restaurante?.configuracoes?.capaUrl || "/images/capa-padrao.webp",
           modoOperacao,
           modoFilaKds,
@@ -795,14 +786,12 @@ export function AdminDashboard() {
         },
       });
     } finally {
-      setSalvandoCor(false);
+      setSalvandoConfig(false);
     }
   };
 
   const slug = restaurante?.slug || "demo";
   const urlPublica = `/r/${slug}`;
-  const defTemaAtual = TEMAS_DISPONIVEIS.find((t) => t.id === temaSelecionado);
-  const classeTemaAtual = defTemaAtual?.classe || "";
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col transition-colors duration-200">
@@ -855,57 +844,14 @@ export function AdminDashboard() {
             </Button>
           </Link>
 
-          {/* SELETOR DE CONFORTO VISUAL DO TERMINAL DO OPERADOR */}
-          <SeletorTemaRapido rotulo="Tema Painel" />
-
-          {/* SELETOR RÁPIDO DE TEMA DO RESTAURANTE */}
-          <div className="flex items-center gap-1.5 bg-neutral-800/90 border border-neutral-700/80 rounded-xl px-2 h-10 shadow-sm">
-            <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-            <select
-              value={temaSelecionado}
-              onChange={async (e) => {
-                const novoTema = e.target.value as any;
-                const defTema = TEMAS_DISPONIVEIS.find((t) => t.id === novoTema);
-                setTemaSelecionado(novoTema);
-                if (defTema) setCorPrimaria(defTema.corPrimaria);
-                try {
-                  await atualizarRestaurante({
-                    configuracoes: {
-                      tema: novoTema,
-                      corPrimaria: defTema?.corPrimaria || corPrimaria,
-                      capaUrl: restaurante?.configuracoes?.capaUrl || "/images/capa-padrao.webp",
-                      modoOperacao,
-                      modoFilaKds,
-                      taxaServico: Number(taxaServicoConfig) || 0,
-                    },
-                  });
-                } catch (err) {
-                  console.warn("Falha ao salvar tema rápido:", err);
-                }
-              }}
-              className="bg-transparent text-white font-bold text-xs outline-none cursor-pointer pr-1"
-              title="Trocar tema visual do restaurante por completo"
-            >
-              {FAMILIAS_TEMAS.map((familia) => (
-                <optgroup key={familia.id} label={`${familia.icone} ${familia.nome}`} className="bg-neutral-900 text-neutral-400 font-bold">
-                  {familia.temas.map((t) => (
-                    <option key={t.id} value={t.id} className="bg-neutral-900 text-white font-normal">
-                      {t.nome}
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
-          </div>
-
           <Button
             type="button"
             variant="outline"
             onClick={() => setModalConfigAberto(true)}
-            className="bg-neutral-800 border-neutral-700 hover:bg-neutral-700 hover:text-white text-neutral-300 font-bold text-xs h-10 px-3 rounded-xl flex items-center gap-2 transition-all"
-            title="Configurações Globais & Tematização"
+            className="bg-card border-border hover:bg-muted text-foreground font-bold text-xs h-10 px-3.5 rounded-xl flex items-center gap-2 shadow-xs transition-all"
+            title="Configurações da Loja"
           >
-            <Settings className="w-4 h-4 text-rose-500" />
+            <Settings className="w-4 h-4 text-primary" />
             <span className="hidden sm:inline">Configurações</span>
           </Button>
 
@@ -913,7 +859,8 @@ export function AdminDashboard() {
             type="button"
             variant="ghost"
             onClick={logout}
-            className="text-neutral-400 hover:text-white hover:bg-neutral-800 rounded-xl text-xs h-10"
+            className="text-muted-foreground hover:text-foreground hover:bg-muted rounded-xl text-xs h-10 px-3 transition-colors"
+            title="Sair do Painel"
           >
             <LogOut className="w-4 h-4" />
           </Button>
@@ -1559,37 +1506,37 @@ export function AdminDashboard() {
 
       {/* MODAL DE CONTATO / UPSELL PRO */}
       <Dialog open={modalProAberto} onOpenChange={(open) => setModalProAberto(open)}>
-        <DialogContent className="max-w-md bg-neutral-900 border-neutral-800 text-white rounded-3xl p-6 shadow-2xl">
+        <DialogContent className="max-w-md bg-card border-border text-card-foreground rounded-3xl p-6 shadow-2xl">
           <DialogHeader className="text-center sm:text-center">
             <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500 to-rose-600 mx-auto flex items-center justify-center mb-3 shadow-lg">
               <Sparkles className="w-6 h-6 text-white" />
             </div>
-            <DialogTitle className="text-xl font-black text-white">
+            <DialogTitle className="text-xl font-black text-foreground">
               Evolua para o MAYaMenu PRO
             </DialogTitle>
-            <DialogDescription className="text-xs text-neutral-400 mt-1">
+            <DialogDescription className="text-xs text-muted-foreground mt-1">
               O módulo completo de Inteligência Analítica & Insights em tempo real estará disponível na próxima rodada de ativações.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-3 py-3 border-y border-neutral-800/80 my-2">
+          <div className="space-y-3 py-3 border-y border-border my-2">
             <div className="flex items-start gap-3">
-              <div className="p-1 rounded bg-rose-500/10 text-rose-400 mt-0.5">
+              <div className="p-1.5 rounded-lg bg-primary/10 text-primary mt-0.5">
                 <BarChart3 className="w-4 h-4" />
               </div>
               <div>
-                <span className="text-xs font-bold text-white block">Histórico Completo de Sessões</span>
-                <span className="text-[11px] text-neutral-400">Todas as mesas e rodadas já estão sendo salvas no histórico seguro do Firestore.</span>
+                <span className="text-xs font-bold text-foreground block">Histórico Completo de Sessões</span>
+                <span className="text-[11px] text-muted-foreground">Todas as mesas e rodadas já estão sendo salvas no histórico seguro do Firestore.</span>
               </div>
             </div>
 
             <div className="flex items-start gap-3">
-              <div className="p-1 rounded bg-amber-500/10 text-amber-400 mt-0.5">
+              <div className="p-1.5 rounded-lg bg-amber-500/10 text-amber-500 mt-0.5">
                 <TrendingUp className="w-4 h-4" />
               </div>
               <div>
-                <span className="text-xs font-bold text-white block">Taxa de Ociosidade & Giro de Mesas</span>
-                <span className="text-[11px] text-neutral-400">Descubra quais mesas geram mais receita por minuto de ocupação.</span>
+                <span className="text-xs font-bold text-foreground block">Taxa de Ociosidade & Giro de Mesas</span>
+                <span className="text-[11px] text-muted-foreground">Descubra quais mesas geram mais receita por minuto de ocupação.</span>
               </div>
             </div>
           </div>
@@ -1601,7 +1548,7 @@ export function AdminDashboard() {
                 alert("Obrigado pelo interesse! Seu restaurante foi adicionado na lista prioritária de acesso antecipado ao MAYaMenu PRO.");
                 setModalProAberto(false);
               }}
-              className="w-full h-11 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2"
+              className="w-full h-11 bg-primary hover:bg-primary/90 text-primary-foreground font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-xs"
             >
               <span>Solicitar Acesso Antecipado</span>
             </Button>
@@ -1610,7 +1557,7 @@ export function AdminDashboard() {
               type="button"
               variant="ghost"
               onClick={() => setModalProAberto(false)}
-              className="w-full h-9 text-neutral-400 hover:text-white rounded-xl text-xs"
+              className="w-full h-9 text-muted-foreground hover:text-foreground rounded-xl text-xs"
             >
               Voltar ao Salão
             </Button>
@@ -1635,13 +1582,13 @@ export function AdminDashboard() {
 
       {/* MODAL DE ADICIONAR / EDITAR PRATO DO CARDÁPIO */}
       <Dialog open={modalPratoAberto} onOpenChange={(open) => !open && setModalPratoAberto(false)}>
-        <DialogContent className="max-w-xl bg-neutral-900 border-neutral-800 text-white rounded-3xl p-0 shadow-2xl max-h-[90vh] flex flex-col overflow-hidden">
-          <DialogHeader className="px-6 pt-6 pb-4 shrink-0 border-b border-neutral-800">
-            <DialogTitle className="text-lg font-black text-white flex items-center gap-2">
-              <UtensilsCrossed className="w-5 h-5 text-rose-500" />
+        <DialogContent className="max-w-xl bg-card border-border text-card-foreground rounded-3xl p-0 shadow-2xl max-h-[90vh] flex flex-col overflow-hidden">
+          <DialogHeader className="px-6 pt-6 pb-4 shrink-0 border-b border-border">
+            <DialogTitle className="text-lg font-black text-foreground flex items-center gap-2">
+              <UtensilsCrossed className="w-5 h-5 text-primary" />
               <span>{itemEmEdicao?.nome ? "Editar Prato" : "Novo Prato no Cardápio"}</span>
             </DialogTitle>
-            <DialogDescription className="text-xs text-neutral-400">
+            <DialogDescription className="text-xs text-muted-foreground">
               Preencha os detalhes do prato. As alterações são sincronizadas em tempo real com todos os clientes.
             </DialogDescription>
           </DialogHeader>
@@ -1650,7 +1597,7 @@ export function AdminDashboard() {
             <form onSubmit={handleSalvarPrato} className="flex flex-col flex-1 overflow-hidden">
               <div className="flex-1 overflow-y-auto p-6 space-y-5 custom-scrollbar">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold uppercase tracking-wider text-neutral-300">
+                  <label className="text-xs font-bold uppercase tracking-wider text-foreground">
                     Nome do Prato *
                   </label>
                   <Input
@@ -1658,14 +1605,14 @@ export function AdminDashboard() {
                     placeholder="Ex: Smash Burger Duplo"
                     value={itemEmEdicao.nome || ""}
                     onChange={(e) => setItemEmEdicao({ ...itemEmEdicao, nome: e.target.value })}
-                    className="bg-neutral-800 border-neutral-700 text-white placeholder:text-neutral-500 rounded-xl"
+                    className="bg-background border-input text-foreground placeholder:text-muted-foreground rounded-xl"
                   />
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   {/* 1. Categoria (Digitação livre + Sugestões) */}
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold uppercase tracking-wider text-neutral-300">
+                    <label className="text-xs font-bold uppercase tracking-wider text-foreground">
                       Categoria *
                     </label>
                     <Input
@@ -1673,7 +1620,7 @@ export function AdminDashboard() {
                       placeholder="Ex: Combos Promocionais"
                       value={itemEmEdicao.categoria || ""}
                       onChange={(e) => setItemEmEdicao({ ...itemEmEdicao, categoria: e.target.value })}
-                      className="bg-neutral-800 border-neutral-700 text-white placeholder:text-neutral-500 rounded-xl text-sm h-9 w-full"
+                      className="bg-background border-input text-foreground placeholder:text-muted-foreground rounded-xl text-sm h-9 w-full"
                     />
                     <datalist id="lista-categorias">
                       <option value="Hambúrgueres" />
@@ -1686,7 +1633,7 @@ export function AdminDashboard() {
 
                   {/* 2. Preço Base (Aceita qualquer valor com centavos) */}
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold uppercase tracking-wider text-neutral-300">
+                    <label className="text-xs font-bold uppercase tracking-wider text-foreground">
                       Preço Base (R$) *
                     </label>
                     <Input
@@ -1699,14 +1646,14 @@ export function AdminDashboard() {
                       onChange={(e) =>
                         setItemEmEdicao({ ...itemEmEdicao, precoBase: parseFloat(e.target.value) || 0 })
                       }
-                      className="bg-neutral-800 border-neutral-700 text-white placeholder:text-neutral-500 rounded-xl font-mono text-sm h-9"
+                      className="bg-background border-input text-foreground placeholder:text-muted-foreground rounded-xl font-mono text-sm h-9"
                     />
                   </div>
 
                   {/* 3. Tempo de Preparo Estimado (Mantido do Agrupamento Ágil) */}
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold uppercase tracking-wider text-neutral-300 flex items-center gap-1.5">
-                      <Clock className="w-3.5 h-3.5 text-amber-400" />
+                    <label className="text-xs font-bold uppercase tracking-wider text-foreground flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-amber-500" />
                       Preparo (min)
                     </label>
                     <Input
@@ -1721,20 +1668,20 @@ export function AdminDashboard() {
                           tempoPreparoEstimado: parseInt(e.target.value, 10) || undefined,
                         })
                       }
-                      className="bg-neutral-800 border-neutral-700 text-white placeholder:text-neutral-500 rounded-xl font-mono text-sm h-9"
+                      className="bg-background border-input text-foreground placeholder:text-muted-foreground rounded-xl font-mono text-sm h-9"
                     />
                   </div>
                 </div>
 
-                <p className="text-[11px] text-neutral-400 flex items-start gap-1.5 bg-neutral-900/60 p-2.5 rounded-xl border border-neutral-800">
-                  <Clock className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+                <p className="text-[11px] text-muted-foreground flex items-start gap-1.5 bg-muted/40 p-2.5 rounded-xl border border-border">
+                  <Clock className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
                   <span>
                     Tempo médio para a cozinha liberar este prato. Essencial para o KDS priorizar pedidos no Modo Agrupamento Ágil.
                   </span>
                 </p>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold uppercase tracking-wider text-neutral-300">
+                  <label className="text-xs font-bold uppercase tracking-wider text-foreground">
                     Descrição dos Ingredientes
                   </label>
                   <textarea
@@ -1742,12 +1689,12 @@ export function AdminDashboard() {
                     placeholder="Ex: Dois burgers de 100g, cheddar duplo, cebola caramelizada e maionese da casa."
                     value={itemEmEdicao.descricao || ""}
                     onChange={(e) => setItemEmEdicao({ ...itemEmEdicao, descricao: e.target.value })}
-                    className="w-full rounded-xl bg-neutral-800 border border-neutral-700 p-3 text-sm text-white placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-rose-500 resize-none"
+                    className="w-full rounded-xl bg-background border border-input p-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none"
                   />
                 </div>
 
                 {/* CONSTRUTOR DE MODIFICADORES (COMPLEMENTOS E VARIAÇÕES) */}
-                <div className="pt-2 border-t border-neutral-800 mt-4 mb-4">
+                <div className="pt-2 border-t border-border mt-4 mb-4">
                   <ModificadorBuilder
                     grupos={itemEmEdicao.grupoModificadores || []}
                     onChange={(novosGrupos) =>
@@ -1758,17 +1705,17 @@ export function AdminDashboard() {
 
                 {/* FOTO DO PRATO (STORAGE UPLOAD COM PREVIEW) */}
                 <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-neutral-300 flex items-center justify-between">
+                  <label className="text-xs font-bold uppercase tracking-wider text-foreground flex items-center justify-between">
                     <span className="flex items-center gap-1.5">
-                      <Camera className="w-3.5 h-3.5 text-rose-500" />
+                      <Camera className="w-3.5 h-3.5 text-primary" />
                       Foto do Prato
                     </span>
-                    <span className="text-[10px] text-neutral-400 font-normal">Máx 5MB (JPG, PNG, WebP)</span>
+                    <span className="text-[10px] text-muted-foreground font-normal">Máx 5MB (JPG, PNG, WebP)</span>
                   </label>
 
                   {/* PREVIEW DA IMAGEM SE HOUVER */}
                   {previewFoto ? (
-                    <div className="relative w-full h-44 rounded-2xl overflow-hidden bg-neutral-950 border border-neutral-700/80 group">
+                    <div className="relative w-full h-44 rounded-2xl overflow-hidden bg-muted border border-border group">
                       <Image
                         src={previewFoto}
                         alt="Prévia do prato"
@@ -1776,7 +1723,7 @@ export function AdminDashboard() {
                         className="object-cover"
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex items-end justify-between p-3 opacity-90 group-hover:opacity-100 transition-opacity">
-                        <span className="text-[11px] text-neutral-300 truncate max-w-[200px]">
+                        <span className="text-[11px] text-white truncate max-w-[200px]">
                           {arquivoFoto ? arquivoFoto.name : "Imagem atual do prato"}
                         </span>
                         <Button
@@ -1784,7 +1731,7 @@ export function AdminDashboard() {
                           size="sm"
                           variant="destructive"
                           onClick={handleRemoverFoto}
-                          className="h-8 px-2.5 bg-red-600/80 hover:bg-red-600 text-white rounded-xl text-xs flex items-center gap-1 shadow-lg"
+                          className="h-8 px-2.5 bg-red-600/90 hover:bg-red-600 text-white rounded-xl text-xs flex items-center gap-1 shadow-sm"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                           Remover
@@ -1793,15 +1740,15 @@ export function AdminDashboard() {
                     </div>
                   ) : (
                     /* DROPZONE / SELETOR DE ARQUIVO */
-                    <label className="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-neutral-700 hover:border-rose-500 rounded-2xl cursor-pointer bg-neutral-800/40 hover:bg-neutral-800/80 transition-all p-3 text-center">
+                    <label className="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-border hover:border-primary rounded-2xl cursor-pointer bg-muted/20 hover:bg-muted/40 transition-all p-3 text-center">
                       <div className="flex flex-col items-center justify-center">
-                        <div className="p-2 bg-rose-500/10 rounded-xl text-rose-400 mb-1.5">
+                        <div className="p-2 bg-primary/10 rounded-xl text-primary mb-1.5">
                           <Upload className="w-4 h-4" />
                         </div>
-                        <p className="text-xs font-bold text-neutral-200">
+                        <p className="text-xs font-bold text-foreground">
                           Clique para enviar ou tirar foto
                         </p>
-                        <p className="text-[10px] text-neutral-400">
+                        <p className="text-[10px] text-muted-foreground">
                           Upload direto para o Firebase Storage
                         </p>
                       </div>
@@ -1816,7 +1763,7 @@ export function AdminDashboard() {
 
                   {/* GALERIA MAYA MEDIA LIBRARY (OPÇÕES PROFISSIONAIS PRONTAS) */}
                   <div className="pt-1">
-                    <span className="text-[11px] font-bold text-neutral-400 block mb-1.5">
+                    <span className="text-[11px] font-bold text-muted-foreground block mb-1.5">
                       Ou selecione uma foto profissional da Galeria MAYa:
                     </span>
                     <div className="grid grid-cols-5 gap-2">
@@ -1835,13 +1782,13 @@ export function AdminDashboard() {
                             }}
                             className={`relative aspect-square rounded-xl overflow-hidden border-2 transition-all group ${
                               selecionada
-                                ? "border-rose-500 scale-105 shadow-md shadow-rose-600/30"
-                                : "border-neutral-800 hover:border-neutral-600 opacity-70 hover:opacity-100"
+                                ? "border-primary scale-105 shadow-md shadow-primary/20"
+                                : "border-border hover:border-muted-foreground/60 opacity-80 hover:opacity-100"
                             }`}
                           >
                             <Image src={foto.thumbnail} alt={foto.titulo} fill className="object-cover" />
                             {selecionada && (
-                              <div className="absolute inset-0 bg-rose-500/30 flex items-center justify-center">
+                              <div className="absolute inset-0 bg-primary/25 flex items-center justify-center">
                                 <Check className="w-3.5 h-3.5 text-white stroke-[3]" />
                               </div>
                             )}
@@ -1852,8 +1799,8 @@ export function AdminDashboard() {
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between p-3 rounded-xl bg-neutral-800/60 border border-neutral-700/60">
-                  <span className="text-xs font-bold text-neutral-300">Disponível para Pedidos</span>
+                <div className="flex items-center justify-between p-3 rounded-xl bg-muted/30 border border-border">
+                  <span className="text-xs font-bold text-foreground">Disponível para Pedidos</span>
                   <Switch
                     checked={itemEmEdicao.ativo !== false}
                     onCheckedChange={(val) => setItemEmEdicao({ ...itemEmEdicao, ativo: val })}
@@ -1862,20 +1809,20 @@ export function AdminDashboard() {
               </div>
 
               {/* Rodapé fixo com os botões (shrink-0) */}
-              <div className="px-6 py-4 bg-neutral-950 border-t border-neutral-800 shrink-0 flex items-center justify-end gap-2">
+              <div className="px-6 py-4 bg-muted/20 border-t border-border shrink-0 flex items-center justify-end gap-2">
                 <Button
                   type="button"
                   variant="ghost"
                   onClick={() => setModalPratoAberto(false)}
                   disabled={salvandoPrato || enviandoFoto}
-                  className="text-neutral-400 hover:text-white rounded-xl text-xs"
+                  className="text-muted-foreground hover:text-foreground rounded-xl text-xs"
                 >
                   Cancelar
                 </Button>
                 <Button
                   type="submit"
                   disabled={salvandoPrato || enviandoFoto}
-                  className="bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl text-xs h-10 px-5 shadow-lg flex items-center gap-1.5"
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold rounded-xl text-xs h-10 px-5 shadow-xs flex items-center gap-1.5"
                 >
                   {enviandoFoto ? (
                     <>
@@ -1904,17 +1851,17 @@ export function AdminDashboard() {
         onComandaConfirmada={handleConfirmarComandaBalcao}
       />
 
-      {/* MODAL DE CONFIGURAÇÕES GLOBAIS E TEMATIZAÇÃO */}
+      {/* MODAL DE CONFIGURAÇÕES GLOBAIS DA LOJA */}
       <Dialog open={modalConfigAberto} onOpenChange={setModalConfigAberto}>
-        <DialogContent className="bg-neutral-900 border-neutral-800 text-white max-w-lg w-[95vw] rounded-2xl p-6 max-h-[90vh] overflow-y-auto">
+        <DialogContent className="bg-card border-border text-card-foreground max-w-lg w-[95vw] rounded-2xl p-6 max-h-[90vh] overflow-y-auto shadow-2xl">
           <DialogHeader>
             <div className="flex items-center gap-2 mb-1">
-              <div className="p-2 rounded-xl bg-rose-500/10 text-rose-500">
+              <div className="p-2 rounded-xl bg-primary/10 text-primary">
                 <Settings className="w-5 h-5" />
               </div>
               <div>
-                <DialogTitle className="text-lg font-black text-white">Configurações da Loja</DialogTitle>
-                <DialogDescription className="text-xs text-neutral-400">
+                <DialogTitle className="text-lg font-black text-foreground">Configurações da Loja</DialogTitle>
+                <DialogDescription className="text-xs text-muted-foreground">
                   Gerencie o fluxo operacional e parâmetros do seu restaurante.
                 </DialogDescription>
               </div>
@@ -1922,47 +1869,12 @@ export function AdminDashboard() {
           </DialogHeader>
 
           <div className="space-y-6 pt-2">
-            {/* COR PRIMÁRIA */}
-            <div className="space-y-3 p-4 rounded-xl bg-neutral-950/60 border border-neutral-800">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-bold uppercase tracking-wider text-neutral-300 flex items-center gap-1.5">
-                  <Palette className="w-3.5 h-3.5 text-rose-500" />
-                  Cor Primária de Destaque
-                </label>
-                <span className="text-[10px] text-neutral-500 font-mono">{corPrimaria}</span>
-              </div>
-              <p className="text-xs text-neutral-400">
-                Aplica a cor da sua marca nos botões, badges e detalhes do cardápio mobile.
-              </p>
-              <div className="flex items-center gap-3">
-                <input
-                  type="color"
-                  value={corPrimaria}
-                  onChange={(e) => setCorPrimaria(e.target.value)}
-                  className="w-12 h-10 rounded-xl bg-transparent border-0 cursor-pointer shrink-0"
-                />
-                <Input
-                  value={corPrimaria}
-                  onChange={(e) => setCorPrimaria(e.target.value)}
-                  className="bg-neutral-900 border-neutral-700 text-white font-mono uppercase text-xs h-10"
-                />
-              </div>
-
-              {/* Pré-visualização da cor */}
-              <div
-                style={{ backgroundColor: corPrimaria }}
-                className="w-full h-9 rounded-xl flex items-center justify-center text-white text-xs font-bold shadow-md transition-colors"
-              >
-                Pré-visualização do Botão
-              </div>
-            </div>
-
             {/* MODELO OPERACIONAL DO SALÃO */}
-            <div className="space-y-3 p-4 rounded-xl bg-neutral-950/60 border border-neutral-800">
-              <label className="text-xs font-bold uppercase tracking-wider text-neutral-300 block">
+            <div className="space-y-3 p-4 rounded-xl bg-muted/30 border border-border">
+              <label className="text-xs font-bold uppercase tracking-wider text-foreground block">
                 Modelo Operacional do Salão
               </label>
-              <p className="text-xs text-neutral-400">
+              <p className="text-xs text-muted-foreground">
                 Defina como os pedidos fluem entre a mesa, o garçom e a cozinha:
               </p>
 
@@ -1972,15 +1884,15 @@ export function AdminDashboard() {
                   onClick={() => setModoOperacao("hibrido")}
                   className={`p-3 rounded-xl border text-left transition-all ${
                     modoOperacao === "hibrido"
-                      ? "bg-rose-950/40 border-rose-500 text-white"
-                      : "bg-neutral-900/60 border-neutral-800 text-neutral-400 hover:border-neutral-700"
+                      ? "bg-primary/10 border-primary text-foreground shadow-xs"
+                      : "bg-card border-border text-muted-foreground hover:border-primary/40 hover:bg-muted/50"
                   }`}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-white">Híbrido / Suporte (Padrão)</span>
-                    {modoOperacao === "hibrido" && <Check className="w-4 h-4 text-rose-500" />}
+                    <span className="text-xs font-bold text-foreground">Híbrido / Suporte (Padrão)</span>
+                    {modoOperacao === "hibrido" && <Check className="w-4 h-4 text-primary" />}
                   </div>
-                  <span className="text-[10px] text-neutral-400 block mt-1 leading-snug">
+                  <span className="text-[10px] text-muted-foreground block mt-1 leading-snug">
                     O pedido vai direto para a cozinha. O garçom atende chamados e fecha contas.
                   </span>
                 </button>
@@ -1990,15 +1902,15 @@ export function AdminDashboard() {
                   onClick={() => setModoOperacao("com_garcom")}
                   className={`p-3 rounded-xl border text-left transition-all ${
                     modoOperacao === "com_garcom"
-                      ? "bg-rose-950/40 border-rose-500 text-white"
-                      : "bg-neutral-900/60 border-neutral-800 text-neutral-400 hover:border-neutral-700"
+                      ? "bg-primary/10 border-primary text-foreground shadow-xs"
+                      : "bg-card border-border text-muted-foreground hover:border-primary/40 hover:bg-muted/50"
                   }`}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-white">Garçom Obrigatório</span>
-                    {modoOperacao === "com_garcom" && <Check className="w-4 h-4 text-rose-500" />}
+                    <span className="text-xs font-bold text-foreground">Garçom Obrigatório</span>
+                    {modoOperacao === "com_garcom" && <Check className="w-4 h-4 text-primary" />}
                   </div>
-                  <span className="text-[10px] text-neutral-400 block mt-1 leading-snug">
+                  <span className="text-[10px] text-muted-foreground block mt-1 leading-snug">
                     O pedido fica pendente e o garçom valida antes de enviar para a cozinha.
                   </span>
                 </button>
@@ -2008,15 +1920,15 @@ export function AdminDashboard() {
                   onClick={() => setModoOperacao("balcao")}
                   className={`p-3 rounded-xl border text-left transition-all ${
                     modoOperacao === "balcao"
-                      ? "bg-rose-950/40 border-rose-500 text-white"
-                      : "bg-neutral-900/60 border-neutral-800 text-neutral-400 hover:border-neutral-700"
+                      ? "bg-primary/10 border-primary text-foreground shadow-xs"
+                      : "bg-card border-border text-muted-foreground hover:border-primary/40 hover:bg-muted/50"
                   }`}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-white">Sem Garçom (Autoatendimento)</span>
-                    {modoOperacao === "balcao" && <Check className="w-4 h-4 text-rose-500" />}
+                    <span className="text-xs font-bold text-foreground">Sem Garçom (Autoatendimento)</span>
+                    {modoOperacao === "balcao" && <Check className="w-4 h-4 text-primary" />}
                   </div>
-                  <span className="text-[10px] text-neutral-400 block mt-1 leading-snug">
+                  <span className="text-[10px] text-muted-foreground block mt-1 leading-snug">
                     O cliente pede na mesa e retira diretamente no balcão/caixa.
                   </span>
                 </button>
@@ -2024,13 +1936,13 @@ export function AdminDashboard() {
             </div>
 
             {/* MODO DE OPERAÇÃO DO KDS (COZINHA) */}
-            <div className="space-y-4 pt-4 border-t border-neutral-800">
+            <div className="space-y-4 pt-4 border-t border-border">
               <div className="flex flex-col gap-1">
-                <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                  <Zap className="w-4 h-4 text-amber-400" />
+                <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+                  <Zap className="w-4 h-4 text-amber-500" />
                   Modo de Operação do KDS (Cozinha)
                 </h3>
-                <p className="text-xs text-neutral-400">
+                <p className="text-xs text-muted-foreground">
                   Altere a forma como os pedidos são organizados no monitor da cozinha em tempo real.
                 </p>
               </div>
@@ -2040,8 +1952,8 @@ export function AdminDashboard() {
                 <label
                   className={`relative cursor-pointer rounded-xl border p-4 flex flex-col gap-2 transition-all duration-200 ${
                     modoFilaKds === "sequencial"
-                      ? "bg-rose-600/10 border-rose-500"
-                      : "bg-neutral-900 border-neutral-800 hover:border-neutral-700 hover:bg-neutral-800/50"
+                      ? "bg-primary/10 border-primary shadow-xs"
+                      : "bg-card border-border hover:border-primary/40 hover:bg-muted/50"
                   }`}
                 >
                   <input
@@ -2056,21 +1968,21 @@ export function AdminDashboard() {
                     <div
                       className={`p-1.5 rounded-lg ${
                         modoFilaKds === "sequencial"
-                          ? "bg-rose-500 text-white"
-                          : "bg-neutral-800 text-neutral-400"
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-muted text-muted-foreground"
                       }`}
                     >
                       <ListOrdered className="w-4 h-4" />
                     </div>
                     <span
                       className={`text-sm font-bold ${
-                        modoFilaKds === "sequencial" ? "text-rose-400" : "text-neutral-300"
+                        modoFilaKds === "sequencial" ? "text-primary" : "text-foreground"
                       }`}
                     >
                       Sequencial (Padrão)
                     </span>
                   </div>
-                  <p className="text-[11px] text-neutral-400 leading-relaxed">
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">
                     Pedidos entram na fila por ordem de chegada (First-In, First-Out). Ideal para dias de movimento tranquilo ou cozinhas lineares.
                   </p>
                 </label>
@@ -2079,8 +1991,8 @@ export function AdminDashboard() {
                 <label
                   className={`relative cursor-pointer rounded-xl border p-4 flex flex-col gap-2 transition-all duration-200 ${
                     modoFilaKds === "agrupamento"
-                      ? "bg-emerald-600/10 border-emerald-500"
-                      : "bg-neutral-900 border-neutral-800 hover:border-neutral-700 hover:bg-neutral-800/50"
+                      ? "bg-emerald-500/10 border-emerald-500 shadow-xs"
+                      : "bg-card border-border hover:border-emerald-500/40 hover:bg-muted/50"
                   }`}
                 >
                   <input
@@ -2091,28 +2003,28 @@ export function AdminDashboard() {
                     onChange={() => setModoFilaKds("agrupamento")}
                     className="sr-only"
                   />
-                  <div className="absolute top-3 right-3 bg-neutral-800 px-2 py-0.5 rounded text-[9px] font-bold text-emerald-400 uppercase tracking-wider">
+                  <div className="absolute top-3 right-3 bg-muted px-2 py-0.5 rounded text-[9px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
                     Pro
                   </div>
                   <div className="flex items-center gap-2">
                     <div
                       className={`p-1.5 rounded-lg ${
                         modoFilaKds === "agrupamento"
-                          ? "bg-emerald-500 text-white"
-                          : "bg-neutral-800 text-neutral-400"
+                          ? "bg-emerald-600 text-white"
+                          : "bg-muted text-muted-foreground"
                       }`}
                     >
                       <Layers className="w-4 h-4" />
                     </div>
                     <span
                       className={`text-sm font-bold ${
-                        modoFilaKds === "agrupamento" ? "text-emerald-400" : "text-neutral-300"
+                        modoFilaKds === "agrupamento" ? "text-emerald-600 dark:text-emerald-400" : "text-foreground"
                       }`}
                     >
                       Agrupamento Ágil
                     </span>
                   </div>
-                  <p className="text-[11px] text-neutral-400 leading-relaxed">
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">
                     Consolida tickets da mesma mesa e prioriza pratos com base no tempo de preparo. Essencial para não travar o salão nos horários de pico.
                   </p>
                 </label>
@@ -2120,17 +2032,17 @@ export function AdminDashboard() {
             </div>
 
             {/* CONFIGURAÇÃO DA TAXA DE SERVIÇO */}
-            <div className="space-y-3 p-4 rounded-xl bg-neutral-950/60 border border-neutral-800">
+            <div className="space-y-3 p-4 rounded-xl bg-muted/30 border border-border">
               <div className="flex items-center justify-between">
-                <label className="text-xs font-bold uppercase tracking-wider text-neutral-300 flex items-center gap-1.5">
-                  <Percent className="w-3.5 h-3.5 text-rose-500" />
+                <label className="text-xs font-bold uppercase tracking-wider text-foreground flex items-center gap-1.5">
+                  <Percent className="w-3.5 h-3.5 text-primary" />
                   Taxa de Serviço do Salão
                 </label>
-                <span className="text-xs font-mono font-bold text-rose-400">
+                <span className="text-xs font-mono font-bold text-primary">
                   {taxaServicoConfig}%
                 </span>
               </div>
-              <p className="text-xs text-neutral-400">
+              <p className="text-xs text-muted-foreground">
                 Percentual sugerido na conta no momento do fechamento da mesa (0% para desativar, 10% padrão, até 20%).
               </p>
               <div className="flex items-center gap-3">
@@ -2141,7 +2053,7 @@ export function AdminDashboard() {
                   step="1"
                   value={taxaServicoConfig}
                   onChange={(e) => setTaxaServicoConfig(Math.max(0, parseInt(e.target.value, 10) || 0))}
-                  className="bg-neutral-900 border-neutral-700 text-white font-mono text-xs h-10 w-28"
+                  className="bg-background border-input text-foreground font-mono text-xs h-10 w-28"
                 />
                 <div className="flex items-center gap-1.5">
                   {[0, 10, 12, 13, 15].map((sugestao) => (
@@ -2151,8 +2063,8 @@ export function AdminDashboard() {
                       onClick={() => setTaxaServicoConfig(sugestao)}
                       className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
                         taxaServicoConfig === sugestao
-                          ? "bg-rose-600 text-white shadow-sm"
-                          : "bg-neutral-800 text-neutral-400 hover:text-white"
+                          ? "bg-primary text-primary-foreground shadow-xs"
+                          : "bg-card border border-border text-foreground hover:bg-muted"
                       }`}
                     >
                       {sugestao}%
@@ -2167,20 +2079,20 @@ export function AdminDashboard() {
                 type="button"
                 variant="ghost"
                 onClick={() => setModalConfigAberto(false)}
-                className="text-neutral-400 hover:text-white rounded-xl text-xs"
+                className="text-muted-foreground hover:text-foreground rounded-xl text-xs"
               >
                 Fechar
               </Button>
               <Button
                 type="button"
                 onClick={async () => {
-                  await handleSalvarCor();
+                  await handleSalvarConfiguracoes();
                   setModalConfigAberto(false);
                 }}
-                disabled={salvandoCor}
-                className="bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl text-xs h-10 px-5 shadow-lg flex items-center gap-1.5"
+                disabled={salvandoConfig}
+                className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold rounded-xl text-xs h-10 px-5 shadow-xs flex items-center gap-1.5"
               >
-                {salvandoCor ? (
+                {salvandoConfig ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
                     Salvando...

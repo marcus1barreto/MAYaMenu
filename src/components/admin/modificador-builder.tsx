@@ -92,12 +92,12 @@ export function ModificadorBuilder({ grupos, onChange }: ModificadorBuilderProps
   if (editandoIndex === null) {
     return (
       <div className="space-y-3">
-        <label className="text-xs font-bold uppercase tracking-wider text-neutral-300 flex items-center justify-between">
+        <label className="text-xs font-bold uppercase tracking-wider text-foreground flex items-center justify-between">
           <span className="flex items-center gap-1.5">
-            <Settings2 className="w-3.5 h-3.5 text-rose-500" />
+            <Settings2 className="w-3.5 h-3.5 text-primary" />
             Complementos e Variações
           </span>
-          <span className="text-[10px] text-neutral-400 font-normal">
+          <span className="text-[10px] text-muted-foreground font-normal">
             (Ponto, Adicionais, Retiradas)
           </span>
         </label>
@@ -107,18 +107,18 @@ export function ModificadorBuilder({ grupos, onChange }: ModificadorBuilderProps
             {grupos.map((grp, idx) => (
               <div
                 key={grp.id || idx}
-                className="p-3 bg-neutral-950 border border-neutral-800 rounded-xl flex items-center justify-between"
+                className="p-3 bg-card border border-border rounded-xl flex items-center justify-between shadow-xs"
               >
                 <div>
                   <div className="flex items-center gap-2">
-                    <h4 className="text-sm font-bold text-white">{grp.nome}</h4>
+                    <h4 className="text-sm font-bold text-foreground">{grp.nome}</h4>
                     {grp.obrigatorio && (
-                      <span className="text-[9px] uppercase font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400">
+                      <span className="text-[9px] uppercase font-bold px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
                         Obrigatório
                       </span>
                     )}
                   </div>
-                  <p className="text-[10px] text-neutral-400 mt-1">
+                  <p className="text-[10px] text-muted-foreground mt-1">
                     {grp.opcoes.length} opções • Mín: {grp.minimo} / Máx: {grp.maximo}
                   </p>
                 </div>
@@ -129,14 +129,14 @@ export function ModificadorBuilder({ grupos, onChange }: ModificadorBuilderProps
                       setGrupoAtual(grp);
                       setEditandoIndex(idx);
                     }}
-                    className="text-xs text-rose-400 hover:text-rose-300 font-bold"
+                    className="text-xs text-primary hover:underline font-bold"
                   >
                     Editar
                   </button>
                   <button
                     type="button"
                     onClick={() => removerGrupo(idx)}
-                    className="text-neutral-500 hover:text-red-400"
+                    className="text-muted-foreground hover:text-red-500"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -150,7 +150,7 @@ export function ModificadorBuilder({ grupos, onChange }: ModificadorBuilderProps
           type="button"
           variant="outline"
           onClick={handleAdicionarGrupo}
-          className="w-full h-10 border-dashed border-neutral-700 hover:border-rose-500 text-neutral-300 hover:text-rose-400 hover:bg-neutral-900 rounded-xl text-xs font-bold"
+          className="w-full h-10 border-dashed border-border hover:border-primary text-muted-foreground hover:text-primary hover:bg-muted/40 rounded-xl text-xs font-bold"
         >
           <Plus className="w-4 h-4 mr-1.5" />
           Adicionar Grupo de Opções
@@ -161,16 +161,16 @@ export function ModificadorBuilder({ grupos, onChange }: ModificadorBuilderProps
 
   // MODO EDIÇÃO: Construtor do Grupo
   return (
-    <div className="p-4 bg-neutral-900 border border-neutral-700 rounded-2xl space-y-4">
-      <div className="flex items-center justify-between pb-2 border-b border-neutral-800">
-        <h4 className="text-sm font-bold text-white flex items-center gap-1.5">
-          <Settings2 className="w-4 h-4 text-rose-500" />
+    <div className="p-4 bg-card border border-border rounded-2xl space-y-4 shadow-xs">
+      <div className="flex items-center justify-between pb-2 border-b border-border">
+        <h4 className="text-sm font-bold text-foreground flex items-center gap-1.5">
+          <Settings2 className="w-4 h-4 text-primary" />
           {editandoIndex < grupos.length ? "Editar Grupo" : "Novo Grupo de Opções"}
         </h4>
         <button
           type="button"
           onClick={() => setEditandoIndex(null)}
-          className="text-xs text-neutral-400 hover:text-white"
+          className="text-xs text-muted-foreground hover:text-foreground"
         >
           Cancelar
         </button>
@@ -178,18 +178,18 @@ export function ModificadorBuilder({ grupos, onChange }: ModificadorBuilderProps
 
       <div className="space-y-3">
         <div className="space-y-1.5">
-          <label className="text-[10px] font-bold uppercase text-neutral-400">Nome do Grupo</label>
+          <label className="text-[10px] font-bold uppercase text-muted-foreground">Nome do Grupo</label>
           <Input
             placeholder="Ex: Qual o ponto da carne?"
             value={grupoAtual.nome}
             onChange={(e) => setGrupoAtual({ ...grupoAtual, nome: e.target.value })}
-            className="h-9 bg-neutral-950 border-neutral-800 text-xs"
+            className="h-9 bg-background border-input text-foreground text-xs"
           />
         </div>
 
         <div className="flex items-center gap-4">
           <div className="flex-1 space-y-1.5">
-            <label className="text-[10px] font-bold uppercase text-neutral-400">Mín. Escolhas</label>
+            <label className="text-[10px] font-bold uppercase text-muted-foreground">Mín. Escolhas</label>
             <Input
               type="number"
               min="0"
@@ -197,11 +197,11 @@ export function ModificadorBuilder({ grupos, onChange }: ModificadorBuilderProps
               onChange={(e) =>
                 setGrupoAtual({ ...grupoAtual, minimo: Math.max(0, parseInt(e.target.value) || 0) })
               }
-              className="h-9 bg-neutral-950 border-neutral-800 text-xs"
+              className="h-9 bg-background border-input text-foreground text-xs"
             />
           </div>
           <div className="flex-1 space-y-1.5">
-            <label className="text-[10px] font-bold uppercase text-neutral-400">Máx. Escolhas</label>
+            <label className="text-[10px] font-bold uppercase text-muted-foreground">Máx. Escolhas</label>
             <Input
               type="number"
               min="1"
@@ -210,15 +210,15 @@ export function ModificadorBuilder({ grupos, onChange }: ModificadorBuilderProps
                 const val = Math.max(1, parseInt(e.target.value) || 1);
                 setGrupoAtual({ ...grupoAtual, maximo: val });
               }}
-              className="h-9 bg-neutral-950 border-neutral-800 text-xs"
+              className="h-9 bg-background border-input text-foreground text-xs"
             />
           </div>
         </div>
 
-        <div className="flex items-center justify-between p-2.5 bg-neutral-950 border border-neutral-800 rounded-xl">
+        <div className="flex items-center justify-between p-2.5 bg-muted/30 border border-border rounded-xl">
           <div>
-            <span className="text-xs font-bold text-white block">Obrigatório?</span>
-            <span className="text-[9px] text-neutral-500">O cliente não avança sem escolher.</span>
+            <span className="text-xs font-bold text-foreground block">Obrigatório?</span>
+            <span className="text-[9px] text-muted-foreground">O cliente não avança sem escolher.</span>
           </div>
           <Switch
             checked={grupoAtual.obrigatorio}
@@ -233,8 +233,8 @@ export function ModificadorBuilder({ grupos, onChange }: ModificadorBuilderProps
         </div>
       </div>
 
-      <div className="space-y-2 pt-2 border-t border-neutral-800">
-        <label className="text-[10px] font-bold uppercase text-neutral-400">Opções do Grupo</label>
+      <div className="space-y-2 pt-2 border-t border-border">
+        <label className="text-[10px] font-bold uppercase text-muted-foreground">Opções do Grupo</label>
 
         {grupoAtual.opcoes.map((opt, oIdx) => (
           <div key={opt.id || oIdx} className="flex items-center gap-2">
@@ -242,23 +242,23 @@ export function ModificadorBuilder({ grupos, onChange }: ModificadorBuilderProps
               placeholder="Ex: Ao Ponto"
               value={opt.nome}
               onChange={(e) => atualizarOpcao(oIdx, "nome", e.target.value)}
-              className="flex-1 h-9 bg-neutral-950 border-neutral-800 text-xs"
+              className="flex-1 h-9 bg-background border-input text-foreground text-xs"
             />
             <div className="relative w-24">
-              <span className="absolute left-2 top-2.5 text-xs text-neutral-500">R$</span>
+              <span className="absolute left-2 top-2.5 text-xs text-muted-foreground">R$</span>
               <Input
                 type="number"
                 step="0.01"
                 min="0"
                 value={opt.precoAdicional}
                 onChange={(e) => atualizarOpcao(oIdx, "precoAdicional", parseFloat(e.target.value) || 0)}
-                className="w-full h-9 pl-7 pr-2 bg-neutral-950 border-neutral-800 text-xs font-mono"
+                className="w-full h-9 pl-7 pr-2 bg-background border-input text-foreground text-xs font-mono"
               />
             </div>
             <button
               type="button"
               onClick={() => removerOpcao(oIdx)}
-              className="p-2 text-neutral-500 hover:text-red-400 transition-colors"
+              className="p-2 text-muted-foreground hover:text-red-500 transition-colors"
             >
               <Trash2 className="w-4 h-4" />
             </button>
@@ -269,7 +269,7 @@ export function ModificadorBuilder({ grupos, onChange }: ModificadorBuilderProps
           type="button"
           variant="ghost"
           onClick={adicionarOpcao}
-          className="h-8 text-[10px] font-bold text-rose-400 hover:text-rose-300 hover:bg-neutral-800 w-full"
+          className="h-8 text-[10px] font-bold text-primary hover:bg-primary/10 w-full"
         >
           <Plus className="w-3 h-3 mr-1" />
           Nova Opção
@@ -279,7 +279,7 @@ export function ModificadorBuilder({ grupos, onChange }: ModificadorBuilderProps
       <Button
         type="button"
         onClick={handleSalvarGrupo}
-        className="w-full h-10 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg mt-4"
+        className="w-full h-10 bg-primary hover:bg-primary/90 text-primary-foreground font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-xs mt-4"
       >
         <CheckCircle2 className="w-4 h-4" />
         Pronto, Salvar Grupo

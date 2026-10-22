@@ -54,7 +54,6 @@ import {
   CalendarPlus,
   Trash2,
 } from "lucide-react";
-import { SeletorTemaRapido } from "@/components/ui/seletor-tema-rapido";
 
 export function SuperAdminView() {
   const [licencas, setLicencas] = useState<Licenca[]>([]);
@@ -316,16 +315,10 @@ export function SuperAdminView() {
               </p>
             </div>
           </div>
-          <div className="md:hidden">
-            <SeletorTemaRapido rotulo="Tema" />
-          </div>
         </div>
 
-        {/* METRICAS RÁPIDAS & SELETOR DE TEMA */}
+        {/* METRICAS RÁPIDAS */}
         <div className="flex flex-wrap items-center gap-3">
-          <div className="hidden md:block">
-            <SeletorTemaRapido rotulo="Tema SuperAdmin" />
-          </div>
           <div
             onClick={() => setAbaAtiva("restaurantes")}
             className="px-4 py-2 bg-card border border-border rounded-2xl text-center cursor-pointer hover:border-primary/50 transition-colors shadow-xs"

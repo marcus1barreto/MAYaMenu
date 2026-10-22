@@ -43,7 +43,6 @@ import {
   lancarItemManualFirestore,
   atualizarStatusPedido,
 } from "@/lib/restaurante-service";
-import { SeletorTemaRapido } from "@/components/ui/seletor-tema-rapido";
 
 // Item de comanda exibido no salão. `refPath` e `statusPedido` vêm do pedido (rodada) de origem
 // e permitem marcar o item como entregue diretamente no Firestore.
@@ -589,9 +588,8 @@ export function GarcomView({
           </div>
         </div>
 
-        {/* SELETOR DE TEMA DO GARÇOM & BOTÃO DE CONTINGÊNCIA */}
+        {/* BOTÃO DE CONTINGÊNCIA */}
         <div className="flex flex-wrap items-center gap-3">
-          <SeletorTemaRapido rotulo="Tema Garçom" />
 
           <Button
             type="button"

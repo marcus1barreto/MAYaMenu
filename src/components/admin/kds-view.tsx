@@ -8,7 +8,6 @@ import { Clock, CheckCircle, ChefHat, Sparkles, AlertTriangle, ArrowRight } from
 import { db } from "@/lib/firebase";
 import { collectionGroup, query, where, onSnapshot } from "firebase/firestore";
 import { escutarPedidosKds, atualizarStatusPedido } from "@/lib/restaurante-service";
-import { SeletorTemaRapido } from "@/components/ui/seletor-tema-rapido";
 
 export interface PedidoKDS {
   id: string; // id do pedido
@@ -310,9 +309,8 @@ export function KdsView({
           </div>
         </div>
 
-        {/* CONTADORES RÁPIDOS, SELETOR DE TEMA E FILTROS */}
+        {/* CONTADORES RÁPIDOS E FILTROS */}
         <div className="flex flex-wrap items-center gap-2.5">
-          <SeletorTemaRapido rotulo="Tema Cozinha" />
 
           <div className="flex items-center gap-1.5 bg-card p-1.5 rounded-2xl border border-border">
             <button

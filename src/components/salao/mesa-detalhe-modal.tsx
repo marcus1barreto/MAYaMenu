@@ -252,35 +252,35 @@ export function MesaDetalheModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="w-[95vw] sm:max-w-4xl max-h-[92vh] bg-neutral-900 border-neutral-800 text-white p-0 flex flex-col rounded-3xl overflow-hidden shadow-2xl">
+      <DialogContent className="w-[95vw] sm:max-w-4xl max-h-[92vh] bg-card border-border text-card-foreground p-0 flex flex-col rounded-3xl overflow-hidden shadow-2xl">
         {/* HEADER DA MESA */}
-        <DialogHeader className="p-5 sm:p-6 bg-neutral-950 border-b border-neutral-800 flex flex-col gap-3">
+        <DialogHeader className="p-5 sm:p-6 bg-muted/20 border-b border-border flex flex-col gap-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <div
-                className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-xl shadow-lg shrink-0 ${mesa.status === "conta_pedida"
-                    ? "bg-rose-600 text-white animate-pulse"
+                className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-xl shadow-sm shrink-0 ${mesa.status === "conta_pedida"
+                    ? "bg-primary text-primary-foreground animate-pulse"
                     : mesa.status === "paga_ocupada"
                       ? "bg-emerald-600 text-white"
                       : mesa.status === "ocupada"
                         ? "bg-amber-500 text-neutral-950"
-                        : "bg-neutral-800 text-neutral-400"
+                        : "bg-muted text-muted-foreground"
                   }`}
               >
                 {mesa.numero}
               </div>
               <div>
-                <DialogTitle className="text-xl sm:text-2xl font-black tracking-tight flex items-center gap-2">
+                <DialogTitle className="text-xl sm:text-2xl font-black tracking-tight flex items-center gap-2 text-foreground">
                   <span>Mesa {mesa.numero}</span>
                   <Badge
                     variant="outline"
                     className={`text-[10px] uppercase font-bold tracking-wider px-2.5 py-0.5 rounded-full ${mesa.status === "conta_pedida"
-                        ? "bg-rose-500/20 text-rose-400 border-rose-500/40"
+                        ? "bg-primary/10 text-primary border-primary/30"
                         : mesa.status === "paga_ocupada"
-                          ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/40"
+                          ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
                           : mesa.status === "ocupada"
-                            ? "bg-amber-500/20 text-amber-400 border-amber-500/40"
-                            : "bg-neutral-800 text-neutral-400 border-neutral-700"
+                            ? "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30"
+                            : "bg-muted text-muted-foreground border-border"
                       }`}
                   >
                     {mesa.status === "conta_pedida"
@@ -292,13 +292,13 @@ export function MesaDetalheModal({
                           : "Livre"}
                   </Badge>
                 </DialogTitle>
-                <DialogDescription className="text-xs text-neutral-400 mt-0.5 flex flex-wrap items-center gap-3">
+                <DialogDescription className="text-xs text-muted-foreground mt-0.5 flex flex-wrap items-center gap-3">
                   <span className="flex items-center gap-1">
-                    <Users className="w-3.5 h-3.5 text-neutral-500" />
+                    <Users className="w-3.5 h-3.5 text-muted-foreground" />
                     {totalPessoas} {totalPessoas === 1 ? "pagante" : "pagantes"}
                   </span>
                   <span className="flex items-center gap-1">
-                    <Clock className="w-3.5 h-3.5 text-neutral-500" />
+                    <Clock className="w-3.5 h-3.5 text-muted-foreground" />
                     {mesa.status === "paga_ocupada" ? "Conta liquidada" : "Atendimento ativo"}
                   </span>
                 </DialogDescription>
@@ -307,23 +307,23 @@ export function MesaDetalheModal({
 
             {/* TOTAL GERAL DA MESA */}
             <div className="text-right ml-auto">
-              <span className="text-[10px] uppercase font-bold text-neutral-400 block tracking-wider">
+              <span className="text-[10px] uppercase font-bold text-muted-foreground block tracking-wider">
                 Total da Mesa
               </span>
-              <span className="text-2xl sm:text-3xl font-black text-rose-400 tracking-tight">
+              <span className="text-2xl sm:text-3xl font-black text-primary tracking-tight">
                 {totalComTaxa.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
               </span>
             </div>
           </div>
 
           {/* ABAS INTERNAS */}
-          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-neutral-800/80">
+          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-border">
             <button
               type="button"
               onClick={() => setAbaInterna("comandas")}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${abaInterna === "comandas"
-                  ? "bg-rose-600 text-white shadow-md"
-                  : "bg-neutral-800/80 text-neutral-400 hover:text-white"
+                  ? "bg-primary text-primary-foreground shadow-xs"
+                  : "bg-muted/50 text-muted-foreground hover:text-foreground hover:bg-muted"
                 }`}
             >
               <Users className="w-3.5 h-3.5" />
@@ -335,8 +335,8 @@ export function MesaDetalheModal({
                 type="button"
                 onClick={() => setAbaInterna("lancar")}
                 className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${abaInterna === "lancar"
-                    ? "bg-rose-600 text-white shadow-md"
-                    : "bg-neutral-800/80 text-neutral-400 hover:text-white"
+                    ? "bg-primary text-primary-foreground shadow-xs"
+                    : "bg-muted/50 text-muted-foreground hover:text-foreground hover:bg-muted"
                   }`}
               >
                 <Plus className="w-3.5 h-3.5" />
@@ -348,8 +348,8 @@ export function MesaDetalheModal({
               type="button"
               onClick={() => setAbaInterna("qrcode")}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${abaInterna === "qrcode"
-                  ? "bg-rose-600 text-white shadow-md"
-                  : "bg-neutral-800/80 text-neutral-400 hover:text-white"
+                  ? "bg-primary text-primary-foreground shadow-xs"
+                  : "bg-muted/50 text-muted-foreground hover:text-foreground hover:bg-muted"
                 }`}
             >
               <QrCode className="w-3.5 h-3.5" />
@@ -366,26 +366,26 @@ export function MesaDetalheModal({
               {/* LISTA DE COMANDAS DOS CLIENTES NA MESA */}
               <div className="md:col-span-7 space-y-4">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-neutral-300">
+                  <h3 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-foreground">
                     Comandas na Mesa
                   </h3>
-                  <span className="text-xs text-neutral-500 font-medium">
+                  <span className="text-xs text-muted-foreground font-medium">
                     Rateio individual por pessoa
                   </span>
                 </div>
 
                 {comandasComItens.length === 0 ? (
-                  <div className="p-8 text-center bg-neutral-950/60 rounded-2xl border border-dashed border-neutral-800">
-                    <Coffee className="w-10 h-10 text-neutral-600 mx-auto mb-2" />
-                    <p className="text-sm font-bold text-neutral-300">Nenhum pedido nesta mesa ainda</p>
-                    <p className="text-xs text-neutral-500 mt-1">
+                  <div className="p-8 text-center bg-muted/20 rounded-2xl border border-dashed border-border">
+                    <Coffee className="w-10 h-10 text-muted-foreground mx-auto mb-2" />
+                    <p className="text-sm font-bold text-foreground">Nenhum pedido nesta mesa ainda</p>
+                    <p className="text-xs text-muted-foreground mt-1">
                       A mesa está livre. O cliente pode escanear o QR Code ou você pode lançar itens manualmente.
                     </p>
                     <div className="mt-4 flex flex-wrap justify-center gap-3">
                       <Button
                         type="button"
                         onClick={() => setAbaInterna("lancar")}
-                        className="h-9 px-4 text-xs font-bold bg-neutral-800 hover:bg-neutral-700 text-white rounded-xl"
+                        className="h-9 px-4 text-xs font-bold bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl shadow-xs"
                       >
                         <Plus className="w-3.5 h-3.5 mr-1" />
                         Lançar Pedido
@@ -393,7 +393,7 @@ export function MesaDetalheModal({
                       <Link href={urlMesa} target="_blank">
                         <Button
                           variant="outline"
-                          className="h-9 px-4 text-xs font-bold border-neutral-700 bg-transparent hover:bg-neutral-800 text-rose-400 rounded-xl"
+                          className="h-9 px-4 text-xs font-bold border-border bg-card hover:bg-muted text-primary rounded-xl"
                         >
                           <ExternalLink className="w-3.5 h-3.5 mr-1" />
                           Abrir Cardápio
@@ -409,32 +409,32 @@ export function MesaDetalheModal({
                       <div
                         key={comanda.id}
                         className={`p-4 rounded-2xl border transition-all ${jaPago
-                            ? "bg-neutral-950 border-neutral-800/80 opacity-60"
-                            : "bg-neutral-950/80 border-neutral-800 hover:border-neutral-700 shadow-md"
+                            ? "bg-muted/30 border-border/70 opacity-60"
+                            : "bg-card border-border hover:border-primary/40 shadow-xs"
                           }`}
                       >
                         <div className="flex items-center justify-between mb-3">
                           <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 rounded-full bg-rose-600/20 text-rose-400 font-black text-xs flex items-center justify-center">
+                            <div className="w-8 h-8 rounded-full bg-primary/10 text-primary font-black text-xs flex items-center justify-center">
                               {comanda.nomeCliente.charAt(0).toUpperCase()}
                             </div>
                             <div>
-                              <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                              <h4 className="text-sm font-bold text-foreground flex items-center gap-2">
                                 <span>{comanda.nomeCliente}</span>
                                 {jaPago && (
-                                  <Badge className="bg-emerald-500/20 text-emerald-400 text-[9px] py-0 border-none">
+                                  <Badge className="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 text-[9px] py-0 border border-emerald-500/20">
                                     Pago
                                   </Badge>
                                 )}
                               </h4>
-                              <span className="text-[10px] text-neutral-400">
+                              <span className="text-[10px] text-muted-foreground">
                                 {comanda.itens.length} {comanda.itens.length === 1 ? "item" : "itens"}
                               </span>
                             </div>
                           </div>
 
                           <div className="text-right">
-                            <span className="text-base font-black text-white block">
+                            <span className="text-base font-black text-foreground block">
                               {comanda.subtotal.toLocaleString("pt-BR", {
                                 style: "currency",
                                 currency: "BRL",
@@ -442,10 +442,10 @@ export function MesaDetalheModal({
                             </span>
                             <span
                               className={`text-[9px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full inline-block ${jaPago
-                                  ? "bg-emerald-500/20 text-emerald-400"
+                                  ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
                                   : comanda.status === "conta_pedida"
-                                    ? "bg-rose-500/20 text-rose-400"
-                                    : "bg-amber-500/20 text-amber-400"
+                                    ? "bg-primary/15 text-primary"
+                                    : "bg-amber-500/15 text-amber-600 dark:text-amber-400"
                                 }`}
                             >
                               {jaPago
@@ -554,32 +554,32 @@ export function MesaDetalheModal({
 
               {/* CARD DE RATEIO & FECHAMENTO DA CONTA */}
               <div className="md:col-span-5 space-y-4">
-                <div className="p-4 sm:p-5 rounded-2xl bg-neutral-950 border border-neutral-800 space-y-4">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-neutral-400 flex items-center gap-2">
-                    <CreditCard className="w-4 h-4 text-rose-500 shrink-0" />
+                <div className="p-4 sm:p-5 rounded-2xl bg-card border border-border space-y-4 shadow-xs">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                    <CreditCard className="w-4 h-4 text-primary shrink-0" />
                     <span>Fechamento & Rateio</span>
                   </h3>
 
-                  <div className="space-y-2.5 text-xs border-b border-neutral-800 pb-3">
-                    <div className="flex items-center justify-between gap-2 text-neutral-300">
-                      <span className="shrink-0">Subtotal Consumido:</span>
-                      <span className="font-bold text-right text-white">
+                  <div className="space-y-2.5 text-xs border-b border-border pb-3">
+                    <div className="flex items-center justify-between gap-2 text-foreground">
+                      <span className="shrink-0 text-muted-foreground">Subtotal Consumido:</span>
+                      <span className="font-bold text-right text-foreground">
                         {totalMesa.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
                       </span>
                     </div>
 
-                    <div className="flex items-center justify-between gap-2 text-neutral-300">
-                      <span className="shrink-0">Taxa de Serviço ({percentualGorjeta}%):</span>
+                    <div className="flex items-center justify-between gap-2 text-foreground">
+                      <span className="shrink-0 text-muted-foreground">Taxa de Serviço ({percentualGorjeta}%):</span>
                       <div className="flex items-center gap-2 ml-auto">
-                        <span className="font-bold text-white">
+                        <span className="font-bold text-foreground">
                           {taxaServico.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
                         </span>
                         <button
                           type="button"
                           onClick={handleAlternarTaxa}
                           className={`text-[10px] px-2 py-0.5 rounded font-black transition-colors ${taxaServicoAtiva
-                              ? "bg-rose-600/30 text-rose-300 border border-rose-500/40"
-                              : "bg-neutral-800 text-neutral-500 border border-neutral-700"
+                              ? "bg-primary/15 text-primary border border-primary/30"
+                              : "bg-muted text-muted-foreground border border-border"
                             }`}
                         >
                           {taxaServicoAtiva ? "ON" : "OFF"}
@@ -587,9 +587,9 @@ export function MesaDetalheModal({
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between gap-2 text-sm font-black text-white pt-2 border-t border-neutral-800/60">
+                    <div className="flex items-center justify-between gap-2 text-sm font-black text-foreground pt-2 border-t border-border">
                       <span className="shrink-0">Total da Mesa:</span>
-                      <span className="text-rose-400 text-base sm:text-lg text-right">
+                      <span className="text-primary text-base sm:text-lg text-right font-black">
                         {totalComTaxa.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
                       </span>
                     </div>
@@ -597,21 +597,21 @@ export function MesaDetalheModal({
 
                   {/* DIVISÃO IGUALITÁRIA */}
                   {totalPessoas > 1 && (
-                    <div className="p-3 bg-neutral-900 rounded-xl border border-neutral-800 text-xs space-y-1">
-                      <span className="text-[10px] uppercase font-bold text-neutral-400 block">
+                    <div className="p-3 bg-muted/30 rounded-xl border border-border text-xs space-y-1">
+                      <span className="text-[10px] uppercase font-bold text-muted-foreground block">
                         Rateio Igualitário ({totalPessoas} pessoas)
                       </span>
-                      <div className="text-base font-black text-white">
+                      <div className="text-base font-black text-foreground">
                         {rateioIgualitario.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
-                        <span className="text-xs text-neutral-400 font-normal ml-1">/ pessoa</span>
+                        <span className="text-xs text-muted-foreground font-normal ml-1">/ pessoa</span>
                       </div>
                     </div>
                   )}
 
                   {/* CAMPO DE OBSERVAÇÕES DA MESA */}
                   <div className="space-y-1.5 pt-1">
-                    <label className="text-[10px] uppercase font-bold tracking-wider text-neutral-400 flex items-center gap-1">
-                      <FileText className="w-3 h-3 text-neutral-500" />
+                    <label className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground flex items-center gap-1">
+                      <FileText className="w-3 h-3 text-muted-foreground" />
                       <span>Observações da Mesa</span>
                     </label>
                     <textarea
@@ -622,7 +622,7 @@ export function MesaDetalheModal({
                         onSalvarObservacao?.(mesa.numero, e.target.value);
                       }}
                       placeholder="Ex: Aniversariante, cliente alérgico a camarão..."
-                      className="w-full text-xs p-2.5 rounded-xl bg-neutral-900 border border-neutral-800 text-white placeholder-neutral-500 focus:outline-none focus:border-rose-500 transition-colors"
+                      className="w-full text-xs p-2.5 rounded-xl bg-background border border-input text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary transition-colors"
                     />
                   </div>
 
@@ -632,7 +632,7 @@ export function MesaDetalheModal({
                       type="button"
                       onClick={handleEncerrarMesa}
                       disabled={encerrando}
-                      className="w-full h-14 bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-800 disabled:text-neutral-400 text-white font-black rounded-xl text-lg transition-colors flex items-center justify-center gap-2 shadow-lg cursor-pointer disabled:cursor-not-allowed"
+                      className="w-full h-14 bg-emerald-600 hover:bg-emerald-500 disabled:bg-muted disabled:text-muted-foreground text-white font-black rounded-xl text-lg transition-colors flex items-center justify-center gap-2 shadow-xs cursor-pointer disabled:cursor-not-allowed"
                     >
                       <CheckCircle2 className="w-5 h-5" />
                       <span>{encerrando ? "Processando..." : "Encerrar e Liberar Mesa"}</span>
@@ -646,16 +646,16 @@ export function MesaDetalheModal({
           {/* 2. ABA: LANÇAR ITEM MANUALMENTE */}
           {abaInterna === "lancar" && (
             <div className="max-w-2xl mx-auto space-y-5">
-              <div className="border-b border-neutral-800 pb-3">
-                <h3 className="text-base font-bold text-white">Lançar Item pelo Garçom</h3>
-                <p className="text-xs text-neutral-400">
+              <div className="border-b border-border pb-3">
+                <h3 className="text-base font-bold text-foreground">Lançar Item pelo Garçom</h3>
+                <p className="text-xs text-muted-foreground">
                   Adicione pedidos diretamente para clientes que pedirem verbalmente na mesa.
                 </p>
               </div>
 
               {/* Escolha do Cliente */}
               <div className="space-y-2">
-                <label className="text-xs font-bold text-neutral-300">
+                <label className="text-xs font-bold text-foreground">
                   Nome do Cliente na Mesa
                 </label>
                 <div className="flex flex-wrap gap-2">
@@ -665,8 +665,8 @@ export function MesaDetalheModal({
                       type="button"
                       onClick={() => setClienteDestino(c.nomeCliente)}
                       className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${clienteDestino === c.nomeCliente
-                          ? "bg-rose-600 border-rose-500 text-white"
-                          : "bg-neutral-800 border-neutral-700 text-neutral-300 hover:text-white"
+                          ? "bg-primary border-primary text-primary-foreground shadow-xs"
+                          : "bg-muted/40 border-border text-foreground hover:bg-muted"
                         }`}
                     >
                       {c.nomeCliente}
@@ -676,8 +676,8 @@ export function MesaDetalheModal({
                     type="button"
                     onClick={() => setClienteDestino("")}
                     className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${!clienteDestino
-                        ? "bg-rose-600 border-rose-500 text-white"
-                        : "bg-neutral-800 border-neutral-700 text-neutral-300 hover:text-white"
+                        ? "bg-primary border-primary text-primary-foreground shadow-xs"
+                        : "bg-muted/40 border-border text-foreground hover:bg-muted"
                       }`}
                   >
                     + Novo Cliente
@@ -690,7 +690,7 @@ export function MesaDetalheModal({
                       value={clienteDestino}
                       placeholder="Digite o nome do novo cliente (ex: João)"
                       onChange={(e) => setClienteDestino(e.target.value)}
-                      className="h-10 bg-neutral-950 border-neutral-800 rounded-xl text-xs"
+                      className="h-10 bg-background border-input text-foreground rounded-xl text-xs"
                     />
                   </div>
                 )}
@@ -698,134 +698,134 @@ export function MesaDetalheModal({
 
               {/* Seleção do Item do Cardápio */}
               <div className="space-y-2">
-                  <label className="text-xs font-bold text-neutral-300">
-                    Selecione o Item do Cardápio
-                  </label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-56 overflow-y-auto p-1">
-                    {CARDAPIO_DEMO.map((item) => (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => setItemSelecionado(item)}
-                        className={`p-3 rounded-xl border text-left flex justify-between items-center transition-all ${itemSelecionado?.id === item.id
-                            ? "bg-rose-600/20 border-rose-500 text-white"
-                            : "bg-neutral-950 border-neutral-800 text-neutral-300 hover:border-neutral-700"
-                          }`}
-                      >
-                        <div>
-                          <div className="text-xs font-bold">{item.nome}</div>
-                          <div className="text-[10px] text-neutral-400">
-                            {item.precoBase.toLocaleString("pt-BR", {
-                              style: "currency",
-                              currency: "BRL",
-                            })}
-                          </div>
+                <label className="text-xs font-bold text-foreground">
+                  Selecione o Item do Cardápio
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-56 overflow-y-auto p-1">
+                  {CARDAPIO_DEMO.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setItemSelecionado(item)}
+                      className={`p-3 rounded-xl border text-left flex justify-between items-center transition-all ${itemSelecionado?.id === item.id
+                          ? "bg-primary/10 border-primary text-foreground shadow-xs"
+                          : "bg-card border-border text-muted-foreground hover:border-primary/40 hover:bg-muted/40"
+                        }`}
+                    >
+                      <div>
+                        <div className="text-xs font-bold text-foreground">{item.nome}</div>
+                        <div className="text-[10px] text-muted-foreground">
+                          {item.precoBase.toLocaleString("pt-BR", {
+                            style: "currency",
+                            currency: "BRL",
+                          })}
                         </div>
-                        {itemSelecionado?.id === item.id && (
-                          <CheckCircle2 className="w-4 h-4 text-rose-500" />
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {itemSelecionado && (
-                  <div className="p-4 bg-neutral-950 rounded-2xl border border-neutral-800 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-white">{itemSelecionado.nome}</span>
-                      {/* Controle de Quantidade */}
-                      <div className="flex items-center gap-2 bg-neutral-900 rounded-xl p-1 border border-neutral-800">
-                        <button
-                          type="button"
-                          onClick={() => setQuantidade((q) => Math.max(1, q - 1))}
-                          className="w-7 h-7 flex items-center justify-center font-bold text-xs hover:bg-neutral-800 rounded"
-                        >
-                          -
-                        </button>
-                        <span className="w-6 text-center text-xs font-bold">{quantidade}</span>
-                        <button
-                          type="button"
-                          onClick={() => setQuantidade((q) => q + 1)}
-                          className="w-7 h-7 flex items-center justify-center font-bold text-xs hover:bg-neutral-800 rounded"
-                        >
-                          +
-                        </button>
                       </div>
-                    </div>
-
-                    <Input
-                      placeholder="Observação (ex: Sem cebola, gelo à parte)"
-                      value={obsItem}
-                      onChange={(e) => setObsItem(e.target.value)}
-                      className="h-10 bg-neutral-900 border-neutral-800 rounded-xl text-xs"
-                    />
-
-                    <Button
-                      type="button"
-                      onClick={handleConfirmarLancamento}
-                      className="w-full h-11 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2"
-                    >
-                      <Plus className="w-4 h-4" />
-                      <span>
-                        Adicionar na Mesa (
-                        {(itemSelecionado.precoBase * quantidade).toLocaleString("pt-BR", {
-                          style: "currency",
-                          currency: "BRL",
-                        })}
-                        )
-                      </span>
-                    </Button>
-                  </div>
-                )}
+                      {itemSelecionado?.id === item.id && (
+                        <CheckCircle2 className="w-4 h-4 text-primary" />
+                      )}
+                    </button>
+                  ))}
+                </div>
               </div>
-          )}
 
-              {/* 3. ABA: QR CODE E LINK DA MESA FÍSICA */}
-              {abaInterna === "qrcode" && (
-                <div className="max-w-md mx-auto text-center space-y-4">
-                  <div className="p-6 bg-white rounded-3xl inline-block shadow-xl">
-                    <QRCodeSVG
-                      value={urlCompleta}
-                      size={200}
-                      level="H"
-                      includeMargin={true}
-                      className="rounded-lg"
-                    />
-                  </div>
-
-                  <div>
-                    <h4 className="text-base font-bold text-white">QR Code Físico da Mesa {mesa.numero}</h4>
-                    <p className="text-xs text-neutral-400 mt-1">
-                      Imprima e cole este código na mesa física. O cliente escaneia com o celular e abre o cardápio automaticamente já vinculado à Mesa {mesa.numero}.
-                    </p>
-                  </div>
-
-                  <div className="flex justify-center gap-3 pt-2">
-                    <Link href={urlMesa} target="_blank">
-                      <Button
-                        variant="outline"
-                        className="h-10 px-4 text-xs font-bold border-neutral-700 bg-neutral-800 hover:bg-neutral-700 text-rose-400 rounded-xl flex items-center gap-2"
+              {itemSelecionado && (
+                <div className="p-4 bg-muted/20 rounded-2xl border border-border space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-foreground">{itemSelecionado.nome}</span>
+                    {/* Controle de Quantidade */}
+                    <div className="flex items-center gap-2 bg-background rounded-xl p-1 border border-border">
+                      <button
+                        type="button"
+                        onClick={() => setQuantidade((q) => Math.max(1, q - 1))}
+                        className="w-7 h-7 flex items-center justify-center font-bold text-xs hover:bg-muted rounded text-foreground"
                       >
-                        <ExternalLink className="w-3.5 h-3.5" />
-                        <span>Testar como Cliente</span>
-                      </Button>
-                    </Link>
-
-                    <Button
-                      type="button"
-                      onClick={() => {
-                        if (typeof window !== "undefined") {
-                          window.print();
-                        }
-                      }}
-                      className="h-10 px-4 text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white rounded-xl flex items-center gap-2"
-                    >
-                      <QrCode className="w-3.5 h-3.5" />
-                      <span>Imprimir QR Code</span>
-                    </Button>
+                        -
+                      </button>
+                      <span className="w-6 text-center text-xs font-bold text-foreground">{quantidade}</span>
+                      <button
+                        type="button"
+                        onClick={() => setQuantidade((q) => q + 1)}
+                        className="w-7 h-7 flex items-center justify-center font-bold text-xs hover:bg-muted rounded text-foreground"
+                      >
+                        +
+                      </button>
+                    </div>
                   </div>
+
+                  <Input
+                    placeholder="Observação (ex: Sem cebola, gelo à parte)"
+                    value={obsItem}
+                    onChange={(e) => setObsItem(e.target.value)}
+                    className="h-10 bg-background border-input text-foreground rounded-xl text-xs"
+                  />
+
+                  <Button
+                    type="button"
+                    onClick={handleConfirmarLancamento}
+                    className="w-full h-11 bg-primary hover:bg-primary/90 text-primary-foreground font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-xs"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>
+                      Adicionar na Mesa (
+                      {(itemSelecionado.precoBase * quantidade).toLocaleString("pt-BR", {
+                        style: "currency",
+                        currency: "BRL",
+                      })}
+                      )
+                    </span>
+                  </Button>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* 3. ABA: QR CODE E LINK DA MESA FÍSICA */}
+          {abaInterna === "qrcode" && (
+            <div className="max-w-md mx-auto text-center space-y-4">
+              <div className="p-6 bg-white rounded-3xl inline-block shadow-lg border border-border">
+                <QRCodeSVG
+                  value={urlCompleta}
+                  size={200}
+                  level="H"
+                  includeMargin={true}
+                  className="rounded-lg"
+                />
+              </div>
+
+              <div>
+                <h4 className="text-base font-bold text-foreground">QR Code Físico da Mesa {mesa.numero}</h4>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Imprima e cole este código na mesa física. O cliente escaneia com o celular e abre o cardápio automaticamente já vinculado à Mesa {mesa.numero}.
+                </p>
+              </div>
+
+              <div className="flex justify-center gap-3 pt-2">
+                <Link href={urlMesa} target="_blank">
+                  <Button
+                    variant="outline"
+                    className="h-10 px-4 text-xs font-bold border-border bg-card hover:bg-muted text-primary rounded-xl flex items-center gap-2 shadow-xs"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    <span>Testar como Cliente</span>
+                  </Button>
+                </Link>
+
+                <Button
+                  type="button"
+                  onClick={() => {
+                    if (typeof window !== "undefined") {
+                      window.print();
+                    }
+                  }}
+                  className="h-10 px-4 text-xs font-bold bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl flex items-center gap-2 shadow-xs"
+                >
+                  <QrCode className="w-3.5 h-3.5" />
+                  <span>Imprimir QR Code</span>
+                </Button>
+              </div>
+            </div>
+          )}
             </div>
       </DialogContent>
     </Dialog>
