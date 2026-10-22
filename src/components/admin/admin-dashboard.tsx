@@ -28,6 +28,7 @@ import { ModificadorBuilder } from "./modificador-builder";
 import { MAYA_MEDIA_LIBRARY } from "@/lib/maya-media-library";
 import { TEMAS_DISPONIVEIS, FAMILIAS_TEMAS, type TemaId } from "@/lib/tema";
 import { SeletorDeTemas } from "./seletor-de-temas";
+import { SeletorTemaRapido } from "@/components/ui/seletor-tema-rapido";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -804,18 +805,18 @@ export function AdminDashboard() {
   const classeTemaAtual = defTemaAtual?.classe || "";
 
   return (
-    <div className={`min-h-screen ${classeTemaAtual} bg-background text-foreground flex flex-col transition-colors duration-200`}>
+    <div className="min-h-screen bg-background text-foreground flex flex-col transition-colors duration-200">
       {/* BARRA SUPERIOR DO PAINEL */}
-      <header className="p-4 sm:p-6 bg-neutral-900 border-b border-neutral-800 flex flex-wrap items-center justify-between gap-4">
+      <header className="p-4 sm:p-6 bg-card border-b border-border flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-rose-600 flex items-center justify-center font-black shadow-md">
+          <div className="w-10 h-10 rounded-2xl bg-rose-600 flex items-center justify-center font-black text-white shadow-md">
             M
           </div>
           <div>
             <h1 className="text-lg sm:text-xl font-black tracking-tight leading-tight">
               {restaurante?.nome || "Painel MAYaMenu"}
             </h1>
-            <p className="text-xs text-neutral-400">Administração & Operação Alpha</p>
+            <p className="text-xs text-muted-foreground">Administração & Operação Alpha</p>
           </div>
         </div>
 
@@ -825,7 +826,7 @@ export function AdminDashboard() {
           <Button
             type="button"
             onClick={() => setScannerBalcaoAberto(true)}
-            className="bg-amber-500 hover:bg-amber-400 text-neutral-950 font-black text-xs h-10 px-3.5 rounded-xl flex items-center gap-2 shadow-lg shadow-amber-950/40 transition-all active:scale-95"
+            className="bg-amber-500 hover:bg-amber-400 text-neutral-950 font-black text-xs h-10 px-3.5 rounded-xl flex items-center gap-2 shadow-xs transition-all active:scale-95"
             title="Escanear comanda do cliente no balcão para baixa imediata"
           >
             <QrCode className="w-4 h-4 text-neutral-950" />
@@ -835,7 +836,7 @@ export function AdminDashboard() {
           <Link href="/cozinha" target="_blank">
             <Button
               variant="outline"
-              className="bg-neutral-800 border-neutral-700 hover:bg-neutral-700 text-amber-400 hover:text-amber-300 font-bold text-xs h-10 rounded-xl flex items-center gap-2"
+              className="bg-card border-border hover:bg-muted text-amber-500 font-bold text-xs h-10 rounded-xl flex items-center gap-2"
             >
               <ChefHat className="w-4 h-4" />
               <span>Abrir KDS Cozinha</span>
@@ -846,13 +847,16 @@ export function AdminDashboard() {
           <Link href={`${urlPublica}?mesa=1`} target="_blank">
             <Button
               variant="outline"
-              className="bg-neutral-800 border-neutral-700 hover:bg-neutral-700 text-white font-bold text-xs h-10 rounded-xl flex items-center gap-2"
+              className="bg-card border-border hover:bg-muted text-foreground font-bold text-xs h-10 rounded-xl flex items-center gap-2"
             >
               <Smartphone className="w-4 h-4 text-rose-500" />
               <span>Ver Cardápio PWA</span>
               <ExternalLink className="w-3 h-3 opacity-60" />
             </Button>
           </Link>
+
+          {/* SELETOR DE CONFORTO VISUAL DO TERMINAL DO OPERADOR */}
+          <SeletorTemaRapido rotulo="Tema Painel" />
 
           {/* SELETOR RÁPIDO DE TEMA DO RESTAURANTE */}
           <div className="flex items-center gap-1.5 bg-neutral-800/90 border border-neutral-700/80 rounded-xl px-2 h-10 shadow-sm">
@@ -925,15 +929,15 @@ export function AdminDashboard() {
       )}
 
       {/* NAVEGAÇÃO DE ABAS */}
-      <div className="border-b border-neutral-800 px-4 sm:px-6 bg-neutral-900/50">
+      <div className="border-b border-border px-4 sm:px-6 bg-card/60">
         <div className="flex items-center gap-2 max-w-5xl mx-auto overflow-x-auto">
           <button
             type="button"
             onClick={() => setAbaAtiva("cardapio")}
             className={`py-3.5 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 ${
               abaAtiva === "cardapio"
-                ? "border-rose-500 text-white"
-                : "border-transparent text-neutral-400 hover:text-neutral-200"
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground"
             }`}
           >
             <UtensilsCrossed className="w-4 h-4" />
@@ -945,8 +949,8 @@ export function AdminDashboard() {
             onClick={() => setAbaAtiva("mesas")}
             className={`py-3.5 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 ${
               abaAtiva === "mesas"
-                ? "border-rose-500 text-white"
-                : "border-transparent text-neutral-400 hover:text-neutral-200"
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground"
             }`}
           >
             <QrCode className="w-4 h-4" />
@@ -958,14 +962,14 @@ export function AdminDashboard() {
             onClick={() => setAbaAtiva("analytics")}
             className={`py-3.5 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 relative ${
               abaAtiva === "analytics"
-                ? "border-rose-500 text-white"
-                : "border-transparent text-neutral-400 hover:text-neutral-200"
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground"
             }`}
           >
-            <BarChart3 className="w-4 h-4 text-amber-400" />
+            <BarChart3 className="w-4 h-4 text-amber-500" />
             <span className="flex items-center gap-1.5">
               MAYa Inteligência
-              <Badge className="bg-amber-500/20 text-amber-400 border border-amber-500/40 text-[9px] font-black uppercase px-1.5 py-0">
+              <Badge className="bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 text-[9px] font-black uppercase px-1.5 py-0">
                 PRO 🚀
               </Badge>
             </span>
@@ -1034,29 +1038,29 @@ export function AdminDashboard() {
                           return (
                             <div
                               key={item.id}
-                              className={`p-3.5 sm:p-4 rounded-2xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                              className={`p-3.5 sm:p-4 rounded-2xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs ${
                                 item.ativo
-                                  ? "bg-neutral-900 border-neutral-800 hover:border-neutral-750"
-                                  : "bg-neutral-900/40 border-neutral-800/50 opacity-60"
+                                  ? "bg-card border-border hover:border-primary/40"
+                                  : "bg-card/40 border-border/50 opacity-60"
                               }`}
                             >
                               <div className="flex items-center gap-3 min-w-0">
                                 {item.fotoUrl && (
-                                  <div className="relative w-14 h-14 rounded-xl overflow-hidden bg-neutral-800 flex-shrink-0 border border-neutral-800">
+                                  <div className="relative w-14 h-14 rounded-xl overflow-hidden bg-muted flex-shrink-0 border border-border">
                                     <Image src={item.fotoUrl} alt={item.nome} fill className="object-cover" />
                                   </div>
                                 )}
                                 <div className="min-w-0">
                                   <div className="flex items-center gap-2">
-                                    <h4 className="text-sm font-bold text-white truncate">{item.nome}</h4>
-                                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-400 border border-neutral-700">
+                                    <h4 className="text-sm font-bold text-foreground truncate">{item.nome}</h4>
+                                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-muted text-muted-foreground border border-border">
                                       #{idx + 1}
                                     </span>
                                   </div>
-                                  <p className="text-xs text-neutral-400 truncate max-w-md mt-0.5">
+                                  <p className="text-xs text-muted-foreground truncate max-w-md mt-0.5">
                                     {item.descricao}
                                   </p>
-                                  <span className="text-xs font-black text-rose-400 mt-1 block">
+                                  <span className="text-xs font-black text-primary mt-1 block">
                                     {item.precoBase.toLocaleString("pt-BR", {
                                       style: "currency",
                                       currency: "BRL",
@@ -1065,15 +1069,15 @@ export function AdminDashboard() {
                                 </div>
                               </div>
 
-                              <div className="flex items-center justify-between sm:justify-end gap-2.5 pt-2 sm:pt-0 border-t sm:border-t-0 border-neutral-800/60">
+                              <div className="flex items-center justify-between sm:justify-end gap-2.5 pt-2 sm:pt-0 border-t sm:border-t-0 border-border">
                                 {/* CONTROLES TÁTEIS DE ORDENAÇÃO */}
-                                <div className="flex items-center gap-1 bg-neutral-950/80 border border-neutral-800 p-1 rounded-xl">
+                                <div className="flex items-center gap-1 bg-muted/60 border border-border p-1 rounded-xl">
                                   <button
                                     type="button"
                                     onClick={() => handleMoverItem(item, "cima")}
                                     disabled={ehPrimeiro}
                                     title="Mover para cima"
-                                    className="p-1.5 rounded-lg text-neutral-300 hover:text-white hover:bg-neutral-800 disabled:opacity-30 disabled:pointer-events-none transition-all active:scale-90"
+                                    className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-30 disabled:pointer-events-none transition-all active:scale-90"
                                   >
                                     <ArrowUp className="w-3.5 h-3.5" />
                                   </button>
@@ -1082,7 +1086,7 @@ export function AdminDashboard() {
                                     onClick={() => handleMoverItem(item, "baixo")}
                                     disabled={ehUltimo}
                                     title="Mover para baixo"
-                                    className="p-1.5 rounded-lg text-neutral-300 hover:text-white hover:bg-neutral-800 disabled:opacity-30 disabled:pointer-events-none transition-all active:scale-90"
+                                    className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-30 disabled:pointer-events-none transition-all active:scale-90"
                                   >
                                     <ArrowDown className="w-3.5 h-3.5" />
                                   </button>
@@ -1091,7 +1095,7 @@ export function AdminDashboard() {
                                     onClick={() => handleFixarTopo(item)}
                                     disabled={ehPrimeiro}
                                     title="Destacar no Topo desta categoria"
-                                    className="px-2 py-1 rounded-lg text-[10px] font-black uppercase text-amber-400 hover:text-amber-300 hover:bg-amber-500/10 disabled:opacity-30 disabled:pointer-events-none transition-all flex items-center gap-1"
+                                    className="px-2 py-1 rounded-lg text-[10px] font-black uppercase text-amber-500 hover:bg-amber-500/10 disabled:opacity-30 disabled:pointer-events-none transition-all flex items-center gap-1"
                                   >
                                     <Pin className="w-3 h-3" />
                                     <span>Topo</span>
@@ -1103,14 +1107,14 @@ export function AdminDashboard() {
                                   <button
                                     type="button"
                                     onClick={() => handleEditarPrato(item)}
-                                    className="px-2.5 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 hover:text-white rounded-lg text-xs font-semibold transition-colors"
+                                    className="px-2.5 py-1.5 bg-muted hover:bg-muted/80 text-foreground rounded-lg text-xs font-semibold transition-colors border border-border"
                                   >
                                     Editar
                                   </button>
                                   <button
                                     type="button"
                                     onClick={() => handleExcluirPrato(item.id, item.fotoUrl)}
-                                    className="p-1.5 bg-red-950/40 hover:bg-red-900/60 text-red-400 rounded-lg text-xs transition-colors"
+                                    className="p-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg text-xs transition-colors border border-red-500/20"
                                     title="Excluir item"
                                   >
                                     <Trash2 className="w-3.5 h-3.5" />
@@ -1172,16 +1176,16 @@ export function AdminDashboard() {
                   <div
                     key={num}
                     onClick={() => handleAbrirMesa(num)}
-                    className={`p-4 rounded-2xl border text-left transition-all flex flex-col justify-between min-h-[140px] group relative overflow-hidden cursor-pointer select-none active:scale-[0.98] ${
+                    className={`p-4 rounded-2xl border text-left transition-all flex flex-col justify-between min-h-[140px] group relative overflow-hidden cursor-pointer select-none active:scale-[0.98] shadow-xs ${
                       ehChamado
                         ? "bg-amber-950/40 border-amber-400 ring-2 ring-amber-400/50 shadow-xl shadow-amber-950/60 animate-pulse"
                         : mesa.status === "conta_pedida"
-                        ? "bg-rose-950/40 border-rose-500/60 hover:border-rose-400 shadow-lg shadow-rose-950/50"
+                        ? "bg-rose-950/20 border-rose-500/60 hover:border-rose-400 shadow-md"
                         : mesa.status === "paga_ocupada"
-                        ? "bg-emerald-950/40 border-emerald-500/80 ring-1 ring-emerald-500/40 shadow-lg shadow-emerald-950/50 hover:border-emerald-400"
+                        ? "bg-emerald-950/20 border-emerald-500/80 ring-1 ring-emerald-500/40 shadow-md hover:border-emerald-400"
                         : mesa.status === "ocupada"
-                        ? "bg-neutral-900 border-amber-500/40 hover:border-amber-400 shadow-md"
-                        : "bg-neutral-900/60 border-neutral-800 hover:border-neutral-700"
+                        ? "bg-card border-amber-500/50 hover:border-amber-500"
+                        : "bg-card/40 border-border hover:border-primary/40"
                     }`}
                   >
                     {/* Indicador de Status Superior */}
@@ -1196,7 +1200,7 @@ export function AdminDashboard() {
                             ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/40"
                             : mesa.status === "ocupada"
                             ? "bg-amber-500 text-neutral-950 font-black shadow-md"
-                            : "bg-neutral-800 text-neutral-400 group-hover:bg-neutral-700"
+                            : "bg-muted text-muted-foreground group-hover:bg-muted/80"
                         }`}
                       >
                         {num}
@@ -1214,12 +1218,12 @@ export function AdminDashboard() {
                           variant="outline"
                           className={`text-[9px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full ${
                             mesa.status === "conta_pedida"
-                              ? "bg-rose-500/20 text-rose-300 border-rose-500/40"
+                              ? "bg-rose-500/20 text-rose-500 border-rose-500/40"
                               : mesa.status === "paga_ocupada"
-                              ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40 font-black"
+                              ? "bg-emerald-500/20 text-emerald-600 dark:text-emerald-300 border-emerald-500/40 font-black"
                               : mesa.status === "ocupada"
-                              ? "bg-amber-500/20 text-amber-300 border-amber-500/40"
-                              : "bg-neutral-800 text-neutral-500 border-neutral-700"
+                              ? "bg-amber-500/20 text-amber-600 dark:text-amber-300 border-amber-500/40"
+                              : "bg-muted text-muted-foreground border-border"
                           }`}
                         >
                           {mesa.status === "conta_pedida"
@@ -1241,7 +1245,7 @@ export function AdminDashboard() {
 
                     {/* Resumo da Mesa */}
                     <div className="mt-3">
-                      <span className="text-xs font-bold text-white block">Mesa {num}</span>
+                      <span className="text-xs font-bold text-foreground block">Mesa {num}</span>
                       {mesa.status !== "livre" ? (
                         <div className="mt-1">
                           {mesa.comandas.length > 0 ? (
@@ -1252,7 +1256,7 @@ export function AdminDashboard() {
                               taxaServicoPercentual={restaurante?.configuracoes?.taxaServico ?? 10}
                             />
                           ) : (
-                            <span className="text-sm font-black text-rose-400 block leading-none">R$ 0,00</span>
+                            <span className="text-sm font-black text-primary block leading-none">R$ 0,00</span>
                           )}
                           <span className="text-[10px] text-neutral-400 flex items-center gap-1 mt-1 font-medium">
                             <Users className="w-3 h-3 text-neutral-500" />
@@ -1274,7 +1278,7 @@ export function AdminDashboard() {
 
         {/* ABA: MAYA INTELIGÊNCIA / ANALYTICS (PREMIUM UPSELL) */}
         {abaAtiva === "analytics" && (
-          <div className="relative min-h-[640px] rounded-3xl overflow-hidden border border-neutral-800 bg-neutral-950/60 p-4 sm:p-8">
+          <div className="relative min-h-[640px] rounded-3xl overflow-hidden border border-border bg-card p-4 sm:p-8 shadow-sm">
             {/* CONTEÚDO DOS RELATÓRIOS (Desfocado apenas se for plano Free) */}
             {(() => {
               const planoAtual = getPlanoRestaurante(restaurante);
@@ -1290,27 +1294,27 @@ export function AdminDashboard() {
                     }`}
                   >
                     {/* Sub-Navegação: Geral vs Laboratório de Salão */}
-                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-neutral-800">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-border">
                       <div>
-                        <h3 className="text-lg font-black text-white flex items-center gap-2">
-                          <BarChart3 className="w-5 h-5 text-rose-500" />
+                        <h3 className="text-lg font-black text-foreground flex items-center gap-2">
+                          <BarChart3 className="w-5 h-5 text-primary" />
                           MAYa Inteligência Operacional
                         </h3>
-                        <p className="text-xs text-neutral-400">
+                        <p className="text-xs text-muted-foreground">
                           {subAbaAnalytics === "geral"
                             ? "Métricas reais de faturamento consolidado, ticket médio e giro do salão"
                             : "Diagnóstico espacial de ociosidade e atratividade mesa a mesa"}
                         </p>
                       </div>
 
-                      <div className="flex bg-neutral-900 border border-neutral-800 p-1 rounded-xl">
+                      <div className="flex bg-muted/60 border border-border p-1 rounded-xl">
                         <button
                           type="button"
                           onClick={() => setSubAbaAnalytics("geral")}
                           className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
                             subAbaAnalytics === "geral"
-                              ? "bg-rose-600 text-white shadow-sm"
-                              : "text-neutral-400 hover:text-white"
+                              ? "bg-primary text-primary-foreground shadow-xs"
+                              : "text-muted-foreground hover:text-foreground"
                           }`}
                         >
                           Visão Geral
@@ -1320,8 +1324,8 @@ export function AdminDashboard() {
                           onClick={() => setSubAbaAnalytics("laboratorio")}
                           className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 ${
                             subAbaAnalytics === "laboratorio"
-                              ? "bg-purple-600 text-white shadow-sm"
-                              : "text-neutral-400 hover:text-purple-300"
+                              ? "bg-purple-600 text-white shadow-xs"
+                              : "text-muted-foreground hover:text-purple-600 dark:hover:text-purple-300"
                           }`}
                         >
                           <Zap className="w-3.5 h-3.5" />
@@ -1332,14 +1336,14 @@ export function AdminDashboard() {
 
                     {/* ESTADO VAZIO (ZERO SESSÕES CONCLUÍDAS) */}
                     {sessoesHistorico.length === 0 ? (
-                      <div className="p-12 text-center bg-neutral-900/40 border border-neutral-800 rounded-3xl space-y-3">
-                        <div className="w-12 h-12 rounded-2xl bg-neutral-800 flex items-center justify-center text-neutral-500 mx-auto">
+                      <div className="p-12 text-center bg-card/60 border border-border rounded-3xl space-y-3">
+                        <div className="w-12 h-12 rounded-2xl bg-muted flex items-center justify-center text-muted-foreground mx-auto">
                           <BarChart3 className="w-6 h-6" />
                         </div>
-                        <h4 className="text-sm font-bold text-neutral-200">
+                        <h4 className="text-sm font-bold text-foreground">
                           Inteligência em Calibração
                         </h4>
-                        <p className="text-xs text-neutral-500 max-w-md mx-auto leading-relaxed">
+                        <p className="text-xs text-muted-foreground max-w-md mx-auto leading-relaxed">
                           Nenhuma comanda foi encerrada ainda. Conforme as mesas forem ocupadas e fechadas pelos garçons ou clientes, os dados de giro, faturamento real e mapa de calor do salão surgirão aqui sem dados fictícios.
                         </p>
                       </div>
@@ -1355,37 +1359,37 @@ export function AdminDashboard() {
                           <div className="space-y-6">
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                               {/* 1. Faturamento Total Histórico */}
-                              <div className="bg-neutral-900 border border-neutral-800 p-5 rounded-2xl space-y-2">
+                              <div className="bg-card border border-border p-5 rounded-2xl space-y-2 shadow-xs">
                                 <div className="flex justify-between items-start">
-                                  <span className="text-xs font-bold text-neutral-400 uppercase">Faturamento Concluído</span>
-                                  <Badge className="bg-emerald-500/10 text-emerald-400 text-[10px]">Real</Badge>
+                                  <span className="text-xs font-bold text-muted-foreground uppercase">Faturamento Concluído</span>
+                                  <Badge className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-[10px]">Real</Badge>
                                 </div>
-                                <div className="text-3xl font-black text-white">
+                                <div className="text-3xl font-black text-foreground">
                                   {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(totalFaturado)}
                                 </div>
-                                <p className="text-[11px] text-neutral-500">{totalSessoes} comandas encerradas no total</p>
+                                <p className="text-[11px] text-muted-foreground">{totalSessoes} comandas encerradas no total</p>
                               </div>
 
                               {/* 2. Ticket Médio Real */}
-                              <div className="bg-neutral-900 border border-neutral-800 p-5 rounded-2xl space-y-2">
+                              <div className="bg-card border border-border p-5 rounded-2xl space-y-2 shadow-xs">
                                 <div className="flex justify-between items-start">
-                                  <span className="text-xs font-bold text-neutral-400 uppercase">Ticket Médio por Mesa</span>
-                                  <Badge className="bg-rose-500/10 text-rose-400 text-[10px]">Média</Badge>
+                                  <span className="text-xs font-bold text-muted-foreground uppercase">Ticket Médio por Mesa</span>
+                                  <Badge className="bg-primary/10 text-primary border border-primary/20 text-[10px]">Média</Badge>
                                 </div>
-                                <div className="text-3xl font-black text-rose-400">
+                                <div className="text-3xl font-black text-primary">
                                   {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(ticketMedio)}
                                 </div>
-                                <p className="text-[11px] text-neutral-500">{totalClientes} pagantes registrados</p>
+                                <p className="text-[11px] text-muted-foreground">{totalClientes} pagantes registrados</p>
                               </div>
 
                               {/* 3. Giro das Mesas */}
-                              <div className="bg-neutral-900 border border-neutral-800 p-5 rounded-2xl space-y-2">
+                              <div className="bg-card border border-border p-5 rounded-2xl space-y-2 shadow-xs">
                                 <div className="flex justify-between items-start">
-                                  <span className="text-xs font-bold text-neutral-400 uppercase">Atendimentos Concluídos</span>
-                                  <Badge className="bg-blue-500/10 text-blue-400 text-[10px]">Salão</Badge>
+                                  <span className="text-xs font-bold text-muted-foreground uppercase">Atendimentos Concluídos</span>
+                                  <Badge className="bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 text-[10px]">Salão</Badge>
                                 </div>
-                                <div className="text-3xl font-black text-white">{totalSessoes}</div>
-                                <p className="text-[11px] text-neutral-500">Média de {(totalSessoes / Math.max(mesas.length, 1)).toFixed(1)} giros por mesa</p>
+                                <div className="text-3xl font-black text-foreground">{totalSessoes}</div>
+                                <p className="text-[11px] text-muted-foreground">Média de {(totalSessoes / Math.max(mesas.length, 1)).toFixed(1)} giros por mesa</p>
                               </div>
                             </div>
                           </div>
