@@ -61,37 +61,27 @@ export function MesaScannerModal({
             aspectRatio: 1.0,
           },
           (decodedText) => {
-            // Extrai o parâmetro ?mesa=X ou /mesa/X ou número puro
-            let mesaEncontrada: string | number | null = null;
+            let numeroMesa: string | null = null;
 
             try {
-              if (decodedText.startsWith("http://") || decodedText.startsWith("https://")) {
-                const url = new URL(decodedText);
-                const paramMesa = url.searchParams.get("mesa");
-                if (paramMesa) {
-                  mesaEncontrada = paramMesa;
-                }
-              }
+              const url = new URL(decodedText);
+              numeroMesa = url.searchParams.get("mesa");
             } catch {
-              // Não era uma URL completa
-            }
-
-            if (!mesaEncontrada) {
-              const matchMesa = decodedText.match(/(?:mesa[=\/:]\s*|m)(\d+)/i);
-              if (matchMesa && matchMesa[1]) {
-                mesaEncontrada = matchMesa[1];
-              } else if (/^\d+$/.test(decodedText.trim())) {
-                mesaEncontrada = decodedText.trim();
+              const match = decodedText.match(/mesa[=:_\s-]*([0-9a-zA-Z]+)/i);
+              if (match) {
+                numeroMesa = match[1];
+              } else if (/^[0-9]{1,3}$/.test(decodedText.trim())) {
+                numeroMesa = decodedText.trim();
               }
             }
 
-            if (mesaEncontrada) {
-              setMesaLida(mesaEncontrada);
+            if (numeroMesa) {
+              setMesaLida(numeroMesa);
               if (scannerRef.current) {
                 scannerRef.current.stop().catch(() => {});
               }
             } else {
-              setErroCamera("QR Code lido não possui uma identificação de mesa válida.");
+              setErroCamera("QR Code escaneado não contém um número de mesa válido.");
             }
           },
           () => {}
@@ -127,25 +117,25 @@ export function MesaScannerModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-md p-6 bg-neutral-900 text-white rounded-3xl border border-neutral-800 shadow-2xl">
-        <DialogHeader className="flex flex-row items-center justify-between pb-2">
-          <DialogTitle className="text-xl font-black text-white flex items-center gap-2">
-            <QrCode className="w-5 h-5 text-emerald-400" />
+      <DialogContent className="max-w-md p-6 bg-white text-neutral-900 rounded-3xl border-2 border-neutral-200/90 shadow-2xl">
+        <DialogHeader className="flex flex-row items-center justify-between pb-2 border-b border-neutral-100">
+          <DialogTitle className="text-lg font-black text-neutral-950 flex items-center gap-2">
+            <QrCode className="w-5 h-5 text-rose-600" />
             <span>Escanear Mesa</span>
           </DialogTitle>
         </DialogHeader>
 
         {mesaLida ? (
-          <div className="space-y-4 py-3">
-            <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-start gap-3 text-emerald-300">
-              <CheckCircle2 className="w-6 h-6 flex-shrink-0 mt-0.5 text-emerald-400" />
+          <div className="space-y-4 py-2 animate-in fade-in duration-300">
+            <div className="p-4 rounded-2xl bg-emerald-50 border-2 border-emerald-200/90 flex items-start gap-3 text-neutral-950 shadow-xs">
+              <CheckCircle2 className="w-6 h-6 flex-shrink-0 mt-0.5 text-emerald-600" />
               <div>
-                <h4 className="text-sm font-bold text-white">Mesa Identificada com Sucesso!</h4>
-                <p className="text-xs text-neutral-300 mt-1">
-                  Deseja mudar para a <strong className="text-emerald-400 text-sm">Mesa {mesaLida}</strong>?
+                <h4 className="text-sm font-black text-neutral-950">Mesa Identificada com Sucesso!</h4>
+                <p className="text-xs text-neutral-600 mt-0.5">
+                  Deseja mudar para a <strong className="text-emerald-700 text-sm font-black">Mesa {mesaLida}</strong>?
                 </p>
                 {mesaAtual && (
-                  <p className="text-[11px] text-neutral-400 mt-0.5">
+                  <p className="text-[11px] text-neutral-500 font-semibold mt-0.5">
                     Mesa atual: {mesaAtual}
                   </p>
                 )}
@@ -155,31 +145,31 @@ export function MesaScannerModal({
             <Button
               type="button"
               onClick={handleConfirmar}
-              className="w-full h-12 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm shadow-lg shadow-emerald-900/30 flex items-center justify-center gap-2"
+              className="w-full h-12 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-black text-sm shadow-md shadow-rose-600/20 flex items-center justify-center gap-2"
             >
               <MapPin className="w-4 h-4" />
               <span>Confirmar e Mudar para Mesa {mesaLida}</span>
             </Button>
           </div>
         ) : (
-          <div className="space-y-4">
-            <p className="text-xs text-neutral-400 leading-relaxed">
+          <div className="space-y-4 py-1">
+            <p className="text-xs text-neutral-600 leading-relaxed">
               Aponte a câmera para o QR Code da sua mesa para abrir ou transferir sua comanda sem sair do cardápio.
             </p>
 
-            <div className="relative w-full aspect-square bg-black rounded-2xl overflow-hidden border-2 border-dashed border-neutral-700 flex items-center justify-center">
+            <div className="relative w-full aspect-square bg-neutral-950 rounded-2xl overflow-hidden border-2 border-dashed border-neutral-300 flex items-center justify-center shadow-inner">
               <div id={leitorId} className="w-full h-full" />
               {iniciando && (
-                <div className="absolute inset-0 bg-neutral-950/80 flex flex-col items-center justify-center text-xs text-neutral-400 gap-2">
-                  <RefreshCw className="w-5 h-5 animate-spin text-emerald-400" />
-                  <span>Iniciando câmera...</span>
+                <div className="absolute inset-0 bg-white/90 backdrop-blur-sm flex flex-col items-center justify-center text-xs text-neutral-700 gap-2">
+                  <RefreshCw className="w-6 h-6 animate-spin text-rose-600" />
+                  <span className="font-bold">Iniciando câmera...</span>
                 </div>
               )}
             </div>
 
             {erroCamera && (
-              <div className="p-3 bg-red-500/10 border border-red-500/30 text-red-400 text-xs rounded-xl flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+              <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 flex-shrink-0 text-red-600" />
                 <span className="flex-1">{erroCamera}</span>
               </div>
             )}
@@ -188,7 +178,7 @@ export function MesaScannerModal({
               type="button"
               variant="outline"
               onClick={onClose}
-              className="w-full h-11 border-neutral-700 text-neutral-300 hover:bg-neutral-800 rounded-xl text-xs font-bold"
+              className="w-full h-11 border-2 border-neutral-300 text-neutral-700 hover:bg-neutral-100 rounded-xl text-xs font-bold"
             >
               Cancelar
             </Button>

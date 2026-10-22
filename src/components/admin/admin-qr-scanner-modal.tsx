@@ -5,7 +5,7 @@ import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
 import { decodeTicket, type TicketPayload } from "@/lib/ticket";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Camera, CheckCircle2, AlertTriangle, RefreshCw, DollarSign, Store, ShoppingBag } from "lucide-react";
+import { CheckCircle2, AlertTriangle, RefreshCw, DollarSign, Store, ShoppingBag } from "lucide-react";
 
 interface AdminQrScannerModalProps {
   isOpen: boolean;
@@ -129,28 +129,28 @@ export function AdminQrScannerModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-md p-6 bg-neutral-900 text-white rounded-3xl border border-neutral-800 shadow-2xl">
-        <DialogHeader className="flex flex-row items-center justify-between pb-2">
-          <DialogTitle className="text-xl font-black text-white flex items-center gap-2">
-            <Store className="w-5 h-5 text-amber-400" />
+      <DialogContent className="max-w-md p-6 bg-white text-neutral-900 rounded-3xl border-2 border-neutral-200/90 shadow-2xl">
+        <DialogHeader className="flex flex-row items-center justify-between pb-2 border-b border-neutral-100">
+          <DialogTitle className="text-lg font-black text-neutral-950 flex items-center gap-2">
+            <Store className="w-5 h-5 text-rose-600" />
             <span>Leitor de Comanda • Balcão / Caixa</span>
           </DialogTitle>
         </DialogHeader>
 
         {ticketLido ? (
           /* MODAL DE AÇÃO RÁPIDA: CONFIRMAR PAGAMENTO E ENTREGA */
-          <div className="space-y-4 py-3 animate-in fade-in duration-300">
-            <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-start gap-3 text-amber-300">
-              <CheckCircle2 className="w-6 h-6 flex-shrink-0 mt-0.5 text-amber-400" />
-              <div>
-                <h4 className="text-sm font-bold text-white">Comanda Digital Identificada!</h4>
-                <p className="text-xs text-neutral-300 mt-1">
-                  Mesa <strong className="text-white">{ticketLido.t}</strong> • Cliente:{" "}
-                  <strong className="text-white">{ticketLido.c.n}</strong>
+          <div className="space-y-4 py-2 animate-in fade-in duration-300">
+            <div className="p-4 rounded-2xl bg-amber-50 border-2 border-amber-200/90 flex items-start gap-3 text-neutral-900 shadow-xs">
+              <CheckCircle2 className="w-6 h-6 flex-shrink-0 mt-0.5 text-amber-600" />
+              <div className="flex-1">
+                <h4 className="text-sm font-black text-neutral-950">Comanda Digital Identificada!</h4>
+                <p className="text-xs text-neutral-600 mt-0.5">
+                  Mesa <strong className="text-neutral-950 font-bold">{ticketLido.t}</strong> • Cliente:{" "}
+                  <strong className="text-neutral-950 font-bold">{ticketLido.c.n}</strong>
                 </p>
-                <div className="mt-2 p-2 bg-neutral-950/80 rounded-xl border border-neutral-800 flex items-center justify-between">
-                  <span className="text-xs text-neutral-400 font-bold">Total a Pagar / Baixar:</span>
-                  <span className="text-base font-black text-emerald-400 font-mono">
+                <div className="mt-2.5 p-2.5 bg-white rounded-xl border-2 border-amber-200 flex items-center justify-between shadow-xs">
+                  <span className="text-xs text-neutral-600 font-bold">Total a Baixar:</span>
+                  <span className="text-base font-black text-emerald-700 font-mono">
                     {totalCalculado.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
                   </span>
                 </div>
@@ -158,21 +158,21 @@ export function AdminQrScannerModal({
             </div>
 
             {/* LISTA RESUMIDA DOS ITENS */}
-            <div className="p-3 bg-neutral-800/80 rounded-xl space-y-2 max-h-40 overflow-y-auto text-xs border border-neutral-700/50">
-              <span className="text-[10px] uppercase font-bold text-neutral-400 block tracking-wider flex items-center gap-1.5">
-                <ShoppingBag className="w-3.5 h-3.5 text-neutral-400" />
+            <div className="p-3 bg-neutral-50 rounded-xl space-y-2 max-h-40 overflow-y-auto text-xs border-2 border-neutral-200/80">
+              <span className="text-[10px] uppercase font-black text-neutral-600 block tracking-wider flex items-center gap-1.5">
+                <ShoppingBag className="w-3.5 h-3.5 text-neutral-500" />
                 <span>Itens da Comanda ({ticketLido.i.reduce((acc, it) => acc + it.q, 0)})</span>
               </span>
               {ticketLido.i.map((it, idx) => (
-                <div key={idx} className="flex justify-between border-b border-neutral-700/50 pb-1.5 last:border-none">
+                <div key={idx} className="flex justify-between border-b border-neutral-200 pb-1.5 last:border-none">
                   <div>
-                    <span className="font-bold text-white">{it.q}x</span> Item ({it.id})
+                    <span className="font-bold text-neutral-950">{it.q}x</span> Item ({it.id})
                     {it.m && it.m.length > 0 && (
-                      <p className="text-rose-400 text-[11px] font-semibold">
+                      <p className="text-rose-600 text-[11px] font-semibold">
                         {it.m.map(([g, o]) => `${g}: ${o}`).join(", ")}
                       </p>
                     )}
-                    {it.o && <p className="text-amber-400 text-[10px] italic">Obs: {it.o}</p>}
+                    {it.o && <p className="text-amber-700 text-[10px] italic">Obs: {it.o}</p>}
                   </div>
                 </div>
               ))}
@@ -182,36 +182,36 @@ export function AdminQrScannerModal({
               type="button"
               onClick={handleConfirmarBaixa}
               disabled={confirmando}
-              className="w-full h-12 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-sm shadow-xl shadow-emerald-950 flex items-center justify-center gap-2"
+              className="w-full h-12 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-sm shadow-md shadow-emerald-600/20 flex items-center justify-center gap-2"
             >
               <DollarSign className="w-4 h-4" />
               <span>
                 {confirmando
                   ? "Confirmando baixa..."
-                  : `Confirmar Pagamento e Entrega da Mesa ${ticketLido.t} - Total ${totalCalculado.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`}
+                  : `Confirmar Baixa da Mesa ${ticketLido.t} - Total ${totalCalculado.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`}
               </span>
             </Button>
           </div>
         ) : (
           /* SCANNER ATIVO */
-          <div className="space-y-4">
-            <p className="text-xs text-neutral-400 leading-relaxed">
+          <div className="space-y-4 py-1">
+            <p className="text-xs text-neutral-600 leading-relaxed">
               Aponte a câmera para a tela do celular do cliente com o <strong>MAYa Sync-QR</strong> para dar baixa instantânea e receber a comanda no balcão.
             </p>
 
-            <div className="relative w-full aspect-square bg-black rounded-2xl overflow-hidden border-2 border-dashed border-neutral-700 flex items-center justify-center">
+            <div className="relative w-full aspect-square bg-neutral-950 rounded-2xl overflow-hidden border-2 border-dashed border-neutral-300 flex items-center justify-center shadow-inner">
               <div id={leitorId} className="w-full h-full" />
               {iniciando && (
-                <div className="absolute inset-0 bg-neutral-950/80 flex flex-col items-center justify-center text-xs text-neutral-400 gap-2">
-                  <RefreshCw className="w-5 h-5 animate-spin text-amber-400" />
-                  <span>Iniciando câmera do caixa...</span>
+                <div className="absolute inset-0 bg-white/90 backdrop-blur-sm flex flex-col items-center justify-center text-xs text-neutral-700 gap-2">
+                  <RefreshCw className="w-6 h-6 animate-spin text-rose-600" />
+                  <span className="font-bold">Iniciando câmera do caixa...</span>
                 </div>
               )}
             </div>
 
             {erroCamera && (
-              <div className="p-3 bg-red-500/10 border border-red-500/30 text-red-400 text-xs rounded-xl flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+              <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 flex-shrink-0 text-red-600" />
                 <span className="flex-1">{erroCamera}</span>
               </div>
             )}
@@ -220,7 +220,7 @@ export function AdminQrScannerModal({
               type="button"
               variant="outline"
               onClick={onClose}
-              className="w-full h-11 border-neutral-700 text-neutral-300 hover:bg-neutral-800 rounded-xl text-xs font-bold"
+              className="w-full h-11 border-2 border-neutral-300 text-neutral-700 hover:bg-neutral-100 rounded-xl text-xs font-bold"
             >
               Cancelar
             </Button>
