@@ -64,13 +64,17 @@ export function MenuView({ restaurante: restauranteInicial, cardapio: cardapioIn
   const [contaPedidaSucesso, setContaPedidaSucesso] = useState(false);
   const [comandaStatus, setComandaStatus] = useState<string | null>(null);
   const [categoriaAtiva, setCategoriaAtiva] = useState<string>("Todas");
-  const [modoVisualCliente, setModoVisualCliente] = useState<"padrao" | "dia" | "noite" | "descanso">("padrao");
+  const [modoVisualCliente, setModoVisualCliente] = useState<"padrao" | "dia" | "noite" | "descanso">("descanso");
 
-  // Carrega preferência pessoal de visualização do cliente (Dia, Noite, Descanso Visual ou Padrão do Restaurante)
+  // Carrega preferência pessoal de visualização do cliente (Padrão: Descanso de Tela / Conforto Visual)
   useEffect(() => {
     const salvo = localStorage.getItem("mayamenu_modo_visual") as any;
     if (salvo && ["padrao", "dia", "noite", "descanso"].includes(salvo)) {
       setModoVisualCliente(salvo);
+    } else {
+      // Padrão do sistema para o cliente: descanso de tela
+      setModoVisualCliente("descanso");
+      localStorage.setItem("mayamenu_modo_visual", "descanso");
     }
   }, []);
 

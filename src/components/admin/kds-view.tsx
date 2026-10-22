@@ -8,6 +8,7 @@ import { Clock, CheckCircle, ChefHat, Sparkles, AlertTriangle, ArrowRight } from
 import { db } from "@/lib/firebase";
 import { collectionGroup, query, where, onSnapshot } from "firebase/firestore";
 import { escutarPedidosKds, atualizarStatusPedido } from "@/lib/restaurante-service";
+import { SeletorTemaRapido } from "@/components/ui/seletor-tema-rapido";
 
 export interface PedidoKDS {
   id: string; // id do pedido
@@ -282,9 +283,9 @@ export function KdsView({
   const listaExibicao = ordenarLista(listaFiltrada);
 
   return (
-    <div className="min-h-screen bg-neutral-950 text-white p-4 sm:p-6 flex flex-col">
+    <div className="min-h-screen bg-background text-foreground p-4 sm:p-6 flex flex-col">
       {/* BARRA SUPERIOR DO KDS */}
-      <header className="flex flex-wrap items-center justify-between gap-4 pb-6 border-b border-neutral-800">
+      <header className="flex flex-wrap items-center justify-between gap-4 pb-6 border-b border-border">
         <div className="flex items-center gap-3">
           <div className="p-2.5 bg-rose-600 rounded-2xl shadow-lg">
             <ChefHat className="w-6 h-6 text-white" />
@@ -292,59 +293,63 @@ export function KdsView({
           <div>
             <h1 className="text-xl sm:text-2xl font-black tracking-tight flex items-center gap-2">
               <span>KDS da Cozinha</span>
-              <span className="text-xs px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 font-bold">
+              <span className="text-xs px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-500 font-bold">
                 AO VIVO
               </span>
               {modoFilaKds === "agrupamento" ? (
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold uppercase tracking-wider">
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-300 font-bold uppercase tracking-wider">
                   Agrupamento Ágil Pro
                 </span>
               ) : (
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-300 font-bold uppercase tracking-wider">
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground font-bold uppercase tracking-wider">
                   Fila Sequencial (FIFO)
                 </span>
               )}
             </h1>
-            <p className="text-xs text-neutral-400">{nomeRestaurante} • Visão Operacional</p>
+            <p className="text-xs text-muted-foreground">{nomeRestaurante} • Visão Operacional</p>
           </div>
         </div>
 
-        {/* CONTADORES RÁPIDOS E FILTROS */}
-        <div className="flex items-center gap-2 bg-neutral-900 p-1.5 rounded-2xl border border-neutral-800">
-          <button
-            type="button"
-            onClick={() => setFiltro("todos")}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-              filtro === "todos"
-                ? "bg-white text-neutral-950 shadow-sm"
-                : "text-neutral-400 hover:text-white"
-            }`}
-          >
-            Todos ({pedidos.length})
-          </button>
-          <button
-            type="button"
-            onClick={() => setFiltro("a_fazer")}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
-              filtro === "a_fazer"
-                ? "bg-amber-500 text-neutral-950 shadow-sm"
-                : "text-amber-400 hover:text-amber-300"
-            }`}
-          >
-            <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-            A Fazer ({pedidosAFazer.length})
-          </button>
-          <button
-            type="button"
-            onClick={() => setFiltro("pronto")}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-              filtro === "pronto"
-                ? "bg-emerald-500 text-neutral-950 shadow-sm"
-                : "text-emerald-400 hover:text-emerald-300"
-            }`}
-          >
-            Prontos ({pedidosProntos.length})
-          </button>
+        {/* CONTADORES RÁPIDOS, SELETOR DE TEMA E FILTROS */}
+        <div className="flex flex-wrap items-center gap-2.5">
+          <SeletorTemaRapido rotulo="Tema Cozinha" />
+
+          <div className="flex items-center gap-1.5 bg-card p-1.5 rounded-2xl border border-border">
+            <button
+              type="button"
+              onClick={() => setFiltro("todos")}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                filtro === "todos"
+                  ? "bg-primary text-primary-foreground shadow-xs"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Todos ({pedidos.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setFiltro("a_fazer")}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                filtro === "a_fazer"
+                  ? "bg-amber-500 text-neutral-950 shadow-xs"
+                  : "text-amber-500 hover:text-amber-600"
+              }`}
+            >
+              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+              A Fazer ({pedidosAFazer.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setFiltro("pronto")}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                filtro === "pronto"
+                  ? "bg-emerald-600 text-white shadow-xs"
+                  : "text-emerald-500 hover:text-emerald-600"
+              }`}
+            >
+              Prontos ({pedidosProntos.length})
+            </button>
+          </div>
         </div>
       </header>
 

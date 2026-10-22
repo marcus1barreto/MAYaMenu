@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import { SuperAdminView } from "@/components/admin/superadmin-view";
+import { TemaUsuarioProvider } from "@/context/tema-context";
 
 export const metadata: Metadata = {
   title: "Gerência Geral MAYaRAnas | SuperAdmin",
@@ -18,7 +19,9 @@ export default function SuperAdminPage() {
         </div>
       }
     >
-      <SuperAdminView />
+      <TemaUsuarioProvider scope="superadmin">
+        <SuperAdminView />
+      </TemaUsuarioProvider>
     </Suspense>
   );
 }

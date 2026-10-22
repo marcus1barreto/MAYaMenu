@@ -54,6 +54,7 @@ import {
   CalendarPlus,
   Trash2,
 } from "lucide-react";
+import { SeletorTemaRapido } from "@/components/ui/seletor-tema-rapido";
 
 export function SuperAdminView() {
   const [licencas, setLicencas] = useState<Licenca[]>([]);
@@ -298,27 +299,33 @@ export function SuperAdminView() {
   const totalTokensVencidos = licencas.filter((l) => isLicencaVencida(l)).length;
 
   return (
-    <div className="min-h-screen bg-neutral-950 text-white p-4 md:p-8 space-y-8">
+    <div className="min-h-screen bg-background text-foreground p-4 md:p-8 space-y-8">
       {/* HEADER DA GERÊNCIA */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-neutral-800 pb-6">
-        <div>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border pb-6">
+        <div className="flex items-center justify-between w-full md:w-auto">
           <div className="flex items-center gap-3">
             <div className="p-2.5 bg-rose-600/20 border border-rose-500/30 rounded-2xl text-rose-500">
               <ShieldCheck className="w-7 h-7" />
             </div>
             <div>
               <h1 className="text-2xl md:text-3xl font-black tracking-tight flex items-center gap-2">
-                MAYaRAnas <span className="text-neutral-500 font-normal">| Gerência Geral</span>
+                MAYaRAnas <span className="opacity-60 font-normal">| Gerência Geral</span>
               </h1>
-              <p className="text-xs text-neutral-400">
+              <p className="text-xs opacity-75">
                 Central de Concessões, Emissão de Licenças e Controle de Estabelecimentos
               </p>
             </div>
           </div>
+          <div className="md:hidden">
+            <SeletorTemaRapido rotulo="Tema" />
+          </div>
         </div>
 
-        {/* METRICAS RÁPIDAS */}
-        <div className="flex items-center gap-3">
+        {/* METRICAS RÁPIDAS & SELETOR DE TEMA */}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="hidden md:block">
+            <SeletorTemaRapido rotulo="Tema SuperAdmin" />
+          </div>
           <div
             onClick={() => setAbaAtiva("restaurantes")}
             className="px-4 py-2 bg-neutral-900 border border-neutral-800 rounded-2xl text-center cursor-pointer hover:border-neutral-700 transition-colors"

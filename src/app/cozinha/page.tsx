@@ -5,7 +5,7 @@ import { KdsView } from "@/components/admin/kds-view";
 import { AdminLoginForm } from "@/components/admin/admin-login-form";
 
 import { PinLockGuard } from "@/components/salao/pin-lock-guard";
-import { resolverClasseTemaRestaurante } from "@/lib/tema";
+import { TemaUsuarioProvider } from "@/context/tema-context";
 
 function CozinhaPageContent() {
   const { user, restaurante, carregando } = useAuth();
@@ -33,10 +33,8 @@ function CozinhaPageContent() {
     );
   }
 
-  const classeTema = resolverClasseTemaRestaurante(restaurante);
-
   return (
-    <div className={`min-h-screen ${classeTema} bg-background text-foreground transition-colors duration-200`}>
+    <TemaUsuarioProvider scope="cozinha" fallbackTemaRestaurante={restaurante?.configuracoes?.tema}>
       <PinLockGuard role="cozinha">
         <KdsView
           restauranteId={restaurante?.id}
@@ -45,7 +43,7 @@ function CozinhaPageContent() {
           modoFilaKds={restaurante?.configuracoes?.modoFilaKds || "sequencial"}
         />
       </PinLockGuard>
-    </div>
+    </TemaUsuarioProvider>
   );
 }
 

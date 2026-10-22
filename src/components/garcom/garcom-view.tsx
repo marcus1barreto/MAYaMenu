@@ -43,6 +43,7 @@ import {
   lancarItemManualFirestore,
   atualizarStatusPedido,
 } from "@/lib/restaurante-service";
+import { SeletorTemaRapido } from "@/components/ui/seletor-tema-rapido";
 
 // Item de comanda exibido no salão. `refPath` e `statusPedido` vêm do pedido (rodada) de origem
 // e permitem marcar o item como entregue diretamente no Firestore.
@@ -573,27 +574,29 @@ export function GarcomView({
   }
 
   return (
-    <div className="min-h-screen bg-neutral-950 text-white p-4 sm:p-6 flex flex-col">
+    <div className="min-h-screen bg-background text-foreground p-4 sm:p-6 flex flex-col">
       {/* CABEÇALHO DA VISÃO DO GARÇOM */}
-      <header className="flex flex-wrap items-center justify-between gap-4 pb-6 border-b border-neutral-800">
+      <header className="flex flex-wrap items-center justify-between gap-4 pb-6 border-b border-border">
         <div className="flex items-center gap-3">
           <div className="p-2.5 bg-rose-600 rounded-2xl shadow-lg">
             <Receipt className="w-6 h-6 text-white" />
           </div>
           <div>
             <h1 className="text-xl sm:text-2xl font-black tracking-tight">Mapa de Mesas do Salão</h1>
-            <p className="text-xs text-neutral-400">
+            <p className="text-xs text-muted-foreground">
               {nomeRestaurante} • Visão do Garçom & Fechamento de Contas
             </p>
           </div>
         </div>
 
-        {/* BOTÃO DE CONTINGÊNCIA: LER QR CODE */}
-        <div className="flex items-center gap-3">
+        {/* SELETOR DE TEMA DO GARÇOM & BOTÃO DE CONTINGÊNCIA */}
+        <div className="flex flex-wrap items-center gap-3">
+          <SeletorTemaRapido rotulo="Tema Garçom" />
+
           <Button
             type="button"
             onClick={() => setScannerAberto(true)}
-            className="h-11 px-4 bg-neutral-900 border border-neutral-700 hover:bg-neutral-800 text-rose-400 hover:text-rose-300 font-bold text-xs rounded-xl flex items-center gap-2 shadow-lg"
+            className="h-10 px-4 bg-card border border-border hover:bg-muted text-rose-500 font-bold text-xs rounded-xl flex items-center gap-2 shadow-xs transition-all"
           >
             <QrCode className="w-4 h-4 text-rose-500" />
             <span>Ler QR Code (Contingência)</span>
