@@ -69,16 +69,10 @@ export default function LandingPage() {
           <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
             <Link
               href="/admin"
-              className="inline-flex items-center gap-1.5 px-2.5 sm:px-3.5 py-2 text-xs sm:text-sm font-semibold text-neutral-700 hover:text-neutral-950 rounded-xl hover:bg-neutral-100 border border-neutral-200 transition-all"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs sm:text-sm font-semibold text-neutral-800 hover:text-neutral-950 rounded-xl hover:bg-neutral-100 border border-neutral-200/90 transition-all shadow-xs"
             >
               <LogIn className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-neutral-500" />
-              <span>Login</span>
-            </Link>
-            <Link
-              href="#precos"
-              className="inline-flex items-center justify-center px-3 sm:px-4 py-2 text-xs sm:text-sm font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-sm hover:shadow-md active:scale-95 transition-all whitespace-nowrap"
-            >
-              Começar Agora
+              <span>Acessar Painel</span>
             </Link>
           </div>
         </div>
@@ -93,7 +87,7 @@ export default function LandingPage() {
               {/* Badge Superior */}
               <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-rose-50 border border-rose-200 text-xs font-bold text-rose-700 mb-4 sm:mb-5 shadow-xs">
                 <Sparkles className="w-3.5 h-3.5 text-rose-600 shrink-0" />
-                <span>✨ Vagas Abertas para Membros Fundadores</span>
+                <span>✨ Experimente a versão free</span>
               </div>
 
               {/* Título H1 M3 Headline */}
@@ -112,13 +106,13 @@ export default function LandingPage() {
 
               {/* CTAs de Conversão (Áreas de toque mínimas de 44px) */}
               <div className="mt-7 sm:mt-8 flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
-                <a
-                  href="#precos"
+                <Link
+                  href="/admin"
                   className="inline-flex items-center justify-center gap-2 px-6 sm:px-7 py-3.5 text-sm sm:text-base font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-lg shadow-rose-600/25 active:scale-95 transition-all group text-center"
                 >
-                  <span>Garanta a Solução para o seu Negócio</span>
+                  <span>Experimente a versão free</span>
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform shrink-0" />
-                </a>
+                </Link>
 
                 <Link
                   href="/admin"
@@ -301,25 +295,23 @@ export default function LandingPage() {
                   </div>
                 </div>
 
-                {/* Card Secundário: Programa Fundadores */}
+                {/* Card Secundário: Versão Free */}
                 <div className="md:col-span-5 flex flex-col items-center justify-center p-6 rounded-2xl bg-neutral-50 border border-neutral-200 text-center">
                   <div className="w-12 h-12 rounded-2xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center mb-3">
                     <Zap className="w-6 h-6" />
                   </div>
-                  <h4 className="font-bold text-neutral-950 text-base">Programa Fundadores</h4>
+                  <h4 className="font-bold text-neutral-950 text-base">Versão Free</h4>
                   <p className="text-xs text-neutral-600 mt-1 mb-5 leading-relaxed">
-                    Instalação guiada pelo time da MAYaRAnas e suporte prioritário.
+                    Comece sem custos, cadastre seus pratos e experimente o cardápio digital PWA na prática.
                   </p>
 
-                  <a
-                    href="https://wa.me/?text=Olá!%20Gostaria%20de%20garantir%20minha%20vaga%20como%20Membro%20Fundador%20do%20MAYaMenu."
-                    target="_blank"
-                    rel="noopener noreferrer"
+                  <Link
+                    href="/admin"
                     className="w-full py-3 px-5 text-sm font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-md shadow-rose-600/20 active:scale-95 transition-all flex items-center justify-center gap-2"
                   >
-                    <span>Quero ser Membro Fundador</span>
+                    <span>Experimente a versão free</span>
                     <ArrowRight className="w-4 h-4" />
-                  </a>
+                  </Link>
 
                   <Link
                     href="/demo"
