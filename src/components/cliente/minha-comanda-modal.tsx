@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { buildTicketPayload, encodeTicket } from "@/lib/ticket";
+import { calcularTotais, somarPedidosAtivos, TAXA_SERVICO_PADRAO } from "@/lib/calculo-conta";
 
 interface MinhaComandaModalProps {
   isOpen: boolean;
@@ -36,6 +37,7 @@ interface MinhaComandaModalProps {
   onPedirConta?: () => void;
   pedindoConta?: boolean;
   contaPedidaSucesso?: boolean;
+  taxaServicoPercentual?: number;
 }
 
 export function MinhaComandaModal({
@@ -51,9 +53,11 @@ export function MinhaComandaModal({
   onPedirConta,
   pedindoConta = false,
   contaPedidaSucesso = false,
+  taxaServicoPercentual,
 }: MinhaComandaModalProps) {
   const [pedidos, setPedidos] = useState<PedidoRodada[]>([]);
-  const [subtotalMesa, setSubtotalMesa] = useState<number>(0);
+  const [totalOutrasComandas, setTotalOutrasComandas] = useState<number>(0);
+  const [taxaServicoAtiva, setTaxaServicoAtiva] = useState<boolean>(true);
   const [carregando, setCarregando] = useState(true);
   const [pedindoMesaToda, setPedindoMesaToda] = useState(false);
   const [mesaTodaPedidaSucesso, setMesaTodaPedidaSucesso] = useState(false);
@@ -103,9 +107,9 @@ export function MinhaComandaModal({
     };
   }, [isOpen, restauranteId, mesaNumero]);
 
-  // Escuta todas as comandas da mesa para rateio/total geral da mesa
+  // Escuta as comandas da mesa: soma o que as OUTRAS pessoas consumiram e a flag da taxa de serviço
   useEffect(() => {
-    if (!isOpen || !restauranteId) return;
+    if (!isOpen || !restauranteId || !clienteUid) return;
 
     try {
       const colRef = collection(
@@ -121,11 +125,17 @@ export function MinhaComandaModal({
         colRef,
         (snap) => {
           let total = 0;
+          let ativa = true;
           snap.forEach((d) => {
             const data = d.data();
+            if (d.id === clienteUid) {
+              if (data.taxaServicoAtiva === false) ativa = false;
+              return;
+            }
             total += Number(data.subtotal) || 0;
           });
-          setSubtotalMesa(total);
+          setTotalOutrasComandas(total);
+          setTaxaServicoAtiva(ativa);
         },
         (err) => {
           console.warn("Aviso ao escutar total da mesa para rateio:", err);
@@ -136,18 +146,22 @@ export function MinhaComandaModal({
     } catch (e) {
       console.warn("Falha ao inicializar listener de total da mesa:", e);
     }
-  }, [isOpen, restauranteId, mesaNumero]);
+  }, [isOpen, restauranteId, mesaNumero, clienteUid]);
 
-  // Total recalculado a partir dos pedidos confirmados no banco
-  const totalConfirmado = pedidos.reduce((acc, p) => acc + (p.subtotal || 0), 0);
-  const totalCliente = totalConfirmado > 0 ? totalConfirmado : subtotalAcumulado;
-  const totalGeralMesa = Math.max(subtotalMesa, totalCliente);
+  // Total recalculado a partir dos pedidos ativos (cancelados/estornados ficam de fora)
+  const totalConfirmado = somarPedidosAtivos(pedidos);
+  const totalCliente = pedidos.length > 0 ? totalConfirmado : subtotalAcumulado;
+  const totalGeralMesa = Math.max(totalCliente, 0) + totalOutrasComandas;
+  const percentualTaxa = typeof taxaServicoPercentual === "number" ? taxaServicoPercentual : TAXA_SERVICO_PADRAO;
+  const taxaCliente = calcularTotais(totalCliente, percentualTaxa, taxaServicoAtiva).taxa;
+  const totalClienteComTaxa = totalCliente + taxaCliente;
+  const totalGeralMesaComTaxa = calcularTotais(totalGeralMesa, percentualTaxa, taxaServicoAtiva).total;
 
   // Solicitar pagamento da mesa completa
   const handlePagarMesaCompleta = async () => {
     if (pedindoMesaToda || mesaTodaPedidaSucesso) return;
     const confirmou = window.confirm(
-      `Deseja solicitar o fechamento da MESA COMPLETA (${mesaNumero}) no valor de ${totalGeralMesa.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}?`
+      `Deseja solicitar o fechamento da MESA COMPLETA (${mesaNumero}) no valor de ${totalGeralMesaComTaxa.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}?`
     );
     if (!confirmou) return;
 
@@ -492,6 +506,32 @@ export function MinhaComandaModal({
               </span>
             </div>
 
+            {taxaCliente > 0 && (
+              <div
+                className={`flex items-center justify-between text-[11px] font-semibold ${
+                  estiloCarteira === "couro-marrom" ? "text-amber-200/70" : "text-neutral-400"
+                }`}
+              >
+                <span>Taxa de serviço ({percentualTaxa}%)</span>
+                <span className="font-mono">
+                  {taxaCliente.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                </span>
+              </div>
+            )}
+
+            {taxaCliente > 0 && (
+              <div
+                className={`flex items-center justify-between text-xs font-black ${
+                  estiloCarteira === "couro-marrom" ? "text-amber-100" : "text-white"
+                }`}
+              >
+                <span className="uppercase tracking-wider">Minha parte c/ taxa</span>
+                <span className="font-mono">
+                  {totalClienteComTaxa.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                </span>
+              </div>
+            )}
+
             <div
               className={`flex items-center justify-between pt-2 border-t ${
                 estiloCarteira === "couro-marrom" ? "border-amber-900/50" : "border-neutral-800"
@@ -510,7 +550,7 @@ export function MinhaComandaModal({
                 Total da Mesa:
               </span>
               <span className="text-base font-black text-amber-400 font-mono">
-                {totalGeralMesa.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                {totalGeralMesaComTaxa.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
               </span>
             </div>
           </div>

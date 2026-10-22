@@ -116,10 +116,46 @@ export function MenuView({ restaurante: restauranteInicial, cardapio: cardapioIn
     return () => unsub();
   }, [restaurante.id]);
 
+  const [chamandoGarcom, setChamandoGarcom] = useState(false);
+  const [garcomChamadoSucesso, setGarcomChamadoSucesso] = useState(false);
+  const [segundosCooldown, setSegundosCooldown] = useState(0);
+
   // Escuta o status da comanda do cliente nesta mesa em tempo real
   useEffect(() => {
     let unsubComanda: (() => void) | null = null;
     let unsubPedidos: (() => void) | null = null;
+    let ultimoStatus: string | null = null;
+    let encerrado = false;
+
+    const encerrarPorPagamento = () => {
+      if (encerrado) return;
+      encerrado = true;
+
+      // Mata os listeners imediatamente para evitar loop
+      if (unsubComanda) {
+        unsubComanda();
+        unsubComanda = null;
+      }
+      if (unsubPedidos) {
+        unsubPedidos();
+        unsubPedidos = null;
+      }
+
+      // Feedback visual imediato
+      marcarVisitaAtualComoPaga(restaurante.slug, numeroMesa);
+      setContaPedidaSucesso(false);
+      setGarcomChamadoSucesso(false);
+      setSegundosCooldown(0);
+      setContaPagaModal(true);
+      setMinhaComandaAberta(false);
+      setCarrinhoAberto(false);
+
+      // Limpeza Local
+      limparSessaoClienteLocal(restaurante.slug);
+      if (typeof limparCarrinho === "function") {
+        limparCarrinho();
+      }
+    };
 
     ensureClienteAnonimo().then((user) => {
       const comandaRef = doc(
@@ -139,33 +175,24 @@ export function MenuView({ restaurante: restauranteInicial, cardapio: cardapioIn
           if (snap.exists()) {
             const data = snap.data() as ComandaCliente;
             setComandaStatus(data.status);
+            ultimoStatus = data.status;
+
+            // Sincroniza o estado do chamado com o Firestore (garçom atendeu => libera o botão)
+            if (data.chamadoGarcom?.ativo === false) {
+              setGarcomChamadoSucesso(false);
+              setSegundosCooldown(0);
+            } else if (data.chamadoGarcom?.ativo === true) {
+              setGarcomChamadoSucesso(true);
+            }
 
             if (data.status === "conta_pedida") {
               setContaPedidaSucesso(true);
             } else if (data.status === "pago") {
-              // Mata os listeners imediatamente para evitar loop
-              if (unsubComanda) {
-                unsubComanda();
-                unsubComanda = null;
-              }
-              if (unsubPedidos) {
-                unsubPedidos();
-                unsubPedidos = null;
-              }
-
-              // Feedback visual imediato
-              marcarVisitaAtualComoPaga(restaurante.slug, numeroMesa);
-              setContaPedidaSucesso(false);
-              setContaPagaModal(true);
-              setMinhaComandaAberta(false);
-              setCarrinhoAberto(false);
-
-              // Limpeza Local
-              limparSessaoClienteLocal(restaurante.slug);
-              if (typeof limparCarrinho === "function") {
-                limparCarrinho();
-              }
+              encerrarPorPagamento();
             }
+          } else if (ultimoStatus && ultimoStatus !== "pago") {
+            // A comanda foi removida pelo garçom/admin ao liberar a mesa: conta encerrada
+            encerrarPorPagamento();
           }
         },
         (err) => {
@@ -196,9 +223,7 @@ export function MenuView({ restaurante: restauranteInicial, cardapio: cardapioIn
     };
   }, [restaurante.id, restaurante.slug, numeroMesa]);
 
-  const [chamandoGarcom, setChamandoGarcom] = useState(false);
-  const [garcomChamadoSucesso, setGarcomChamadoSucesso] = useState(false);
-  const [segundosCooldown, setSegundosCooldown] = useState(0);
+
 
   // Monitora o cooldown anti-flooding de 120s
   useEffect(() => {
@@ -927,6 +952,7 @@ export function MenuView({ restaurante: restauranteInicial, cardapio: cardapioIn
         onPedirConta={handlePedirConta}
         pedindoConta={pedindoConta}
         contaPedidaSucesso={contaPedidaSucesso}
+        taxaServicoPercentual={restaurante.configuracoes?.taxaServico}
       />
 
       {/* MODAL DE LEITURA INTERNA DO QR CODE DA MESA */}

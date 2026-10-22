@@ -626,6 +626,25 @@ export async function atenderGarcomFirestore(
 }
 
 /**
+ * Garçom/Admin liga ou desliga a taxa de serviço; o cliente enxerga o mesmo valor em tempo real.
+ */
+export async function definirTaxaServicoMesa(
+  restauranteId: string,
+  mesaNumero: number | string,
+  comandasIds: string[],
+  ativa: boolean
+): Promise<void> {
+  await Promise.all(
+    comandasIds.map((cId) =>
+      updateDoc(
+        doc(db, "restaurantes", restauranteId, "mesas", String(mesaNumero), "comandas_abertas", cId),
+        { taxaServicoAtiva: ativa, atualizadoEm: serverTimestamp() }
+      ).catch((e) => console.warn("Falha ao definir taxa de serviço da comanda", cId, e))
+    )
+  );
+}
+
+/**
  * Libera a mesa fechando as comandas e limpando/entregando os pedidos filhos daquela mesa via writeBatch
  * para evitar que pedidos órfãos fiquem aparecendo no KDS da cozinha.
  */

@@ -117,6 +117,7 @@ export interface ComandaCliente {
   atualizadoEm?: Timestamp;
   subtotal: number; // Soma acumulada de todos os pedidos/rodadas deste cliente
   status: 'pedindo' | 'aguardando_pratos' | 'conta_pedida' | 'pago';
+  taxaServicoAtiva?: boolean; // Definido pelo garçom/admin; padrão: true
   chamadoGarcom?: {
     ativo: boolean;
     solicitadoEm: any;

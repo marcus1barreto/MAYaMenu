@@ -4,7 +4,8 @@ import React, { useState, useEffect } from "react";
 import type { MesaOperacional, ComandaGarcom, ItemComandaGarcom } from "@/components/garcom/garcom-view";
 import type { MenuItem, PedidoComRef } from "@/types";
 import { CARDAPIO_DEMO } from "@/lib/mock-data";
-import { escutarPedidosMesa, fecharContaMesa, atualizarStatusPedido } from "@/lib/restaurante-service";
+import { escutarPedidosMesa, fecharContaMesa, atualizarStatusPedido, definirTaxaServicoMesa } from "@/lib/restaurante-service";
+import { calcularTotais } from "@/lib/calculo-conta";
 import { useTotalComanda } from "@/hooks/useTotalComanda";
 import {
   Dialog,
@@ -97,6 +98,15 @@ export function MesaDetalheModal({
     }
   };
 
+  const handleAlternarTaxa = () => {
+    const nova = !taxaServicoAtiva;
+    setTaxaServicoAtiva(nova);
+    const idRest = restauranteId || slug;
+    if (idRest && mesa) {
+      definirTaxaServicoMesa(idRest, mesa.numero, mesa.comandas.map((c) => c.id), nova);
+    }
+  };
+
   // Estados para lançamento manual
   const [clienteDestino, setClienteDestino] = useState("");
   const [itemSelecionado, setItemSelecionado] = useState<MenuItem | null>(null);
@@ -166,10 +176,11 @@ export function MesaDetalheModal({
   // 1. Lê o percentual configurado (se não fornecido, assume 10% por padrão)
   const percentualGorjeta = typeof taxaServicoPercentual === "number" ? taxaServicoPercentual : 10;
 
-  // 2. Cálculo dinâmico usando o percentual do restaurante
+  // 2. Cálculo central (ignora cancelados e arredonda em centavos)
   const totalMesa = comandasComItens.reduce((acc, c) => acc + c.subtotal, 0);
-  const taxaServico = taxaServicoAtiva ? totalMesa * (percentualGorjeta / 100) : 0;
-  const totalComTaxa = totalMesa + taxaServico;
+  const totaisMesa = calcularTotais(totalMesa, percentualGorjeta, taxaServicoAtiva);
+  const taxaServico = totaisMesa.taxa;
+  const totalComTaxa = totaisMesa.total;
   const totalPessoas = comandasComItens.length;
   const rateioIgualitario = totalPessoas > 0 ? totalComTaxa / totalPessoas : 0;
 
@@ -565,7 +576,7 @@ export function MesaDetalheModal({
                         </span>
                         <button
                           type="button"
-                          onClick={() => setTaxaServicoAtiva(!taxaServicoAtiva)}
+                          onClick={handleAlternarTaxa}
                           className={`text-[10px] px-2 py-0.5 rounded font-black transition-colors ${taxaServicoAtiva
                               ? "bg-rose-600/30 text-rose-300 border border-rose-500/40"
                               : "bg-neutral-800 text-neutral-500 border border-neutral-700"
