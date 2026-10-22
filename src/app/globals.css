@@ -307,10 +307,8 @@
   box-shadow: -8px 0 25px rgba(0, 0, 0, 0.85);
 }
 
-/* Costura pespontada realista de alfaiataria em couro */
-.costura-carteira {
-  position: relative;
-}
+/* Costura pespontada realista de alfaiataria em couro
+   (o painel já é position: fixed, que ancora o ::after absoluto; não sobrescrever) */
 .costura-carteira::after {
   content: "";
   position: absolute;

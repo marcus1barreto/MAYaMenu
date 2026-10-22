@@ -230,13 +230,13 @@ export function MinhaComandaModal({
       >
         {/* CABEÇALHO DA CARTEIRA DE CONTA */}
         <SheetHeader
-          className={`p-5 border-b flex flex-col gap-2 transition-colors ${
+          className={`p-5 pr-12 border-b flex flex-col gap-2 transition-colors ${
             estiloCarteira === "couro-marrom"
               ? "bg-[#2b180d]/90 border-amber-800/40"
               : "bg-neutral-900/90 border-neutral-800"
           }`}
         >
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2.5">
               <div
                 className={`p-2 rounded-xl border shadow-inner ${
@@ -353,9 +353,11 @@ export function MinhaComandaModal({
                       : "bg-[#161618]/90 border-neutral-800 shadow-black/50 text-neutral-100"
                   }`}
                 >
-                  <div className="flex items-center justify-between border-b pb-2 ${
-                    estiloCarteira === 'couro-marrom' ? 'border-amber-900/40' : 'border-neutral-800/80'
-                  }">
+                  <div
+                    className={`flex items-center justify-between border-b pb-2 ${
+                      estiloCarteira === "couro-marrom" ? "border-amber-900/40" : "border-neutral-800/80"
+                    }`}
+                  >
                     <span
                       className={`text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 ${
                         estiloCarteira === "couro-marrom" ? "text-amber-300" : "text-neutral-300"
