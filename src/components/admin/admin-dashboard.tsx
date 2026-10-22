@@ -69,6 +69,7 @@ import {
   Layers,
   Zap,
   Percent,
+  BookOpen,
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
@@ -840,6 +841,18 @@ export function AdminDashboard() {
             >
               <Smartphone className="w-4 h-4 text-rose-500" />
               <span>Ver Cardápio PWA</span>
+              <ExternalLink className="w-3 h-3 opacity-60" />
+            </Button>
+          </Link>
+
+          <Link href="/manual" target="_blank">
+            <Button
+              variant="outline"
+              className="bg-card border-border hover:bg-muted text-foreground font-bold text-xs h-10 rounded-xl flex items-center gap-2"
+              title="Abrir Central de Ajuda, Guia Rápido e FAQ"
+            >
+              <BookOpen className="w-4 h-4 text-rose-600" />
+              <span className="hidden sm:inline">Manual & Ajuda</span>
               <ExternalLink className="w-3 h-3 opacity-60" />
             </Button>
           </Link>

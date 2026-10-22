@@ -64,6 +64,9 @@ export default function LandingPage() {
             <a href="#perguntas" className="hover:text-rose-600 transition-colors">
               Dúvidas
             </a>
+            <Link href="/manual" className="hover:text-rose-600 transition-colors">
+              Manual & FAQ
+            </Link>
           </nav>
 
           <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
@@ -392,6 +395,9 @@ export default function LandingPage() {
             <a href="#pilares" className="hover:text-rose-600 transition-colors">
               PWA e KDS
             </a>
+            <Link href="/manual" className="hover:text-rose-600 transition-colors">
+              Manual & FAQ
+            </Link>
             <a href="#precos" className="hover:text-rose-600 transition-colors">
               Tarifa Flexível
             </a>

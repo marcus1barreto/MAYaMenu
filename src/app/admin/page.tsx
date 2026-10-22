@@ -11,9 +11,14 @@ function AdminPageContent() {
 
   if (carregando) {
     return (
-      <div className="min-h-screen bg-neutral-950 flex items-center justify-center text-white">
-        <div className="text-sm font-semibold tracking-wider uppercase animate-pulse">
-          Carregando Painel Administrativo...
+      <div className="min-h-screen bg-neutral-50 flex items-center justify-center text-neutral-900">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-rose-600 flex items-center justify-center text-white font-black text-lg animate-pulse shadow-md">
+            M
+          </div>
+          <div className="text-xs font-bold tracking-wider uppercase text-neutral-500">
+            Carregando Painel Administrativo...
+          </div>
         </div>
       </div>
     );
@@ -22,7 +27,7 @@ function AdminPageContent() {
   // Se o usuário não estiver logado ou estiver anônimo (cliente), exibe formulário de acesso
   if (!user || user.isAnonymous) {
     return (
-      <div className="min-h-screen bg-neutral-950 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-neutral-50/70 flex items-center justify-center p-4">
         <AdminLoginForm />
       </div>
     );
