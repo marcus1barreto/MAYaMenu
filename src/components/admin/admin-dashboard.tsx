@@ -214,6 +214,11 @@ export function AdminDashboard() {
               lista = lista.filter((c) => c.id !== docId);
             } else if (change.type === "added" || change.type === "modified") {
               const data = change.doc.data() as ComandaCliente;
+              if ((data as any).arquivada === true) {
+                // Comanda liberada/arquivada: remove do mapa do salão
+                lista = lista.filter((c) => c.id !== docId);
+                return;
+              }
               const comandaItem: ComandaCliente & { refPath: string } = {
                 ...data,
                 id: docId,
@@ -235,6 +240,7 @@ export function AdminDashboard() {
           }
 
           for (const c of lista) {
+            if ((c as any).arquivada === true) continue;
             const numMesa = Number(c.mesa) || 1;
             const mesaAtual = mapa.get(numMesa) || { numero: numMesa, status: "livre", comandas: [] };
             const garcomChamadoAtivo = Boolean(c.chamadoGarcom?.ativo);

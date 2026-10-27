@@ -1,8 +1,12 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useTransition } from "react";
+import Link from "next/link";
 import {
   criarNovaLicenca,
+  criarLoteLicencas,
+  baixarCSVLicencas,
+  formatarLicencasClipboard,
   escutarLicencas,
   escutarArquivoMorto,
   escutarRestaurantes,
@@ -71,6 +75,13 @@ import {
   LogIn,
   LogOut,
   CheckCircle2,
+  MessageCircle,
+  Loader2,
+  FileSpreadsheet,
+  Layers2,
+  FileDown,
+  Boxes,
+  BookOpen,
 } from "lucide-react";
 
 export function SuperAdminView() {
@@ -93,6 +104,13 @@ export function SuperAdminView() {
   const [maxPratosCustom, setMaxPratosCustom] = useState<string>("");
   const [maxMesasCustom, setMaxMesasCustom] = useState<string>("");
 
+  // Fábrica de Concessões em Lote (Campanhas Comerciais)
+  const [modoEmissao, setModoEmissao] = useState<"individual" | "lote">("individual");
+  const [quantidadeLote, setQuantidadeLote] = useState<string>("5");
+  const [loteRecemCriado, setLoteRecemCriado] = useState<Licenca[]>([]);
+  const [modalLoteAberto, setModalLoteAberto] = useState(false);
+  const [copiadoLoteTexto, setCopiadoLoteTexto] = useState(false);
+
   // Estado de Autenticação do Operador do SuperAdmin
   const [usuarioAuth, setUsuarioAuth] = useState<User | null>(null);
   const [modalLoginAberto, setModalLoginAberto] = useState(false);
@@ -104,6 +122,10 @@ export function SuperAdminView() {
   // Alertas de feedback da interface
   const [alertaErro, setAlertaErro] = useState<string | null>(null);
   const [alertaSucesso, setAlertaSucesso] = useState<string | null>(null);
+
+  // Transição não bloqueante com React 19 para o Grid de Estabelecimentos
+  const [isPending, startTransition] = useTransition();
+  const [pendingRestauranteId, setPendingRestauranteId] = useState<string | null>(null);
 
   useEffect(() => {
     const unsubLicencas = escutarLicencas((dados) => {
@@ -187,6 +209,51 @@ export function SuperAdminView() {
     }
   };
 
+  const handleCriarLoteLicencas = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCriando(true);
+    try {
+      const qtd = Number(quantidadeLote) || 5;
+      const horas = validadeHoras ? Number(validadeHoras) : undefined;
+      const novas = await criarLoteLicencas({
+        quantidade: qtd,
+        plano: planoSelecionado,
+        responsavelPrefixo: responsavel,
+        notas,
+        horasValidade: horas && horas > 0 ? horas : undefined,
+        limitesPersonalizados: {
+          maxPratos: maxPratosCustom ? Number(maxPratosCustom) : undefined,
+          maxMesas: maxMesasCustom ? Number(maxMesasCustom) : undefined,
+        },
+      });
+
+      // Atualização atômica na UI
+      setLicencas((prev) => [...novas, ...prev]);
+      setLoteRecemCriado(novas);
+      setModalLoteAberto(true);
+      setAlertaSucesso(`Fábrica de Licenças: ${novas.length} concessões (${planoSelecionado.toUpperCase()}) emitidas em lote com sucesso!`);
+      setAlertaErro(null);
+    } catch (err: unknown) {
+      console.error("Falha ao fabricar lote de concessões:", err);
+      const msg = err instanceof Error ? err.message : String(err);
+      setAlertaErro(`Falha na fábrica de concessões: ${msg}`);
+    } finally {
+      setCriando(false);
+    }
+  };
+
+  const handleBaixarCSV = (lista: Licenca[]) => {
+    baixarCSVLicencas(lista);
+    setAlertaSucesso("Planilha CSV baixada com sucesso!");
+  };
+
+  const handleCopiarLoteClipboard = (lista: Licenca[]) => {
+    const texto = formatarLicencasClipboard(lista);
+    navigator.clipboard.writeText(texto);
+    setCopiadoLoteTexto(true);
+    setTimeout(() => setCopiadoLoteTexto(false), 2500);
+  };
+
   const handleAlterarStatus = async (codigo: string, novoStatus: "ativa" | "suspensa" | "revogada") => {
     // Atualização otimista imediata na UI
     setLicencas((prev) =>
@@ -216,60 +283,66 @@ export function SuperAdminView() {
       return;
     }
 
-    const novosLimites = LIMITES_POR_PLANO[novoPlano];
-    const restAlvo = restaurantes.find((r) => r.id === restauranteId);
-    const planoAnterior = restAlvo?.plano || restAlvo?.licenca?.plano || "free";
+    setPendingRestauranteId(restauranteId);
 
-    // Atualização otimista na lista de concessões
-    setLicencas((prev) =>
-      prev.map((lic) =>
-        lic.restauranteId === restauranteId || (licencaCodigo && lic.id === licencaCodigo)
-          ? { ...lic, plano: novoPlano, limites: novosLimites }
-          : lic
-      )
-    );
-    // Atualização otimista na lista de restaurantes
-    setRestaurantes((prev) =>
-      prev.map((r) =>
-        r.id === restauranteId
-          ? {
-              ...r,
-              plano: novoPlano,
-              maxMesas: novosLimites.maxMesas,
-              maxPratos: novosLimites.maxPratos,
-              licenca: {
-                ...r.licenca,
-                plano: novoPlano,
-                limites: novosLimites,
-              },
-            }
-          : r
-      )
-    );
+    startTransition(async () => {
+      const novosLimites = LIMITES_POR_PLANO[novoPlano];
+      const restAlvo = restaurantes.find((r) => r.id === restauranteId);
+      const planoAnterior = restAlvo?.plano || restAlvo?.licenca?.plano || "free";
 
-    try {
-      await alterarPlanoRestaurante(restauranteId, novoPlano, licencaCodigo);
-      setAlertaSucesso(`Plano do estabelecimento alterado para ${novoPlano.toUpperCase()} com sucesso!`);
-      setAlertaErro(null);
-    } catch (err: unknown) {
-      console.error("Erro ao alterar plano do restaurante:", err);
-      // Reverte estado otimista para o anterior em caso de falha
-      const limitesAnteriores = LIMITES_POR_PLANO[planoAnterior as PlanoTipo] || LIMITES_POR_PLANO.free;
+      // Atualização otimista na lista de concessões
+      setLicencas((prev) =>
+        prev.map((lic) =>
+          lic.restauranteId === restauranteId || (licencaCodigo && lic.id === licencaCodigo)
+            ? { ...lic, plano: novoPlano, limites: novosLimites }
+            : lic
+        )
+      );
+      // Atualização otimista na lista de restaurantes
       setRestaurantes((prev) =>
         prev.map((r) =>
           r.id === restauranteId
             ? {
                 ...r,
-                plano: planoAnterior,
-                maxMesas: limitesAnteriores.maxMesas,
-                maxPratos: limitesAnteriores.maxPratos,
+                plano: novoPlano,
+                maxMesas: novosLimites.maxMesas,
+                maxPratos: novosLimites.maxPratos,
+                licenca: {
+                  ...r.licenca,
+                  plano: novoPlano,
+                  limites: novosLimites,
+                },
               }
             : r
         )
       );
-      const msg = err instanceof Error ? err.message : String(err);
-      setAlertaErro(`Falha ao salvar no Firestore: ${msg}. Verifique se você está logado.`);
-    }
+
+      try {
+        await alterarPlanoRestaurante(restauranteId, novoPlano, licencaCodigo);
+        setAlertaSucesso(`Plano do estabelecimento alterado para ${novoPlano.toUpperCase()} com sucesso!`);
+        setAlertaErro(null);
+      } catch (err: unknown) {
+        console.error("Erro ao alterar plano do restaurante:", err);
+        // Reverte estado otimista para o anterior em caso de falha
+        const limitesAnteriores = LIMITES_POR_PLANO[planoAnterior as PlanoTipo] || LIMITES_POR_PLANO.free;
+        setRestaurantes((prev) =>
+          prev.map((r) =>
+            r.id === restauranteId
+              ? {
+                  ...r,
+                  plano: planoAnterior,
+                  maxMesas: limitesAnteriores.maxMesas,
+                  maxPratos: limitesAnteriores.maxPratos,
+                }
+              : r
+          )
+        );
+        const msg = err instanceof Error ? err.message : String(err);
+        setAlertaErro(`Falha ao salvar no Firestore: ${msg}. Verifique se você está logado.`);
+      } finally {
+        setPendingRestauranteId(null);
+      }
+    });
   };
 
   const handleAlterarSuspensaoRestaurante = async (
@@ -285,51 +358,57 @@ export function SuperAdminView() {
       return;
     }
 
-    const estadoAnterior = restaurantes.find((r) => r.id === restauranteId)?.suspenso || false;
+    setPendingRestauranteId(restauranteId);
 
-    // Atualização otimista
-    setRestaurantes((prev) =>
-      prev.map((r) =>
-        r.id === restauranteId
-          ? {
-              ...r,
-              suspenso,
-              configuracoes: {
-                ...r.configuracoes,
-                suspenso,
-              },
-            }
-          : r
-      )
-    );
-    try {
-      await alterarStatusRestaurante(restauranteId, suspenso);
-      setAlertaSucesso(
-        suspenso
-          ? "Estabelecimento suspenso! Acesso de clientes, mesas e KDS pausados em tempo real."
-          : "Estabelecimento reativado com sucesso! Cardápio e mesas liberados."
-      );
-      setAlertaErro(null);
-    } catch (err: unknown) {
-      console.error("Erro ao alterar suspensão do restaurante:", err);
-      // Reverte estado otimista
+    startTransition(async () => {
+      const estadoAnterior = restaurantes.find((r) => r.id === restauranteId)?.suspenso || false;
+
+      // Atualização otimista
       setRestaurantes((prev) =>
         prev.map((r) =>
           r.id === restauranteId
             ? {
                 ...r,
-                suspenso: estadoAnterior,
+                suspenso,
                 configuracoes: {
                   ...r.configuracoes,
-                  suspenso: estadoAnterior,
+                  suspenso,
                 },
               }
             : r
         )
       );
-      const msg = err instanceof Error ? err.message : String(err);
-      setAlertaErro(`Falha ao alterar suspensão no Firestore: ${msg}.`);
-    }
+      try {
+        await alterarStatusRestaurante(restauranteId, suspenso);
+        setAlertaSucesso(
+          suspenso
+            ? "Estabelecimento suspenso! Acesso de clientes, mesas e KDS pausados em tempo real."
+            : "Estabelecimento reativado com sucesso! Cardápio e mesas liberados."
+        );
+        setAlertaErro(null);
+      } catch (err: unknown) {
+        console.error("Erro ao alterar suspensão do restaurante:", err);
+        // Reverte estado otimista
+        setRestaurantes((prev) =>
+          prev.map((r) =>
+            r.id === restauranteId
+              ? {
+                  ...r,
+                  suspenso: estadoAnterior,
+                  configuracoes: {
+                    ...r.configuracoes,
+                    suspenso: estadoAnterior,
+                  },
+                }
+              : r
+          )
+        );
+        const msg = err instanceof Error ? err.message : String(err);
+        setAlertaErro(`Falha ao alterar suspensão no Firestore: ${msg}.`);
+      } finally {
+        setPendingRestauranteId(null);
+      }
+    });
   };
 
   const handleCopiar = (codigo: string) => {
@@ -344,6 +423,23 @@ export function SuperAdminView() {
     navigator.clipboard.writeText(url);
     setCopiadoLinkId(codigo);
     setTimeout(() => setCopiadoLinkId(null), 2500);
+  };
+
+  const handleCompartilharWhatsApp = (lic: Licenca) => {
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    const url = `${origin}/ativar/${lic.id}`;
+    const planoNome = lic.plano.toUpperCase();
+    const texto = encodeURIComponent(
+      `Olá${lic.responsavel ? ` ${lic.responsavel}` : ""}! Segue o seu link de concessão exclusivo para ativação do MAYaMenu (${planoNome}):\n\n🔗 ${url}\n\nCódigo de Concessão: ${lic.id}\n(Válido por tempo limitado. Basta clicar no link acima para cadastrar seu restaurante).`
+    );
+    window.open(`https://api.whatsapp.com/send?text=${texto}`, "_blank");
+  };
+
+  const aplicarPreset = (plano: PlanoTipo, horas: string) => {
+    setPlanoSelecionado(plano);
+    setValidadeHoras(horas);
+    setMaxPratosCustom("");
+    setMaxMesasCustom("");
   };
 
   const handleRenovarLicenca = async (codigo: string) => {
@@ -478,6 +574,22 @@ export function SuperAdminView() {
                     </Button>
                   </div>
                 )}
+
+                <Link href="/superadmin/ajuda" target="_blank">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-[11px] rounded-lg border-border bg-card text-foreground hover:bg-muted hover:text-rose-600 flex items-center gap-1.5 shadow-xs transition-colors"
+                    title="Abrir Manual Executivo & Operações"
+                  >
+                    <BookOpen className="w-3.5 h-3.5 text-rose-600" />
+                    <span>Manual SuperAdmin</span>
+                    <span className="px-1 py-0.2 rounded text-[8px] font-black uppercase tracking-wider bg-rose-100 text-rose-700 border border-rose-200">
+                      NOVO
+                    </span>
+                  </Button>
+                </Link>
               </div>
             </div>
           </div>
@@ -676,11 +788,14 @@ export function SuperAdminView() {
                 const planoAtual = rest.plano || rest.licenca?.plano || "free";
                 const isSuspenso = !!(rest.suspenso || rest.configuracoes?.suspenso);
                 const limites = rest.licenca?.limites || LIMITES_POR_PLANO[planoAtual as PlanoTipo] || LIMITES_POR_PLANO.free;
+                const isItemPending = isPending && pendingRestauranteId === rest.id;
 
                 return (
                   <div
                     key={rest.id}
                     className={`p-5 bg-card border rounded-3xl space-y-4 shadow-sm transition-all ${
+                      isItemPending ? "ring-2 ring-primary/50 opacity-90 scale-[0.99]" : ""
+                    } ${
                       isSuspenso
                         ? "border-rose-500/40 bg-rose-500/5"
                         : "border-border hover:border-primary/40"
@@ -704,19 +819,24 @@ export function SuperAdminView() {
                         )}
                       </div>
 
-                      <Badge
-                        className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full ${
-                          isSuspenso
-                            ? "bg-rose-500/10 text-rose-500 border border-rose-500/30"
-                            : planoAtual === "enterprise"
-                            ? "bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30"
-                            : planoAtual === "pro"
-                            ? "bg-violet-500/15 text-violet-600 dark:text-violet-300 border border-violet-500/30"
-                            : "bg-muted text-muted-foreground border border-border"
-                        }`}
-                      >
-                        {isSuspenso ? "Suspenso" : planoAtual}
-                      </Badge>
+                      <div className="flex items-center gap-1.5">
+                        {isItemPending && (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin text-primary shrink-0" />
+                        )}
+                        <Badge
+                          className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full ${
+                            isSuspenso
+                              ? "bg-rose-500/10 text-rose-500 border border-rose-500/30"
+                              : planoAtual === "enterprise"
+                              ? "bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30"
+                              : planoAtual === "pro"
+                              ? "bg-violet-500/15 text-violet-600 dark:text-violet-300 border border-violet-500/30"
+                              : "bg-muted text-muted-foreground border border-border"
+                          }`}
+                        >
+                          {isSuspenso ? "Suspenso" : planoAtual}
+                        </Badge>
+                      </div>
                     </div>
 
                     {/* DADOS DE CAPACIDADE / LIMITES */}
@@ -745,8 +865,9 @@ export function SuperAdminView() {
                       <div className="flex bg-muted rounded-lg p-1 border border-border shadow-inner">
                         <button
                           type="button"
+                          disabled={isItemPending}
                           onClick={() => handleAlterarPlano(rest.id, "free", rest.licenca?.id)}
-                          className={`px-2.5 py-1 text-[10px] sm:text-xs font-bold rounded-md transition-all ${
+                          className={`px-2.5 py-1 text-[10px] sm:text-xs font-bold rounded-md transition-all disabled:opacity-50 ${
                             planoAtual === "free"
                               ? "bg-card text-foreground shadow-xs"
                               : "text-muted-foreground hover:text-foreground"
@@ -757,8 +878,9 @@ export function SuperAdminView() {
 
                         <button
                           type="button"
+                          disabled={isItemPending}
                           onClick={() => handleAlterarPlano(rest.id, "pro", rest.licenca?.id)}
-                          className={`px-2.5 py-1 text-[10px] sm:text-xs font-bold rounded-md transition-all ${
+                          className={`px-2.5 py-1 text-[10px] sm:text-xs font-bold rounded-md transition-all disabled:opacity-50 ${
                             planoAtual === "pro"
                               ? "bg-violet-600 text-white shadow-sm shadow-violet-900/50"
                               : "text-neutral-500 hover:text-violet-400"
@@ -769,8 +891,9 @@ export function SuperAdminView() {
 
                         <button
                           type="button"
+                          disabled={isItemPending}
                           onClick={() => handleAlterarPlano(rest.id, "enterprise", rest.licenca?.id)}
-                          className={`px-2.5 py-1 text-[10px] sm:text-xs font-bold rounded-md transition-all ${
+                          className={`px-2.5 py-1 text-[10px] sm:text-xs font-bold rounded-md transition-all disabled:opacity-50 ${
                             planoAtual === "enterprise"
                               ? "bg-amber-500 text-amber-950 shadow-sm shadow-amber-900/50"
                               : "text-neutral-500 hover:text-amber-500"
@@ -784,8 +907,9 @@ export function SuperAdminView() {
                       {isSuspenso ? (
                         <button
                           type="button"
+                          disabled={isItemPending}
                           onClick={() => handleAlterarSuspensaoRestaurante(rest.id, false)}
-                          className="px-3 py-1.5 text-[10px] sm:text-xs font-bold text-emerald-400 hover:bg-emerald-500/15 rounded-lg border border-emerald-500/30 flex items-center gap-1 transition-colors"
+                          className="px-3 py-1.5 text-[10px] sm:text-xs font-bold text-emerald-400 hover:bg-emerald-500/15 rounded-lg border border-emerald-500/30 flex items-center gap-1 transition-colors disabled:opacity-50"
                         >
                           <RotateCcw className="w-3.5 h-3.5" />
                           Reativar
@@ -831,17 +955,94 @@ export function SuperAdminView() {
         </div>
       ) : abaAtiva === "ativas" ? (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* FORMULÁRIO: GERAR NOVA CONCESSÃO */}
+          {/* FORMULÁRIO: GERAR NOVA CONCESSÃO OU FÁBRICA EM LOTE */}
           <div className="lg:col-span-1">
             <Card className="bg-card border-border text-card-foreground rounded-3xl overflow-hidden shadow-sm">
-              <CardHeader className="bg-muted/40 border-b border-border pb-4">
-                <CardTitle className="text-base font-black flex items-center gap-2 text-primary">
-                  <KeyRound className="w-5 h-5" />
-                  Emitir Nova Licença / Token
+              <CardHeader className="bg-muted/40 border-b border-border pb-4 space-y-3">
+                <CardTitle className="text-base font-black flex items-center justify-between text-primary">
+                  <div className="flex items-center gap-2">
+                    {modoEmissao === "lote" ? (
+                      <Boxes className="w-5 h-5 text-rose-500" />
+                    ) : (
+                      <KeyRound className="w-5 h-5 text-primary" />
+                    )}
+                    <span>{modoEmissao === "lote" ? "Fábrica de Licenças" : "Emitir Nova Licença"}</span>
+                  </div>
+                  {modoEmissao === "lote" && (
+                    <Badge className="bg-rose-500/15 text-rose-400 border border-rose-500/30 text-[10px] font-bold">
+                      Batch Mode
+                    </Badge>
+                  )}
                 </CardTitle>
+
+                {/* SEGMENTED CONTROL: INDIVIDUAL vs FÁBRICA */}
+                <div className="flex bg-muted rounded-xl p-1 border border-border">
+                  <button
+                    type="button"
+                    onClick={() => setModoEmissao("individual")}
+                    className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                      modoEmissao === "individual"
+                        ? "bg-card text-foreground shadow-xs"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <KeyRound className="w-3.5 h-3.5" />
+                    Individual
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setModoEmissao("lote")}
+                    className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                      modoEmissao === "lote"
+                        ? "bg-rose-600 text-white shadow-xs"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <Boxes className="w-3.5 h-3.5" />
+                    <span>Fábrica em Lote</span>
+                    <span
+                      className={`px-1 py-0.2 rounded text-[8px] font-black uppercase tracking-wider transition-colors ${
+                        modoEmissao === "lote"
+                          ? "bg-white text-rose-600"
+                          : "bg-rose-100 text-rose-700 border border-rose-200"
+                      }`}
+                    >
+                      NOVO
+                    </span>
+                  </button>
+                </div>
               </CardHeader>
               <CardContent className="p-6 space-y-4">
-                <form onSubmit={handleCriarLicenca} className="space-y-4">
+                <form
+                  onSubmit={modoEmissao === "lote" ? handleCriarLoteLicencas : handleCriarLicenca}
+                  className="space-y-4"
+                >
+                  {/* SELEÇÃO DE QUANTIDADE NO MODO LOTE */}
+                  {modoEmissao === "lote" && (
+                    <div className="space-y-1.5 bg-rose-500/5 p-3 rounded-2xl border border-rose-500/20">
+                      <label className="text-xs font-bold uppercase tracking-wider text-rose-400 flex items-center justify-between">
+                        <span>Quantidade no Lote</span>
+                        <span className="text-[10px] text-muted-foreground font-mono">1 a 100</span>
+                      </label>
+                      <div className="grid grid-cols-4 gap-2">
+                        {["5", "10", "25", "50"].map((q) => (
+                          <button
+                            key={q}
+                            type="button"
+                            onClick={() => setQuantidadeLote(q)}
+                            className={`py-1.5 rounded-xl text-xs font-black border transition-all ${
+                              quantidadeLote === q
+                                ? "bg-rose-600 border-rose-500 text-white shadow-xs"
+                                : "bg-card border-border text-muted-foreground hover:text-foreground"
+                            }`}
+                          >
+                            {q} un
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   {/* PLANO */}
                   <div className="space-y-1.5">
                     <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
@@ -876,17 +1077,49 @@ export function SuperAdminView() {
                         {LIMITES_POR_PLANO[planoSelecionado].maxMesas} mesas
                       </span>
                     </div>
+
+                    {/* PRESETS RÁPIDOS */}
+                    <div className="flex flex-wrap items-center gap-1.5 pt-2">
+                      <span className="text-[10px] uppercase font-bold text-muted-foreground mr-1">Atalhos:</span>
+                      <button
+                        type="button"
+                        onClick={() => aplicarPreset("free", "48")}
+                        className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-muted hover:bg-muted/80 text-foreground border border-border transition-colors"
+                      >
+                        Free 48h
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => aplicarPreset("pro", "168")}
+                        className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-violet-500/15 text-violet-400 border border-violet-500/30 hover:bg-violet-500/25 transition-colors"
+                      >
+                        Pro 7d
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => aplicarPreset("enterprise", "720")}
+                        className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30 hover:bg-amber-500/25 transition-colors"
+                      >
+                        Enterprise 30d
+                      </button>
+                    </div>
                   </div>
 
-                  {/* DESTINATÁRIO / RESPONSÁVEL */}
+                  {/* DESTINATÁRIO / RESPONSÁVEL / CAMPANHA */}
                   <div className="space-y-1.5">
                     <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                      Destinatário / Contato
+                      {modoEmissao === "lote"
+                        ? "Campanha / Representante / Tag"
+                        : "Destinatário / Contato"}
                     </label>
                     <Input
                       value={responsavel}
                       onChange={(e) => setResponsavel(e.target.value)}
-                      placeholder="Ex: Marcus Barreto (WhatsApp / Restaurante X)"
+                      placeholder={
+                        modoEmissao === "lote"
+                          ? "Ex: Campanha Abrasel / Evento Gastronômico"
+                          : "Ex: Marcus Barreto (WhatsApp / Restaurante X)"
+                      }
                       className="bg-card border-border text-foreground rounded-xl h-10 text-xs"
                     />
                   </div>
@@ -954,9 +1187,21 @@ export function SuperAdminView() {
                   <Button
                     type="submit"
                     disabled={criando}
-                    className="w-full bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-2xl h-11 text-xs uppercase tracking-wider shadow-lg shadow-rose-600/30 transition-all"
+                    className="w-full bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-2xl h-11 text-xs uppercase tracking-wider shadow-lg shadow-rose-600/30 transition-all flex items-center justify-center gap-2"
                   >
-                    {criando ? "Gerando Token..." : "Gerar Código de Licença"}
+                    {criando ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        {modoEmissao === "lote" ? "Fabricando Lote..." : "Gerando Token..."}
+                      </>
+                    ) : modoEmissao === "lote" ? (
+                      <>
+                        <Boxes className="w-4 h-4" />
+                        Fabricar Lote de {quantidadeLote} Concessões
+                      </>
+                    ) : (
+                      "Gerar Código de Licença"
+                    )}
                   </Button>
                 </form>
               </CardContent>
@@ -965,20 +1210,37 @@ export function SuperAdminView() {
 
           {/* LISTAGEM DE LICENÇAS E CONCESSÕES */}
           <div className="lg:col-span-2 space-y-4">
-            <div className="flex items-center justify-between gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <h2 className="text-lg font-black tracking-tight flex items-center gap-2">
                 <Store className="w-5 h-5 text-muted-foreground" />
                 Concessões Registradas ({licencasFiltradas.length})
               </h2>
 
-              <div className="relative w-64">
-                <Search className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
-                <Input
-                  value={filtro}
-                  onChange={(e) => setFiltro(e.target.value)}
-                  placeholder="Buscar código, nome..."
-                  className="bg-card border-border text-foreground pl-9 rounded-xl h-9 text-xs"
-                />
+              <div className="flex items-center gap-2">
+                {/* BOTÃO EXPORTAR CSV */}
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleBaixarCSV(licencasFiltradas)}
+                  className="h-9 px-3 rounded-xl border-border bg-card hover:bg-muted text-xs font-bold flex items-center gap-1.5 shadow-xs"
+                >
+                  <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+                  <span className="hidden sm:inline">Exportar</span> CSV
+                  <span className="px-1 py-0.2 rounded text-[8px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-200">
+                    NOVO
+                  </span>
+                </Button>
+
+                <div className="relative w-48 sm:w-60">
+                  <Search className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
+                  <Input
+                    value={filtro}
+                    onChange={(e) => setFiltro(e.target.value)}
+                    placeholder="Buscar código, nome..."
+                    className="bg-card border-border text-foreground pl-9 rounded-xl h-9 text-xs"
+                  />
+                </div>
               </div>
             </div>
 
@@ -1083,7 +1345,7 @@ export function SuperAdminView() {
 
                       {/* AÇÕES DE GESTÃO E COMPARTILHAMENTO EFÊMERO */}
                       {disponivel && (
-                        <div className="pt-2 space-y-2">
+                        <div className="pt-2 grid grid-cols-2 gap-2">
                           <Button
                             variant="outline"
                             size="sm"
@@ -1092,15 +1354,25 @@ export function SuperAdminView() {
                           >
                             {copiadoLinkId === lic.id ? (
                               <>
-                                <Check className="w-4 h-4 text-emerald-400" />
-                                Link de Ativação Copiado!
+                                <Check className="w-3.5 h-3.5 text-emerald-400" />
+                                Copiado!
                               </>
                             ) : (
                               <>
-                                <Copy className="w-4 h-4" />
-                                Copiar Link de Ativação
+                                <Copy className="w-3.5 h-3.5" />
+                                Copiar Link
                               </>
                             )}
+                          </Button>
+
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleCompartilharWhatsApp(lic)}
+                            className="w-full bg-emerald-600/10 hover:bg-emerald-600 text-emerald-400 hover:text-white border-emerald-500/30 rounded-xl text-[11px] font-black uppercase tracking-wider h-9 transition-all flex items-center justify-center gap-1.5 shadow-sm"
+                          >
+                            <MessageCircle className="w-3.5 h-3.5" />
+                            WhatsApp
                           </Button>
                         </div>
                       )}
@@ -1459,30 +1731,30 @@ export function SuperAdminView() {
 
       {/* MODAL INSPECIONADOR DE JSON DO ARQUIVO MORTO */}
       {jsonModalItem && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-neutral-900 border border-neutral-800 rounded-3xl max-w-2xl w-full max-h-[85vh] flex flex-col overflow-hidden shadow-2xl">
-            <div className="flex items-center justify-between p-5 border-b border-neutral-800">
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-card border border-border text-foreground rounded-3xl max-w-2xl w-full max-h-[85vh] flex flex-col overflow-hidden shadow-2xl">
+            <div className="flex items-center justify-between p-5 border-b border-border">
               <div className="flex items-center gap-2">
-                <FileCode2 className="w-5 h-5 text-purple-400" />
-                <h3 className="font-bold text-sm text-white">
+                <FileCode2 className="w-5 h-5 text-purple-600" />
+                <h3 className="font-bold text-sm text-foreground">
                   JSON de Auditoria — {jsonModalItem.codigo || jsonModalItem.id}
                 </h3>
               </div>
               <button
                 onClick={() => setJsonModalItem(null)}
-                className="p-1 text-neutral-400 hover:text-white rounded-lg hover:bg-neutral-800"
+                className="p-1 text-muted-foreground hover:text-foreground rounded-lg hover:bg-muted transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="p-5 flex-1 overflow-auto bg-neutral-950 font-mono text-xs text-neutral-300">
+            <div className="p-5 flex-1 overflow-auto bg-muted/40 font-mono text-xs text-foreground">
               <pre className="whitespace-pre-wrap">
                 {jsonModalItem.snapshotJson || JSON.stringify(jsonModalItem, null, 2)}
               </pre>
             </div>
 
-            <div className="p-4 border-t border-neutral-800 flex justify-end gap-2 bg-neutral-900">
+            <div className="p-4 border-t border-border flex justify-end gap-2 bg-card">
               <Button
                 variant="outline"
                 size="sm"
@@ -1492,16 +1764,16 @@ export function SuperAdminView() {
                   setCopiadoJsonId(jsonModalItem.id);
                   setTimeout(() => setCopiadoJsonId(null), 2500);
                 }}
-                className="bg-neutral-800 border-neutral-700 text-white text-xs rounded-xl"
+                className="border-border text-xs rounded-xl"
               >
                 {copiadoJsonId === jsonModalItem.id ? (
                   <>
-                    <Check className="w-4 h-4 text-emerald-400 mr-1" />
+                    <Check className="w-4 h-4 text-emerald-600 mr-1" />
                     Copiado!
                   </>
                 ) : (
                   <>
-                    <Copy className="w-4 h-4 mr-1 text-neutral-400" />
+                    <Copy className="w-4 h-4 mr-1 text-muted-foreground" />
                     Copiar JSON
                   </>
                 )}
@@ -1528,6 +1800,169 @@ export function SuperAdminView() {
           </div>
         </div>
       )}
+
+      {/* MODAL FÁBRICA DE LICENÇAS - RESULTADO DO LOTE */}
+      <Dialog open={modalLoteAberto} onOpenChange={setModalLoteAberto}>
+        <DialogContent className="max-w-4xl bg-card border-border text-foreground rounded-3xl p-6 shadow-2xl max-h-[90vh] flex flex-col overflow-hidden">
+          <DialogHeader className="space-y-1 mb-2">
+            <div className="flex items-center justify-between">
+              <DialogTitle className="text-lg font-black flex items-center gap-2">
+                <Boxes className="w-5 h-5 text-amber-500" />
+                <span>Fábrica de Licenças — Lote Gerado ({loteRecemCriado.length} Concessões)</span>
+              </DialogTitle>
+            </div>
+            <DialogDescription className="text-xs text-muted-foreground">
+              Concessões criadas com sucesso de forma atômica no Firestore e sincronizadas em cache local.
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* BARRA DE AÇÕES DO LOTE */}
+          <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-muted/40 rounded-2xl border border-border my-2">
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="bg-amber-500/10 text-amber-400 border-amber-500/30 text-xs font-bold uppercase">
+                Plano {planoSelecionado}
+              </Badge>
+              <Badge variant="outline" className="bg-emerald-500/10 text-emerald-400 border-emerald-500/30 text-xs font-bold">
+                {loteRecemCriado.length} Códigos Ativos
+              </Badge>
+              {validadeHoras && Number(validadeHoras) > 0 ? (
+                <Badge variant="outline" className="bg-blue-500/10 text-blue-400 border-blue-500/30 text-xs">
+                  Validade: {validadeHoras}h
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="bg-purple-500/10 text-purple-400 border-purple-500/30 text-xs">
+                  Sem Expiração
+                </Badge>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => handleBaixarCSV(loteRecemCriado)}
+                className="h-9 px-3 text-xs font-bold rounded-xl border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
+              >
+                <FileDown className="w-4 h-4 mr-1.5" />
+                Baixar Planilha (.csv)
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => handleCopiarLoteClipboard(loteRecemCriado)}
+                className="h-9 px-3 text-xs font-bold rounded-xl bg-amber-500 hover:bg-amber-600 text-black"
+              >
+                {copiadoLoteTexto ? (
+                  <>
+                    <Check className="w-4 h-4 mr-1.5 text-black" />
+                    Copiado para Área de Transferência!
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-4 h-4 mr-1.5" />
+                    Copiar Lista WhatsApp/Slack
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+
+          {/* LISTA ROLÁVEL DE CONCESSÕES GERADAS */}
+          <div className="flex-1 overflow-auto rounded-2xl border border-border bg-muted/10 p-2 space-y-2 max-h-[50vh]">
+            {loteRecemCriado.map((lic, index) => {
+              const origin = typeof window !== "undefined" ? window.location.origin : "";
+              const urlAtivacao = `${origin}/ativar/${lic.id}`;
+              return (
+                <div
+                  key={lic.id}
+                  className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl bg-card border border-border hover:border-amber-500/30 transition-colors gap-3"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs font-mono font-bold text-muted-foreground w-6">
+                      #{String(index + 1).padStart(2, "0")}
+                    </span>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-black text-sm tracking-wide text-foreground">
+                          {lic.id}
+                        </span>
+                        <Badge variant="outline" className="text-[10px] uppercase font-bold py-0 h-4 border-amber-500/40 text-amber-400">
+                          {lic.plano}
+                        </Badge>
+                      </div>
+                      <div className="text-[11px] text-muted-foreground truncate max-w-sm">
+                        {lic.responsavel ? (
+                          <span className="font-medium text-foreground/80">{lic.responsavel} — </span>
+                        ) : null}
+                        <span className="font-mono text-[10px]">{urlAtivacao}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 self-end sm:self-auto">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleCopiar(lic.id)}
+                      className="h-8 px-2.5 text-xs rounded-lg text-muted-foreground hover:text-foreground"
+                      title="Copiar Código"
+                    >
+                      {copiadoId === lic.id ? (
+                        <Check className="w-3.5 h-3.5 text-emerald-400 mr-1" />
+                      ) : (
+                        <Copy className="w-3.5 h-3.5 mr-1" />
+                      )}
+                      Código
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleCopiarLink(lic.id)}
+                      className="h-8 px-2.5 text-xs rounded-lg text-muted-foreground hover:text-foreground"
+                      title="Copiar Link de Ativação"
+                    >
+                      {copiadoLinkId === lic.id ? (
+                        <Check className="w-3.5 h-3.5 text-emerald-400 mr-1" />
+                      ) : (
+                        <Copy className="w-3.5 h-3.5 mr-1" />
+                      )}
+                      Link
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleCompartilharWhatsApp(lic)}
+                      className="h-8 px-2.5 text-xs rounded-lg text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10"
+                      title="Enviar via WhatsApp"
+                    >
+                      <MessageCircle className="w-3.5 h-3.5 mr-1 text-emerald-400" />
+                      WhatsApp
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="flex items-center justify-between pt-3 border-t border-border mt-2">
+            <span className="text-xs text-muted-foreground">
+              Total: <strong className="text-foreground">{loteRecemCriado.length}</strong> concessões prontas para entrega
+            </span>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setModalLoteAberto(false)}
+              className="rounded-xl text-xs px-5 h-9 font-bold"
+            >
+              Concluir e Fechar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* MODAL DE LOGIN RÁPIDO DO OPERADOR */}
       <Dialog open={modalLoginAberto} onOpenChange={setModalLoginAberto}>

@@ -39,6 +39,7 @@ import {
 import Link from "next/link";
 import { QRCodeSVG } from "qrcode.react";
 import type { PedidoFilaOffline } from "@/lib/offline-queue";
+import { BotaoImprimirCaixa } from "@/components/caixa/botao-imprimir-caixa";
 
 interface MesaDetalheModalProps {
   mesa: MesaOperacional | null;
@@ -570,25 +571,33 @@ export function MesaDetalheModal({
                           </div>
                         )}
 
-                        {/* Botão de Cobrança Individual */}
-                        {!jaPago && !modoSomenteLeitura && (
-                          <Button
-                            type="button"
-                            disabled={encerrando}
-                            onClick={() => handleEncerrarComandaMesa(comanda.id, comanda.nomeCliente)}
-                            className="w-full h-10 bg-neutral-800 hover:bg-emerald-600 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-colors"
-                          >
-                            <DollarSign className="w-3.5 h-3.5" />
-                            <span>
-                              {encerrando
-                                ? "Processando..."
-                                : `Encerrar e Cobrar ${comanda.nomeCliente} (${comanda.subtotal.toLocaleString(
-                                  "pt-BR",
-                                  { style: "currency", currency: "BRL" }
-                                )})`}
-                            </span>
-                          </Button>
-                        )}
+                        {/* Ações da Comanda: Impressão Térmica e Cobrança Individual */}
+                        <div className="flex items-center gap-2 mt-2">
+                          <BotaoImprimirCaixa
+                            comanda={comanda}
+                            mesaNumero={mesa.numero}
+                            className="h-10 text-xs px-3"
+                            label="Imprimir (USB)"
+                          />
+                          {!jaPago && !modoSomenteLeitura && (
+                            <Button
+                              type="button"
+                              disabled={encerrando}
+                              onClick={() => handleEncerrarComandaMesa(comanda.id, comanda.nomeCliente)}
+                              className="flex-1 h-10 bg-neutral-800 hover:bg-emerald-600 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-colors"
+                            >
+                              <DollarSign className="w-3.5 h-3.5" />
+                              <span>
+                                {encerrando
+                                  ? "Processando..."
+                                  : `Cobrar ${comanda.nomeCliente} (${comanda.subtotal.toLocaleString(
+                                    "pt-BR",
+                                    { style: "currency", currency: "BRL" }
+                                  )})`}
+                              </span>
+                            </Button>
+                          )}
+                        </div>
                       </div>
                     );
                   })
@@ -669,8 +678,16 @@ export function MesaDetalheModal({
                     />
                   </div>
 
-                  {/* 🟢 BOTÃO DE ENCERRAR E LIBERAR MESA (Sempre visível) */}
-                  <div className="mt-4">
+                  {/* 🟢 BOTÃO DE IMPRIMIR MESA E ENCERRAR/LIBERAR */}
+                  <div className="mt-4 space-y-2">
+                    <BotaoImprimirCaixa
+                      mesa={mesa}
+                      mesaNumero={mesa.numero}
+                      taxaServico={taxaServico}
+                      total={totalComTaxa}
+                      className="w-full h-11 border-border bg-card hover:bg-muted text-foreground font-bold rounded-xl text-sm"
+                      label="Imprimir Conferência da Mesa (USB)"
+                    />
                     <button
                       type="button"
                       onClick={handleEncerrarMesa}

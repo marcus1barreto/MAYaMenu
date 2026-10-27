@@ -7,6 +7,7 @@ import {
   createUserWithEmailAndPassword,
   signOut as firebaseSignOut,
   onAuthStateChanged,
+  onIdTokenChanged,
   type User,
 } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
@@ -40,6 +41,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Monitora estado do Auth e escuta o documento do restaurante em tempo real
   useEffect(() => {
     let unsubRestaurante: (() => void) | null = null;
+
+    // Sincroniza o JWT fresco do Firebase Auth com o cookie '__session' para o Middleware
+    const unsubIdToken = onIdTokenChanged(auth, async (currentUser) => {
+      if (currentUser) {
+        // Pega o JWT fresco (onde moram os Custom Claims)
+        const token = await currentUser.getIdToken();
+        // Salva no cookie '__session' (nome recomendado pelo Firebase para Firebase Hosting/Vercel)
+        document.cookie = `__session=${token}; path=/; secure; samesite=strict; max-age=3600`;
+      } else {
+        // Limpa o cookie se deslogar
+        document.cookie = `__session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
+      }
+    });
 
     const unsubAuth = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
@@ -126,6 +140,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     return () => {
+      unsubIdToken();
       unsubAuth();
       if (unsubRestaurante) unsubRestaurante();
     };

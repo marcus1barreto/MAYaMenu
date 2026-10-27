@@ -19,6 +19,11 @@ import {
   Layers,
   Sparkles,
   Search,
+  Printer,
+  ShieldAlert,
+  Cpu,
+  Receipt,
+  RotateCcw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -43,9 +48,21 @@ const FAQS: FaqItem[] = [
   },
   {
     categoria: "operacao",
+    pergunta: "O que impede que uma mesa já paga seja reaberta indevidamente por um cliente?",
+    resposta:
+      "Ao encerrar o atendimento e liberar a mesa no caixa, o sistema aplica um 'Tombstone' atômico no documento da comanda (status marcado como 'pago' e carimbo temporal). Regras mestras de segurança no banco de dados (Firestore Security Rules) rejeitam sumariamente qualquer tentativa do cliente de modificar itens ou reativar comandas seladas como pagas.",
+  },
+  {
+    categoria: "operacao",
     pergunta: "Como configurar ou desativar a taxa de serviço (10%)?",
     resposta:
       "No painel do administrador, clique no botão 'Configurações' no topo da tela. Você pode ajustar a porcentagem da taxa de serviço (por exemplo, 0%, 10% ou 12%) ou desativá-la totalmente. O valor é calculado de forma transparente no rodapé da comanda do cliente.",
+  },
+  {
+    categoria: "tecnico",
+    pergunta: "Como funciona a impressão USB direta no caixa via Web Serial (sem drivers)?",
+    resposta:
+      "O MAYaMenu integra nativamente a Web Serial API (disponível no Google Chrome, Edge e Opera). O operador conecta a impressora térmica USB de 58mm ou 80mm ao computador e clica em 'Imprimir Comanda'. O navegador solicita autorização uma única vez e memoriza a porta pareada para todas as impressões seguintes, enviando comandos ESC/POS com corte automático de papel e sem depender de servidores de spool intermediários.",
   },
   {
     categoria: "tecnico",
@@ -57,7 +74,19 @@ const FAQS: FaqItem[] = [
     categoria: "tecnico",
     pergunta: "Qual impressora térmica é recomendada para comandas e cupons?",
     resposta:
-      "O MAYaMenu foi projetado para operar 100% sem papel com o monitor de cozinha KDS. Porém, se o seu restaurante utiliza impressora térmica física, qualquer equipamento padrão ESC/POS de 80mm ou 58mm (conectado via USB, Rede ou Spooler do Windows/Linux) pode ser disparado diretamente do navegador com um clique.",
+      "Qualquer impressora térmica padrão ESC/POS de 80mm ou 58mm (Epson, Elgin, Daruma, Bematech, Xprinter, pos58/pos80). O envio de dados pode ser feito tanto pela porta USB direta com Web Serial quanto pela caixa de diálogo de impressão tradicional do sistema operacional.",
+  },
+  {
+    categoria: "financeiro",
+    pergunta: "O cupom impresso pode sair com QR Code Pix dinâmico no valor exato da mesa?",
+    resposta:
+      "Sim! O motor gráfico ESC/POS do MAYaMenu desenha nativamente na bobina térmica o QR Code com o payload canônico EMV do Banco Central (padrão BR Code com checksum CRC16-CCITT). O cliente pode apontar o aplicativo bancário para o papel e quitar a conta em segundos, com o valor exato e chave Pix já preenchidos.",
+  },
+  {
+    categoria: "financeiro",
+    pergunta: "Como funcionam as cotas e limites de pratos e mesas nos diferentes planos?",
+    resposta:
+      "A Concessão Free permite até 15 pratos e 5 mesas de forma perene e vitalícia. O Plano Pro expande a capacidade para até 150 pratos e 30 mesas com relatórios avançados. O Plano VIP atende operações de alto volume com pratos e mesas ilimitados.",
   },
   {
     categoria: "financeiro",
@@ -105,18 +134,29 @@ export default function ManualPage() {
             </div>
           </Link>
 
-          <div className="hidden md:flex items-center gap-6 text-xs font-bold text-neutral-600">
+          <div className="hidden md:flex items-center gap-5 text-xs font-bold text-neutral-600">
             <a href="#guia-rapido" className="hover:text-rose-600 transition-colors">
               Guia Rápido
             </a>
             <a href="#modos-salao" className="hover:text-rose-600 transition-colors">
               Modos do Salão
             </a>
+            <a href="#impressao-pix" className="hover:text-rose-600 transition-colors flex items-center gap-1.5">
+              <Printer className="w-3.5 h-3.5 text-rose-500" />
+              <span>Impressão & Pix</span>
+              <span className="px-1 py-0.2 rounded text-[8px] font-black uppercase tracking-wider bg-rose-100 text-rose-700 border border-rose-200">
+                NOVO
+              </span>
+            </a>
+            <a href="#seguranca-caixa" className="hover:text-rose-600 transition-colors flex items-center gap-1">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
+              Segurança do Caixa
+            </a>
             <a href="#faq" className="hover:text-rose-600 transition-colors">
-              FAQ Operacional
+              FAQ
             </a>
             <a href="#politicas" className="hover:text-rose-600 transition-colors">
-              Políticas & Garantias
+              Políticas
             </a>
           </div>
 
@@ -281,6 +321,131 @@ export default function ManualPage() {
               <h3 className="text-base font-black text-neutral-900">Fast Food & Cafeterias</h3>
               <p className="text-xs text-neutral-600 leading-relaxed">
                 Sem necessidade de mesas fixas. Os clientes realizam os pedidos no balcão ou via QR de totem, efetuam o pagamento antecipado e retiram o pedido pelo número da senha gerada.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* SEÇÃO NOVA: IMPRESSÃO DIRETA WEB SERIAL & QR CODE PIX ESC/POS */}
+      <section id="impressao-pix" className="py-16 px-4 sm:px-6 bg-neutral-50 border-b border-neutral-200 text-neutral-900">
+        <div className="max-w-5xl mx-auto space-y-12">
+          <div className="text-center space-y-2">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-50 border border-rose-200 text-rose-700 text-[11px] font-black uppercase tracking-wider">
+              <Sparkles className="w-3.5 h-3.5 text-rose-600" />
+              Inovação de Hardware no Navegador • NOVIDADE
+            </div>
+            <h2 className="text-2xl sm:text-3xl font-black text-neutral-950 tracking-tight flex items-center justify-center gap-2">
+              <Printer className="w-7 h-7 text-rose-600" />
+              Impressão Térmica ESC/POS USB & QR Code Pix Nativo
+            </h2>
+            <p className="text-xs sm:text-sm text-neutral-600 max-w-2xl mx-auto">
+              Imprima comprovantes e comandas direto do Google Chrome ou Edge sem instalar drivers, servidores de spool ou DLLs locais.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="p-6 rounded-3xl bg-white border border-neutral-200/90 shadow-sm space-y-3">
+              <div className="w-10 h-10 rounded-2xl bg-rose-50 border border-rose-100 text-rose-600 flex items-center justify-center">
+                <Cpu className="w-5 h-5" />
+              </div>
+              <div className="flex items-center justify-between">
+                <h3 className="text-base font-black text-neutral-900">Web Serial API Nativa</h3>
+                <span className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-rose-100 text-rose-700 border border-rose-200">
+                  NOVO
+                </span>
+              </div>
+              <p className="text-xs text-neutral-600 leading-relaxed">
+                Comunicação serial direta com impressoras térmicas USB de 58mm e 80mm. O operador autoriza a porta USB uma única vez e o sistema memoriza o dispositivo permanentemente para disparos com 1 clique.
+              </p>
+              <div className="pt-2 text-[11px] font-bold text-rose-600">
+                Suporte: Epson, Elgin, Daruma, Bematech, pos58/80.
+              </div>
+            </div>
+
+            <div className="p-6 rounded-3xl bg-white border border-neutral-200/90 shadow-sm space-y-3">
+              <div className="w-10 h-10 rounded-2xl bg-emerald-50 border border-emerald-100 text-emerald-600 flex items-center justify-center">
+                <QrCode className="w-5 h-5" />
+              </div>
+              <div className="flex items-center justify-between">
+                <h3 className="text-base font-black text-neutral-900">QR Code Pix no Papel</h3>
+                <span className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-200">
+                  NOVO
+                </span>
+              </div>
+              <p className="text-xs text-neutral-600 leading-relaxed">
+                Desenho de QR Code vetorial direto na bobina via bytecode ESC/POS (Function 165-181) com payload canônico BACEN (BR Code) e soma de verificação CRC16-CCITT com valor exato da mesa.
+              </p>
+              <div className="pt-2 text-[11px] font-bold text-emerald-600">
+                O cliente escaneia o cupom físico e paga no Pix na hora.
+              </div>
+            </div>
+
+            <div className="p-6 rounded-3xl bg-white border border-neutral-200/90 shadow-sm space-y-3">
+              <div className="w-10 h-10 rounded-2xl bg-amber-50 border border-amber-100 text-amber-600 flex items-center justify-center">
+                <Receipt className="w-5 h-5" />
+              </div>
+              <div className="flex items-center justify-between">
+                <h3 className="text-base font-black text-neutral-900">Anti-Mojibake & Guilhotina</h3>
+                <span className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-200">
+                  PADRÃO NFD
+                </span>
+              </div>
+              <p className="text-xs text-neutral-600 leading-relaxed">
+                Normalização Unicode NFD automática que remove caracteres corrompidos em acentos e cedilhas, com alinhamento tabular e comando de corte automático de papel (GS V) ao fim da impressão.
+              </p>
+              <div className="pt-2 text-[11px] font-bold text-amber-600">
+                Impressão limpa, legível e padronizada.
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* SEÇÃO NOVA: SEGURANÇA OPERACIONAL & TRAVA MESTRA */}
+      <section id="seguranca-caixa" className="py-16 px-4 sm:px-6 bg-white border-b border-neutral-200">
+        <div className="max-w-5xl mx-auto space-y-12">
+          <div className="text-center space-y-2">
+            <span className="text-xs font-black uppercase tracking-widest text-emerald-600">
+              Integridade do Salão e Caixa
+            </span>
+            <h2 className="text-2xl sm:text-3xl font-black text-neutral-950 tracking-tight flex items-center justify-center gap-2">
+              <ShieldCheck className="w-7 h-7 text-emerald-600" />
+              Ciclo da Mesa & Trava Mestra Anti-Reabertura (Tombstone)
+            </h2>
+            <p className="text-xs sm:text-sm text-neutral-500 max-w-xl mx-auto">
+              Arquitetura à prova de fraudes: garanta que mesas quitadas não sejam adulteradas ou reabertas por engano.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="p-6 rounded-3xl bg-neutral-50 border border-neutral-200/80 space-y-3">
+              <div className="w-10 h-10 rounded-2xl bg-blue-50 border border-blue-100 text-blue-600 flex items-center justify-center font-black">
+                1
+              </div>
+              <h3 className="text-base font-black text-neutral-900">Consumo & Sincronização</h3>
+              <p className="text-xs text-neutral-600 leading-relaxed">
+                Clientes pedem no celular ou garçom lança no app. Os pedidos alimentam o KDS da cozinha instantaneamente em tempo real.
+              </p>
+            </div>
+
+            <div className="p-6 rounded-3xl bg-neutral-50 border border-neutral-200/80 space-y-3">
+              <div className="w-10 h-10 rounded-2xl bg-amber-50 border border-amber-100 text-amber-600 flex items-center justify-center font-black">
+                2
+              </div>
+              <h3 className="text-base font-black text-neutral-900">Fechamento & Tombstone</h3>
+              <p className="text-xs text-neutral-600 leading-relaxed">
+                Ao receber o pagamento no caixa ou via Pix, a comanda recebe status "pago", carimbo de data/hora e a mesa é liberada para novos clientes.
+              </p>
+            </div>
+
+            <div className="p-6 rounded-3xl bg-neutral-50 border border-neutral-200/80 space-y-3">
+              <div className="w-10 h-10 rounded-2xl bg-emerald-50 border border-emerald-100 text-emerald-600 flex items-center justify-center font-black">
+                3
+              </div>
+              <h3 className="text-base font-black text-neutral-900">Bloqueio nas Firestore Rules</h3>
+              <p className="text-xs text-neutral-600 leading-relaxed">
+                As regras do banco de dados rejeitam qualquer mutação vinda de clientes se o documento estiver com status "pago", blindando o fechamento de caixa.
               </p>
             </div>
           </div>

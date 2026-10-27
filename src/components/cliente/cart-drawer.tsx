@@ -216,8 +216,12 @@ export function CartDrawer({
         // Chegou aqui? Está salvo (ou na nuvem, ou no cache local)
         const isOffline = typeof navigator !== "undefined" && !navigator.onLine;
         setUsouOffline(isOffline);
-      } catch (firestoreErr) {
-        // Este catch SÓ é disparado se o próprio IndexedDB falhar ou estiver cheio
+      } catch (firestoreErr: any) {
+        if (firestoreErr?.code === "permission-denied") {
+          alert("Esta comanda já foi encerrada e paga no caixa. Não é possível lançar novos pedidos.");
+          setEnviando(false);
+          return;
+        }
         console.error("Falha na gravação atômica:", firestoreErr);
         setUsouOffline(true);
       }

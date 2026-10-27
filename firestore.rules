@@ -122,10 +122,14 @@ service cloud.firestore {
         match /comandas_abertas/{clienteId} {
           allow read: if true;
 
-          allow create: if isSignedIn() || request.resource.data.id == clienteId;
+          // Criação: somente se NÃO estiver criando já como pago
+          allow create: if (isSignedIn() || request.resource.data.id == clienteId)
+            && request.resource.data.status in ['pedindo', 'aguardando_pratos'];
 
+          // Trava mestra: Se está pago, o cliente não toca mais!
           allow update: if (isSignedIn() && (
             (request.auth.uid == clienteId 
+              && resource.data.status != 'pago'
               && (
                 // Permite chamar o garçom mantendo o status ou qualquer transição válida
                 request.resource.data.status == resource.data.status
@@ -135,6 +139,7 @@ service cloud.firestore {
           )) || (
             // Permite atualização de chamado do garçom pelo cliente
             request.resource.data.id == resource.data.id
+            && resource.data.status != 'pago'
           );
 
           // Apenas o Garçom/Dono do restaurante pode libertar e encerrar a mesa
@@ -146,7 +151,10 @@ service cloud.firestore {
             allow read: if true;
 
             allow create: if (isSignedIn() && (
-              (request.auth.uid == clienteId && request.resource.data.status == 'a_fazer')
+              (request.auth.uid == clienteId 
+                && request.resource.data.status == 'a_fazer'
+                && get(/databases/$(database)/documents/restaurantes/$(restauranteId)/mesas/$(numeroMesa)/comandas_abertas/$(clienteId)).data.status != 'pago'
+              )
               || isOwner(restauranteId)
             )) || request.resource.data.status == 'a_fazer';
 

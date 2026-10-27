@@ -13,6 +13,7 @@ import {
   orderBy,
   onSnapshot,
   serverTimestamp,
+  writeBatch,
   type Unsubscribe,
 } from "firebase/firestore";
 import type { Licenca, PlanoTipo, LimitesPlano, Restaurante } from "@/types";
@@ -96,7 +97,150 @@ export async function criarNovaLicenca(params: {
     console.warn("Firestore bloqueado ou offline para concessões. Salvo localmente com sucesso:", err);
   }
 
-  return novaLicenca;
+    return novaLicenca;
+}
+
+/**
+ * Fábrica de Concessões: Emite um lote de novas licenças em massa (Ação do SuperAdmin)
+ */
+export async function criarLoteLicencas(params: {
+  quantidade: number;
+  plano: PlanoTipo;
+  responsavelPrefixo?: string;
+  notas?: string;
+  horasValidade?: number;
+  limitesPersonalizados?: Partial<LimitesPlano>;
+}): Promise<Licenca[]> {
+  const qtd = Math.min(Math.max(1, params.quantidade), 100); // 1 a 100 licenças por lote
+  const limitesBase = LIMITES_POR_PLANO[params.plano];
+  const limites: LimitesPlano = {
+    maxPratos: params.limitesPersonalizados?.maxPratos ?? limitesBase.maxPratos,
+    maxMesas: params.limitesPersonalizados?.maxMesas ?? limitesBase.maxMesas,
+  };
+
+  const agora = new Date();
+  let expiracaoEm: Date | undefined = undefined;
+  if (params.horasValidade && params.horasValidade > 0) {
+    expiracaoEm = new Date(agora.getTime() + params.horasValidade * 60 * 60 * 1000);
+  }
+
+  const loteCriado: Licenca[] = [];
+  const codigosGerados = new Set<string>();
+
+  for (let i = 1; i <= qtd; i++) {
+    let codigo = gerarCodigoLicenca();
+    while (codigosGerados.has(codigo)) {
+      codigo = gerarCodigoLicenca();
+    }
+    codigosGerados.add(codigo);
+
+    const responsavel = params.responsavelPrefixo
+      ? `${params.responsavelPrefixo.trim()} #${String(i).padStart(2, "0")}`
+      : "";
+
+    loteCriado.push({
+      id: codigo,
+      status: "disponivel",
+      plano: params.plano,
+      limites,
+      criadaEm: agora,
+      expiracaoEm,
+      responsavel,
+      notas: params.notas?.trim() || "",
+    });
+  }
+
+  // 1. Salva localmente
+  salvarLoteLicencasLocal(loteCriado);
+
+  // 2. Persiste em batches atômicos no Firestore
+  try {
+    const CHUNK_SIZE = 400;
+    for (let i = 0; i < loteCriado.length; i += CHUNK_SIZE) {
+      const chunk = loteCriado.slice(i, i + CHUNK_SIZE);
+      const batch = writeBatch(db);
+      for (const lic of chunk) {
+        const ref = doc(db, "concessoes", lic.id);
+        batch.set(ref, {
+          ...lic,
+          criadaEm: serverTimestamp(),
+        });
+      }
+      await batch.commit();
+    }
+  } catch (err) {
+    console.warn("Falha ao salvar lote no Firestore, mantido em cache local:", err);
+  }
+
+  return loteCriado;
+}
+
+/**
+ * Exporta uma lista de licenças para formato CSV com link de ativação
+ */
+export function gerarCSVLicencas(licencas: Licenca[], baseUrl?: string): string {
+  const origin = baseUrl || (typeof window !== "undefined" ? window.location.origin : "");
+  const headers = [
+    "Codigo",
+    "Plano",
+    "Status",
+    "Link_Ativacao",
+    "Responsavel",
+    "Observacoes",
+    "Validade",
+    "Max_Pratos",
+    "Max_Mesas",
+  ];
+
+  const rows = licencas.map((lic) => {
+    const link = `${origin}/ativar/${lic.id}`;
+    return [
+      `"${lic.id}"`,
+      `"${lic.plano.toUpperCase()}"`,
+      `"${lic.status}"`,
+      `"${link}"`,
+      `"${(lic.responsavel || "").replace(/"/g, '""')}"`,
+      `"${(lic.notas || "").replace(/"/g, '""')}"`,
+      lic.expiracaoEm ? `"${new Date(lic.expiracaoEm).toLocaleString("pt-BR")}"` : `"Sem expiracao"`,
+      lic.limites.maxPratos,
+      lic.limites.maxMesas,
+    ].join(",");
+  });
+
+  return [headers.join(","), ...rows].join("\r\n");
+}
+
+/**
+ * Dispara o download de arquivo CSV no navegador
+ */
+export function baixarCSVLicencas(licencas: Licenca[], nomeArquivo?: string): void {
+  if (typeof window === "undefined") return;
+  const csvContent = "\uFEFF" + gerarCSVLicencas(licencas);
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  const dataStr = new Date().toISOString().slice(0, 10);
+  link.setAttribute("href", url);
+  link.setAttribute("download", nomeArquivo || `concessoes_mayamenu_${dataStr}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+/**
+ * Gera texto formatado para copiar e colar no WhatsApp, Telegram ou Slack
+ */
+export function formatarLicencasClipboard(licencas: Licenca[], baseUrl?: string): string {
+  const origin = baseUrl || (typeof window !== "undefined" ? window.location.origin : "");
+  const linhas = licencas.map((lic, idx) => {
+    const link = `${origin}/ativar/${lic.id}`;
+    const plano = lic.plano.toUpperCase();
+    const resp = lic.responsavel ? ` (${lic.responsavel})` : "";
+    return `${idx + 1}. [${plano}] ${lic.id}${resp}\n   🔗 ${link}`;
+  });
+
+  return `🎫 MAYaMenu - Lote de Concessões (${licencas.length} emitidas):\n\n${linhas.join("\n\n")}\n\n⚠️ Instruções: O lojista só precisa clicar no link para cadastrar e ativar o restaurante instantaneamente.`;
 }
 
 /**
@@ -740,6 +884,24 @@ function salvarLicencaLocal(licenca: Licenca): void {
     localStorage.setItem("mayamenu_concessoes_locais", JSON.stringify(novaLista));
   } catch (e) {
     console.warn("Falha ao salvar licença no localStorage:", e);
+  }
+}
+
+function salvarLoteLicencasLocal(novas: Licenca[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    const locais = obterLicencasLocais();
+    const mapa = new Map<string, Licenca>();
+    for (const l of locais) {
+      mapa.set(l.id, l);
+    }
+    for (const n of novas) {
+      mapa.set(n.id, n);
+    }
+    const listaFinal = Array.from(mapa.values());
+    localStorage.setItem("mayamenu_concessoes_locais", JSON.stringify(listaFinal));
+  } catch (e) {
+    console.warn("Falha ao salvar lote no localStorage:", e);
   }
 }
 

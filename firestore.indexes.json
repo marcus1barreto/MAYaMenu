@@ -27,6 +27,24 @@
           "order": "DESCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "comandas_abertas",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "arquivada",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "encerradaEm",
+          "order": "ASCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": [

@@ -12,6 +12,12 @@ import {
   LogIn,
   Zap,
   Store,
+  Printer,
+  QrCode,
+  ShieldCheck,
+  Boxes,
+  Cpu,
+  FileSpreadsheet,
 } from "lucide-react";
 
 export const metadata: Metadata = {
@@ -54,9 +60,15 @@ export default function LandingPage() {
             </div>
           </Link>
 
-          <nav className="hidden md:flex items-center gap-8 text-sm font-semibold text-neutral-600">
+          <nav className="hidden md:flex items-center gap-7 text-sm font-semibold text-neutral-600">
             <a href="#pilares" className="hover:text-rose-600 transition-colors">
               Como Funciona
+            </a>
+            <a href="#novidades" className="hover:text-rose-600 transition-colors flex items-center gap-1.5">
+              <span>Novidades</span>
+              <span className="px-1 py-0.2 rounded text-[8px] font-black uppercase tracking-wider bg-rose-100 text-rose-700 border border-rose-200">
+                NOVO
+              </span>
             </a>
             <a href="#precos" className="hover:text-rose-600 transition-colors">
               Tarifa Flexível
@@ -237,6 +249,122 @@ export default function LandingPage() {
                 <span>Radar proativo de salão e mesas</span>
               </div>
             </article>
+          </div>
+        </section>
+
+        {/* 3.1 SEÇÃO NOVIDADES & ATUALIZAÇÕES TECNOLÓGICAS (LANÇAMENTOS RECENTES) */}
+        <section id="novidades" className="py-16 md:py-24 border-t border-neutral-200/80 bg-gradient-to-b from-neutral-50/70 via-white to-white">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6">
+            <div className="text-center max-w-3xl mx-auto mb-12 sm:mb-16">
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-rose-50 border border-rose-200 text-rose-700 text-xs font-black uppercase tracking-wider mb-3 shadow-2xs">
+                <Sparkles className="w-3.5 h-3.5 text-rose-600" />
+                <span>Lançamentos & Inovações 2026</span>
+              </div>
+              <h2 className="text-2xl sm:text-4xl font-black text-neutral-950 tracking-tight">
+                O MAYaMenu está sempre um passo à frente no seu salão
+              </h2>
+              <p className="mt-3 text-neutral-600 text-sm sm:text-base max-w-2xl mx-auto">
+                Tecnologias recém-lançadas para acelerar o fechamento de contas, cortar custos com equipamentos caros e blindar a segurança financeira do seu restaurante.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {/* Card 1: Web Serial USB */}
+              <article className="p-6 sm:p-7 rounded-3xl bg-white border border-neutral-200/90 shadow-sm hover:shadow-md hover:border-rose-300 transition-all flex flex-col justify-between group">
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="w-11 h-11 rounded-2xl bg-rose-50 border border-rose-100 text-rose-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <Printer className="w-5 h-5" />
+                    </div>
+                    <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-rose-100 text-rose-700 border border-rose-200">
+                      NOVO
+                    </span>
+                  </div>
+                  <h3 className="text-lg font-black text-neutral-950 mb-2">
+                    Impressão Web Serial (Sem Drivers)
+                  </h3>
+                  <p className="text-xs text-neutral-600 leading-relaxed">
+                    Conecte impressoras térmicas USB de 58mm ou 80mm direto no Google Chrome ou Edge. O sistema memoriza o dispositivo e corta o papel automaticamente sem instalar drivers locais.
+                  </p>
+                </div>
+                <div className="mt-5 pt-3 border-t border-neutral-100 flex items-center gap-1.5 text-[11px] font-bold text-rose-600">
+                  <Cpu className="w-3.5 h-3.5" />
+                  <span>Epson, Elgin, Bematech e pos80</span>
+                </div>
+              </article>
+
+              {/* Card 2: Pix ESC/POS */}
+              <article className="p-6 sm:p-7 rounded-3xl bg-white border border-neutral-200/90 shadow-sm hover:shadow-md hover:border-emerald-300 transition-all flex flex-col justify-between group">
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="w-11 h-11 rounded-2xl bg-emerald-50 border border-emerald-100 text-emerald-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <QrCode className="w-5 h-5" />
+                    </div>
+                    <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-200">
+                      NOVO
+                    </span>
+                  </div>
+                  <h3 className="text-lg font-black text-neutral-950 mb-2">
+                    QR Code Pix Impresso no Papel
+                  </h3>
+                  <p className="text-xs text-neutral-600 leading-relaxed">
+                    O cupom impresso sai com o QR Code Pix vetorizado com o valor exato da mesa e checksum CRC16 do Banco Central. O cliente aponta o celular e paga na hora da entrega da conta.
+                  </p>
+                </div>
+                <div className="mt-5 pt-3 border-t border-neutral-100 flex items-center gap-1.5 text-[11px] font-bold text-emerald-600">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>Zero taxa • Direto na sua conta</span>
+                </div>
+              </article>
+
+              {/* Card 3: Trava Mestra Tombstone */}
+              <article className="p-6 sm:p-7 rounded-3xl bg-white border border-neutral-200/90 shadow-sm hover:shadow-md hover:border-blue-300 transition-all flex flex-col justify-between group">
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="w-11 h-11 rounded-2xl bg-blue-50 border border-blue-100 text-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <ShieldCheck className="w-5 h-5" />
+                    </div>
+                    <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-blue-100 text-blue-800 border border-blue-200">
+                      SEGURANÇA
+                    </span>
+                  </div>
+                  <h3 className="text-lg font-black text-neutral-950 mb-2">
+                    Trava Mestra no Caixa (Tombstone)
+                  </h3>
+                  <p className="text-xs text-neutral-600 leading-relaxed">
+                    Blindagem nas regras de banco de dados: mesas pagas são seladas de forma definitiva. Clientes jamais conseguem reabrir comandas ou adicionar itens a contas encerradas.
+                  </p>
+                </div>
+                <div className="mt-5 pt-3 border-t border-neutral-100 flex items-center gap-1.5 text-[11px] font-bold text-blue-600">
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  <span>Fechamento à prova de adulterações</span>
+                </div>
+              </article>
+
+              {/* Card 4: Fábrica de Licenças */}
+              <article className="p-6 sm:p-7 rounded-3xl bg-white border border-neutral-200/90 shadow-sm hover:shadow-md hover:border-amber-300 transition-all flex flex-col justify-between group">
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="w-11 h-11 rounded-2xl bg-amber-50 border border-amber-100 text-amber-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <Boxes className="w-5 h-5" />
+                    </div>
+                    <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-200">
+                      B2B / REDES
+                    </span>
+                  </div>
+                  <h3 className="text-lg font-black text-neutral-950 mb-2">
+                    Fábrica de Licenças & Lotes CSV
+                  </h3>
+                  <p className="text-xs text-neutral-600 leading-relaxed">
+                    Emita pacotes de 5 a 50 licenças com 1 clique para redes de franquias, eventos ou parceiros comerciais, com exportação instantânea para planilha e disparo direto no WhatsApp.
+                  </p>
+                </div>
+                <div className="mt-5 pt-3 border-t border-neutral-100 flex items-center gap-1.5 text-[11px] font-bold text-amber-600">
+                  <FileSpreadsheet className="w-3.5 h-3.5" />
+                  <span>Onboarding em menos de 1 minuto</span>
+                </div>
+              </article>
+            </div>
           </div>
         </section>
 

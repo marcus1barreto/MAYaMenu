@@ -58,6 +58,7 @@ export function MenuView({ restaurante: restauranteInicial, cardapio: cardapioIn
   const [menuLateralAberto, setMenuLateralAberto] = useState(false);
   const [buscaAberta, setBuscaAberta] = useState(false);
   const [contaPagaModal, setContaPagaModal] = useState(false);
+  const [metodoPagamentoEncerrado, setMetodoPagamentoEncerrado] = useState<string | null>(null);
   const [sessaoFinalizada, setSessaoFinalizada] = useState(false);
   const [subtotalComandaBanco, setSubtotalComandaBanco] = useState(0);
   const [busca, setBusca] = useState("");
@@ -138,9 +139,13 @@ export function MenuView({ restaurante: restauranteInicial, cardapio: cardapioIn
     let ultimoStatus: string | null = null;
     let encerrado = false;
 
-    const encerrarPorPagamento = () => {
+    const encerrarPorPagamento = (metodo?: string) => {
       if (encerrado) return;
       encerrado = true;
+
+      if (metodo) {
+        setMetodoPagamentoEncerrado(metodo);
+      }
 
       // Mata os listeners imediatamente para evitar loop
       if (unsubComanda) {
@@ -198,7 +203,7 @@ export function MenuView({ restaurante: restauranteInicial, cardapio: cardapioIn
           if (data.status === "conta_pedida") {
             setContaPedidaSucesso(true);
           } else if (data.status === "pago") {
-            encerrarPorPagamento();
+            encerrarPorPagamento(data.metodoPagamento);
           }
         } else if (ultimoStatus && ultimoStatus !== "pago") {
           // A comanda foi removida pelo garçom/admin ao liberar a mesa: conta encerrada
@@ -952,9 +957,15 @@ export function MenuView({ restaurante: restauranteInicial, cardapio: cardapioIn
             </div>
 
             <div className="space-y-1.5">
-              <h3 className="text-xl font-black text-white">Conta Paga com Sucesso!</h3>
+              <h3 className="text-xl font-black text-white">
+                {metodoPagamentoEncerrado === "pix"
+                  ? "Pix Recebido com Sucesso!"
+                  : "Conta Paga com Sucesso!"}
+              </h3>
               <p className="text-xs text-neutral-400 leading-relaxed">
-                Seu pagamento foi confirmado pelo restaurante. A comanda da <strong>Mesa {numeroMesa}</strong> foi encerrada.
+                {metodoPagamentoEncerrado === "pix"
+                  ? "Seu pagamento via Pix foi confirmado pelo restaurante. Agradecemos a preferência!"
+                  : `Seu pagamento foi confirmado pelo restaurante. A comanda da Mesa ${numeroMesa} foi encerrada.`}
               </p>
               <p className="text-xs text-rose-400 font-semibold pt-1">
                 Muito obrigado pela visita! Volte sempre! ✨

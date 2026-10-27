@@ -488,6 +488,7 @@ export function escutarComandasSalão(
       const lista: (ComandaCliente & { refPath: string })[] = [];
       snapshot.forEach((d) => {
         const data = d.data() as ComandaCliente;
+        if (data.status === "pago" || (data as any).arquivada === true) return;
         lista.push({
           ...data,
           id: d.id,
@@ -745,8 +746,13 @@ export async function liberarMesaFirestore(
       console.warn(`Aviso ao ler comanda ${cId} para consolidar histórico da mesa:`, e);
     }
 
-    // Apaga a comanda ativa após copiar para o histórico
-    batch.delete(comandaRef);
+    // Sela a comanda ativa como 'pago' (tombstone) para disparar o onSnapshot do cliente
+    batch.update(comandaRef, {
+      status: "pago",
+      encerradaEm: serverTimestamp(),
+      arquivada: true,
+      atualizadoEm: serverTimestamp(),
+    });
   }
 
   // 2. Gravação atômica do documento histórico de sessão
@@ -1181,10 +1187,13 @@ export async function fecharContaMesa(
     });
   });
 
-  // 3. Libera a mesa excluindo a comanda pai
-  // (Nota: excluir o doc pai no Firestore NÃO apaga a subcoleção, o que preserva
-  // os pedidos no banco para auditoria/histórico, mas esvazia a mesa no salão)
-  batch.delete(comandaRef);
+  // 3. Sela a comanda pai como 'pago' (tombstone) para disparar feedback em tempo real
+  batch.update(comandaRef, {
+    status: "pago",
+    encerradaEm: serverTimestamp(),
+    arquivada: true,
+    atualizadoEm: serverTimestamp(),
+  });
 
   // 4. Executa a transação completa de uma vez só
   await batch.commit();
