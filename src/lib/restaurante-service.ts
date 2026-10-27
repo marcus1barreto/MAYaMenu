@@ -25,6 +25,7 @@ import type { Restaurante, MenuItem, PedidoRodada, PedidoComRef, StatusPedido, C
 import { RESTAURANTE_DEMO, CARDAPIO_DEMO } from "@/lib/mock-data";
 import { normalizarItemCardapio } from "@/lib/modificadores";
 import { millisOu } from "@/lib/datas";
+import { enfileirarPedidoOffline } from "@/lib/offline-queue";
 
 /**
  * Verifica se um slug já está em uso por outro restaurante no Firestore
@@ -93,6 +94,7 @@ export async function obterRestaurantePorSlugValido(slug: string): Promise<Resta
           modoFilaKds: data.configuracoes?.modoFilaKds || "sequencial",
           taxaServico: typeof data.configuracoes?.taxaServico === "number" ? data.configuracoes.taxaServico : 10,
           suspenso: data.configuracoes?.suspenso,
+          pixConfig: data.configuracoes?.pixConfig,
         },
       };
     }
@@ -120,6 +122,7 @@ export async function obterRestaurantePorSlugValido(slug: string): Promise<Resta
           modoFilaKds: data.configuracoes?.modoFilaKds || "sequencial",
           taxaServico: typeof data.configuracoes?.taxaServico === "number" ? data.configuracoes.taxaServico : 10,
           suspenso: data.configuracoes?.suspenso,
+          pixConfig: data.configuracoes?.pixConfig,
         },
       };
     }
@@ -173,6 +176,7 @@ export function escutarRestaurante(
             modoFilaKds: data.configuracoes?.modoFilaKds || "sequencial",
             taxaServico: typeof data.configuracoes?.taxaServico === "number" ? data.configuracoes.taxaServico : 10,
             suspenso: data.configuracoes?.suspenso,
+            pixConfig: data.configuracoes?.pixConfig,
           },
         });
       } else if (isDemo) {
@@ -394,55 +398,72 @@ export async function popularCardapioInicialSeVazio(restauranteId: string): Prom
 }
 
 /**
- * Escuta os pedidos/rodadas de cozinha em tempo real usando collectionGroup("pedidos").
- * O KDS filtra os pratos pelo restaurante logado (por UID ou por Slug).
+ * Escuta os tickets do KDS diretamente na subcoleção isolada /kds_tickets.
+ * A Cozinha NÃO lê as mesas. Lê apenas a fila de tickets pendentes.
  */
 export function escutarPedidosKds(
-  restauranteIdOuSlug: string,
-  onAtualizacao: (pedidos: PedidoComRef[]) => void,
-  slugAlternativo?: string
+  restauranteId: string,
+  onAtualizacao: (pedidos: any[]) => void
 ): Unsubscribe {
-  const idsParaBuscar = Array.from(
-    new Set([restauranteIdOuSlug, slugAlternativo].filter(Boolean) as string[])
-  );
+  const idFinal = (restauranteId || "demo").trim();
+  const kdsCollectionRef = collection(db, "restaurantes", idFinal, "kds_tickets");
 
-  const q = idsParaBuscar.length > 1
-    ? query(collectionGroup(db, "pedidos"), where("restauranteId", "in", idsParaBuscar))
-    : query(collectionGroup(db, "pedidos"), where("restauranteId", "==", idsParaBuscar[0]));
+  // O banco retorna apenas o que a cozinha precisa fazer AGORA. Zero sobrecarga de histórico.
+  const q = query(
+    kdsCollectionRef,
+    where("status", "in", ["a_fazer", "pronto"])
+  );
 
   return onSnapshot(
     q,
     (snapshot) => {
-      const lista: PedidoComRef[] = [];
+      const lista: any[] = [];
       snapshot.forEach((d) => {
-        const data = d.data() as PedidoRodada;
+        const data = d.data();
+        let horarioFormatado = "Agora";
+        if (data.criadoEm?.toDate) {
+          horarioFormatado = data.criadoEm.toDate().toLocaleTimeString("pt-BR", {
+            hour: "2-digit",
+            minute: "2-digit",
+          });
+        }
         lista.push({
           ...data,
           id: d.id,
           refPath: d.ref.path,
+          horario: horarioFormatado,
         });
       });
 
-      // Ordena por data de criação decrescente no cliente
-      lista.sort((a, b) => millisOu(b.criadoEm) - millisOu(a.criadoEm));
+      // Ordena por data crescente (FIFO - mais antigos primeiro para a esteira marchar)
+      lista.sort((a, b) => millisOu(a.criadoEm) - millisOu(b.criadoEm));
 
       onAtualizacao(lista);
     },
-    (err) => {
-      console.warn("Listener do KDS indisponível (offline ou index pendente):", err);
-    }
+    (err) => console.warn("Listener do KDS falhou:", err)
   );
 }
 
 /**
  * Atualiza o status de preparo do pedido no Firestore ('a_fazer' -> 'pronto' -> 'entregue').
+ * Atualiza o ticket no KDS e, opcionalmente, sincroniza na comanda pai da mesa.
  */
 export async function atualizarStatusPedido(
   refPath: string,
-  novoStatus: StatusPedido
+  novoStatus: StatusPedido,
+  options?: { pedidoRefPath?: string }
 ): Promise<void> {
   const pedidoRef = doc(db, refPath);
-  await updateDoc(pedidoRef, { status: novoStatus });
+  await updateDoc(pedidoRef, { status: novoStatus, atualizadoEm: serverTimestamp() });
+
+  if (options?.pedidoRefPath) {
+    try {
+      const pedidoOriginalRef = doc(db, options.pedidoRefPath);
+      await updateDoc(pedidoOriginalRef, { status: novoStatus });
+    } catch (e) {
+      console.warn("Aviso ao sincronizar status na comanda do cliente:", e);
+    }
+  }
 }
 
 /**
@@ -709,6 +730,9 @@ export async function liberarMesaFirestore(
             }
             // Apaga os pedidos ativos para limpar o KDS
             batch.delete(pDoc.ref);
+            // Também remove o ticket desacoplado na fila do KDS para não deixar tickets zumbis na cozinha
+            const kdsTicketRef = doc(db, "restaurantes", restauranteId, "kds_tickets", pDoc.id);
+            batch.delete(kdsTicketRef);
           });
         } catch (e) {
           console.warn("Falha ao buscar pedidos da comanda para baixa em lote:", e);
@@ -863,8 +887,31 @@ export async function injetarTicketContingencia(
     status: "aguardando_pratos" as const,
   };
 
-  await setDoc(comandaRef, dadosComanda, { merge: true });
-  await setDoc(pedidoRef, dadosPedido);
+  const kdsRef = doc(db, "restaurantes", restauranteId, "kds_tickets", ticket.id);
+  const payloadKds = {
+    id: ticket.id,
+    mesa: ticket.mesa,
+    numeroMesa: Number(ticket.mesa) || ticket.mesa,
+    clienteId: ticket.clienteId,
+    nomeCliente: ticket.nomeCliente,
+    status: "a_fazer" as const,
+    pedidoRefPath: pedidoRef.path,
+    itens: ticket.itens.map((i) => ({
+      menuItemId: i.menuItemId,
+      nome: i.nome || "",
+      quantidade: i.quantidade,
+      tempoPreparoEstimado: (i as any).tempoPreparoEstimado,
+      modificadores: i.modificadores || [],
+      observacoes: i.observacoes || "",
+    })),
+    criadoEm: agoraTimestamp,
+  };
+
+  const batch = writeBatch(db);
+  batch.set(comandaRef, dadosComanda, { merge: true });
+  batch.set(pedidoRef, dadosPedido);
+  batch.set(kdsRef, payloadKds);
+  await batch.commit();
 }
 
 /**
@@ -887,28 +934,6 @@ export async function lancarItemManualFirestore(params: {
   const pedidoId = `ped-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
   const subtotalItem = (Number(params.item.precoBase) || 0) * params.quantidade;
 
-  const comandaRef = doc(
-    db,
-    "restaurantes",
-    idFinal,
-    "mesas",
-    String(params.mesaNumero),
-    "comandas_abertas",
-    cId
-  );
-
-  const pedidoRef = doc(
-    db,
-    "restaurantes",
-    idFinal,
-    "mesas",
-    String(params.mesaNumero),
-    "comandas_abertas",
-    cId,
-    "pedidos",
-    pedidoId
-  );
-
   const itensMapeados = [
     {
       menuItemId: params.item.id,
@@ -917,56 +942,133 @@ export async function lancarItemManualFirestore(params: {
       precoFinal: Number(params.item.precoBase) || 0,
       modificadores: [],
       observacoes: params.observacao || "",
+      tempoPreparoEstimado: params.item.tempoPreparoEstimado,
     },
   ];
 
-  // Documento individual da rodada para o KDS da cozinha
-  const dadosPedidoRodada = {
-    id: pedidoId,
-    restauranteId: idFinal,
-    slug: params.slug || idFinal,
-    clienteId: cId,
-    nomeCliente: params.clienteNome.trim(),
-    mesa: params.mesaNumero,
-    numeroMesa: Number(params.mesaNumero) || params.mesaNumero,
-    itens: itensMapeados,
-    subtotal: subtotalItem,
-    status: "a_fazer" as const,
-    criadoEm: serverTimestamp(),
-  };
-
-  const comandaSnap = await getDoc(comandaRef);
-
-  let saveComandaPromise: Promise<unknown>;
-  if (!comandaSnap.exists()) {
-    saveComandaPromise = setDoc(comandaRef, {
-      id: cId,
+  // 1. ZONA DE SOMBRA: Se o dispositivo já estiver sem conexão, salva diretamente na fila IndexedDB
+  if (typeof navigator !== "undefined" && !navigator.onLine) {
+    await enfileirarPedidoOffline({
+      id: pedidoId,
       restauranteId: idFinal,
       slug: params.slug || idFinal,
-      nomeCliente: params.clienteNome.trim(),
-      mesa: params.mesaNumero,
-      numeroMesa: Number(params.mesaNumero) || params.mesaNumero,
-      criadoEm: serverTimestamp(),
-      atualizadoEm: serverTimestamp(),
+      mesaNumero: params.mesaNumero,
+      clienteNome: params.clienteNome.trim(),
+      clienteId: cId,
+      itens: itensMapeados,
       subtotal: subtotalItem,
-      status: "aguardando_pratos" as const,
+      observacao: params.observacao,
+      criadoEmMillis: Date.now(),
+      tentativas: 0,
+      status: "pendente",
     });
-  } else {
-    saveComandaPromise = updateDoc(comandaRef, {
-      restauranteId: idFinal,
-      slug: params.slug || idFinal,
-      nomeCliente: params.clienteNome.trim(),
-      mesa: params.mesaNumero,
-      numeroMesa: Number(params.mesaNumero) || params.mesaNumero,
-      atualizadoEm: serverTimestamp(),
-      subtotal: increment(subtotalItem),
-      status: "aguardando_pratos" as const,
-    });
+    return;
   }
 
-  const savePedidoPromise = setDoc(pedidoRef, dadosPedidoRodada);
+  // 2. DISPARO ONLINE COM INTERCEPTAÇÃO RESILIENTE
+  try {
+    const comandaRef = doc(
+      db,
+      "restaurantes",
+      idFinal,
+      "mesas",
+      String(params.mesaNumero),
+      "comandas_abertas",
+      cId
+    );
 
-  await Promise.all([saveComandaPromise, savePedidoPromise]);
+    const pedidoRef = doc(
+      db,
+      "restaurantes",
+      idFinal,
+      "mesas",
+      String(params.mesaNumero),
+      "comandas_abertas",
+      cId,
+      "pedidos",
+      pedidoId
+    );
+
+    const kdsRef = doc(db, "restaurantes", idFinal, "kds_tickets", pedidoId);
+
+    const dadosPedidoRodada = {
+      id: pedidoId,
+      restauranteId: idFinal,
+      slug: params.slug || idFinal,
+      clienteId: cId,
+      nomeCliente: params.clienteNome.trim(),
+      mesa: params.mesaNumero,
+      numeroMesa: Number(params.mesaNumero) || params.mesaNumero,
+      itens: itensMapeados,
+      subtotal: subtotalItem,
+      status: "a_fazer" as const,
+      criadoEm: serverTimestamp(),
+    };
+
+    const payloadKds = {
+      id: pedidoId,
+      mesa: params.mesaNumero,
+      numeroMesa: Number(params.mesaNumero) || params.mesaNumero,
+      clienteId: cId,
+      nomeCliente: params.clienteNome.trim(),
+      status: "a_fazer" as const,
+      pedidoRefPath: pedidoRef.path,
+      itens: itensMapeados,
+      criadoEm: serverTimestamp(),
+    };
+
+    const comandaSnap = await getDoc(comandaRef);
+    const batch = writeBatch(db);
+
+    if (!comandaSnap.exists()) {
+      batch.set(comandaRef, {
+        id: cId,
+        restauranteId: idFinal,
+        slug: params.slug || idFinal,
+        nomeCliente: params.clienteNome.trim(),
+        mesa: params.mesaNumero,
+        numeroMesa: Number(params.mesaNumero) || params.mesaNumero,
+        criadoEm: serverTimestamp(),
+        atualizadoEm: serverTimestamp(),
+        subtotal: subtotalItem,
+        status: "aguardando_pratos" as const,
+      });
+    } else {
+      batch.update(comandaRef, {
+        restauranteId: idFinal,
+        slug: params.slug || idFinal,
+        nomeCliente: params.clienteNome.trim(),
+        mesa: params.mesaNumero,
+        numeroMesa: Number(params.mesaNumero) || params.mesaNumero,
+        atualizadoEm: serverTimestamp(),
+        subtotal: increment(subtotalItem),
+        status: "aguardando_pratos" as const,
+      });
+    }
+
+    batch.set(pedidoRef, dadosPedidoRodada);
+    batch.set(kdsRef, payloadKds);
+
+    await batch.commit();
+  } catch (err: any) {
+    console.warn("Falha de rede ao submeter pedido no Firestore. Roteando para fila IndexedDB offline:", err);
+    // Em caso de falha de conexão ou timeout, enfileira o mesmo pedidoId para persistência idempotente
+    await enfileirarPedidoOffline({
+      id: pedidoId,
+      restauranteId: idFinal,
+      slug: params.slug || idFinal,
+      mesaNumero: params.mesaNumero,
+      clienteNome: params.clienteNome.trim(),
+      clienteId: cId,
+      itens: itensMapeados,
+      subtotal: subtotalItem,
+      observacao: params.observacao,
+      criadoEmMillis: Date.now(),
+      tentativas: 1,
+      status: "pendente",
+      ultimoErro: String(err?.message || err),
+    });
+  }
 }
 
 /**
@@ -1068,6 +1170,12 @@ export async function fecharContaMesa(
   pedidosSnap.forEach((pedidoDoc) => {
     // Ao atualizar para 'pago', o pedido some automaticamente do KDS da Cozinha
     batch.update(pedidoDoc.ref, {
+      status: "pago",
+      fechadoEm: new Date().toISOString(),
+    });
+    // Atualiza também o ticket desacoplado na fila do KDS
+    const kdsTicketRef = doc(db, "restaurantes", restauranteId, "kds_tickets", pedidoDoc.id);
+    batch.update(kdsTicketRef, {
       status: "pago",
       fechadoEm: new Date().toISOString(),
     });

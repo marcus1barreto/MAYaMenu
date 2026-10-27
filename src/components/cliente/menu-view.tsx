@@ -27,11 +27,13 @@ import {
   Sun,
   Moon,
   Coffee,
+  Store,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { ensureClienteAnonimo, db } from "@/lib/firebase";
+import { ensureClienteAnonimo, auth, db } from "@/lib/firebase";
+import { onAuthStateChanged } from "firebase/auth";
 import { doc, updateDoc, serverTimestamp, onSnapshot } from "firebase/firestore";
 import { escutarCardapio, escutarRestaurante, chamarGarcomFirestore, escutarPedidosCliente } from "@/lib/restaurante-service";
 import { marcarVisitaAtualComoPaga, limparSessaoClienteLocal } from "@/lib/historico-cliente";
@@ -96,12 +98,41 @@ export function MenuView({ restaurante: restauranteInicial, cardapio: cardapioIn
     return () => unsub();
   }, [restaurante.id]);
 
+  const [uid, setUid] = useState<string | null>(null);
   const [chamandoGarcom, setChamandoGarcom] = useState(false);
   const [garcomChamadoSucesso, setGarcomChamadoSucesso] = useState(false);
   const [segundosCooldown, setSegundosCooldown] = useState(0);
 
-  // Escuta o status da comanda do cliente nesta mesa em tempo real
+  // 1. Recuperação Silenciosa de UID (Firebase Auth + IndexedDB)
+  // Reconhece instantaneamente se o cliente acabou de voltar do Instagram ou reabriu a aba
   useEffect(() => {
+    let ativo = true;
+
+    // Escuta IMEDIATAMENTE a sessão local do IndexedDB gerenciada pelo Firebase Auth.
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+      if (!ativo) return;
+      if (user) {
+        setUid(user.uid);
+      } else {
+        // Primeira vez do cliente hoje ou cache limpo: gera e persiste login anônimo
+        ensureClienteAnonimo().then((result) => {
+          if (ativo) {
+            setUid(result.uid);
+          }
+        });
+      }
+    });
+
+    return () => {
+      ativo = false;
+      unsubscribeAuth();
+    };
+  }, []);
+
+  // 2. Escuta o status da comanda do cliente nesta mesa em tempo real assim que o UID for resolvido
+  useEffect(() => {
+    if (!uid) return;
+
     let unsubComanda: (() => void) | null = null;
     let unsubPedidos: (() => void) | null = null;
     let ultimoStatus: string | null = null;
@@ -137,71 +168,69 @@ export function MenuView({ restaurante: restauranteInicial, cardapio: cardapioIn
       }
     };
 
-    ensureClienteAnonimo().then((user) => {
-      const comandaRef = doc(
-        db,
-        "restaurantes",
-        restaurante.id,
-        "mesas",
-        String(numeroMesa),
-        "comandas_abertas",
-        user.uid
-      );
+    const comandaRef = doc(
+      db,
+      "restaurantes",
+      restaurante.id,
+      "mesas",
+      String(numeroMesa),
+      "comandas_abertas",
+      uid
+    );
 
-      // 1. Escuta status da comanda pai
-      unsubComanda = onSnapshot(
-        comandaRef,
-        (snap) => {
-          if (snap.exists()) {
-            const data = snap.data() as ComandaCliente;
-            setComandaStatus(data.status);
-            ultimoStatus = data.status;
+    // 1. Escuta status da comanda pai
+    unsubComanda = onSnapshot(
+      comandaRef,
+      (snap) => {
+        if (snap.exists()) {
+          const data = snap.data() as ComandaCliente;
+          setComandaStatus(data.status);
+          ultimoStatus = data.status;
 
-            // Sincroniza o estado do chamado com o Firestore (garçom atendeu => libera o botão)
-            if (data.chamadoGarcom?.ativo === false) {
-              setGarcomChamadoSucesso(false);
-              setSegundosCooldown(0);
-            } else if (data.chamadoGarcom?.ativo === true) {
-              setGarcomChamadoSucesso(true);
-            }
+          // Sincroniza o estado do chamado com o Firestore (garçom atendeu => libera o botão)
+          if (data.chamadoGarcom?.ativo === false) {
+            setGarcomChamadoSucesso(false);
+            setSegundosCooldown(0);
+          } else if (data.chamadoGarcom?.ativo === true) {
+            setGarcomChamadoSucesso(true);
+          }
 
-            if (data.status === "conta_pedida") {
-              setContaPedidaSucesso(true);
-            } else if (data.status === "pago") {
-              encerrarPorPagamento();
-            }
-          } else if (ultimoStatus && ultimoStatus !== "pago") {
-            // A comanda foi removida pelo garçom/admin ao liberar a mesa: conta encerrada
+          if (data.status === "conta_pedida") {
+            setContaPedidaSucesso(true);
+          } else if (data.status === "pago") {
             encerrarPorPagamento();
           }
-        },
-        (err) => {
-          console.error("Erro no listener da comanda do cliente:", err);
+        } else if (ultimoStatus && ultimoStatus !== "pago") {
+          // A comanda foi removida pelo garçom/admin ao liberar a mesa: conta encerrada
+          encerrarPorPagamento();
         }
-      );
+      },
+      (err) => {
+        console.error("Erro no listener da comanda do cliente:", err);
+      }
+    );
 
-      // 2. Escuta pedidos reais para subtotal exato e dinâmico na barra flutuante
-      unsubPedidos = escutarPedidosCliente(
-        restaurante.id,
-        numeroMesa,
-        user.uid,
-        (lista) => {
-          const totalAtivo = lista.reduce((acc, p) => {
-            if (p.status !== "cancelado" && p.status !== "estornado") {
-              return acc + (p.subtotal || 0);
-            }
-            return acc;
-          }, 0);
-          setSubtotalComandaBanco(totalAtivo);
-        }
-      );
-    });
+    // 2. Escuta pedidos reais para subtotal exato e dinâmico na barra flutuante
+    unsubPedidos = escutarPedidosCliente(
+      restaurante.id,
+      numeroMesa,
+      uid,
+      (lista) => {
+        const totalAtivo = lista.reduce((acc, p) => {
+          if (p.status !== "cancelado" && p.status !== "estornado") {
+            return acc + (p.subtotal || 0);
+          }
+          return acc;
+        }, 0);
+        setSubtotalComandaBanco(totalAtivo);
+      }
+    );
 
     return () => {
       if (unsubComanda) unsubComanda();
       if (unsubPedidos) unsubPedidos();
     };
-  }, [restaurante.id, restaurante.slug, numeroMesa]);
+  }, [uid, restaurante.id, restaurante.slug, numeroMesa]);
 
 
 
@@ -231,12 +260,12 @@ export function MenuView({ restaurante: restauranteInicial, cardapio: cardapioIn
 
     setChamandoGarcom(true);
     try {
-      const user = await ensureClienteAnonimo();
+      const finalUid = uid || (await ensureClienteAnonimo()).uid;
       await chamarGarcomFirestore({
         restauranteId: restaurante.id,
         slug: restaurante.slug,
         mesaNumero: numeroMesa,
-        clienteId: user.uid,
+        clienteId: finalUid,
         nomeCliente: nomeCliente || "Cliente",
         motivo: "Atendimento no Salão",
       });
@@ -252,17 +281,22 @@ export function MenuView({ restaurante: restauranteInicial, cardapio: cardapioIn
     }
   };
 
-  const handlePedirConta = async () => {
+  const handlePedirConta = async (
+    metodo: "pix" | "cartao_garcom" = "cartao_garcom",
+    payloadPix?: string
+  ) => {
     if (pedindoConta || contaPedidaSucesso) return;
     const msgConfirmacao = ehAutoatendimento
       ? "Deseja solicitar o fechamento da sua comanda para pagamento no balcão/caixa?"
+      : metodo === "pix"
+      ? "Confirmar envio do aviso de pagamento via Pix para conciliação no salão?"
       : "Deseja pedir a conta da sua mesa ao garçom?";
     const confirmou = window.confirm(msgConfirmacao);
     if (!confirmou) return;
 
     setPedindoConta(true);
     try {
-      const user = await ensureClienteAnonimo();
+      const finalUid = uid || (await ensureClienteAnonimo()).uid;
       const comandaRef = doc(
         db,
         "restaurantes",
@@ -270,13 +304,20 @@ export function MenuView({ restaurante: restauranteInicial, cardapio: cardapioIn
         "mesas",
         String(numeroMesa),
         "comandas_abertas",
-        user.uid
+        finalUid
       );
 
-      await updateDoc(comandaRef, {
+      const dadosUpdate: any = {
         status: "conta_pedida",
+        metodoPagamento: metodo,
         atualizadoEm: serverTimestamp(),
-      });
+      };
+      if (metodo === "pix" && payloadPix) {
+        dadosUpdate.pixPayload = payloadPix;
+        dadosUpdate.solicitacaoPagamentoEm = serverTimestamp();
+      }
+
+      await updateDoc(comandaRef, dadosUpdate);
       setContaPedidaSucesso(true);
     } catch (e) {
       console.warn("Conta pedida localmente ou offline:", e);
@@ -299,6 +340,26 @@ export function MenuView({ restaurante: restauranteInicial, cardapio: cardapioIn
       );
     })
     .sort((a, b) => (a.ordem ?? 9999) - (b.ordem ?? 9999));
+
+  if (restaurante.suspenso || restaurante.configuracoes?.suspenso) {
+    return (
+      <main className="min-h-screen bg-neutral-950 text-white flex flex-col items-center justify-center p-6 text-center antialiased">
+        <div className="max-w-md w-full bg-neutral-900/80 border border-rose-900/40 p-8 rounded-3xl backdrop-blur-md shadow-2xl flex flex-col items-center space-y-5 animate-in fade-in duration-300">
+          <div className="w-16 h-16 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-500 flex items-center justify-center">
+            <Store className="w-8 h-8" />
+          </div>
+          <div className="space-y-2">
+            <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+              {restaurante.nome}
+            </h1>
+            <p className="text-xs sm:text-sm text-neutral-400 leading-relaxed">
+              O atendimento digital deste estabelecimento está temporariamente pausado. Por favor, solicite atendimento diretamente à equipe no local.
+            </p>
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   if (sessaoFinalizada) {
     return (
@@ -846,6 +907,7 @@ export function MenuView({ restaurante: restauranteInicial, cardapio: cardapioIn
         restauranteId={restaurante.id}
         mesaNumero={numeroMesa}
         slug={restaurante.slug}
+        clienteUid={uid || undefined}
         corPrimaria={corPrimaria}
         subtotalAcumulado={subtotalComandaBanco}
         statusComanda={comandaStatus}
@@ -854,6 +916,8 @@ export function MenuView({ restaurante: restauranteInicial, cardapio: cardapioIn
         pedindoConta={pedindoConta}
         contaPedidaSucesso={contaPedidaSucesso}
         taxaServicoPercentual={restaurante.configuracoes?.taxaServico}
+        pixConfig={restaurante.configuracoes?.pixConfig}
+        restauranteNome={restaurante.nome}
       />
 
       {/* MODAL DE LEITURA INTERNA DO QR CODE DA MESA */}

@@ -19,10 +19,17 @@ import {
   Users,
   User,
   QrCode,
+  Copy,
+  Check,
+  Zap,
+  ArrowLeft,
+  CreditCard,
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { buildTicketPayload, encodeTicket } from "@/lib/ticket";
 import { calcularTotais, somarPedidosAtivos, TAXA_SERVICO_PADRAO } from "@/lib/calculo-conta";
+import { gerarPayloadPix } from "@/lib/pix";
+import type { PixConfig } from "@/types";
 
 interface MinhaComandaModalProps {
   isOpen: boolean;
@@ -30,14 +37,17 @@ interface MinhaComandaModalProps {
   restauranteId: string;
   mesaNumero: number | string;
   slug: string;
+  clienteUid?: string;
   corPrimaria?: string;
   subtotalAcumulado?: number;
   statusComanda?: string | null;
   ehAutoatendimento?: boolean;
-  onPedirConta?: () => void;
+  onPedirConta?: (metodo?: "pix" | "cartao_garcom", payloadPix?: string) => void;
   pedindoConta?: boolean;
   contaPedidaSucesso?: boolean;
   taxaServicoPercentual?: number;
+  pixConfig?: PixConfig;
+  restauranteNome?: string;
 }
 
 export function MinhaComandaModal({
@@ -45,12 +55,15 @@ export function MinhaComandaModal({
   onClose,
   restauranteId,
   mesaNumero,
+  clienteUid: clienteUidProp,
   subtotalAcumulado = 0,
   ehAutoatendimento = false,
   onPedirConta,
   pedindoConta = false,
   contaPedidaSucesso = false,
   taxaServicoPercentual,
+  pixConfig,
+  restauranteNome,
 }: MinhaComandaModalProps) {
   const [pedidos, setPedidos] = useState<PedidoRodada[]>([]);
   const [totalOutrasComandas, setTotalOutrasComandas] = useState<number>(0);
@@ -58,8 +71,10 @@ export function MinhaComandaModal({
   const [carregando, setCarregando] = useState(true);
   const [pedindoMesaToda, setPedindoMesaToda] = useState(false);
   const [mesaTodaPedidaSucesso, setMesaTodaPedidaSucesso] = useState(false);
-  const [clienteUid, setClienteUid] = useState<string>("");
+  const [clienteUid, setClienteUid] = useState<string>(clienteUidProp || "");
   const [mostrarSyncQr, setMostrarSyncQr] = useState<boolean>(false);
+  const [abaPagamento, setAbaPagamento] = useState<"extrato" | "pix">("extrato");
+  const [copiadoPix, setCopiadoPix] = useState(false);
 
   useEffect(() => {
     if (!isOpen || !restauranteId) return;
@@ -67,10 +82,16 @@ export function MinhaComandaModal({
     let unsub: (() => void) | null = null;
     setCarregando(true);
 
-    ensureClienteAnonimo()
-      .then((user) => {
-        setClienteUid(user.uid);
-        unsub = escutarPedidosCliente(restauranteId, mesaNumero, user.uid, (lista) => {
+    const obterUid = async () => {
+      if (clienteUidProp) return clienteUidProp;
+      const user = await ensureClienteAnonimo();
+      return (user as any)?.uid || String(user);
+    };
+
+    obterUid()
+      .then((uid) => {
+        setClienteUid(uid);
+        unsub = escutarPedidosCliente(restauranteId, mesaNumero, uid, (lista) => {
           setPedidos(lista);
           setCarregando(false);
         });
@@ -83,7 +104,7 @@ export function MinhaComandaModal({
     return () => {
       if (unsub) unsub();
     };
-  }, [isOpen, restauranteId, mesaNumero]);
+  }, [isOpen, restauranteId, mesaNumero, clienteUidProp]);
 
   // Escuta as comandas da mesa: soma o que as outras pessoas consumiram e a flag da taxa de serviço
   useEffect(() => {
@@ -134,6 +155,39 @@ export function MinhaComandaModal({
   const taxaCliente = calcularTotais(totalCliente, percentualTaxa, taxaServicoAtiva).taxa;
   const totalClienteComTaxa = totalCliente + taxaCliente;
   const totalGeralMesaComTaxa = calcularTotais(totalGeralMesa, percentualTaxa, taxaServicoAtiva).total;
+
+  const temPix = Boolean(pixConfig?.ativo && pixConfig?.chave);
+
+  const payloadPix = React.useMemo(() => {
+    if (!temPix || !pixConfig || totalClienteComTaxa <= 0) return "";
+    try {
+      return gerarPayloadPix({
+        chave: pixConfig.chave,
+        tipoChave: pixConfig.tipoChave,
+        beneficiario: pixConfig.beneficiario || restauranteNome || "MAYaMenu",
+        cidade: pixConfig.cidade || "SAO PAULO",
+        valor: totalClienteComTaxa,
+        identificador: `M${mesaNumero}C${(clienteUid || "anon").slice(-4)}`,
+        descricao: `Mesa ${mesaNumero}`,
+      });
+    } catch (err) {
+      console.warn("Falha ao gerar payload Pix:", err);
+      return "";
+    }
+  }, [temPix, pixConfig, totalClienteComTaxa, mesaNumero, clienteUid, restauranteNome]);
+
+  const handleCopiarPix = async () => {
+    if (!payloadPix) return;
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(payloadPix);
+        setCopiadoPix(true);
+        setTimeout(() => setCopiadoPix(false), 3000);
+      }
+    } catch (err) {
+      console.warn("Falha ao copiar Pix para o clipboard:", err);
+    }
+  };
 
   // Solicitar pagamento da mesa completa
   const handlePagarMesaCompleta = async () => {
@@ -223,26 +277,154 @@ export function MinhaComandaModal({
         <SheetHeader className="p-5 border-b border-border bg-card">
           <div className="flex items-center justify-between gap-3 pr-8">
             <div className="flex items-center gap-3 min-w-0">
-              <div className="p-2.5 rounded-xl bg-primary/10 text-primary border border-primary/20 shrink-0">
-                <Receipt className="w-5 h-5" />
-              </div>
+              {abaPagamento === "pix" ? (
+                <button
+                  type="button"
+                  onClick={() => setAbaPagamento("extrato")}
+                  className="p-2 rounded-xl bg-muted hover:bg-muted/80 text-foreground transition-all shrink-0"
+                  title="Voltar ao Extrato"
+                >
+                  <ArrowLeft className="w-5 h-5" />
+                </button>
+              ) : (
+                <div className="p-2.5 rounded-xl bg-primary/10 text-primary border border-primary/20 shrink-0">
+                  <Receipt className="w-5 h-5" />
+                </div>
+              )}
               <div className="min-w-0">
                 <SheetTitle className="text-lg font-black text-foreground flex items-center gap-2 truncate">
-                  Comanda da Mesa
-                  <Badge variant="outline" className="text-xs font-bold font-mono px-2 py-0.5 rounded-full">
+                  {abaPagamento === "pix" ? "Pagamento via Pix" : "Comanda da Mesa"}
+                  <Badge variant="outline" className={`text-xs font-bold font-mono px-2 py-0.5 rounded-full ${
+                    abaPagamento === "pix" ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/30" : ""
+                  }`}>
                     Mesa {mesaNumero}
                   </Badge>
                 </SheetTitle>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Extrato detalhado de despesas
+                  {abaPagamento === "pix"
+                    ? "Instantâneo & direto na conta do lojista"
+                    : "Extrato detalhado de despesas"}
                 </p>
               </div>
             </div>
           </div>
         </SheetHeader>
 
-        {/* LISTAGEM DE PEDIDOS / RODADAS (M3 BODY & TITLES) */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3 bg-muted/20">
+        {abaPagamento === "pix" ? (
+          /* TELA DE CHECKOUT PIX DINÂMICO */
+          <div className="flex-1 overflow-y-auto p-5 space-y-4 bg-muted/20 flex flex-col items-center text-center">
+            {/* CARD DE VALOR */}
+            <div className="w-full p-4 rounded-2xl bg-card border border-border shadow-xs text-center space-y-1">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                Total da sua parte a pagar
+              </span>
+              <div className="text-2xl sm:text-3xl font-black text-foreground font-mono">
+                {totalClienteComTaxa.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+              </div>
+              {taxaCliente > 0 && (
+                <p className="text-[10px] text-muted-foreground">
+                  (Inclui {percentualTaxa}% de taxa sugerida)
+                </p>
+              )}
+            </div>
+
+            {/* CONTAINER DO QR CODE PIX */}
+            <div className="p-4 bg-white rounded-3xl border-2 border-border shadow-md flex flex-col items-center space-y-3 max-w-[260px] w-full">
+              <p className="text-[11px] font-black text-neutral-800 uppercase tracking-wider flex items-center gap-1.5">
+                <QrCode className="w-3.5 h-3.5 text-emerald-600" />
+                Escaneie no app do banco
+              </p>
+              <div className="p-2 bg-white rounded-2xl border border-neutral-200">
+                {payloadPix ? (
+                  <QRCodeSVG
+                    value={payloadPix}
+                    size={190}
+                    level="M"
+                    includeMargin={true}
+                  />
+                ) : (
+                  <div className="w-[190px] h-[190px] flex items-center justify-center text-neutral-400 text-xs">
+                    Gerando QR Pix...
+                  </div>
+                )}
+              </div>
+              <div className="space-y-0.5 text-center">
+                <span className="text-[10px] font-bold text-neutral-700 block truncate max-w-[220px]">
+                  {pixConfig?.beneficiario || restauranteNome || "MAYaMenu"}
+                </span>
+                <span className="text-[9px] font-mono text-neutral-400 block truncate max-w-[220px]">
+                  Chave: {pixConfig?.chave}
+                </span>
+              </div>
+            </div>
+
+            {/* BOTÃO COPIAR CÓDIGO PIX COPIA E COLA */}
+            <Button
+              type="button"
+              onClick={handleCopiarPix}
+              className={`w-full max-w-sm h-12 rounded-xl text-xs uppercase tracking-wider font-black transition-all shadow-sm flex items-center justify-center gap-2 ${
+                copiadoPix
+                  ? "bg-emerald-600 text-white"
+                  : "bg-neutral-900 text-white hover:bg-neutral-800 active:scale-95"
+              }`}
+            >
+              {copiadoPix ? (
+                <>
+                  <Check className="w-4 h-4 text-emerald-200" />
+                  <span>Código Pix Copiado!</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="w-4 h-4" />
+                  <span>Copiar Código Pix (Copia e Cola)</span>
+                </>
+              )}
+            </Button>
+
+            {/* BOTÃO AVISAR QUE JÁ REALIZOU O PIX */}
+            <div className="w-full max-w-sm pt-1 space-y-2 pb-safe">
+              <Button
+                type="button"
+                onClick={() => onPedirConta?.("pix", payloadPix)}
+                disabled={pedindoConta || contaPedidaSucesso}
+                className={`w-full h-12 rounded-xl text-xs uppercase tracking-wider font-black transition-all shadow-sm flex items-center justify-center gap-2 ${
+                  contaPedidaSucesso
+                    ? "bg-emerald-600 text-white"
+                    : "bg-emerald-600 hover:bg-emerald-500 text-white active:scale-95"
+                }`}
+              >
+                {contaPedidaSucesso ? (
+                  <>
+                    <CheckCircle2 className="w-4 h-4 text-white" />
+                    <span>Pagamento Pix Informado!</span>
+                  </>
+                ) : pedindoConta ? (
+                  <>
+                    <Clock className="w-4 h-4 animate-spin" />
+                    <span>Avisando Salão...</span>
+                  </>
+                ) : (
+                  <>
+                    <Zap className="w-4 h-4 fill-white" />
+                    <span>Já fiz o Pix (Avisar Salão)</span>
+                  </>
+                )}
+              </Button>
+
+              <button
+                type="button"
+                onClick={() => setAbaPagamento("extrato")}
+                className="text-xs text-muted-foreground hover:text-foreground font-medium py-1 transition-colors flex items-center justify-center gap-1 mx-auto"
+              >
+                <CreditCard className="w-3.5 h-3.5" />
+                Prefiro pagar ao garçom no cartão/dinheiro
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* LISTAGEM DE PEDIDOS / RODADAS (M3 BODY & TITLES) */}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3 bg-muted/20">
           {carregando ? (
             <div className="p-12 text-center text-xs text-muted-foreground space-y-2">
               <Clock className="w-8 h-8 text-primary animate-spin mx-auto opacity-80" />
@@ -416,67 +598,146 @@ export function MinhaComandaModal({
           </div>
 
           {/* BOTÕES DE AÇÃO: M3 CALL TO ACTION (ALTURA MÍNIMA 44px P/ TOQUE MÓVEL) */}
-          <div className="flex flex-col sm:flex-row w-full gap-2 pt-1 pb-safe">
-            {/* 1. PAGAR A MINHA PARTE */}
-            <Button
-              type="button"
-              onClick={onPedirConta}
-              disabled={pedindoConta || contaPedidaSucesso || totalCliente === 0}
-              className={`w-full sm:flex-1 h-12 rounded-xl text-xs uppercase tracking-wider font-black transition-all shadow-sm flex items-center justify-center gap-1.5 ${
-                contaPedidaSucesso
-                  ? "bg-emerald-600 text-white"
-                  : "bg-primary hover:bg-primary/90 text-primary-foreground active:scale-95"
-              }`}
-            >
-              {contaPedidaSucesso ? (
-                <>
-                  <CheckCircle2 className="w-4 h-4 text-white" />
-                  <span>Parte Solicitada</span>
-                </>
-              ) : pedindoConta ? (
-                <>
-                  <Clock className="w-4 h-4 animate-spin" />
-                  <span>Pedindo...</span>
-                </>
-              ) : (
-                <>
-                  <Receipt className="w-4 h-4" />
-                  <span>Pagar Minha Parte</span>
-                </>
-              )}
-            </Button>
+          <div className="flex flex-col w-full gap-2 pt-1 pb-safe">
+            {temPix && totalCliente > 0 ? (
+              <>
+                {/* BOTÃO 1: PAGAR VIA PIX INSTANTÂNEO */}
+                <Button
+                  type="button"
+                  onClick={() => setAbaPagamento("pix")}
+                  className="w-full h-12 rounded-xl text-xs uppercase tracking-wider font-black transition-all shadow-sm flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white active:scale-95"
+                >
+                  <Zap className="w-4 h-4 fill-white" />
+                  <span>Pagar com Pix Instantâneo ({totalClienteComTaxa.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })})</span>
+                </Button>
 
-            {/* 2. PAGAR MESA COMPLETA */}
-            <Button
-              type="button"
-              onClick={handlePagarMesaCompleta}
-              disabled={pedindoMesaToda || mesaTodaPedidaSucesso || totalGeralMesa === 0}
-              variant="outline"
-              className={`w-full sm:flex-1 h-12 rounded-xl text-xs uppercase tracking-wider font-bold transition-all border border-border shadow-xs flex items-center justify-center gap-1.5 ${
-                mesaTodaPedidaSucesso
-                  ? "bg-emerald-50 text-emerald-700 border-emerald-300"
-                  : "bg-card hover:bg-muted text-foreground active:scale-95"
-              }`}
-            >
-              {mesaTodaPedidaSucesso ? (
-                <>
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                  <span>Mesa Solicitada</span>
-                </>
-              ) : pedindoMesaToda ? (
-                <>
-                  <Clock className="w-4 h-4 animate-spin text-primary" />
-                  <span>Pedindo...</span>
-                </>
-              ) : (
-                <>
-                  <Users className="w-4 h-4 text-foreground" />
-                  <span>Pagar Toda a Mesa</span>
-                </>
-              )}
-            </Button>
+                <div className="flex flex-col sm:flex-row w-full gap-2">
+                  {/* BOTÃO 2: PAGAR AO GARÇOM */}
+                  <Button
+                    type="button"
+                    onClick={() => onPedirConta?.("cartao_garcom")}
+                    disabled={pedindoConta || contaPedidaSucesso}
+                    variant="outline"
+                    className={`w-full sm:flex-1 h-11 rounded-xl text-xs uppercase tracking-wider font-bold transition-all border border-border shadow-xs flex items-center justify-center gap-1.5 ${
+                      contaPedidaSucesso
+                        ? "bg-emerald-50 text-emerald-700 border-emerald-300"
+                        : "bg-card hover:bg-muted text-foreground active:scale-95"
+                    }`}
+                  >
+                    {contaPedidaSucesso ? (
+                      <>
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                        <span>Garçom Solicitado</span>
+                      </>
+                    ) : pedindoConta ? (
+                      <>
+                        <Clock className="w-4 h-4 animate-spin text-primary" />
+                        <span>Chamando...</span>
+                      </>
+                    ) : (
+                      <>
+                        <CreditCard className="w-4 h-4 text-muted-foreground" />
+                        <span>Pagar c/ Garçom</span>
+                      </>
+                    )}
+                  </Button>
+
+                  {/* BOTÃO 3: PAGAR TODA A MESA */}
+                  <Button
+                    type="button"
+                    onClick={handlePagarMesaCompleta}
+                    disabled={pedindoMesaToda || mesaTodaPedidaSucesso || totalGeralMesa === 0}
+                    variant="outline"
+                    className={`w-full sm:flex-1 h-11 rounded-xl text-xs uppercase tracking-wider font-bold transition-all border border-border shadow-xs flex items-center justify-center gap-1.5 ${
+                      mesaTodaPedidaSucesso
+                        ? "bg-emerald-50 text-emerald-700 border-emerald-300"
+                        : "bg-card hover:bg-muted text-foreground active:scale-95"
+                    }`}
+                  >
+                    {mesaTodaPedidaSucesso ? (
+                      <>
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                        <span>Mesa Solicitada</span>
+                      </>
+                    ) : pedindoMesaToda ? (
+                      <>
+                        <Clock className="w-4 h-4 animate-spin text-primary" />
+                        <span>Pedindo...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Users className="w-4 h-4 text-foreground" />
+                        <span>Pagar Toda a Mesa</span>
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </>
+            ) : (
+              /* MANTÉM OS BOTÕES CLÁSSICOS QUANDO NÃO HÁ PIX ATIVO */
+              <div className="flex flex-col sm:flex-row w-full gap-2">
+                <Button
+                  type="button"
+                  onClick={() => onPedirConta?.("cartao_garcom")}
+                  disabled={pedindoConta || contaPedidaSucesso || totalCliente === 0}
+                  className={`w-full sm:flex-1 h-12 rounded-xl text-xs uppercase tracking-wider font-black transition-all shadow-sm flex items-center justify-center gap-1.5 ${
+                    contaPedidaSucesso
+                      ? "bg-emerald-600 text-white"
+                      : "bg-primary hover:bg-primary/90 text-primary-foreground active:scale-95"
+                  }`}
+                >
+                  {contaPedidaSucesso ? (
+                    <>
+                      <CheckCircle2 className="w-4 h-4 text-white" />
+                      <span>Parte Solicitada</span>
+                    </>
+                  ) : pedindoConta ? (
+                    <>
+                      <Clock className="w-4 h-4 animate-spin" />
+                      <span>Pedindo...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Receipt className="w-4 h-4" />
+                      <span>Pagar Minha Parte</span>
+                    </>
+                  )}
+                </Button>
+
+                <Button
+                  type="button"
+                  onClick={handlePagarMesaCompleta}
+                  disabled={pedindoMesaToda || mesaTodaPedidaSucesso || totalGeralMesa === 0}
+                  variant="outline"
+                  className={`w-full sm:flex-1 h-12 rounded-xl text-xs uppercase tracking-wider font-bold transition-all border border-border shadow-xs flex items-center justify-center gap-1.5 ${
+                    mesaTodaPedidaSucesso
+                      ? "bg-emerald-50 text-emerald-700 border-emerald-300"
+                      : "bg-card hover:bg-muted text-foreground active:scale-95"
+                  }`}
+                >
+                  {mesaTodaPedidaSucesso ? (
+                    <>
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                      <span>Mesa Solicitada</span>
+                    </>
+                  ) : pedindoMesaToda ? (
+                    <>
+                      <Clock className="w-4 h-4 animate-spin text-primary" />
+                      <span>Pedindo...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Users className="w-4 h-4 text-foreground" />
+                      <span>Pagar Toda a Mesa</span>
+                    </>
+                  )}
+                </Button>
+              </div>
+            )}
           </div>
         </div>
+      </>
+    )}
       </SheetContent>
     </Sheet>
   );

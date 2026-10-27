@@ -20,6 +20,9 @@ import {
   Bell,
   ChefHat,
   Utensils,
+  WifiOff,
+  RefreshCw,
+  Loader2,
 } from "lucide-react";
 import {
   Dialog,
@@ -43,6 +46,12 @@ import {
   lancarItemManualFirestore,
   atualizarStatusPedido,
 } from "@/lib/restaurante-service";
+import {
+  escutarFilaOffline,
+  drenarFilaOffline,
+  iniciarMonitoramentoOffline,
+  type PedidoFilaOffline,
+} from "@/lib/offline-queue";
 
 // Item de comanda exibido no salão. `refPath` e `statusPedido` vêm do pedido (rodada) de origem
 // e permitem marcar o item como entregue diretamente no Firestore.
@@ -60,6 +69,7 @@ export interface ComandaGarcom {
   nomeCliente: string;
   subtotal: number;
   status: "pedindo" | "aguardando_pratos" | "conta_pedida" | "pago";
+  metodoPagamento?: "pix" | "cartao_garcom" | "dinheiro_garcom" | "balcao";
   itens: ItemComandaGarcom[];
   chamadoGarcom?: {
     ativo: boolean;
@@ -204,6 +214,36 @@ export function GarcomView({
   const [pedidosProntos, setPedidosProntos] = useState<PedidoComRef[]>([]);
   const [atualizandoPedidoId, setAtualizandoPedidoId] = useState<string | null>(null);
 
+  const [pedidosOffline, setPedidosOffline] = useState<PedidoFilaOffline[]>([]);
+  const [sincronizandoOffline, setSincronizandoOffline] = useState(false);
+
+  // Monitoramento e escuta reativa da fila offline (IndexedDB)
+  useEffect(() => {
+    const idBusca = restauranteId || restaurante?.id || slug || restaurante?.slug;
+    const pararMonitoramento = iniciarMonitoramentoOffline(idBusca);
+    const pararEscuta = escutarFilaOffline((fila) => {
+      setPedidosOffline(fila);
+    }, idBusca);
+
+    return () => {
+      pararMonitoramento();
+      pararEscuta();
+    };
+  }, [restauranteId, restaurante?.id, slug, restaurante?.slug]);
+
+  const handleForcarDrenagem = async () => {
+    if (sincronizandoOffline) return;
+    setSincronizandoOffline(true);
+    try {
+      const idBusca = restauranteId || restaurante?.id || slug || restaurante?.slug;
+      await drenarFilaOffline(idBusca);
+    } catch (err) {
+      console.warn("Erro ao sincronizar fila offline manualmente:", err);
+    } finally {
+      setSincronizandoOffline(false);
+    }
+  };
+
   // 1. Escuta todas as comandas abertas do salão em tempo real com expurgo explícito de 'removed'
   useEffect(() => {
     if (bloqueadoPorAutoatendimento) return;
@@ -263,6 +303,7 @@ export function GarcomView({
               nomeCliente: c.nomeCliente,
               subtotal: c.subtotal || 0,
               status: c.status,
+              metodoPagamento: c.metodoPagamento,
               itens: [],
               chamadoGarcom: c.chamadoGarcom,
             });
@@ -588,8 +629,27 @@ export function GarcomView({
           </div>
         </div>
 
-        {/* BOTÃO DE CONTINGÊNCIA */}
+        {/* BOTÃO DE CONTINGÊNCIA & STATUS OFFLINE */}
         <div className="flex flex-wrap items-center gap-3">
+          {pedidosOffline.length > 0 && (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-500 text-xs font-semibold shadow-xs">
+              <WifiOff className="w-4 h-4 text-amber-500 shrink-0 animate-pulse" />
+              <span>
+                {pedidosOffline.length} {pedidosOffline.length === 1 ? "pedido offline" : "pedidos offline"}
+              </span>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                disabled={sincronizandoOffline}
+                onClick={handleForcarDrenagem}
+                className="h-7 px-2 text-[10px] uppercase font-bold text-amber-400 hover:text-amber-300 hover:bg-amber-500/20 rounded-lg flex items-center gap-1 transition-all"
+              >
+                <RefreshCw className={`w-3 h-3 ${sincronizandoOffline ? "animate-spin" : ""}`} />
+                <span>{sincronizandoOffline ? "Sincronizando..." : "Sincronizar"}</span>
+              </Button>
+            </div>
+          )}
 
           <Button
             type="button"
@@ -742,8 +802,19 @@ export function GarcomView({
                     )}
 
                     {ehConta && !ehChamado && (
-                      <Badge className="bg-rose-600 text-white text-[10px] font-black uppercase tracking-wider px-2 py-0.5">
-                        Pediu Conta
+                      <Badge className={`${
+                        m.comandas.some((cmd) => cmd.metodoPagamento === "pix")
+                          ? "bg-teal-600 text-white border-teal-400"
+                          : "bg-rose-600 text-white"
+                      } text-[10px] font-black uppercase tracking-wider px-2 py-0.5 flex items-center gap-1 shadow-sm`}>
+                        {m.comandas.some((cmd) => cmd.metodoPagamento === "pix") ? (
+                          <>
+                            <QrCode className="w-3 h-3" />
+                            PIX Solicitado
+                          </>
+                        ) : (
+                          "Pediu Conta"
+                        )}
                       </Badge>
                     )}
 
@@ -751,6 +822,13 @@ export function GarcomView({
                       <Badge className="bg-emerald-600 text-white text-[10px] font-black uppercase tracking-wider px-2 py-0.5 shadow-md flex items-center gap-1">
                         <CheckCircle2 className="w-3 h-3" />
                         Paga / Ocupada
+                      </Badge>
+                    )}
+
+                    {pedidosOffline.some((p) => Number(p.mesaNumero) === m.numero) && (
+                      <Badge className="bg-amber-600/90 text-white border border-amber-400/50 text-[10px] font-black uppercase tracking-wider px-2 py-0.5 shadow-md flex items-center gap-1 animate-pulse">
+                        <WifiOff className="w-3 h-3" />
+                        Sync Pendente
                       </Badge>
                     )}
 
@@ -795,6 +873,7 @@ export function GarcomView({
         onClose={() => setMesaSelecionada(null)}
         slug={slug}
         restauranteId={restauranteId}
+        pedidosOffline={pedidosOffline}
         taxaServicoPercentual={restaurante?.configuracoes?.taxaServico}
         onMarcarPago={handleMarcarComoPago}
         onLiberarMesa={handleLiberarMesa}

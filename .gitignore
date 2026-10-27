@@ -40,3 +40,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# python / e2e test artifacts
+__pycache__/
+*.py[cod]
+tests/e2e/screenshots/
+tests/e2e/**/screenshots/

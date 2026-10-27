@@ -16,6 +16,13 @@ import {
 } from "@/lib/licenca-service";
 import type { Licenca, LicencaArquivada, PlanoTipo, Restaurante } from "@/types";
 import { parseDateToMillis } from "@/lib/datas";
+import { auth } from "@/lib/firebase";
+import {
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  signOut,
+  type User,
+} from "firebase/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -31,6 +38,13 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import {
   ShieldCheck,
   KeyRound,
@@ -53,6 +67,10 @@ import {
   ClockAlert,
   CalendarPlus,
   Trash2,
+  AlertTriangle,
+  LogIn,
+  LogOut,
+  CheckCircle2,
 } from "lucide-react";
 
 export function SuperAdminView() {
@@ -75,6 +93,18 @@ export function SuperAdminView() {
   const [maxPratosCustom, setMaxPratosCustom] = useState<string>("");
   const [maxMesasCustom, setMaxMesasCustom] = useState<string>("");
 
+  // Estado de Autenticação do Operador do SuperAdmin
+  const [usuarioAuth, setUsuarioAuth] = useState<User | null>(null);
+  const [modalLoginAberto, setModalLoginAberto] = useState(false);
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginSenha, setLoginSenha] = useState("");
+  const [autenticando, setAutenticando] = useState(false);
+  const [erroAuth, setErroAuth] = useState<string | null>(null);
+
+  // Alertas de feedback da interface
+  const [alertaErro, setAlertaErro] = useState<string | null>(null);
+  const [alertaSucesso, setAlertaSucesso] = useState<string | null>(null);
+
   useEffect(() => {
     const unsubLicencas = escutarLicencas((dados) => {
       setLicencas(dados);
@@ -85,12 +115,43 @@ export function SuperAdminView() {
     const unsubRestaurantes = escutarRestaurantes((dados) => {
       setRestaurantes(dados);
     });
+    const unsubAuth = onAuthStateChanged(auth, (user) => {
+      setUsuarioAuth(user);
+    });
     return () => {
       unsubLicencas();
       unsubArquivo();
       unsubRestaurantes();
+      unsubAuth();
     };
   }, []);
+
+  const handleLoginOperador = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAutenticando(true);
+    setErroAuth(null);
+    try {
+      await signInWithEmailAndPassword(auth, loginEmail.trim(), loginSenha);
+      setModalLoginAberto(false);
+      setLoginSenha("");
+      setAlertaSucesso("Operador SuperAdmin autenticado com sucesso!");
+      setAlertaErro(null);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Falha na autenticação.";
+      setErroAuth(msg);
+    } finally {
+      setAutenticando(false);
+    }
+  };
+
+  const handleLogoutOperador = async () => {
+    try {
+      await signOut(auth);
+      setAlertaSucesso("Sessão administrativa encerrada.");
+    } catch (err) {
+      console.error("Erro ao desconectar:", err);
+    }
+  };
 
   const handleCriarLicenca = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -115,8 +176,12 @@ export function SuperAdminView() {
       setNotas("");
       setMaxPratosCustom("");
       setMaxMesasCustom("");
-    } catch (err) {
+      setAlertaSucesso(`Concessão ${nova.id} (${planoSelecionado.toUpperCase()}) emitida com sucesso!`);
+      setAlertaErro(null);
+    } catch (err: unknown) {
       console.error("Falha ao criar licença:", err);
+      const msg = err instanceof Error ? err.message : String(err);
+      setAlertaErro(`Falha ao emitir concessão: ${msg}`);
     } finally {
       setCriando(false);
     }
@@ -129,8 +194,11 @@ export function SuperAdminView() {
     );
     try {
       await alterarStatusLicenca(codigo, novoStatus);
-    } catch (err) {
+      setAlertaSucesso(`Status da licença ${codigo} alterado para ${novoStatus.toUpperCase()}.`);
+    } catch (err: unknown) {
       console.warn("Falha ao alterar status remoto da licença:", err);
+      const msg = err instanceof Error ? err.message : String(err);
+      setAlertaErro(`Erro ao atualizar licença: ${msg}`);
     }
   };
 
@@ -139,7 +207,19 @@ export function SuperAdminView() {
     novoPlano: PlanoTipo,
     licencaCodigo?: string
   ) => {
+    // Alerta se não estiver autenticado de forma não anônima
+    if (!auth.currentUser || auth.currentUser.isAnonymous) {
+      setAlertaErro(
+        "Atenção: Para alterar planos de estabelecimentos no Firestore, faça login como operador administrativo no topo da página."
+      );
+      setModalLoginAberto(true);
+      return;
+    }
+
     const novosLimites = LIMITES_POR_PLANO[novoPlano];
+    const restAlvo = restaurantes.find((r) => r.id === restauranteId);
+    const planoAnterior = restAlvo?.plano || restAlvo?.licenca?.plano || "free";
+
     // Atualização otimista na lista de concessões
     setLicencas((prev) =>
       prev.map((lic) =>
@@ -166,10 +246,29 @@ export function SuperAdminView() {
           : r
       )
     );
+
     try {
       await alterarPlanoRestaurante(restauranteId, novoPlano, licencaCodigo);
-    } catch (err) {
+      setAlertaSucesso(`Plano do estabelecimento alterado para ${novoPlano.toUpperCase()} com sucesso!`);
+      setAlertaErro(null);
+    } catch (err: unknown) {
       console.error("Erro ao alterar plano do restaurante:", err);
+      // Reverte estado otimista para o anterior em caso de falha
+      const limitesAnteriores = LIMITES_POR_PLANO[planoAnterior as PlanoTipo] || LIMITES_POR_PLANO.free;
+      setRestaurantes((prev) =>
+        prev.map((r) =>
+          r.id === restauranteId
+            ? {
+                ...r,
+                plano: planoAnterior,
+                maxMesas: limitesAnteriores.maxMesas,
+                maxPratos: limitesAnteriores.maxPratos,
+              }
+            : r
+        )
+      );
+      const msg = err instanceof Error ? err.message : String(err);
+      setAlertaErro(`Falha ao salvar no Firestore: ${msg}. Verifique se você está logado.`);
     }
   };
 
@@ -177,6 +276,17 @@ export function SuperAdminView() {
     restauranteId: string,
     suspenso: boolean
   ) => {
+    // Alerta se não estiver autenticado
+    if (!auth.currentUser || auth.currentUser.isAnonymous) {
+      setAlertaErro(
+        "Atenção: Para suspender ou reativar estabelecimentos no Firestore, faça login como operador administrativo no topo da página."
+      );
+      setModalLoginAberto(true);
+      return;
+    }
+
+    const estadoAnterior = restaurantes.find((r) => r.id === restauranteId)?.suspenso || false;
+
     // Atualização otimista
     setRestaurantes((prev) =>
       prev.map((r) =>
@@ -194,8 +304,31 @@ export function SuperAdminView() {
     );
     try {
       await alterarStatusRestaurante(restauranteId, suspenso);
-    } catch (err) {
+      setAlertaSucesso(
+        suspenso
+          ? "Estabelecimento suspenso! Acesso de clientes, mesas e KDS pausados em tempo real."
+          : "Estabelecimento reativado com sucesso! Cardápio e mesas liberados."
+      );
+      setAlertaErro(null);
+    } catch (err: unknown) {
       console.error("Erro ao alterar suspensão do restaurante:", err);
+      // Reverte estado otimista
+      setRestaurantes((prev) =>
+        prev.map((r) =>
+          r.id === restauranteId
+            ? {
+                ...r,
+                suspenso: estadoAnterior,
+                configuracoes: {
+                  ...r.configuracoes,
+                  suspenso: estadoAnterior,
+                },
+              }
+            : r
+        )
+      );
+      const msg = err instanceof Error ? err.message : String(err);
+      setAlertaErro(`Falha ao alterar suspensão no Firestore: ${msg}.`);
     }
   };
 
@@ -313,6 +446,39 @@ export function SuperAdminView() {
               <p className="text-xs opacity-75">
                 Central de Concessões, Emissão de Licenças e Controle de Estabelecimentos
               </p>
+
+              {/* IDENTIFICAÇÃO DO OPERADOR / LOGIN RÁPIDO */}
+              <div className="flex items-center gap-2 mt-2">
+                {usuarioAuth && !usuarioAuth.isAnonymous ? (
+                  <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/30 px-3 py-1 rounded-xl text-emerald-400 text-xs font-semibold">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>Operador: {usuarioAuth.email}</span>
+                    <button
+                      type="button"
+                      onClick={handleLogoutOperador}
+                      className="ml-2 hover:text-white underline text-[10px]"
+                    >
+                      Sair
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <Badge className="bg-amber-500/10 text-amber-500 border border-amber-500/30 text-[11px] font-bold">
+                      Sessão Não Autenticada
+                    </Badge>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setModalLoginAberto(true)}
+                      className="h-7 text-[11px] rounded-lg border-amber-500/40 text-amber-400 hover:bg-amber-500/10 flex items-center gap-1"
+                    >
+                      <LogIn className="w-3 h-3" />
+                      Identificar Operador
+                    </Button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -367,6 +533,61 @@ export function SuperAdminView() {
           </div>
         </div>
       </div>
+
+      {/* ALERTA DE SESSÃO NÃO AUTENTICADA */}
+      {(!usuarioAuth || usuarioAuth.isAnonymous) && (
+        <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-500 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs animate-in fade-in">
+          <div className="flex items-center gap-2.5">
+            <AlertTriangle className="w-5 h-5 flex-shrink-0" />
+            <div>
+              <strong className="block font-bold">Modo Somente Leitura (Sem Permissão de Gravação no Firestore)</strong>
+              <span>
+                Para alterar planos de restaurantes (Free/Pro/Enterprise) ou suspender estabelecimentos, identifique-se com a conta administrativa no topo da página.
+              </span>
+            </div>
+          </div>
+          <Button
+            type="button"
+            onClick={() => setModalLoginAberto(true)}
+            className="bg-amber-500 hover:bg-amber-600 text-neutral-950 font-bold h-9 px-4 rounded-xl text-xs whitespace-nowrap shadow-sm"
+          >
+            Fazer Login de Operador
+          </Button>
+        </div>
+      )}
+
+      {/* FEEDBACK DE OPERAÇÕES (SUCESSO / ERRO) */}
+      {alertaSucesso && (
+        <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-between gap-3 text-xs animate-in fade-in">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+            <span>{alertaSucesso}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setAlertaSucesso(null)}
+            className="text-emerald-400 hover:text-white"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {alertaErro && (
+        <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-400 flex items-center justify-between gap-3 text-xs animate-in fade-in">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+            <span>{alertaErro}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setAlertaErro(null)}
+            className="text-rose-400 hover:text-white"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {/* SELETOR DE ABAS */}
       <div className="flex flex-wrap items-center gap-2 border-b border-border pb-3">
@@ -1307,6 +1528,76 @@ export function SuperAdminView() {
           </div>
         </div>
       )}
+
+      {/* MODAL DE LOGIN RÁPIDO DO OPERADOR */}
+      <Dialog open={modalLoginAberto} onOpenChange={setModalLoginAberto}>
+        <DialogContent className="max-w-md bg-card border-border text-foreground rounded-3xl p-6 shadow-2xl">
+          <DialogHeader className="space-y-2 mb-4">
+            <DialogTitle className="text-lg font-black flex items-center gap-2">
+              <Lock className="w-5 h-5 text-rose-500" />
+              <span>Identificação de Operador SuperAdmin</span>
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground">
+              Insira as credenciais administrativas para habilitar permissão de gravação no Firestore (migração de planos e suspensões).
+            </DialogDescription>
+          </DialogHeader>
+
+          {erroAuth && (
+            <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs flex items-center gap-2 mb-4">
+              <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+              <span>{erroAuth}</span>
+            </div>
+          )}
+
+          <form onSubmit={handleLoginOperador} className="space-y-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                E-mail do Administrador
+              </label>
+              <Input
+                type="email"
+                value={loginEmail}
+                onChange={(e) => setLoginEmail(e.target.value)}
+                placeholder="admin@mayamenu.com ou teste@teste.com"
+                required
+                className="bg-background border-border text-foreground rounded-xl h-10 text-xs"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                Senha de Acesso
+              </label>
+              <Input
+                type="password"
+                value={loginSenha}
+                onChange={(e) => setLoginSenha(e.target.value)}
+                placeholder="••••••••"
+                required
+                className="bg-background border-border text-foreground rounded-xl h-10 text-xs"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setModalLoginAberto(false)}
+                className="text-xs text-muted-foreground hover:text-foreground rounded-xl"
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                disabled={autenticando}
+                className="bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl text-xs h-10 px-5"
+              >
+                {autenticando ? "Autenticando..." : "Entrar como Operador"}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

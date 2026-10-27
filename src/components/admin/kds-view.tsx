@@ -120,76 +120,15 @@ export function KdsView({
   });
   const [filtro, setFiltro] = useState<"todos" | "a_fazer" | "pronto">("todos");
 
-  // Conecta ao Firestore em tempo real tratando a deleção e remoção de pedidos ao fechar a mesa
+  // Conecta ao Firestore em tempo real escutando a subcoleção isolada kds_tickets
   useEffect(() => {
     if (isSandbox) return;
     const idBusca = restauranteId || slug;
     if (!idBusca) return;
 
-    const idsParaBuscar = Array.from(
-      new Set([restauranteId, slug].filter(Boolean) as string[])
-    );
-
-    const q = idsParaBuscar.length > 1
-      ? query(collectionGroup(db, "pedidos"), where("restauranteId", "in", idsParaBuscar))
-      : query(collectionGroup(db, "pedidos"), where("restauranteId", "==", idsParaBuscar[0]));
-
-    const unsub = onSnapshot(
-      q,
-      (snapshot) => {
-        setPedidos((prevPedidos) => {
-          let lista = [...prevPedidos];
-
-          snapshot.docChanges().forEach((change) => {
-            const docId = change.doc.id;
-            if (change.type === "removed") {
-              // Quando a mesa é fechada ou os pedidos são excluídos, retira os pratos do ecrã instantaneamente
-              lista = lista.filter((p) => p.id !== docId);
-            } else if (change.type === "added" || change.type === "modified") {
-              const data = change.doc.data() as PedidoRodada;
-
-              // Somente 'a_fazer' e 'pronto' pertencem à esteira; entregue/cancelado/estornado saem do KDS
-              if (data.status !== "a_fazer" && data.status !== "pronto") {
-                lista = lista.filter((p) => p.id !== docId);
-                return;
-              }
-
-              let horarioFormatado = "Agora";
-              if (data.criadoEm?.toDate) {
-                horarioFormatado = data.criadoEm.toDate().toLocaleTimeString("pt-BR", {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                });
-              }
-
-              const pedidoConvertido: PedidoKDS = {
-                id: docId,
-                refPath: change.doc.ref.path,
-                mesa: data.mesa,
-                clienteId: data.clienteId,
-                nomeCliente: data.nomeCliente,
-                horario: horarioFormatado,
-                subtotal: data.subtotal,
-                status: data.status,
-                itens: data.itens || [],
-              };
-
-              const index = lista.findIndex((p) => p.id === docId);
-              if (index >= 0) {
-                lista[index] = pedidoConvertido;
-              } else {
-                lista.push(pedidoConvertido);
-              }
-            }
-          });
-
-          return lista;
-        });
-      },
-      (err) => {
-        console.warn("Listener do KDS indisponível (offline ou index pendente):", err);
-      }
-    );
+    const unsub = escutarPedidosKds(idBusca, (listaAtualizada) => {
+      setPedidos(listaAtualizada);
+    });
 
     return () => unsub();
   }, [restauranteId, slug, isSandbox]);
@@ -217,7 +156,9 @@ export function KdsView({
     // Se tiver caminho persistente no Firestore, atualiza em tempo real
     if (pedidoAlvo.refPath) {
       try {
-        await atualizarStatusPedido(pedidoAlvo.refPath, novoStatus);
+        await atualizarStatusPedido(pedidoAlvo.refPath, novoStatus, {
+          pedidoRefPath: (pedidoAlvo as any).pedidoRefPath,
+        });
       } catch (err) {
         console.warn("Falha ao atualizar status do pedido no Firestore:", err);
       }

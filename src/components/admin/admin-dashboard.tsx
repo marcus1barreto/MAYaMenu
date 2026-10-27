@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "@/context/auth-context";
 import { CARDAPIO_DEMO } from "@/lib/mock-data";
-import type { MenuItem, ComandaCliente, HistoricoSessaoMesa } from "@/types";
+import type { MenuItem, ComandaCliente, HistoricoSessaoMesa, TipoChavePix } from "@/types";
 import { getLimitesLicenca, getPlanoRestaurante } from "@/lib/licenca-limites";
 import { parseDateToMillis } from "@/lib/datas";
 import { db } from "@/lib/firebase";
@@ -131,6 +131,21 @@ export function AdminDashboard() {
   const [taxaServicoConfig, setTaxaServicoConfig] = useState<number>(
     restaurante?.configuracoes?.taxaServico !== undefined ? restaurante.configuracoes.taxaServico : 10
   );
+  const [pixAtivo, setPixAtivo] = useState<boolean>(
+    restaurante?.configuracoes?.pixConfig?.ativo ?? false
+  );
+  const [pixTipoChave, setPixTipoChave] = useState<TipoChavePix>(
+    restaurante?.configuracoes?.pixConfig?.tipoChave || "cpf"
+  );
+  const [pixChave, setPixChave] = useState<string>(
+    restaurante?.configuracoes?.pixConfig?.chave || ""
+  );
+  const [pixBeneficiario, setPixBeneficiario] = useState<string>(
+    restaurante?.configuracoes?.pixConfig?.beneficiario || restaurante?.nome || ""
+  );
+  const [pixCidade, setPixCidade] = useState<string>(
+    restaurante?.configuracoes?.pixConfig?.cidade || ""
+  );
   const [salvandoConfig, setSalvandoConfig] = useState(false);
   const [scannerBalcaoAberto, setScannerBalcaoAberto] = useState(false);
   const [feedbackBalcao, setFeedbackBalcao] = useState<string | null>(null);
@@ -229,6 +244,7 @@ export function AdminDashboard() {
               nomeCliente: c.nomeCliente,
               subtotal: c.subtotal || 0,
               status: c.status,
+              metodoPagamento: c.metodoPagamento,
               itens: [],
               chamadoGarcom: c.chamadoGarcom,
             });
@@ -784,6 +800,13 @@ export function AdminDashboard() {
           modoOperacao,
           modoFilaKds,
           taxaServico: Number(taxaServicoConfig) || 0,
+          pixConfig: {
+            ativo: pixAtivo,
+            tipoChave: pixTipoChave,
+            chave: pixChave.trim(),
+            beneficiario: pixBeneficiario.trim(),
+            cidade: pixCidade.trim(),
+          },
         },
       });
     } finally {
@@ -1178,7 +1201,9 @@ export function AdminDashboard() {
                           variant="outline"
                           className={`text-[9px] uppercase font-black tracking-wider px-2 py-0.5 rounded-full ${
                             mesa.status === "conta_pedida"
-                              ? "bg-rose-100 text-rose-700 border-rose-300 font-black"
+                              ? mesa.comandas.some((cmd) => cmd.metodoPagamento === "pix")
+                                ? "bg-teal-100 text-teal-800 border-teal-300 font-black flex items-center gap-1"
+                                : "bg-rose-100 text-rose-700 border-rose-300 font-black"
                               : mesa.status === "paga_ocupada"
                               ? "bg-emerald-100 text-emerald-800 border-emerald-300 font-black"
                               : mesa.status === "ocupada"
@@ -1186,13 +1211,22 @@ export function AdminDashboard() {
                               : "bg-neutral-100 text-neutral-600 border-neutral-200 font-bold"
                           }`}
                         >
-                          {mesa.status === "conta_pedida"
-                            ? "Conta"
-                            : mesa.status === "paga_ocupada"
-                            ? "Paga"
-                            : mesa.status === "ocupada"
-                            ? "Ocupada"
-                            : "Livre"}
+                          {mesa.status === "conta_pedida" ? (
+                            mesa.comandas.some((cmd) => cmd.metodoPagamento === "pix") ? (
+                              <>
+                                <QrCode className="w-2.5 h-2.5" />
+                                PIX
+                              </>
+                            ) : (
+                              "Conta"
+                            )
+                          ) : mesa.status === "paga_ocupada" ? (
+                            "Paga"
+                          ) : mesa.status === "ocupada" ? (
+                            "Ocupada"
+                          ) : (
+                            "Livre"
+                          )}
                         </Badge>
 
                         {mesa.alertaUpsell && (
@@ -2085,6 +2119,98 @@ export function AdminDashboard() {
                   ))}
                 </div>
               </div>
+            </div>
+
+            {/* CONFIGURAÇÃO DE PIX DO ESTABELECIMENTO (BACEN) */}
+            <div className="space-y-3 p-4 rounded-xl bg-muted/30 border border-border">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold uppercase tracking-wider text-foreground flex items-center gap-1.5">
+                  <QrCode className="w-3.5 h-3.5 text-emerald-600" />
+                  Recebimento Instantâneo via Pix
+                </label>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-bold text-muted-foreground">
+                    {pixAtivo ? "Ativado" : "Desativado"}
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={pixAtivo}
+                    onChange={(e) => setPixAtivo(e.target.checked)}
+                    className="w-4 h-4 rounded text-emerald-600 accent-emerald-600 cursor-pointer"
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Permita que clientes paguem a comanda via Copia-e-Cola ou QR Code direto para sua conta sem taxas de intermediação.
+              </p>
+
+              {pixAtivo && (
+                <div className="space-y-3 pt-2 border-t border-border">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[11px] font-bold text-foreground block mb-1">
+                        Tipo de Chave Pix
+                      </label>
+                      <select
+                        value={pixTipoChave}
+                        onChange={(e) => setPixTipoChave(e.target.value as TipoChavePix)}
+                        className="w-full h-10 px-3 bg-background border border-input rounded-xl text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                      >
+                        <option value="cpf">CPF</option>
+                        <option value="cnpj">CNPJ</option>
+                        <option value="telefone">Celular / WhatsApp</option>
+                        <option value="email">E-mail</option>
+                        <option value="aleatoria">Chave Aleatória (EVP)</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] font-bold text-foreground block mb-1">
+                        Chave Pix
+                      </label>
+                      <Input
+                        type="text"
+                        placeholder="Ex: 12345678909 ou chave@pix.com"
+                        value={pixChave}
+                        onChange={(e) => setPixChave(e.target.value)}
+                        className="bg-background border-input text-foreground text-xs h-10"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[11px] font-bold text-foreground block mb-1">
+                        Nome do Beneficiário / Titular
+                      </label>
+                      <Input
+                        type="text"
+                        maxLength={25}
+                        placeholder="Ex: Bar do Marcus"
+                        value={pixBeneficiario}
+                        onChange={(e) => setPixBeneficiario(e.target.value)}
+                        className="bg-background border-input text-foreground text-xs h-10"
+                      />
+                      <span className="text-[10px] text-muted-foreground">Máximo 25 caracteres (padrão BACEN)</span>
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] font-bold text-foreground block mb-1">
+                        Cidade do Estabelecimento
+                      </label>
+                      <Input
+                        type="text"
+                        maxLength={15}
+                        placeholder="Ex: Sao Paulo"
+                        value={pixCidade}
+                        onChange={(e) => setPixCidade(e.target.value)}
+                        className="bg-background border-input text-foreground text-xs h-10"
+                      />
+                      <span className="text-[10px] text-muted-foreground">Máximo 15 caracteres (padrão BACEN)</span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="flex items-center justify-end gap-2 pt-2">

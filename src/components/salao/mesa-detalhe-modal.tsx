@@ -34,9 +34,11 @@ import {
   Bell,
   Loader2,
   Check,
+  WifiOff,
 } from "lucide-react";
 import Link from "next/link";
 import { QRCodeSVG } from "qrcode.react";
+import type { PedidoFilaOffline } from "@/lib/offline-queue";
 
 interface MesaDetalheModalProps {
   mesa: MesaOperacional | null;
@@ -45,6 +47,7 @@ interface MesaDetalheModalProps {
   slug: string;
   restauranteId?: string;
   modoSomenteLeitura?: boolean; // Se true, esconde ações operacionais (usado no Admin)
+  pedidosOffline?: PedidoFilaOffline[];
   onMarcarPago: (mesaNumero: number, clienteId: string) => void;
   onLiberarMesa: (mesaNumero: number) => void;
   onAtenderGarcom?: (mesaNumero: number, clienteId: string) => void;
@@ -67,6 +70,7 @@ export function MesaDetalheModal({
   slug,
   restauranteId,
   modoSomenteLeitura = false,
+  pedidosOffline,
   onMarcarPago,
   onLiberarMesa,
   onAtenderGarcom,
@@ -374,6 +378,28 @@ export function MesaDetalheModal({
                   </span>
                 </div>
 
+                {/* ALERTA DE FILA OFFLINE DA MESA */}
+                {(() => {
+                  const pedidosOfflineMesa = (pedidosOffline || []).filter(
+                    (p) => mesa && Number(p.mesaNumero) === mesa.numero
+                  );
+                  if (pedidosOfflineMesa.length === 0) return null;
+                  return (
+                    <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex items-center justify-between text-xs text-amber-500 shadow-xs">
+                      <div className="flex items-center gap-2">
+                        <WifiOff className="w-4 h-4 shrink-0 animate-pulse text-amber-500" />
+                        <span>
+                          {pedidosOfflineMesa.length}{" "}
+                          {pedidosOfflineMesa.length === 1 ? "pedido armazenado" : "pedidos armazenados"} localmente (Sincronização Pendente).
+                        </span>
+                      </div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-amber-500/80 bg-amber-500/10 px-2 py-0.5 rounded-full">
+                        Fila Offline
+                      </span>
+                    </div>
+                  );
+                })()}
+
                 {comandasComItens.length === 0 ? (
                   <div className="p-8 text-center bg-muted/20 rounded-2xl border border-dashed border-border">
                     <Coffee className="w-10 h-10 text-muted-foreground mx-auto mb-2" />
@@ -441,18 +467,27 @@ export function MesaDetalheModal({
                               })}
                             </span>
                             <span
-                              className={`text-[9px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full inline-block ${jaPago
+                              className={`text-[9px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full inline-flex items-center gap-1 ${jaPago
                                   ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
-                                  : comanda.status === "conta_pedida"
-                                    ? "bg-primary/15 text-primary"
-                                    : "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+                                  : comanda.metodoPagamento === "pix"
+                                    ? "bg-teal-500/15 text-teal-600 dark:text-teal-400 border border-teal-500/30"
+                                    : comanda.status === "conta_pedida"
+                                      ? "bg-primary/15 text-primary"
+                                      : "bg-amber-500/15 text-amber-600 dark:text-amber-400"
                                 }`}
                             >
-                              {jaPago
-                                ? "Pago"
-                                : comanda.status === "conta_pedida"
-                                  ? "Pediu Conta"
-                                  : "Consumindo"}
+                              {jaPago ? (
+                                "Pago"
+                              ) : comanda.metodoPagamento === "pix" ? (
+                                <>
+                                  <QrCode className="w-2.5 h-2.5" />
+                                  Pix Solicitado
+                                </>
+                              ) : comanda.status === "conta_pedida" ? (
+                                "Pediu Conta"
+                              ) : (
+                                "Consumindo"
+                              )}
                             </span>
                           </div>
                         </div>
@@ -479,9 +514,17 @@ export function MesaDetalheModal({
                                   })}
                                 </span>
 
-                                {/* BOTÃO DE MARCAR COMO SERVIDO / ENTREGUE */}
+                                {/* BOTÃO DE MARCAR COMO SERVIDO / ENTREGUE OU BADGE OFFLINE */}
                                 {!modoSomenteLeitura && (
-                                  it.statusPedido === "entregue" ? (
+                                  !it.refPath ? (
+                                    <Badge
+                                      variant="outline"
+                                      className="text-[9px] bg-amber-500/15 text-amber-500 border-amber-500/30 font-bold uppercase tracking-wider flex items-center gap-1 py-0 px-2 shadow-xs animate-pulse"
+                                    >
+                                      <Clock className="w-2.5 h-2.5 animate-spin" />
+                                      Sync Pendente
+                                    </Badge>
+                                  ) : it.statusPedido === "entregue" ? (
                                     <span className="text-[10px] text-emerald-400 font-bold flex items-center gap-1">
                                       <Check className="w-3 h-3" />
                                       Entregue

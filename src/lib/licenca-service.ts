@@ -556,11 +556,17 @@ export async function alterarStatusRestaurante(
 ): Promise<void> {
   try {
     const restRef = doc(db, "restaurantes", restauranteId);
-    await updateDoc(restRef, {
-      suspenso,
-      "configuracoes.suspenso": suspenso,
-      atualizadoEm: serverTimestamp(),
-    });
+    await setDoc(
+      restRef,
+      {
+        suspenso,
+        configuracoes: {
+          suspenso,
+        },
+        atualizadoEm: serverTimestamp(),
+      },
+      { merge: true }
+    );
   } catch (err) {
     console.error("Falha ao alterar status de suspensão do restaurante:", err);
     throw err;
@@ -577,18 +583,26 @@ export async function alterarPlanoRestaurante(
 ): Promise<void> {
   const novosLimites = LIMITES_POR_PLANO[novoPlano];
 
-  // 1. Atualiza no documento do restaurante
+  // 1. Atualiza no documento do restaurante (usando setDoc com merge para garantir criação ou update resiliente)
   try {
     const restRef = doc(db, "restaurantes", restauranteId);
-    await updateDoc(restRef, {
-      plano: novoPlano,
-      maxMesas: novosLimites.maxMesas,
-      maxPratos: novosLimites.maxPratos,
-      "licenca.plano": novoPlano,
-      "licenca.limites": novosLimites,
-    });
+    await setDoc(
+      restRef,
+      {
+        plano: novoPlano,
+        maxMesas: novosLimites.maxMesas,
+        maxPratos: novosLimites.maxPratos,
+        licenca: {
+          plano: novoPlano,
+          limites: novosLimites,
+        },
+        atualizadoEm: serverTimestamp(),
+      },
+      { merge: true }
+    );
   } catch (err) {
-    console.warn("Falha ao atualizar plano no restaurante:", err);
+    console.error("Falha ao atualizar plano no restaurante:", err);
+    throw err;
   }
 
   // 2. Se houver licença vinculada, atualiza também a concessão
@@ -596,12 +610,18 @@ export async function alterarPlanoRestaurante(
     const codigoFormatado = licencaCodigo.trim().toUpperCase();
     try {
       const licRef = doc(db, "concessoes", codigoFormatado);
-      await updateDoc(licRef, {
-        plano: novoPlano,
-        limites: novosLimites,
-      });
-    } catch {
+      await setDoc(
+        licRef,
+        {
+          plano: novoPlano,
+          limites: novosLimites,
+          atualizadoEm: serverTimestamp(),
+        },
+        { merge: true }
+      );
+    } catch (err) {
       // Ignora se for licença já utilizada / arquivada
+      console.warn("Concessão não atualizada diretamente (pode estar arquivada):", err);
     }
 
     const locais = obterLicencasLocais();

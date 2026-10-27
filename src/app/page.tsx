@@ -179,7 +179,7 @@ export default function LandingPage() {
         <section id="pilares" className="py-16 md:py-24 max-w-7xl mx-auto px-4 sm:px-6">
           <div className="text-center max-w-3xl mx-auto mb-12 sm:mb-16">
             <h2 className="text-xs sm:text-sm uppercase tracking-widest font-black text-rose-600 mb-2.5">
-              Tecnologia de Gigante, Preço de Bairro
+              Tecnologia de Gigante, Preço de Guardanapo
             </h2>
             <p className="text-2xl sm:text-4xl font-black text-neutral-950 tracking-tight">
               Tudo o que seu salão precisa para rodar sem atrito e com zero complicação

@@ -5,6 +5,7 @@ import { KdsView } from "@/components/admin/kds-view";
 import { AdminLoginForm } from "@/components/admin/admin-login-form";
 
 import { PinLockGuard } from "@/components/salao/pin-lock-guard";
+import { EstabelecimentoSuspensoView } from "@/components/admin/estabelecimento-suspenso-view";
 import { TemaUsuarioProvider } from "@/context/tema-context";
 
 function CozinhaPageContent() {
@@ -31,6 +32,11 @@ function CozinhaPageContent() {
         <AdminLoginForm />
       </div>
     );
+  }
+
+  // Guard de Suspensão de Estabelecimento em Tempo Real
+  if (restaurante && (restaurante.suspenso || restaurante.configuracoes?.suspenso)) {
+    return <EstabelecimentoSuspensoView restaurante={restaurante} />;
   }
 
   return (

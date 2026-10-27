@@ -44,7 +44,18 @@ export interface Restaurante {
     modoFilaKds?: ModoFilaKds; // 'sequencial' (padrão FIFO) | 'agrupamento' (Ágil / Otimizado)
     taxaServico?: number; // Percentual da taxa de serviço (padrão: 10)
     suspenso?: boolean;
+    pixConfig?: PixConfig;
   };
+}
+
+export type TipoChavePix = 'cpf' | 'cnpj' | 'email' | 'telefone' | 'aleatoria';
+
+export interface PixConfig {
+  chave: string;
+  tipoChave: TipoChavePix;
+  beneficiario: string; // Nome do titular / Razão Social (máx 25 chars para EMV)
+  cidade: string; // Cidade (máx 15 chars para EMV)
+  ativo: boolean;
 }
 
 export interface MenuItem {
@@ -117,6 +128,9 @@ export interface ComandaCliente {
   atualizadoEm?: Timestamp;
   subtotal: number; // Soma acumulada de todos os pedidos/rodadas deste cliente
   status: 'pedindo' | 'aguardando_pratos' | 'conta_pedida' | 'pago';
+  metodoPagamento?: 'pix' | 'cartao_garcom' | 'dinheiro_garcom' | 'balcao';
+  pixPayload?: string;
+  solicitacaoPagamentoEm?: Timestamp;
   taxaServicoAtiva?: boolean; // Definido pelo garçom/admin; padrão: true
   chamadoGarcom?: {
     ativo: boolean;

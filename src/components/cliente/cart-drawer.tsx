@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useCart } from "@/context/cart-context";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { QRCodeSVG } from "qrcode.react";
 import { buildTicketPayload, encodeTicket } from "@/lib/ticket";
 import { ensureClienteAnonimo, db } from "@/lib/firebase";
-import { doc, getDoc, setDoc, updateDoc, serverTimestamp, increment, collection } from "firebase/firestore";
+import { doc, getDoc, setDoc, updateDoc, serverTimestamp, increment, collection, writeBatch } from "firebase/firestore";
 import {
   Trash2,
   Plus,
@@ -22,6 +22,13 @@ import {
 } from "lucide-react";
 import confetti from "canvas-confetti";
 import { salvarVisitaLocal, gerarComprovanteHash } from "@/lib/historico-cliente";
+
+function gerarIdempotencyKey(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `ped-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+}
 
 interface CartDrawerProps {
   isOpen: boolean;
@@ -59,20 +66,31 @@ export function CartDrawer({
   const [usouOffline, setUsouOffline] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
+  // Usamos useRef para guardar o ID do pedido. Ele sobrevive a re-renderizações 
+  // e garante que retentativas/cliques repetidos usem exatamente o mesmo ID.
+  const idempotencyKey = useRef<string>("");
+
+  useEffect(() => {
+    if (!idempotencyKey.current) {
+      idempotencyKey.current = gerarIdempotencyKey();
+    }
+  }, []);
+
   const temNome = nomeCliente.trim().length >= 2;
   const podeFinalizar = itens.length > 0 && temNome && !enviando;
 
   const handleFinalizarPedido = async () => {
-    if (!podeFinalizar) return;
+    // 1. Trava dupla contra cliques simultâneos
+    if (!podeFinalizar || enviando) return;
 
     setEnviando(true);
     setErro(null);
 
-    // ID Gerado no Cliente (GARANTE IDEMPOTÊNCIA)
-    // Se o usuário clicar várias vezes, ou se a rede falhar e ele tentar de novo,
-    // será usado um novo UUID para uma nova tentativa, OU o mesmo pedido
-    // apenas sobrescreverá a rodada atual no Firestore.
-    const pedidoId = `ped-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+    // Usa o ID fixo gerado para esta intenção de compra (Garante Idempotência)
+    if (!idempotencyKey.current) {
+      idempotencyKey.current = gerarIdempotencyKey();
+    }
+    const pedidoId = idempotencyKey.current;
 
     try {
       // 1. Obtém a Sessão Offline (O UUID gerado no localStorage se o Auth falhar)
@@ -106,29 +124,7 @@ export function CartDrawer({
       // 3. Monta as Referências e Payloads
       const idRestauranteFinal = (restauranteId || slug || "demo").trim();
 
-      // Referência da Mesa (Comanda Pai)
-      const comandaRef = doc(
-        db,
-        "restaurantes",
-        idRestauranteFinal,
-        "mesas",
-        String(mesa),
-        "comandas_abertas",
-        uid
-      );
 
-      // Referência do Pedido (Rodada da Cozinha)
-      const pedidoRef = doc(
-        db,
-        "restaurantes",
-        idRestauranteFinal,
-        "mesas",
-        String(mesa),
-        "comandas_abertas",
-        uid,
-        "pedidos",
-        pedidoId
-      );
 
       // Mapeamento limpo dos itens para a cozinha
       const itensMapeados = itens.map((it) => ({
@@ -172,20 +168,57 @@ export function CartDrawer({
         status: "aguardando_pratos" as const,
       };
 
-      // 4. Executa as Gravações no IndexedDB / Firestore
+      // 1. Instancia o Lote de Escrita Atômica
+      const batch = writeBatch(db);
+
+      // 2. Define as 3 referências apontando para o mesmo momento
+      const comandaRef = doc(
+        db,
+        "restaurantes",
+        idRestauranteFinal,
+        "mesas",
+        String(mesa),
+        "comandas_abertas",
+        uid
+      );
+      const pedidoRef = doc(comandaRef, "pedidos", pedidoId);
+      const kdsRef = doc(db, "restaurantes", idRestauranteFinal, "kds_tickets", pedidoId); // Isolado da mesa
+
+      // 3. Monta o Payload específico e leve para o KDS (sem subtotal financeiro)
+      const payloadKds = {
+        id: pedidoId, // Mesmo ID do pedido para rastreabilidade
+        mesa,
+        numeroMesa: Number(mesa) || mesa,
+        clienteId: uid,
+        nomeCliente: nomeCliente.trim(),
+        status: "a_fazer" as const, // A query do KDS vai filtrar estritamente por isso
+        pedidoRefPath: pedidoRef.path,
+        itens: itensMapeados.map((i) => ({
+          menuItemId: i.menuItemId,
+          nome: i.nome,
+          quantidade: i.quantidade,
+          tempoPreparoEstimado: i.tempoPreparoEstimado,
+          modificadores: i.modificadores || [],
+          observacoes: i.observacoes || "",
+        })),
+        criadoEm: serverTimestamp(),
+      };
+
+      // 4. Empilha as operações (Merge na comanda pai, criação no pedido, criação no KDS)
+      batch.set(comandaRef, dadosComanda, { merge: true });
+      batch.set(pedidoRef, dadosPedidoRodada);
+      batch.set(kdsRef, payloadKds);
+
       try {
-        // Como a persistência local (IndexedDB) está ligada, isso resolve na hora,
-        // mesmo sem rede! O Firestore enfileira o envio silenciosamente.
-        await setDoc(comandaRef, dadosComanda, { merge: true });
-        await setDoc(pedidoRef, dadosPedidoRodada);
+        // 5. Executa tudo de uma vez. Ou grava tudo, ou falha tudo.
+        await batch.commit();
 
         // Chegou aqui? Está salvo (ou na nuvem, ou no cache local)
         const isOffline = typeof navigator !== "undefined" && !navigator.onLine;
         setUsouOffline(isOffline);
       } catch (firestoreErr) {
-        // Este catch SÓ é disparado se o próprio IndexedDB falhar ou estiver cheio,
-        // o que é um apagão local severo. Aí sim o QR entra como salvação.
-        console.error("Falha crônica no IndexedDB/Firestore:", firestoreErr);
+        // Este catch SÓ é disparado se o próprio IndexedDB falhar ou estiver cheio
+        console.error("Falha na gravação atômica:", firestoreErr);
         setUsouOffline(true);
       }
 
@@ -227,22 +260,28 @@ export function CartDrawer({
         // Ignora
       }
 
+      // SUCESSO: Renova a chave de idempotência para uma futura NOVA rodada de pedidos
+      idempotencyKey.current = gerarIdempotencyKey();
       setPedidoConcluido(true);
       limparCarrinho();
     } catch (error) {
-      console.error("Erro fatal ao finalizar o pedido:", error);
-      setErro("Ocorreu um erro ao processar seu pedido. Mostre o QR Code ao garçom.");
+      console.error("Falha ao gravar pedido:", error);
+      // EM CASO DE ERRO (ex: timeout), NÃO renovamos a idempotencyKey.
+      // Se o cliente clicar em enviar de novo, o Firestore usará o mesmo `pedidoId`.
+      // Como estamos usando set no batch, a operação será sobrescrita e não duplicada (Idempotente).
+      setErro("Ocorreu um erro ao processar seu pedido. Tente novamente ou mostre o QR Code ao garçom.");
       setUsouOffline(true);
       setPedidoConcluido(true);
-      limparCarrinho();
     } finally {
       setEnviando(false);
     }
   };
 
   const handleReset = () => {
+    idempotencyKey.current = gerarIdempotencyKey();
     setPedidoConcluido(false);
     setTicketPayloadRaw(null);
+    setErro(null);
     onClose();
   };
 
