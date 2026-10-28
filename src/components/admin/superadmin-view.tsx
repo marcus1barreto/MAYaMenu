@@ -594,7 +594,7 @@ export function SuperAdminView() {
             <Button
               type="button"
               onClick={handleLogoutOperador}
-              className="w-full bg-neutral-950 hover:bg-neutral-800 text-white font-bold h-11 rounded-2xl shadow-md transition-colors"
+              className="w-full bg-rose-600 hover:bg-rose-700 text-white font-bold h-11 rounded-2xl shadow-md transition-colors"
             >
               <LogOut className="w-4 h-4 mr-2" />
               Sair e Trocar de Conta
@@ -621,34 +621,34 @@ export function SuperAdminView() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border pb-6">
         <div className="flex items-center justify-between w-full md:w-auto">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-rose-600/20 border border-rose-500/30 rounded-2xl text-rose-500">
+            <div className="p-2.5 bg-rose-50 border border-rose-100 rounded-2xl text-rose-600 shadow-xs">
               <ShieldCheck className="w-7 h-7" />
             </div>
             <div>
-              <h1 className="text-2xl md:text-3xl font-black tracking-tight flex items-center gap-2">
+              <h1 className="text-2xl md:text-3xl font-black tracking-tight text-foreground flex items-center gap-2">
                 MAYaRAnas <span className="opacity-60 font-normal">| Gerência Geral</span>
               </h1>
-              <p className="text-xs opacity-75">
+              <p className="text-xs text-muted-foreground">
                 Central de Concessões, Emissão de Licenças e Controle de Estabelecimentos
               </p>
 
               {/* IDENTIFICAÇÃO DO OPERADOR / LOGIN RÁPIDO */}
               <div className="flex items-center gap-2 mt-2">
                 {ehSuperAdmin ? (
-                  <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/30 px-3 py-1 rounded-xl text-emerald-600 dark:text-emerald-400 text-xs font-semibold">
-                    <CheckCircle2 className="w-3.5 h-3.5" />
+                  <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-xl text-emerald-800 text-xs font-semibold">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                     <span>Operador: {usuarioAuth?.email}</span>
                     <button
                       type="button"
                       onClick={handleLogoutOperador}
-                      className="ml-2 hover:text-emerald-950 dark:hover:text-emerald-200 underline text-[10px]"
+                      className="ml-2 hover:text-emerald-950 underline text-[10px]"
                     >
                       Sair
                     </button>
                   </div>
                 ) : (
                   <div className="flex items-center gap-2">
-                    <Badge className="bg-amber-500/10 text-amber-500 border border-amber-500/30 text-[11px] font-bold">
+                    <Badge className="bg-amber-50 text-amber-800 border border-amber-200 text-[11px] font-bold">
                       Sessão Não Autenticada
                     </Badge>
                     <Button
@@ -656,7 +656,7 @@ export function SuperAdminView() {
                       size="sm"
                       variant="outline"
                       onClick={() => setModalLoginAberto(true)}
-                      className="h-7 text-[11px] rounded-lg border-amber-500/40 text-amber-400 hover:bg-amber-500/10 flex items-center gap-1"
+                      className="h-7 text-[11px] rounded-lg border-amber-300 text-amber-800 hover:bg-amber-100 flex items-center gap-1"
                     >
                       <LogIn className="w-3 h-3" />
                       Identificar Operador
@@ -691,55 +691,55 @@ export function SuperAdminView() {
             className="px-4 py-2 bg-card border border-border rounded-2xl text-center cursor-pointer hover:border-primary/50 transition-colors shadow-xs"
           >
             <span className="block text-xs uppercase tracking-wider text-muted-foreground font-bold flex items-center justify-center gap-1">
-              <Store className="w-3 h-3 text-emerald-500" />
+              <Store className="w-3 h-3 text-emerald-600" />
               Operação
             </span>
-            <span className="text-xl font-black text-emerald-500">{totalRestaurantesAtivos}</span>
+            <span className="text-xl font-black text-emerald-600">{totalRestaurantesAtivos}</span>
           </div>
           <div
             onClick={() => setAbaAtiva("ativas")}
             className="px-4 py-2 bg-card border border-border rounded-2xl text-center cursor-pointer hover:border-primary/50 transition-colors shadow-xs"
           >
             <span className="block text-xs uppercase tracking-wider text-muted-foreground font-bold flex items-center justify-center gap-1">
-              <KeyRound className="w-3 h-3 text-amber-500" />
+              <KeyRound className="w-3 h-3 text-amber-600" />
               Disponíveis
             </span>
-            <span className="text-xl font-black text-amber-500">{totalTokensDisponiveis}</span>
+            <span className="text-xl font-black text-amber-600">{totalTokensDisponiveis}</span>
           </div>
           <div
             onClick={() => setAbaAtiva("vencidas")}
             className="px-4 py-2 bg-card border border-border rounded-2xl text-center cursor-pointer hover:border-primary/50 transition-colors shadow-xs"
           >
             <span className="block text-xs uppercase tracking-wider text-muted-foreground font-bold flex items-center justify-center gap-1">
-              <ClockAlert className="w-3 h-3 text-orange-500" />
+              <ClockAlert className="w-3 h-3 text-orange-600" />
               Vencidas
             </span>
-            <span className="text-xl font-black text-orange-500">{totalTokensVencidos}</span>
+            <span className="text-xl font-black text-orange-600">{totalTokensVencidos}</span>
           </div>
           <div className="px-4 py-2 bg-card border border-border rounded-2xl text-center shadow-xs">
             <span className="block text-xs uppercase tracking-wider text-muted-foreground font-bold">
               Suspensos
             </span>
-            <span className="text-xl font-black text-rose-500">{totalRestaurantesSuspensos}</span>
+            <span className="text-xl font-black text-rose-600">{totalRestaurantesSuspensos}</span>
           </div>
           <div
             onClick={() => setAbaAtiva("arquivo_morto")}
             className="px-4 py-2 bg-card border border-border rounded-2xl text-center cursor-pointer hover:border-primary/50 transition-colors shadow-xs"
           >
             <span className="block text-xs uppercase tracking-wider text-muted-foreground font-bold flex items-center justify-center gap-1">
-              <Archive className="w-3 h-3 text-purple-500" />
+              <Archive className="w-3 h-3 text-purple-600" />
               Arquivo Morto
             </span>
-            <span className="text-xl font-black text-purple-500">{arquivoMorto.length}</span>
+            <span className="text-xl font-black text-purple-600">{arquivoMorto.length}</span>
           </div>
         </div>
       </div>
 
       {/* ALERTA DE SESSÃO NÃO AUTENTICADA */}
       {(!usuarioAuth || usuarioAuth.isAnonymous) && (
-        <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-500 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs animate-in fade-in">
+        <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs animate-in fade-in shadow-xs">
           <div className="flex items-center gap-2.5">
-            <AlertTriangle className="w-5 h-5 flex-shrink-0" />
+            <AlertTriangle className="w-5 h-5 flex-shrink-0 text-amber-600" />
             <div>
               <strong className="block font-bold">Modo Somente Leitura (Sem Permissão de Gravação no Firestore)</strong>
               <span>
@@ -750,7 +750,7 @@ export function SuperAdminView() {
           <Button
             type="button"
             onClick={() => setModalLoginAberto(true)}
-            className="bg-amber-500 hover:bg-amber-600 text-neutral-950 font-bold h-9 px-4 rounded-xl text-xs whitespace-nowrap shadow-sm"
+            className="bg-amber-500 hover:bg-amber-600 text-white font-bold h-9 px-4 rounded-xl text-xs whitespace-nowrap shadow-xs"
           >
             Fazer Login de Operador
           </Button>
@@ -759,15 +759,15 @@ export function SuperAdminView() {
 
       {/* FEEDBACK DE OPERAÇÕES (SUCESSO / ERRO) */}
       {alertaSucesso && (
-        <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-between gap-3 text-xs animate-in fade-in">
+        <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 flex items-center justify-between gap-3 text-xs animate-in fade-in shadow-xs">
           <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+            <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-emerald-600" />
             <span>{alertaSucesso}</span>
           </div>
           <button
             type="button"
             onClick={() => setAlertaSucesso(null)}
-            className="text-emerald-400 hover:text-white"
+            className="text-emerald-700 hover:text-emerald-950 transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
@@ -775,15 +775,15 @@ export function SuperAdminView() {
       )}
 
       {alertaErro && (
-        <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-400 flex items-center justify-between gap-3 text-xs animate-in fade-in">
+        <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 flex items-center justify-between gap-3 text-xs animate-in fade-in shadow-xs">
           <div className="flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+            <AlertTriangle className="w-4 h-4 flex-shrink-0 text-rose-600" />
             <span>{alertaErro}</span>
           </div>
           <button
             type="button"
             onClick={() => setAlertaErro(null)}
-            className="text-rose-400 hover:text-white"
+            className="text-rose-700 hover:text-rose-950 transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
@@ -844,30 +844,30 @@ export function SuperAdminView() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <h2 className="text-xl font-black tracking-tight flex items-center gap-2">
-                <Store className="w-5 h-5 text-emerald-400" />
+                <Store className="w-5 h-5 text-emerald-600" />
                 Estabelecimentos em Operação ({restaurantesFiltrados.length})
               </h2>
-              <p className="text-xs text-neutral-400">
+              <p className="text-xs text-muted-foreground">
                 Gerencie versões de planos (Free, Pro, Enterprise) e status de operação dos restaurantes ativos em tempo real.
               </p>
             </div>
 
             <div className="relative w-full sm:w-72">
-              <Search className="w-4 h-4 text-neutral-500 absolute left-3 top-1/2 -translate-y-1/2" />
+              <Search className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
               <Input
                 value={filtro}
                 onChange={(e) => setFiltro(e.target.value)}
                 placeholder="Buscar restaurante, slug ou plano..."
-                className="bg-neutral-900 border-neutral-800 text-white pl-9 rounded-xl h-9 text-xs"
+                className="bg-card border-border text-foreground pl-9 rounded-xl h-9 text-xs shadow-xs focus-visible:ring-1 focus-visible:ring-primary"
               />
             </div>
           </div>
 
           {restaurantesFiltrados.length === 0 ? (
-            <div className="p-16 text-center bg-neutral-900/40 border border-neutral-800 rounded-3xl space-y-3">
-              <Store className="w-12 h-12 text-neutral-600 mx-auto" />
-              <h3 className="text-sm font-bold text-neutral-300">Nenhum estabelecimento encontrado</h3>
-              <p className="text-xs text-neutral-500 max-w-sm mx-auto">
+            <div className="p-16 text-center bg-card border border-border rounded-3xl space-y-3 shadow-xs">
+              <Store className="w-12 h-12 text-muted-foreground/60 mx-auto" />
+              <h3 className="text-sm font-bold text-foreground">Nenhum estabelecimento encontrado</h3>
+              <p className="text-xs text-muted-foreground max-w-sm mx-auto">
                 Assim que um cliente ativar seu link de concessão, o restaurante aparecerá automaticamente aqui.
               </p>
             </div>
@@ -882,11 +882,11 @@ export function SuperAdminView() {
                 return (
                   <div
                     key={rest.id}
-                    className={`p-5 bg-card border rounded-3xl space-y-4 shadow-sm transition-all ${
+                    className={`p-5 bg-card border rounded-3xl space-y-4 shadow-xs transition-all ${
                       isItemPending ? "ring-2 ring-primary/50 opacity-90 scale-[0.99]" : ""
                     } ${
                       isSuspenso
-                        ? "border-rose-500/40 bg-rose-500/5"
+                        ? "border-rose-200 bg-rose-50/40"
                         : "border-border hover:border-primary/40"
                     }`}
                   >
@@ -901,7 +901,7 @@ export function SuperAdminView() {
                             href={`/r/${rest.slug}`}
                             target="_blank"
                             rel="noreferrer"
-                            className="text-xs font-mono text-emerald-600 dark:text-emerald-400 hover:underline inline-block mt-0.5"
+                            className="text-xs font-mono text-emerald-700 hover:underline inline-block mt-0.5"
                           >
                             /r/{rest.slug}
                           </a>
@@ -915,11 +915,11 @@ export function SuperAdminView() {
                         <Badge
                           className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full ${
                             isSuspenso
-                              ? "bg-rose-500/10 text-rose-500 border border-rose-500/30"
+                              ? "bg-rose-50 text-rose-800 border border-rose-200"
                               : planoAtual === "enterprise"
-                              ? "bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30"
+                              ? "bg-amber-50 text-amber-800 border border-amber-200"
                               : planoAtual === "pro"
-                              ? "bg-violet-500/15 text-violet-600 dark:text-violet-300 border border-violet-500/30"
+                              ? "bg-violet-50 text-violet-800 border border-violet-200"
                               : "bg-muted text-muted-foreground border border-border"
                           }`}
                         >
@@ -971,8 +971,8 @@ export function SuperAdminView() {
                           onClick={() => handleAlterarPlano(rest.id, "pro", rest.licenca?.id)}
                           className={`px-2.5 py-1 text-[10px] sm:text-xs font-bold rounded-md transition-all disabled:opacity-50 ${
                             planoAtual === "pro"
-                              ? "bg-violet-600 text-white shadow-sm shadow-violet-900/50"
-                              : "text-neutral-500 hover:text-violet-400"
+                              ? "bg-violet-600 text-white shadow-xs"
+                              : "text-muted-foreground hover:text-violet-600"
                           }`}
                         >
                           PRO
@@ -984,8 +984,8 @@ export function SuperAdminView() {
                           onClick={() => handleAlterarPlano(rest.id, "enterprise", rest.licenca?.id)}
                           className={`px-2.5 py-1 text-[10px] sm:text-xs font-bold rounded-md transition-all disabled:opacity-50 ${
                             planoAtual === "enterprise"
-                              ? "bg-amber-500 text-amber-950 shadow-sm shadow-amber-900/50"
-                              : "text-neutral-500 hover:text-amber-500"
+                              ? "bg-amber-500 text-white shadow-xs"
+                              : "text-muted-foreground hover:text-amber-600"
                           }`}
                         >
                           ENTERPRISE
@@ -998,7 +998,7 @@ export function SuperAdminView() {
                           type="button"
                           disabled={isItemPending}
                           onClick={() => handleAlterarSuspensaoRestaurante(rest.id, false)}
-                          className="px-3 py-1.5 text-[10px] sm:text-xs font-bold text-emerald-400 hover:bg-emerald-500/15 rounded-lg border border-emerald-500/30 flex items-center gap-1 transition-colors disabled:opacity-50"
+                          className="px-3 py-1.5 text-[10px] sm:text-xs font-bold text-emerald-700 hover:bg-emerald-50 rounded-lg border border-emerald-200 flex items-center gap-1 transition-colors disabled:opacity-50"
                         >
                           <RotateCcw className="w-3.5 h-3.5" />
                           Reativar
@@ -1008,26 +1008,26 @@ export function SuperAdminView() {
                           <AlertDialogTrigger asChild>
                             <button
                               type="button"
-                              className="px-2.5 py-1 text-[10px] sm:text-xs font-bold text-rose-500 hover:bg-rose-500/15 hover:text-rose-400 rounded-lg transition-colors border border-transparent hover:border-rose-500/30 flex items-center gap-1"
+                              className="px-2.5 py-1 text-[10px] sm:text-xs font-bold text-rose-600 hover:bg-rose-50 hover:text-rose-700 rounded-lg transition-colors border border-transparent hover:border-rose-200 flex items-center gap-1"
                             >
                               <Ban className="w-3.5 h-3.5" />
                               Suspender
                             </button>
                           </AlertDialogTrigger>
-                          <AlertDialogContent className="bg-neutral-950 border border-neutral-800 text-white rounded-2xl max-w-sm">
+                          <AlertDialogContent className="bg-card border border-border text-foreground rounded-3xl max-w-sm shadow-xl">
                             <AlertDialogHeader>
-                              <AlertDialogTitle className="text-rose-500">Suspender Estabelecimento?</AlertDialogTitle>
-                              <AlertDialogDescription className="text-neutral-400">
+                              <AlertDialogTitle className="text-rose-600 font-black">Suspender Estabelecimento?</AlertDialogTitle>
+                              <AlertDialogDescription className="text-muted-foreground text-xs leading-relaxed">
                                 Esta ação cortará imediatamente o acesso de <strong>{rest.nome}</strong> ao painel administrativo e desativará os QR Codes das mesas em operação.
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter className="mt-4">
-                              <AlertDialogCancel className="bg-neutral-900 border-neutral-800 text-white hover:bg-neutral-800 hover:text-white rounded-xl">
+                              <AlertDialogCancel className="bg-muted hover:bg-muted/80 text-foreground border-border rounded-xl text-xs font-bold">
                                 Cancelar
                               </AlertDialogCancel>
                               <AlertDialogAction
                                 onClick={() => handleAlterarSuspensaoRestaurante(rest.id, true)}
-                                className="bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold"
+                                className="bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold text-xs"
                               >
                                 Sim, Suspender
                               </AlertDialogAction>
@@ -1058,7 +1058,7 @@ export function SuperAdminView() {
                     <span>{modoEmissao === "lote" ? "Fábrica de Licenças" : "Emitir Nova Licença"}</span>
                   </div>
                   {modoEmissao === "lote" && (
-                    <Badge className="bg-rose-500/15 text-rose-400 border border-rose-500/30 text-[10px] font-bold">
+                    <Badge className="bg-rose-50 text-rose-700 border border-rose-200 text-[10px] font-bold">
                       Batch Mode
                     </Badge>
                   )}
@@ -1108,8 +1108,8 @@ export function SuperAdminView() {
                 >
                   {/* SELEÇÃO DE QUANTIDADE NO MODO LOTE */}
                   {modoEmissao === "lote" && (
-                    <div className="space-y-1.5 bg-rose-500/5 p-3 rounded-2xl border border-rose-500/20">
-                      <label className="text-xs font-bold uppercase tracking-wider text-rose-400 flex items-center justify-between">
+                    <div className="space-y-1.5 bg-rose-50/60 p-3 rounded-2xl border border-rose-200">
+                      <label className="text-xs font-bold uppercase tracking-wider text-rose-700 flex items-center justify-between">
                         <span>Quantidade no Lote</span>
                         <span className="text-[10px] text-muted-foreground font-mono">1 a 100</span>
                       </label>
@@ -1180,14 +1180,14 @@ export function SuperAdminView() {
                       <button
                         type="button"
                         onClick={() => aplicarPreset("pro", "168")}
-                        className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-violet-500/15 text-violet-400 border border-violet-500/30 hover:bg-violet-500/25 transition-colors"
+                        className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-violet-50 text-violet-700 border border-violet-200 hover:bg-violet-100 transition-colors"
                       >
                         Pro 7d
                       </button>
                       <button
                         type="button"
                         onClick={() => aplicarPreset("enterprise", "720")}
-                        className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30 hover:bg-amber-500/25 transition-colors"
+                        className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition-colors"
                       >
                         Enterprise 30d
                       </button>
@@ -1215,14 +1215,14 @@ export function SuperAdminView() {
 
                   {/* VALIDADE / EXPIRAÇÃO DO CONVITE EFÊMERO */}
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold uppercase tracking-wider text-neutral-400 flex items-center justify-between">
+                    <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
                       <span>Validade do Link de Ativação</span>
-                      <span className="text-[10px] text-rose-400 font-mono">Burn-After-Reading</span>
+                      <span className="text-[10px] text-rose-600 font-mono font-bold">Burn-After-Reading</span>
                     </label>
                     <select
                       value={validadeHoras}
                       onChange={(e) => setValidadeHoras(e.target.value)}
-                      className="w-full bg-neutral-800 border border-neutral-700 text-white rounded-xl h-10 px-3 text-xs outline-none focus:border-rose-500"
+                      className="w-full bg-card border border-border text-foreground rounded-xl h-10 px-3 text-xs outline-none focus:border-rose-500 shadow-xs transition-colors"
                     >
                       <option value="24">Válido por 24 horas</option>
                       <option value="48">Válido por 48 horas (Padrão)</option>
@@ -1234,21 +1234,21 @@ export function SuperAdminView() {
 
                   {/* NOTAS OU CONDIÇÃO */}
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold uppercase tracking-wider text-neutral-400">
+                    <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                       Observações Internas (Opcional)
                     </label>
                     <Input
                       value={notas}
                       onChange={(e) => setNotas(e.target.value)}
                       placeholder="Ex: Demonstração 30 dias / Parceria"
-                      className="bg-neutral-800 border-neutral-700 text-white rounded-xl h-10 text-xs"
+                      className="bg-card border-border text-foreground rounded-xl h-10 text-xs shadow-xs focus-visible:ring-1 focus-visible:ring-primary"
                     />
                   </div>
 
                   {/* LIMITES PERSONALIZADOS */}
                   <div className="grid grid-cols-2 gap-3 pt-1">
                     <div className="space-y-1">
-                      <label className="text-[10px] uppercase font-bold text-neutral-500">
+                      <label className="text-[10px] uppercase font-bold text-muted-foreground">
                         Limite de Pratos
                       </label>
                       <Input
@@ -1256,11 +1256,11 @@ export function SuperAdminView() {
                         value={maxPratosCustom}
                         onChange={(e) => setMaxPratosCustom(e.target.value)}
                         placeholder={String(LIMITES_POR_PLANO[planoSelecionado].maxPratos)}
-                        className="bg-neutral-800 border-neutral-700 text-white rounded-xl h-9 text-xs"
+                        className="bg-card border-border text-foreground rounded-xl h-9 text-xs shadow-xs focus-visible:ring-1 focus-visible:ring-primary"
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[10px] uppercase font-bold text-neutral-500">
+                      <label className="text-[10px] uppercase font-bold text-muted-foreground">
                         Limite de Mesas
                       </label>
                       <Input
@@ -1268,7 +1268,7 @@ export function SuperAdminView() {
                         value={maxMesasCustom}
                         onChange={(e) => setMaxMesasCustom(e.target.value)}
                         placeholder={String(LIMITES_POR_PLANO[planoSelecionado].maxMesas)}
-                        className="bg-neutral-800 border-neutral-700 text-white rounded-xl h-9 text-xs"
+                        className="bg-card border-border text-foreground rounded-xl h-9 text-xs shadow-xs focus-visible:ring-1 focus-visible:ring-primary"
                       />
                     </div>
                   </div>
@@ -1374,10 +1374,10 @@ export function SuperAdminView() {
                         <Badge
                           className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full ${
                             disponivel
-                              ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
+                              ? "bg-amber-50 text-amber-800 border border-amber-200"
                               : ativa
-                              ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
-                              : "bg-rose-500/10 text-rose-500 border border-rose-500/20"
+                              ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
+                              : "bg-rose-50 text-rose-800 border border-rose-200"
                           }`}
                         >
                           {lic.status}
@@ -1418,16 +1418,16 @@ export function SuperAdminView() {
 
                       {/* LIMITES E DETALHES DO PLANO */}
                       <div className="flex items-center gap-3 pt-2 border-t border-border text-[11px] text-muted-foreground">
-                        <div className="flex items-center gap-1 font-semibold uppercase text-neutral-300">
-                          <Layers className="w-3.5 h-3.5 text-rose-500" />
+                        <div className="flex items-center gap-1 font-semibold uppercase text-foreground">
+                          <Layers className="w-3.5 h-3.5 text-rose-600" />
                           {lic.plano}
                         </div>
                         <div className="flex items-center gap-1">
-                          <UtensilsCrossed className="w-3.5 h-3.5 text-neutral-500" />
+                          <UtensilsCrossed className="w-3.5 h-3.5 text-muted-foreground" />
                           {lic.limites.maxPratos} pratos
                         </div>
                         <div className="flex items-center gap-1">
-                          <LayoutGrid className="w-3.5 h-3.5 text-neutral-500" />
+                          <LayoutGrid className="w-3.5 h-3.5 text-muted-foreground" />
                           {lic.limites.maxMesas} mesas
                         </div>
                       </div>
@@ -1439,11 +1439,11 @@ export function SuperAdminView() {
                             variant="outline"
                             size="sm"
                             onClick={() => handleCopiarLink(lic.id)}
-                            className="w-full bg-rose-600/10 hover:bg-rose-600 text-rose-400 hover:text-white border-rose-500/30 rounded-xl text-[11px] font-black uppercase tracking-wider h-9 transition-all flex items-center justify-center gap-1.5 shadow-sm"
+                            className="w-full bg-rose-50 hover:bg-rose-600 text-rose-700 hover:text-white border-rose-200 rounded-xl text-[11px] font-black uppercase tracking-wider h-9 transition-all flex items-center justify-center gap-1.5 shadow-xs"
                           >
                             {copiadoLinkId === lic.id ? (
                               <>
-                                <Check className="w-3.5 h-3.5 text-emerald-400" />
+                                <Check className="w-3.5 h-3.5 text-emerald-600" />
                                 Copiado!
                               </>
                             ) : (
@@ -1458,7 +1458,7 @@ export function SuperAdminView() {
                             variant="outline"
                             size="sm"
                             onClick={() => handleCompartilharWhatsApp(lic)}
-                            className="w-full bg-emerald-600/10 hover:bg-emerald-600 text-emerald-400 hover:text-white border-emerald-500/30 rounded-xl text-[11px] font-black uppercase tracking-wider h-9 transition-all flex items-center justify-center gap-1.5 shadow-sm"
+                            className="w-full bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white border-emerald-200 rounded-xl text-[11px] font-black uppercase tracking-wider h-9 transition-all flex items-center justify-center gap-1.5 shadow-xs"
                           >
                             <MessageCircle className="w-3.5 h-3.5" />
                             WhatsApp
@@ -1467,17 +1467,17 @@ export function SuperAdminView() {
                       )}
 
                       {ativa && (
-                        <div className="mt-4 pt-4 border-t border-neutral-800 flex flex-wrap items-center justify-between gap-3">
+                        <div className="mt-4 pt-4 border-t border-border flex flex-wrap items-center justify-between gap-3">
                           {/* 1. SEGMENTED CONTROL (Mudança Silenciosa e Rápida) */}
-                          <div className="flex bg-neutral-950 rounded-lg p-1 border border-neutral-800 shadow-inner">
+                          <div className="flex bg-muted rounded-lg p-1 border border-border shadow-inner">
                             {/* Botão FREE */}
                             <button
                               type="button"
                               onClick={() => handleAlterarPlano(lic.restauranteId || lic.id, "free", lic.id)}
                               className={`px-3 py-1.5 text-[10px] sm:text-xs font-bold rounded-md transition-all ${
                                 lic.plano === "free"
-                                  ? "bg-neutral-800 text-neutral-200 shadow-sm"
-                                  : "text-neutral-500 hover:text-neutral-300"
+                                  ? "bg-card text-foreground shadow-xs"
+                                  : "text-muted-foreground hover:text-foreground"
                               }`}
                             >
                               FREE
@@ -1489,8 +1489,8 @@ export function SuperAdminView() {
                               onClick={() => handleAlterarPlano(lic.restauranteId || lic.id, "pro", lic.id)}
                               className={`px-3 py-1.5 text-[10px] sm:text-xs font-bold rounded-md transition-all ${
                                 lic.plano === "pro"
-                                  ? "bg-violet-600 text-white shadow-sm shadow-violet-900/50"
-                                  : "text-neutral-500 hover:text-violet-400"
+                                  ? "bg-violet-600 text-white shadow-xs"
+                                  : "text-muted-foreground hover:text-violet-600"
                               }`}
                             >
                               PRO
@@ -1502,8 +1502,8 @@ export function SuperAdminView() {
                               onClick={() => handleAlterarPlano(lic.restauranteId || lic.id, "enterprise", lic.id)}
                               className={`px-3 py-1.5 text-[10px] sm:text-xs font-bold rounded-md transition-all ${
                                 lic.plano === "enterprise"
-                                  ? "bg-amber-500 text-amber-950 shadow-sm shadow-amber-900/50"
-                                  : "text-neutral-500 hover:text-amber-500"
+                                  ? "bg-amber-500 text-white shadow-xs"
+                                  : "text-muted-foreground hover:text-amber-600"
                               }`}
                             >
                               ENTERPRISE
@@ -1515,26 +1515,26 @@ export function SuperAdminView() {
                             <AlertDialogTrigger asChild>
                               <button
                                 type="button"
-                                className="px-3 py-1.5 text-[10px] sm:text-xs font-bold text-rose-500 hover:bg-rose-500/15 hover:text-rose-400 rounded-lg transition-colors border border-transparent hover:border-rose-500/30 flex items-center gap-1.5"
+                                className="px-3 py-1.5 text-[10px] sm:text-xs font-bold text-rose-600 hover:bg-rose-50 rounded-lg transition-colors border border-transparent hover:border-rose-200 flex items-center gap-1.5"
                               >
                                 <Ban className="w-3.5 h-3.5" />
                                 Suspender
                               </button>
                             </AlertDialogTrigger>
-                            <AlertDialogContent className="bg-neutral-950 border border-neutral-800 text-white rounded-2xl max-w-sm">
+                            <AlertDialogContent className="bg-card border border-border text-foreground rounded-3xl max-w-sm shadow-xl">
                               <AlertDialogHeader>
-                                <AlertDialogTitle className="text-rose-500">Suspender Estabelecimento?</AlertDialogTitle>
-                                <AlertDialogDescription className="text-neutral-400">
+                                <AlertDialogTitle className="text-rose-600 font-black">Suspender Estabelecimento?</AlertDialogTitle>
+                                <AlertDialogDescription className="text-muted-foreground text-xs leading-relaxed">
                                   Esta ação cortará imediatamente o acesso do restaurante <strong>{lic.restauranteNome || lic.id}</strong> ao painel administrativo e desativará todos os QR Codes das mesas em operação.
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter className="mt-4">
-                                <AlertDialogCancel className="bg-neutral-900 border-neutral-800 text-white hover:bg-neutral-800 hover:text-white rounded-xl">
+                                <AlertDialogCancel className="bg-muted hover:bg-muted/80 text-foreground border-border rounded-xl text-xs font-bold">
                                   Cancelar
                                 </AlertDialogCancel>
                                 <AlertDialogAction
                                   onClick={() => handleAlterarStatus(lic.id, "suspensa")}
-                                  className="bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold"
+                                  className="bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold text-xs"
                                 >
                                   Sim, Suspender
                                 </AlertDialogAction>
@@ -1550,7 +1550,7 @@ export function SuperAdminView() {
                             variant="outline"
                             size="sm"
                             onClick={() => handleAlterarStatus(lic.id, "ativa")}
-                            className="w-full bg-neutral-800 hover:bg-emerald-950/40 text-emerald-400 border-neutral-700 hover:border-emerald-500/50 rounded-xl text-[10px] font-bold uppercase tracking-wider h-8"
+                            className="w-full bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-xl text-[10px] font-bold uppercase tracking-wider h-8 shadow-xs"
                           >
                             <RotateCcw className="w-3.5 h-3.5 mr-1" />
                             Reativar Concessão
@@ -1570,30 +1570,30 @@ export function SuperAdminView() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <h2 className="text-xl font-black tracking-tight flex items-center gap-2">
-                <ClockAlert className="w-5 h-5 text-orange-400" />
+                <ClockAlert className="w-5 h-5 text-orange-600" />
                 Licenças Vencidas ({licencasVencidas.length})
               </h2>
-              <p className="text-xs text-neutral-400">
+              <p className="text-xs text-muted-foreground">
                 Tokens emitidos que ultrapassaram o prazo de validade sem ativação por nenhum lojista.
               </p>
             </div>
 
             <div className="relative w-full sm:w-72">
-              <Search className="w-4 h-4 text-neutral-500 absolute left-3 top-1/2 -translate-y-1/2" />
+              <Search className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
               <Input
                 value={filtro}
                 onChange={(e) => setFiltro(e.target.value)}
                 placeholder="Buscar token ou contato..."
-                className="bg-neutral-900 border-neutral-800 text-white pl-9 rounded-xl h-9 text-xs"
+                className="bg-card border-border text-foreground pl-9 rounded-xl h-9 text-xs shadow-xs focus-visible:ring-1 focus-visible:ring-primary"
               />
             </div>
           </div>
 
           {licencasVencidas.length === 0 ? (
-            <div className="p-16 text-center bg-neutral-900/40 border border-neutral-800 rounded-3xl space-y-3">
-              <ClockAlert className="w-12 h-12 text-neutral-600 mx-auto" />
-              <h3 className="text-sm font-bold text-neutral-300">Nenhuma licença vencida</h3>
-              <p className="text-xs text-neutral-500 max-w-sm mx-auto">
+            <div className="p-16 text-center bg-card border border-border rounded-3xl space-y-3 shadow-xs">
+              <ClockAlert className="w-12 h-12 text-muted-foreground/60 mx-auto" />
+              <h3 className="text-sm font-bold text-foreground">Nenhuma licença vencida</h3>
+              <p className="text-xs text-muted-foreground max-w-sm mx-auto">
                 Todos os convites emitidos estão dentro do prazo ou já foram ativados com sucesso pelos clientes.
               </p>
             </div>
@@ -1606,57 +1606,57 @@ export function SuperAdminView() {
                 return (
                   <div
                     key={lic.id}
-                    className="p-5 bg-neutral-900/90 border border-orange-900/40 rounded-3xl space-y-3.5 shadow-md relative overflow-hidden"
+                    className="p-5 bg-card border border-orange-200 rounded-3xl space-y-3.5 shadow-xs relative overflow-hidden hover:border-orange-400 transition-colors"
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <span className="font-mono text-sm font-black text-orange-300 bg-orange-950/60 border border-orange-800/60 px-2.5 py-1 rounded-xl tracking-wider">
+                      <span className="font-mono text-sm font-black text-orange-800 bg-orange-50 border border-orange-200 px-2.5 py-1 rounded-xl tracking-wider">
                         {lic.id}
                       </span>
-                      <Badge className="bg-orange-500/10 text-orange-400 border border-orange-500/30 text-[10px] uppercase font-bold">
+                      <Badge className="bg-orange-50 text-orange-800 border border-orange-200 text-[10px] uppercase font-bold">
                         Vencida
                       </Badge>
                     </div>
 
                     <div className="space-y-1 text-xs">
                       <div>
-                        <span className="text-neutral-500 block text-[10px] uppercase font-bold">
+                        <span className="text-muted-foreground block text-[10px] uppercase font-bold">
                           Destinatário Previsto
                         </span>
-                        <span className="text-white font-bold text-sm">
+                        <span className="text-foreground font-bold text-sm">
                           {lic.responsavel || "Não informado"}
                         </span>
                       </div>
                       {lic.notas && (
-                        <p className="text-[11px] text-neutral-400 italic">“{lic.notas}”</p>
+                        <p className="text-[11px] text-muted-foreground italic">“{lic.notas}”</p>
                       )}
-                      <div className="pt-1 text-[11px] text-orange-400/90 flex items-center gap-1 font-mono">
+                      <div className="pt-1 text-[11px] text-orange-700 flex items-center gap-1 font-mono">
                         <ClockAlert className="w-3.5 h-3.5" />
                         Expirou em: {expirouEmStr}
                       </div>
                     </div>
 
                     {/* DETALHES DO PLANO */}
-                    <div className="flex items-center gap-3 pt-2 border-t border-neutral-800 text-[11px] text-neutral-400">
-                      <div className="flex items-center gap-1 font-bold uppercase text-neutral-300">
-                        <Layers className="w-3.5 h-3.5 text-rose-500" />
+                    <div className="flex items-center gap-3 pt-2 border-t border-border text-[11px] text-muted-foreground">
+                      <div className="flex items-center gap-1 font-bold uppercase text-foreground">
+                        <Layers className="w-3.5 h-3.5 text-rose-600" />
                         {lic.plano}
                       </div>
                       <div className="flex items-center gap-1">
-                        <UtensilsCrossed className="w-3.5 h-3.5 text-neutral-500" />
+                        <UtensilsCrossed className="w-3.5 h-3.5 text-muted-foreground" />
                         {lic.limites.maxPratos} pratos
                       </div>
                       <div className="flex items-center gap-1">
-                        <LayoutGrid className="w-3.5 h-3.5 text-neutral-500" />
+                        <LayoutGrid className="w-3.5 h-3.5 text-muted-foreground" />
                         {lic.limites.maxMesas} mesas
                       </div>
                     </div>
 
                     {/* AÇÕES: RENOVAR, ARQUIVAR OU REVOGAR */}
-                    <div className="pt-2 border-t border-neutral-800 flex items-center gap-2">
+                    <div className="pt-2 border-t border-border flex items-center gap-2">
                       <Button
                         size="sm"
                         onClick={() => handleRenovarLicenca(lic.id)}
-                        className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] h-8 rounded-xl font-bold flex items-center justify-center gap-1.5 shadow-sm"
+                        className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] h-8 rounded-xl font-bold flex items-center justify-center gap-1.5 shadow-xs"
                         title="Renova o prazo por mais 48 horas"
                       >
                         <CalendarPlus className="w-3.5 h-3.5" />
@@ -1667,7 +1667,7 @@ export function SuperAdminView() {
                         size="sm"
                         variant="outline"
                         onClick={() => handleArquivarExpirada(lic)}
-                        className="bg-neutral-800 hover:bg-purple-950/40 text-purple-300 hover:text-white border-neutral-700 hover:border-purple-500/50 text-[11px] h-8 px-2.5 rounded-xl font-bold flex items-center gap-1"
+                        className="bg-muted hover:bg-purple-50 text-purple-700 hover:text-purple-800 border-border hover:border-purple-200 text-[11px] h-8 px-2.5 rounded-xl font-bold flex items-center gap-1 transition-colors"
                         title="Mover para Arquivo Morto com status expirada"
                       >
                         <Archive className="w-3.5 h-3.5" />
@@ -1678,7 +1678,7 @@ export function SuperAdminView() {
                         size="sm"
                         variant="outline"
                         onClick={() => handleRevogarLicenca(lic.id)}
-                        className="bg-neutral-800 hover:bg-rose-950/40 text-rose-400 border-neutral-700 hover:border-rose-500/50 text-[11px] h-8 px-2.5 rounded-xl font-bold"
+                        className="bg-muted hover:bg-rose-50 text-rose-600 hover:text-rose-700 border-border hover:border-rose-200 text-[11px] h-8 px-2.5 rounded-xl font-bold transition-colors"
                         title="Descartar e excluir token permanentemente"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -1693,19 +1693,19 @@ export function SuperAdminView() {
       ) : (
         /* ABA ARQUIVO MORTO / REGISTROS EM JSON */
         <div className="space-y-6">
-          <div className="p-6 bg-neutral-900 border border-neutral-800 rounded-3xl space-y-2">
+          <div className="p-6 bg-card border border-border rounded-3xl space-y-2 shadow-xs">
             <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-purple-600/20 border border-purple-500/30 rounded-2xl text-purple-400">
+              <div className="p-2.5 bg-purple-50 border border-purple-200 rounded-2xl text-purple-700">
                 <Archive className="w-6 h-6" />
               </div>
               <div>
-                <h2 className="text-xl font-black text-white flex items-center gap-2">
+                <h2 className="text-xl font-black text-foreground flex items-center gap-2">
                   Arquivo Morto de Licenças & Tokens
-                  <Badge className="bg-purple-500/20 text-purple-300 border-purple-500/30 text-[10px]">
+                  <Badge className="bg-purple-50 text-purple-800 border-purple-200 text-[10px] font-bold">
                     Imutável (WORM)
                   </Badge>
                 </h2>
-                <p className="text-xs text-neutral-400">
+                <p className="text-xs text-muted-foreground">
                   Todas as licenças consumidas são desvinculadas das concessões ativas e arquivadas
                   aqui em formato JSON permanente para auditoria e histórico fiscal.
                 </p>
@@ -1714,10 +1714,10 @@ export function SuperAdminView() {
           </div>
 
           {arquivoMorto.length === 0 ? (
-            <div className="p-16 text-center bg-neutral-900/40 border border-neutral-800 rounded-3xl space-y-3">
-              <Archive className="w-12 h-12 text-neutral-600 mx-auto" />
-              <h3 className="text-sm font-bold text-neutral-300">Nenhum registro arquivado ainda</h3>
-              <p className="text-xs text-neutral-500 max-w-sm mx-auto">
+            <div className="p-16 text-center bg-card border border-border rounded-3xl space-y-3 shadow-xs">
+              <Archive className="w-12 h-12 text-muted-foreground/60 mx-auto" />
+              <h3 className="text-sm font-bold text-foreground">Nenhum registro arquivado ainda</h3>
+              <p className="text-xs text-muted-foreground max-w-sm mx-auto">
                 Assim que um lojista ativar um estabelecimento através do seu token efêmero, a licença
                 será arquivada automaticamente aqui como JSON.
               </p>
@@ -1733,44 +1733,44 @@ export function SuperAdminView() {
                 return (
                   <div
                     key={item.id}
-                    className="p-5 bg-neutral-900/90 border border-neutral-800/80 rounded-3xl space-y-3 shadow-md hover:border-purple-500/40 transition-colors"
+                    className="p-5 bg-card border border-border rounded-3xl space-y-3 shadow-xs hover:border-purple-300 transition-colors"
                   >
                     <div className="flex items-center justify-between">
-                      <span className="font-mono text-xs font-black text-purple-300 bg-purple-950/60 border border-purple-800/60 px-2.5 py-1 rounded-xl">
+                      <span className="font-mono text-xs font-black text-purple-800 bg-purple-50 border border-purple-200 px-2.5 py-1 rounded-xl">
                         {item.codigo || item.id}
                       </span>
-                      <Badge className="bg-neutral-800 text-neutral-400 text-[10px] border-neutral-700">
+                      <Badge className="bg-muted text-muted-foreground text-[10px] border border-border">
                         {item.motivo || "ativada"}
                       </Badge>
                     </div>
 
                     <div className="space-y-1 text-xs">
                       <div>
-                        <span className="text-neutral-500 block text-[10px] uppercase font-bold">
+                        <span className="text-muted-foreground block text-[10px] uppercase font-bold">
                           Estabelecimento
                         </span>
-                        <span className="text-white font-bold text-sm">
+                        <span className="text-foreground font-bold text-sm">
                           {item.restauranteNome || "Estabelecimento"}
                         </span>
                         {item.slug && (
-                          <span className="text-purple-400 block text-[11px] font-mono">
+                          <span className="text-purple-700 block text-[11px] font-mono">
                             /r/{item.slug}
                           </span>
                         )}
                       </div>
-                      <div className="pt-1 text-[11px] text-neutral-400">
-                        Arquivado em: <span className="text-neutral-300">{dataFormatada}</span>
+                      <div className="pt-1 text-[11px] text-muted-foreground">
+                        Arquivado em: <span className="text-foreground font-medium">{dataFormatada}</span>
                       </div>
                     </div>
 
-                    <div className="pt-2 border-t border-neutral-800 flex items-center gap-2">
+                    <div className="pt-2 border-t border-border flex items-center gap-2">
                       <Button
                         size="sm"
                         variant="outline"
                         onClick={() => setJsonModalItem(item)}
-                        className="flex-1 bg-neutral-800 hover:bg-neutral-700 text-white border-neutral-700 text-[11px] h-8 rounded-xl font-semibold flex items-center justify-center gap-1.5"
+                        className="flex-1 bg-muted hover:bg-muted/80 text-foreground border-border text-[11px] h-8 rounded-xl font-semibold flex items-center justify-center gap-1.5 shadow-xs"
                       >
-                        <Eye className="w-3.5 h-3.5 text-purple-400" />
+                        <Eye className="w-3.5 h-3.5 text-purple-700" />
                         Ver JSON
                       </Button>
                       <Button
@@ -1782,13 +1782,13 @@ export function SuperAdminView() {
                           setCopiadoJsonId(item.id);
                           setTimeout(() => setCopiadoJsonId(null), 2500);
                         }}
-                        className="bg-neutral-800 hover:bg-neutral-700 text-white border-neutral-700 text-[11px] h-8 px-3 rounded-xl"
+                        className="bg-muted hover:bg-muted/80 text-foreground border-border text-[11px] h-8 px-3 rounded-xl shadow-xs"
                         title="Copiar JSON"
                       >
                         {copiadoJsonId === item.id ? (
-                          <Check className="w-3.5 h-3.5 text-emerald-400" />
+                          <Check className="w-3.5 h-3.5 text-emerald-600" />
                         ) : (
-                          <Copy className="w-3.5 h-3.5 text-neutral-400" />
+                          <Copy className="w-3.5 h-3.5 text-muted-foreground" />
                         )}
                       </Button>
                       <Button
@@ -1804,10 +1804,10 @@ export function SuperAdminView() {
                           a.click();
                           URL.revokeObjectURL(url);
                         }}
-                        className="bg-neutral-800 hover:bg-neutral-700 text-white border-neutral-700 text-[11px] h-8 px-3 rounded-xl"
+                        className="bg-muted hover:bg-muted/80 text-foreground border-border text-[11px] h-8 px-3 rounded-xl shadow-xs"
                         title="Baixar Arquivo JSON"
                       >
-                        <Download className="w-3.5 h-3.5 text-neutral-400" />
+                        <Download className="w-3.5 h-3.5 text-muted-foreground" />
                       </Button>
                     </div>
                   </div>
@@ -1908,18 +1908,18 @@ export function SuperAdminView() {
           {/* BARRA DE AÇÕES DO LOTE */}
           <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-muted/40 rounded-2xl border border-border my-2">
             <div className="flex items-center gap-2">
-              <Badge variant="outline" className="bg-amber-500/10 text-amber-400 border-amber-500/30 text-xs font-bold uppercase">
+              <Badge variant="outline" className="bg-amber-50 text-amber-800 border-amber-200 text-xs font-bold uppercase">
                 Plano {planoSelecionado}
               </Badge>
-              <Badge variant="outline" className="bg-emerald-500/10 text-emerald-400 border-emerald-500/30 text-xs font-bold">
+              <Badge variant="outline" className="bg-emerald-50 text-emerald-800 border-emerald-200 text-xs font-bold">
                 {loteRecemCriado.length} Códigos Ativos
               </Badge>
               {validadeHoras && Number(validadeHoras) > 0 ? (
-                <Badge variant="outline" className="bg-blue-500/10 text-blue-400 border-blue-500/30 text-xs">
+                <Badge variant="outline" className="bg-blue-50 text-blue-800 border-blue-200 text-xs font-semibold">
                   Validade: {validadeHoras}h
                 </Badge>
               ) : (
-                <Badge variant="outline" className="bg-purple-500/10 text-purple-400 border-purple-500/30 text-xs">
+                <Badge variant="outline" className="bg-purple-50 text-purple-800 border-purple-200 text-xs font-semibold">
                   Sem Expiração
                 </Badge>
               )}
@@ -1931,7 +1931,7 @@ export function SuperAdminView() {
                 variant="outline"
                 size="sm"
                 onClick={() => handleBaixarCSV(loteRecemCriado)}
-                className="h-9 px-3 text-xs font-bold rounded-xl border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
+                className="h-9 px-3 text-xs font-bold rounded-xl border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 shadow-xs"
               >
                 <FileDown className="w-4 h-4 mr-1.5" />
                 Baixar Planilha (.csv)
@@ -1940,11 +1940,11 @@ export function SuperAdminView() {
                 type="button"
                 size="sm"
                 onClick={() => handleCopiarLoteClipboard(loteRecemCriado)}
-                className="h-9 px-3 text-xs font-bold rounded-xl bg-amber-500 hover:bg-amber-600 text-black"
+                className="h-9 px-3 text-xs font-bold rounded-xl bg-rose-600 hover:bg-rose-700 text-white shadow-xs"
               >
                 {copiadoLoteTexto ? (
                   <>
-                    <Check className="w-4 h-4 mr-1.5 text-black" />
+                    <Check className="w-4 h-4 mr-1.5 text-white" />
                     Copiado para Área de Transferência!
                   </>
                 ) : (
@@ -1965,7 +1965,7 @@ export function SuperAdminView() {
               return (
                 <div
                   key={lic.id}
-                  className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl bg-card border border-border hover:border-amber-500/30 transition-colors gap-3"
+                  className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl bg-card border border-border hover:border-amber-400 transition-colors gap-3 shadow-xs"
                 >
                   <div className="flex items-center gap-3">
                     <span className="text-xs font-mono font-bold text-muted-foreground w-6">
@@ -1976,7 +1976,7 @@ export function SuperAdminView() {
                         <span className="font-mono font-black text-sm tracking-wide text-foreground">
                           {lic.id}
                         </span>
-                        <Badge variant="outline" className="text-[10px] uppercase font-bold py-0 h-4 border-amber-500/40 text-amber-400">
+                        <Badge variant="outline" className="text-[10px] uppercase font-bold py-0 h-4 border-amber-300 bg-amber-50 text-amber-800">
                           {lic.plano}
                         </Badge>
                       </div>
@@ -1999,7 +1999,7 @@ export function SuperAdminView() {
                       title="Copiar Código"
                     >
                       {copiadoId === lic.id ? (
-                        <Check className="w-3.5 h-3.5 text-emerald-400 mr-1" />
+                        <Check className="w-3.5 h-3.5 text-emerald-600 mr-1" />
                       ) : (
                         <Copy className="w-3.5 h-3.5 mr-1" />
                       )}
@@ -2014,7 +2014,7 @@ export function SuperAdminView() {
                       title="Copiar Link de Ativação"
                     >
                       {copiadoLinkId === lic.id ? (
-                        <Check className="w-3.5 h-3.5 text-emerald-400 mr-1" />
+                        <Check className="w-3.5 h-3.5 text-emerald-600 mr-1" />
                       ) : (
                         <Copy className="w-3.5 h-3.5 mr-1" />
                       )}
@@ -2025,10 +2025,10 @@ export function SuperAdminView() {
                       variant="outline"
                       size="sm"
                       onClick={() => handleCompartilharWhatsApp(lic)}
-                      className="h-8 px-2.5 text-xs rounded-lg text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10"
+                      className="h-8 px-2.5 text-xs rounded-lg text-emerald-700 border-emerald-200 bg-emerald-50 hover:bg-emerald-100 shadow-xs"
                       title="Enviar via WhatsApp"
                     >
-                      <MessageCircle className="w-3.5 h-3.5 mr-1 text-emerald-400" />
+                      <MessageCircle className="w-3.5 h-3.5 mr-1 text-emerald-600" />
                       WhatsApp
                     </Button>
                   </div>
@@ -2067,7 +2067,7 @@ export function SuperAdminView() {
           </DialogHeader>
 
           {erroAuth && (
-            <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs flex items-center gap-2 mb-4">
+            <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-xs flex items-center gap-2 mb-4">
               <AlertTriangle className="w-4 h-4 flex-shrink-0" />
               <span>{erroAuth}</span>
             </div>
