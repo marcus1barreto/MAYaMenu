@@ -61,6 +61,13 @@ export default function LandingPage() {
           </Link>
 
           <nav className="hidden md:flex items-center gap-7 text-sm font-semibold text-neutral-600">
+            <Link href="/demo" className="text-rose-700 hover:text-rose-800 transition-colors flex items-center gap-1.5 font-bold">
+              <Store className="w-4 h-4 text-rose-600" />
+              <span>Restaurante Modelo</span>
+              <span className="px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider bg-rose-100 text-rose-700 border border-rose-200">
+                SHOWROOM
+              </span>
+            </Link>
             <a href="#pilares" className="hover:text-rose-600 transition-colors">
               Como Funciona
             </a>
@@ -130,11 +137,12 @@ export default function LandingPage() {
                 </Link>
 
                 <Link
-                  href="/admin"
-                  className="inline-flex items-center justify-center gap-2 px-5 sm:px-6 py-3.5 text-sm sm:text-base font-semibold text-neutral-800 hover:text-neutral-950 bg-neutral-100 hover:bg-neutral-200/80 border border-neutral-200 rounded-xl transition-all text-center"
+                  href="/demo"
+                  className="inline-flex items-center justify-center gap-2 px-5 sm:px-6 py-3.5 text-sm sm:text-base font-bold text-rose-700 hover:text-rose-800 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl transition-all text-center shadow-xs"
+                  title="Visite o restaurante modelo MAYaBurger & Co. e experimente na prática"
                 >
-                  <LogIn className="w-4 h-4 text-neutral-600 shrink-0" />
-                  <span>Painel do Restaurante</span>
+                  <Store className="w-4 h-4 text-rose-600 shrink-0" />
+                  <span>Ver Restaurante Modelo (Ao Vivo)</span>
                 </Link>
               </div>
 
@@ -446,9 +454,10 @@ export default function LandingPage() {
 
                   <Link
                     href="/demo"
-                    className="mt-3.5 text-xs text-neutral-600 hover:text-neutral-950 transition-colors font-medium underline-offset-4 hover:underline"
+                    className="mt-3.5 text-xs text-rose-700 hover:text-rose-800 transition-colors font-bold flex items-center justify-center gap-1.5"
                   >
-                    Ou teste uma mesa na Sandbox Demo
+                    <Store className="w-3.5 h-3.5 text-rose-600" />
+                    <span>Ou visite o Restaurante Modelo para degustar</span>
                   </Link>
                 </div>
               </div>
@@ -511,8 +520,9 @@ export default function LandingPage() {
           </div>
 
           <div className="flex flex-wrap items-center justify-center gap-6 text-xs font-semibold text-neutral-600">
-            <Link href="/demo" className="hover:text-rose-600 transition-colors">
-              Sandbox Demo
+            <Link href="/demo" className="hover:text-rose-600 transition-colors flex items-center gap-1.5 text-neutral-800 font-bold">
+              <Store className="w-3.5 h-3.5 text-rose-600" />
+              <span>Restaurante Modelo (Demo)</span>
             </Link>
             <Link href="/historico" className="hover:text-rose-600 transition-colors">
               Meus Recibos
