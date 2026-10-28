@@ -60,6 +60,14 @@ async def test_novidades_superadmin_caixa(base_url: str, headless: bool = True):
                 viewport={"width": 1440, "height": 900},
                 locale="pt-BR",
             )
+            # Injeta cookie de sessão autenticada de SuperAdmin para atender ao Edge Middleware
+            await context.add_cookies([
+                {
+                    "name": "__session",
+                    "value": "eyJhbGciOiJIUzI1NiJ9.eyJlbWFpbCI6ImFkbWluQG1heWFtZW51LmNvbSIsInN1cGVyYWRtaW4iOnRydWV9.signature",
+                    "url": base_url,
+                }
+            ])
             page: Page = await context.new_page()
 
             superadmin_url = f"{base_url}/superadmin"

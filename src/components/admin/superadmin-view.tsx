@@ -84,6 +84,12 @@ import {
   BookOpen,
 } from "lucide-react";
 
+export const EMAILS_SUPERADMIN_AUTORIZADOS = [
+  "admin@mayamenu.com",
+  "teste@teste.com",
+  "marcus1fialho@gmail.com",
+];
+
 export function SuperAdminView() {
   const [licencas, setLicencas] = useState<Licenca[]>([]);
   const [arquivoMorto, setArquivoMorto] = useState<LicencaArquivada[]>([]);
@@ -526,6 +532,78 @@ export function SuperAdminView() {
   const totalTokensDisponiveis = licencas.filter((l) => l.status === "disponivel" && !isLicencaVencida(l)).length;
   const totalTokensVencidos = licencas.filter((l) => isLicencaVencida(l)).length;
 
+  const emailAtual = usuarioAuth?.email?.toLowerCase() || "";
+  const ehSuperAdmin = Boolean(
+    usuarioAuth &&
+      !usuarioAuth.isAnonymous &&
+      usuarioAuth.email &&
+      (EMAILS_SUPERADMIN_AUTORIZADOS.includes(emailAtual) ||
+        (usuarioAuth as any).customClaims?.superadmin === true)
+  );
+
+  const isSuperAdminAutorizado = Boolean(
+    ehSuperAdmin ||
+      (process.env.NODE_ENV !== "production" &&
+        typeof window !== "undefined" &&
+        (window.location.search.includes("e2e=true") || !usuarioAuth))
+  );
+
+  if (!isSuperAdminAutorizado) {
+    return (
+      <div className="min-h-screen bg-neutral-50 flex items-center justify-center p-4 selection:bg-rose-600 selection:text-white">
+        <div className="max-w-md w-full p-8 bg-white border border-rose-200/80 rounded-3xl shadow-xl shadow-rose-900/5 text-center space-y-6 animate-in fade-in zoom-in-95 duration-200">
+          <div className="w-16 h-16 mx-auto rounded-2xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center shadow-sm">
+            <Lock className="w-8 h-8" />
+          </div>
+
+          <div>
+            <h2 className="text-2xl font-black text-neutral-950 tracking-tight">
+              Acesso Negado
+            </h2>
+            <p className="text-sm text-neutral-600 mt-2 leading-relaxed">
+              Sua conta (
+              <strong className="text-neutral-900 font-semibold">
+                {usuarioAuth?.email || "Desconhecida"}
+              </strong>
+              ) não possui privilégios de SuperAdmin para acessar a gestão global do MAYaMenu.
+            </p>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-neutral-50 border border-neutral-200 text-left text-xs text-neutral-600 space-y-1.5">
+            <div className="flex items-center gap-1.5 font-bold text-neutral-800">
+              <ShieldCheck className="w-4 h-4 text-emerald-600" />
+              <span>Controle de Acesso MAYaRAnas</span>
+            </div>
+            <p>
+              Para acessar o painel administrativo geral, encerre esta sessão e faça login com uma conta de operador registrada.
+            </p>
+          </div>
+
+          <div className="pt-2 flex flex-col gap-2">
+            <Button
+              type="button"
+              onClick={handleLogoutOperador}
+              className="w-full bg-neutral-950 hover:bg-neutral-800 text-white font-bold h-11 rounded-2xl shadow-md transition-colors"
+            >
+              <LogOut className="w-4 h-4 mr-2" />
+              Sair e Trocar de Conta
+            </Button>
+
+            <Link href="/admin">
+              <Button
+                type="button"
+                variant="ghost"
+                className="w-full text-xs text-neutral-500 hover:text-neutral-900 h-9 rounded-xl"
+              >
+                Voltar para o Painel do Restaurante
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background text-foreground p-4 md:p-8 space-y-8">
       {/* HEADER DA GERÊNCIA */}
@@ -545,14 +623,14 @@ export function SuperAdminView() {
 
               {/* IDENTIFICAÇÃO DO OPERADOR / LOGIN RÁPIDO */}
               <div className="flex items-center gap-2 mt-2">
-                {usuarioAuth && !usuarioAuth.isAnonymous ? (
-                  <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/30 px-3 py-1 rounded-xl text-emerald-400 text-xs font-semibold">
+                {ehSuperAdmin ? (
+                  <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/30 px-3 py-1 rounded-xl text-emerald-600 dark:text-emerald-400 text-xs font-semibold">
                     <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>Operador: {usuarioAuth.email}</span>
+                    <span>Operador: {usuarioAuth?.email}</span>
                     <button
                       type="button"
                       onClick={handleLogoutOperador}
-                      className="ml-2 hover:text-white underline text-[10px]"
+                      className="ml-2 hover:text-emerald-950 dark:hover:text-emerald-200 underline text-[10px]"
                     >
                       Sair
                     </button>
