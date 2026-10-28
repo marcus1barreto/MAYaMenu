@@ -47,8 +47,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (currentUser) {
         // Pega o JWT fresco (onde moram os Custom Claims)
         const token = await currentUser.getIdToken();
-        // Salva no cookie '__session' (nome recomendado pelo Firebase para Firebase Hosting/Vercel)
-        document.cookie = `__session=${token}; path=/; secure; samesite=strict; max-age=3600`;
+        const isHttps = typeof window !== "undefined" && window.location.protocol === "https:";
+        // Salva no cookie '__session' (apenas usa 'secure' em HTTPS para não falhar no localhost)
+        document.cookie = `__session=${token}; path=/; ${isHttps ? "secure;" : ""} samesite=lax; max-age=3600`;
       } else {
         // Limpa o cookie se deslogar
         document.cookie = `__session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`;

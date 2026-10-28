@@ -143,8 +143,19 @@ export function SuperAdminView() {
     const unsubRestaurantes = escutarRestaurantes((dados) => {
       setRestaurantes(dados);
     });
-    const unsubAuth = onAuthStateChanged(auth, (user) => {
+    const unsubAuth = onAuthStateChanged(auth, async (user) => {
       setUsuarioAuth(user);
+      if (user) {
+        try {
+          const token = await user.getIdToken();
+          const isHttps = typeof window !== "undefined" && window.location.protocol === "https:";
+          document.cookie = `__session=${token}; path=/; ${isHttps ? "secure;" : ""} samesite=lax; max-age=3600`;
+        } catch (e) {
+          console.warn("Aviso ao sincronizar token no superadmin:", e);
+        }
+      } else {
+        document.cookie = `__session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
+      }
     });
     return () => {
       unsubLicencas();

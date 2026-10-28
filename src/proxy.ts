@@ -12,6 +12,12 @@ export function proxy(request: NextRequest) {
 
   // 1. Intercepta tanto /hq quanto /superadmin (e sub-rotas)
   if (path.startsWith("/hq") || path.startsWith("/superadmin")) {
+    // Em desenvolvimento local (HTTP/localhost), o navegador não envia cookies com flag 'secure',
+    // delegando o controle de acesso ao portão de ferro estrito do componente React.
+    if (process.env.NODE_ENV !== "production") {
+      return NextResponse.next();
+    }
+
     const sessionCookie = request.cookies.get("__session")?.value;
 
     if (!sessionCookie) {
