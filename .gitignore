@@ -46,3 +46,9 @@ __pycache__/
 *.py[cod]
 tests/e2e/screenshots/
 tests/e2e/**/screenshots/
+
+# credenciais e chaves privadas do pendrive (air-gapped hq)
+service-account*.json
+tools/mayahq-portable/chaves/*.json
+!tools/mayahq-portable/chaves/service-account.example.json
+
