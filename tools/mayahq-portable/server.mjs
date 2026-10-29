@@ -196,17 +196,17 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    // API 3: Listar Licenças
+    // API 3: Listar Licenças (Coleção 'concessoes')
     if (pathname === "/api/licencas" && req.method === "GET") {
-      const resposta = await chamarFirestore("GET", "licencas?pageSize=100");
+      const resposta = await chamarFirestore("GET", "concessoes?pageSize=100");
       const lista = (resposta.documents || []).map(converterDocumentoFirestore);
       responderJson(200, { licencas: lista });
       return;
     }
 
-    // API 4: Listar Arquivo Morto
+    // API 4: Listar Arquivo Morto (Coleção 'arquivo_morto_licencas')
     if (pathname === "/api/arquivo-morto" && req.method === "GET") {
-      const resposta = await chamarFirestore("GET", "arquivo_morto?pageSize=100");
+      const resposta = await chamarFirestore("GET", "arquivo_morto_licencas?pageSize=100");
       const lista = (resposta.documents || []).map(converterDocumentoFirestore);
       responderJson(200, { arquivoMorto: lista });
       return;
@@ -251,6 +251,134 @@ const server = http.createServer(async (req, res) => {
       });
 
       responderJson(200, { sucesso: true, suspenso });
+      return;
+    }
+
+    // API 7: Criar Lote de Licenças (Direto no Firestore 'concessoes')
+    if (pathname === "/api/licencas/criar-lote" && req.method === "POST") {
+      let bodyRaw = "";
+      for await (const chunk of req) bodyRaw += chunk;
+      const { quantidade = 1, plano = "pro", responsavel = "", notas = "", horasValidade = 0 } = JSON.parse(bodyRaw);
+
+      const qtd = Math.min(Math.max(1, Number(quantidade) || 1), 50);
+      const limites = plano === "enterprise"
+        ? { maxPratos: 999, maxMesas: 999 }
+        : plano === "pro"
+        ? { maxPratos: 60, maxMesas: 30 }
+        : { maxPratos: 15, maxMesas: 5 };
+
+      const agora = new Date();
+      const agoraIso = agora.toISOString();
+      const expiracaoIso = horasValidade > 0
+        ? new Date(agora.getTime() + horasValidade * 3600 * 1000).toISOString()
+        : null;
+
+      const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+      const gerarCodigo = () => {
+        let p1 = "";
+        let p2 = "";
+        for (let i = 0; i < 4; i++) {
+          p1 += chars.charAt(Math.floor(Math.random() * chars.length));
+          p2 += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return `MAYA-${p1}-${p2}`;
+      };
+
+      const novasLicencas = [];
+
+      for (let i = 1; i <= qtd; i++) {
+        const codigo = gerarCodigo();
+        const respFormatado = responsavel ? (qtd > 1 ? `${responsavel} #${String(i).padStart(2, "0")}` : responsavel) : "";
+
+        const fields = {
+          id: { stringValue: codigo },
+          status: { stringValue: "disponivel" },
+          plano: { stringValue: plano },
+          responsavel: { stringValue: respFormatado },
+          notas: { stringValue: notas || "" },
+          criadaEm: { timestampValue: agoraIso },
+          limites: {
+            mapValue: {
+              fields: {
+                maxPratos: { integerValue: String(limites.maxPratos) },
+                maxMesas: { integerValue: String(limites.maxMesas) },
+              },
+            },
+          },
+        };
+
+        if (expiracaoIso) {
+          fields.expiracaoEm = { timestampValue: expiracaoIso };
+        }
+
+        await chamarFirestore("PATCH", `concessoes/${codigo}`, { fields });
+
+        novasLicencas.push({
+          id: codigo,
+          status: "disponivel",
+          plano,
+          responsavel: respFormatado,
+          notas,
+          criadaEm: agoraIso,
+          expiracaoEm: expiracaoIso,
+          limites,
+        });
+      }
+
+      responderJson(200, { sucesso: true, criadas: novasLicencas });
+      return;
+    }
+
+    // API 8: Revogar ou Alterar Status de Licença
+    if (pathname === "/api/licencas/alterar-status" && req.method === "POST") {
+      let bodyRaw = "";
+      for await (const chunk of req) bodyRaw += chunk;
+      const { licencaId, novoStatus } = JSON.parse(bodyRaw);
+
+      if (!licencaId || !novoStatus) {
+        responderJson(400, { erro: "Parâmetros inválidos." });
+        return;
+      }
+
+      await chamarFirestore("PATCH", `concessoes/${licencaId}?updateMask.fieldPaths=status`, {
+        fields: {
+          status: { stringValue: novoStatus },
+        },
+      });
+
+      responderJson(200, { sucesso: true, licencaId, novoStatus });
+      return;
+    }
+
+    // API 9: Arquivar Licença Expirada (Move para 'arquivo_morto_licencas')
+    if (pathname === "/api/licencas/arquivar" && req.method === "POST") {
+      let bodyRaw = "";
+      for await (const chunk of req) bodyRaw += chunk;
+      const { licenca } = JSON.parse(bodyRaw);
+
+      if (!licenca || !licenca.id) {
+        responderJson(400, { erro: "Licença inválida para arquivamento." });
+        return;
+      }
+
+      const agoraIso = new Date().toISOString();
+      const fields = {
+        id: { stringValue: licenca.id },
+        planoOriginal: { stringValue: licenca.plano || "free" },
+        arquivadoEm: { timestampValue: agoraIso },
+        motivo: { stringValue: "Arquivamento manual via Console Portátil" },
+        dadosSnapshot: {
+          stringValue: JSON.stringify(licenca),
+        },
+      };
+
+      // 1. Salva no arquivo morto
+      await chamarFirestore("PATCH", `arquivo_morto_licencas/${licenca.id}`, { fields });
+
+      // 2. Remove da coleção concessoes
+      await chamarFirestore("DELETE", `concessoes/${licenca.id}`);
+
+      responderJson(200, { sucesso: true, arquivadoId: licenca.id });
       return;
     }
 

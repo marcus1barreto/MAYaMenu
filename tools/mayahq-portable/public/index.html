@@ -79,23 +79,32 @@
       </div>
     </div>
 
-    <!-- NAVEGAÇÃO DE ABAS -->
-    <div class="flex items-center gap-2 border-b border-neutral-200 pb-3">
-      <button onclick="mudarAba('restaurantes')" id="tab-btn-restaurantes" class="px-4 py-2 rounded-xl text-xs font-bold bg-emerald-600 text-white shadow-xs transition-all">
-        🏪 Estabelecimentos em Operação
-      </button>
-      <button onclick="mudarAba('licencas')" id="tab-btn-licencas" class="px-4 py-2 rounded-xl text-xs font-bold bg-white text-neutral-600 border border-neutral-200 hover:text-neutral-900 transition-all">
-        🔑 Licenças & Lotes
-      </button>
+    <!-- BARRA DE CONTROLE E ABAS -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-neutral-200 pb-3">
+      <div class="flex items-center gap-2 overflow-x-auto">
+        <button onclick="mudarAba('restaurantes')" id="tab-btn-restaurantes" class="px-4 py-2 rounded-xl text-xs font-bold bg-emerald-600 text-white shadow-xs transition-all shrink-0">
+          🏪 Estabelecimentos em Operação
+        </button>
+        <button onclick="mudarAba('licencas')" id="tab-btn-licencas" class="px-4 py-2 rounded-xl text-xs font-bold bg-white text-neutral-600 border border-neutral-200 hover:text-neutral-900 transition-all shrink-0">
+          🔑 Licenças & Lotes
+        </button>
+        <button onclick="mudarAba('arquivo')" id="tab-btn-arquivo" class="px-4 py-2 rounded-xl text-xs font-bold bg-white text-neutral-600 border border-neutral-200 hover:text-neutral-900 transition-all shrink-0">
+          🗄️ Arquivo Morto
+        </button>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <input type="text" id="filtro-busca" placeholder="🔍 Filtrar lista..." oninput="filtrarDados()" class="px-3 py-1.5 rounded-xl border border-neutral-200 bg-white text-xs text-neutral-800 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 shadow-xs">
+        <button onclick="carregarDados()" class="px-3 py-1.5 rounded-xl border border-neutral-200 bg-white hover:bg-neutral-100 text-xs font-bold text-neutral-700 flex items-center gap-1.5 shadow-xs shrink-0">
+          🔄 Atualizar
+        </button>
+      </div>
     </div>
 
     <!-- CONTEÚDO DA ABA: RESTAURANTES -->
     <div id="aba-restaurantes" class="space-y-4">
       <div class="flex items-center justify-between gap-4">
         <h2 class="text-lg font-black text-neutral-950">Estabelecimentos Cadastrados no Banco</h2>
-        <button onclick="carregarDados()" class="px-3 py-1.5 rounded-xl border border-neutral-200 bg-white hover:bg-neutral-100 text-xs font-bold text-neutral-700 flex items-center gap-1.5 shadow-xs">
-          🔄 Atualizar Dados
-        </button>
       </div>
 
       <div id="lista-restaurantes" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -107,13 +116,137 @@
 
     <!-- CONTEÚDO DA ABA: LICENÇAS -->
     <div id="aba-licencas" class="space-y-4 hidden">
-      <div class="flex items-center justify-between gap-4">
-        <h2 class="text-lg font-black text-neutral-950">Concessões & Licenças Registradas</h2>
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-3xl border border-neutral-200/80 shadow-xs">
+        <div>
+          <h2 class="text-lg font-black text-neutral-950">Fábrica de Licenças & Lotes</h2>
+          <p class="text-xs text-neutral-500">Emita chaves avulsas ou em lotes para novos clientes e ative no WhatsApp ou CSV.</p>
+        </div>
+        <button onclick="abrirModalCriarLote()" class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold flex items-center gap-2 shadow-xs transition-colors shrink-0">
+          <span>➕</span>
+          <span>Emitir Novo Lote</span>
+        </button>
       </div>
+
       <div id="lista-licencas" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <div class="p-8 text-center bg-white rounded-3xl border border-neutral-200 text-xs text-neutral-500 col-span-full">
           Carregando licenças...
         </div>
+      </div>
+    </div>
+
+    <!-- CONTEÚDO DA ABA: ARQUIVO MORTO -->
+    <div id="aba-arquivo" class="space-y-4 hidden">
+      <div class="flex items-center justify-between gap-4">
+        <div>
+          <h2 class="text-lg font-black text-neutral-950">Arquivo Morto & Auditoria</h2>
+          <p class="text-xs text-neutral-500">Histórico de licenças expiradas, utilizadas ou canceladas para conferência fiscal e contábil.</p>
+        </div>
+      </div>
+
+      <div id="lista-arquivo" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div class="p-8 text-center bg-white rounded-3xl border border-neutral-200 text-xs text-neutral-500 col-span-full">
+          Carregando arquivo morto...
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: EMITIR LOTE DE LICENÇAS -->
+  <div id="modal-criar-lote" class="fixed inset-0 z-50 bg-neutral-950/40 backdrop-blur-xs flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-3xl border border-neutral-200 shadow-xl max-w-md w-full p-6 space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 class="text-lg font-black text-neutral-950">Emitir Concessões em Lote</h3>
+        <button onclick="fecharModalCriarLote()" class="text-neutral-400 hover:text-neutral-700 text-lg font-bold">✕</button>
+      </div>
+
+      <form id="form-criar-lote" onsubmit="submeterCriarLote(event)" class="space-y-3.5">
+        <div>
+          <label class="block text-xs font-bold text-neutral-700 mb-1">Quantidade de Licenças</label>
+          <select id="lote-qtd" class="w-full px-3 py-2 rounded-xl border border-neutral-200 text-xs text-neutral-900 bg-white">
+            <option value="1">1 licença avulsa</option>
+            <option value="5" selected>5 licenças</option>
+            <option value="10">10 licenças</option>
+            <option value="25">25 licenças</option>
+            <option value="50">50 licenças</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-neutral-700 mb-1">Plano do Lote</label>
+          <select id="lote-plano" class="w-full px-3 py-2 rounded-xl border border-neutral-200 text-xs text-neutral-900 bg-white">
+            <option value="pro" selected>PRO (60 pratos / 30 mesas)</option>
+            <option value="enterprise">ENTERPRISE (Pratos e mesas ilimitados)</option>
+            <option value="free">FREE (15 pratos / 5 mesas)</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-neutral-700 mb-1">Validade Inicial</label>
+          <select id="lote-validade" class="w-full px-3 py-2 rounded-xl border border-neutral-200 text-xs text-neutral-900 bg-white">
+            <option value="48">48 horas (Ativação Imediata)</option>
+            <option value="168">7 dias</option>
+            <option value="720">30 dias</option>
+            <option value="0" selected>Sem expiração (Vitalício/Pré-pago)</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-neutral-700 mb-1">Identificador / Parceiro / Lead (Opcional)</label>
+          <input type="text" id="lote-responsavel" placeholder="Ex: Campanha Sebrae, Representante Sul..." class="w-full px-3 py-2 rounded-xl border border-neutral-200 text-xs text-neutral-900 bg-white">
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-neutral-700 mb-1">Notas Internas</label>
+          <input type="text" id="lote-notas" placeholder="Ex: Lote promocional..." class="w-full px-3 py-2 rounded-xl border border-neutral-200 text-xs text-neutral-900 bg-white">
+        </div>
+
+        <div class="pt-2 flex items-center justify-end gap-2">
+          <button type="button" onclick="fecharModalCriarLote()" class="px-4 py-2 rounded-xl border border-neutral-200 text-xs font-bold text-neutral-600 hover:bg-neutral-50">Cancelar</button>
+          <button type="submit" id="btn-submit-lote" class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-xs transition-colors">Gerar e Gravar no Firestore</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: RESULTADO DO LOTE RECÉM-CRIADO -->
+  <div id="modal-resultado-lote" class="fixed inset-0 z-50 bg-neutral-950/40 backdrop-blur-xs flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-3xl border border-neutral-200 shadow-xl max-w-lg w-full p-6 space-y-4">
+      <div class="flex items-center justify-between">
+        <div>
+          <h3 class="text-lg font-black text-neutral-950">Lote Emitido com Sucesso!</h3>
+          <p class="text-xs text-neutral-500">As chaves já estão registradas no Firestore.</p>
+        </div>
+        <button onclick="fecharModalResultadoLote()" class="text-neutral-400 hover:text-neutral-700 text-lg font-bold">✕</button>
+      </div>
+
+      <div id="resultado-lote-lista" class="max-h-60 overflow-y-auto space-y-2 bg-neutral-50 p-3 rounded-2xl border border-neutral-200 font-mono text-xs">
+      </div>
+
+      <div class="flex flex-col sm:flex-row items-center justify-end gap-2 pt-2">
+        <button onclick="copiarLoteWhatsApp()" class="w-full sm:w-auto px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs">
+          <span>📋</span>
+          <span>Copiar p/ WhatsApp</span>
+        </button>
+        <button onclick="baixarLoteCSV()" class="w-full sm:w-auto px-4 py-2 rounded-xl border border-neutral-200 bg-white hover:bg-neutral-50 text-neutral-800 text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs">
+          <span>📥</span>
+          <span>Baixar CSV</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: VISUALIZAR JSON DE AUDITORIA -->
+  <div id="modal-json" class="fixed inset-0 z-50 bg-neutral-950/40 backdrop-blur-xs flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-3xl border border-neutral-200 shadow-xl max-w-2xl w-full p-6 space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 class="text-lg font-black text-neutral-950" id="modal-json-titulo">Registro de Auditoria</h3>
+        <button onclick="fecharModalJson()" class="text-neutral-400 hover:text-neutral-700 text-lg font-bold">✕</button>
+      </div>
+
+      <pre id="modal-json-conteudo" class="bg-neutral-900 text-neutral-100 p-4 rounded-2xl text-xs font-mono overflow-x-auto max-h-96"></pre>
+
+      <div class="flex justify-end">
+        <button onclick="fecharModalJson()" class="px-4 py-2 rounded-xl bg-neutral-900 text-white text-xs font-bold">Fechar</button>
       </div>
     </div>
   </div>
@@ -121,6 +254,9 @@
   <script>
     let restaurantes = [];
     let licencas = [];
+    let arquivoMorto = [];
+    let loteRecemEmitido = [];
+    const BASE_URL = "https://mayamenu--mayaranas-8ad9f.us-east4.hosted.app";
 
     async function verificarStatus() {
       try {
@@ -141,17 +277,18 @@
 
     async function carregarDados() {
       try {
-        const [resRest, resLic] = await Promise.all([
+        const [resRest, resLic, resArq] = await Promise.all([
           fetch('/api/restaurantes').then(r => r.json()).catch(() => ({ restaurantes: [] })),
           fetch('/api/licencas').then(r => r.json()).catch(() => ({ licencas: [] })),
+          fetch('/api/arquivo-morto').then(r => r.json()).catch(() => ({ arquivoMorto: [] })),
         ]);
 
         restaurantes = resRest.restaurantes || [];
         licencas = resLic.licencas || [];
+        arquivoMorto = resArq.arquivoMorto || [];
 
         renderizarEstatisticas();
-        renderizarRestaurantes();
-        renderizarLicencas();
+        filtrarDados();
       } catch (e) {
         console.error("Erro ao carregar dados:", e);
       }
@@ -159,19 +296,44 @@
 
     function renderizarEstatisticas() {
       document.getElementById('stat-restaurantes').textContent = restaurantes.length;
-      document.getElementById('stat-ativas').textContent = licencas.filter(l => l.status === 'ativa').length;
+      document.getElementById('stat-ativas').textContent = licencas.filter(l => l.status === 'disponivel' || l.status === 'ativa').length;
       document.getElementById('stat-suspensos').textContent = restaurantes.filter(r => r.suspenso).length;
-      document.getElementById('stat-arquivo').textContent = licencas.filter(l => l.status === 'expirada').length;
+      document.getElementById('stat-arquivo').textContent = arquivoMorto.length;
     }
 
-    function renderizarRestaurantes() {
+    function filtrarDados() {
+      const termo = (document.getElementById('filtro-busca').value || "").toLowerCase().trim();
+
+      const restsFiltrados = restaurantes.filter(r => 
+        (r.nome || "").toLowerCase().includes(termo) || 
+        (r.slug || "").toLowerCase().includes(termo) ||
+        (r.id || "").toLowerCase().includes(termo)
+      );
+
+      const licsFiltradas = licencas.filter(l => 
+        (l.id || "").toLowerCase().includes(termo) || 
+        (l.responsavel || "").toLowerCase().includes(termo) ||
+        (l.plano || "").toLowerCase().includes(termo)
+      );
+
+      const arqFiltrados = arquivoMorto.filter(a => 
+        (a.id || "").toLowerCase().includes(termo) || 
+        (a.motivo || "").toLowerCase().includes(termo)
+      );
+
+      renderizarRestaurantes(restsFiltrados);
+      renderizarLicencas(licsFiltradas);
+      renderizarArquivoMorto(arqFiltrados);
+    }
+
+    function renderizarRestaurantes(lista) {
       const container = document.getElementById('lista-restaurantes');
-      if (restaurantes.length === 0) {
-        container.innerHTML = '<div class="p-8 text-center bg-white rounded-3xl border border-neutral-200 text-xs text-neutral-500 col-span-full">Nenhum restaurante encontrado no banco.</div>';
+      if (lista.length === 0) {
+        container.innerHTML = '<div class="p-8 text-center bg-white rounded-3xl border border-neutral-200 text-xs text-neutral-500 col-span-full">Nenhum estabelecimento encontrado.</div>';
         return;
       }
 
-      container.innerHTML = restaurantes.map(r => {
+      container.innerHTML = lista.map(r => {
         const plano = r.plano || 'free';
         const isSuspenso = !!r.suspenso;
 
@@ -209,22 +371,56 @@
       }).join('');
     }
 
-    function renderizarLicencas() {
+    function renderizarLicencas(lista) {
       const container = document.getElementById('lista-licencas');
-      if (licencas.length === 0) {
+      if (lista.length === 0) {
         container.innerHTML = '<div class="p-8 text-center bg-white rounded-3xl border border-neutral-200 text-xs text-neutral-500 col-span-full">Nenhuma licença encontrada.</div>';
         return;
       }
 
-      container.innerHTML = licencas.map(l => `
+      container.innerHTML = lista.map(l => {
+        const linkAtivacao = `${BASE_URL}/ativar/${l.id}`;
+        return `
+          <div class="p-5 bg-white border border-neutral-200/80 rounded-3xl space-y-3 shadow-xs">
+            <div class="flex items-center justify-between">
+              <span class="font-mono text-xs font-black bg-neutral-100 px-2.5 py-1 rounded-xl">${l.id}</span>
+              <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${l.status === 'disponivel' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-neutral-100 text-neutral-700'}">${l.status}</span>
+            </div>
+            <div class="text-xs text-neutral-600">
+              <strong class="text-neutral-900">${l.responsavel || 'Aguardando Ativação'}</strong>
+              <div class="text-[11px] text-neutral-400 mt-0.5">Plano: ${l.plano || 'pro'}</div>
+            </div>
+            <div class="pt-2 border-t border-neutral-100 flex items-center justify-between gap-2 text-xs">
+              <button onclick="copiarLink('${linkAtivacao}')" class="text-rose-600 font-bold hover:underline">Copiar Link</button>
+              <div class="flex items-center gap-1.5">
+                <button onclick="revogarLicenca('${l.id}')" class="text-neutral-500 hover:text-rose-600 font-semibold">Revogar</button>
+                <button onclick="arquivarLicenca('${l.id}')" class="text-neutral-500 hover:text-purple-600 font-semibold">Arquivar</button>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderizarArquivoMorto(lista) {
+      const container = document.getElementById('lista-arquivo');
+      if (lista.length === 0) {
+        container.innerHTML = '<div class="p-8 text-center bg-white rounded-3xl border border-neutral-200 text-xs text-neutral-500 col-span-full">Nenhum item arquivado.</div>';
+        return;
+      }
+
+      container.innerHTML = lista.map(a => `
         <div class="p-5 bg-white border border-neutral-200/80 rounded-3xl space-y-3 shadow-xs">
           <div class="flex items-center justify-between">
-            <span class="font-mono text-xs font-black bg-neutral-100 px-2.5 py-1 rounded-xl">${l.id}</span>
-            <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${l.status === 'ativa' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}">${l.status}</span>
+            <span class="font-mono text-xs font-black bg-purple-50 text-purple-800 px-2.5 py-1 rounded-xl">${a.id}</span>
+            <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-600">Arquivado</span>
           </div>
           <div class="text-xs text-neutral-600">
-            <strong class="text-neutral-900">${l.restauranteNome || l.responsavel || 'Aguardando Ativação'}</strong>
-            <div class="text-[11px] text-neutral-400 mt-0.5">Plano: ${l.plano || 'free'}</div>
+            <div>${a.motivo || 'Arquivamento histórico'}</div>
+            <div class="text-[11px] text-neutral-400 mt-0.5">Plano: ${a.planoOriginal || 'free'}</div>
+          </div>
+          <div class="pt-2 border-t border-neutral-100 flex justify-end">
+            <button onclick="abrirModalJson('${a.id}')" class="text-xs font-bold text-neutral-700 hover:text-neutral-900 bg-neutral-100 px-2.5 py-1 rounded-lg">Ver JSON</button>
           </div>
         </div>
       `).join('');
@@ -259,20 +455,162 @@
       }
     }
 
+    function abrirModalCriarLote() {
+      document.getElementById('modal-criar-lote').classList.remove('hidden');
+    }
+
+    function fecharModalCriarLote() {
+      document.getElementById('modal-criar-lote').classList.add('hidden');
+    }
+
+    async function submeterCriarLote(e) {
+      e.preventDefault();
+      const btn = document.getElementById('btn-submit-lote');
+      btn.disabled = true;
+      btn.textContent = "Gerando...";
+
+      try {
+        const payload = {
+          quantidade: document.getElementById('lote-qtd').value,
+          plano: document.getElementById('lote-plano').value,
+          horasValidade: Number(document.getElementById('lote-validade').value),
+          responsavel: document.getElementById('lote-responsavel').value,
+          notas: document.getElementById('lote-notas').value,
+        };
+
+        const res = await fetch('/api/licencas/criar-lote', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.erro || "Falha ao criar lote");
+
+        fecharModalCriarLote();
+        loteRecemEmitido = data.criadas || [];
+        exibirResultadoLote(loteRecemEmitido);
+        carregarDados();
+      } catch (err) {
+        alert("Erro ao emitir lote: " + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Gerar e Gravar no Firestore";
+      }
+    }
+
+    function exibirResultadoLote(lista) {
+      const container = document.getElementById('resultado-lote-lista');
+      container.innerHTML = lista.map((lic, idx) => `
+        <div class="flex items-center justify-between border-b border-neutral-200 pb-1">
+          <span>${idx + 1}. <strong>${lic.id}</strong> (${lic.plano.toUpperCase()})</span>
+          <span class="text-neutral-500">${lic.responsavel || 'Avulsa'}</span>
+        </div>
+      `).join('');
+
+      document.getElementById('modal-resultado-lote').classList.remove('hidden');
+    }
+
+    function fecharModalResultadoLote() {
+      document.getElementById('modal-resultado-lote').classList.add('hidden');
+    }
+
+    function copiarLoteWhatsApp() {
+      if (loteRecemEmitido.length === 0) return;
+      const linhas = loteRecemEmitido.map((lic, idx) => {
+        const link = `${BASE_URL}/ativar/${lic.id}`;
+        const resp = lic.responsavel ? ` (${lic.responsavel})` : "";
+        return `${idx + 1}. [${lic.plano.toUpperCase()}] ${lic.id}${resp}\n   🔗 ${link}`;
+      });
+
+      const texto = `🎫 MAYaMenu - Lote de Concessões (${loteRecemEmitido.length} emitidas):\n\n${linhas.join("\n\n")}\n\n⚠️ Instruções: O lojista só precisa clicar no link para cadastrar e ativar o restaurante instantaneamente.`;
+      navigator.clipboard.writeText(texto).then(() => {
+        alert("Copiado para a Área de Transferência no formato WhatsApp!");
+      });
+    }
+
+    function baixarLoteCSV() {
+      if (loteRecemEmitido.length === 0) return;
+      const headers = ["Codigo", "Plano", "Link_Ativacao", "Responsavel", "Notas"];
+      const rows = loteRecemEmitido.map(l => [
+        `"${l.id}"`,
+        `"${l.plano.toUpperCase()}"`,
+        `"${BASE_URL}/ativar/${l.id}"`,
+        `"${(l.responsavel || "").replace(/"/g, '""')}"`,
+        `"${(l.notas || "").replace(/"/g, '""')}"`,
+      ].join(","));
+
+      const csv = "\uFEFF" + [headers.join(","), ...rows].join("\r\n");
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `concessoes_mayamenu_${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    async function revogarLicenca(id) {
+      if (!confirm(`Deseja revogar a licença ${id}?`)) return;
+      try {
+        await fetch('/api/licencas/alterar-status', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ licencaId: id, novoStatus: 'revogada' }),
+        });
+        carregarDados();
+      } catch (e) {
+        alert("Erro: " + e.message);
+      }
+    }
+
+    async function arquivarLicenca(id) {
+      const lic = licencas.find(l => l.id === id);
+      if (!lic) return;
+      if (!confirm(`Deseja mover a licença ${id} para o arquivo morto?`)) return;
+      try {
+        await fetch('/api/licencas/arquivar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ licenca: lic }),
+        });
+        carregarDados();
+      } catch (e) {
+        alert("Erro: " + e.message);
+      }
+    }
+
+    function copiarLink(link) {
+      navigator.clipboard.writeText(link).then(() => {
+        alert("Link de ativação copiado!");
+      });
+    }
+
+    function abrirModalJson(id) {
+      const item = arquivoMorto.find(a => a.id === id);
+      if (!item) return;
+      document.getElementById('modal-json-titulo').textContent = `Auditoria: ${id}`;
+      document.getElementById('modal-json-conteudo').textContent = JSON.stringify(item, null, 2);
+      document.getElementById('modal-json-modal', 'modal-json');
+      document.getElementById('modal-json').classList.remove('hidden');
+    }
+
+    function fecharModalJson() {
+      document.getElementById('modal-json').classList.add('hidden');
+    }
+
     function mudarAba(aba) {
       document.getElementById('aba-restaurantes').classList.toggle('hidden', aba !== 'restaurantes');
       document.getElementById('aba-licencas').classList.toggle('hidden', aba !== 'licencas');
+      document.getElementById('aba-arquivo').classList.toggle('hidden', aba !== 'arquivo');
 
       const btnRest = document.getElementById('tab-btn-restaurantes');
       const btnLic = document.getElementById('tab-btn-licencas');
+      const btnArq = document.getElementById('tab-btn-arquivo');
 
-      if (aba === 'restaurantes') {
-        btnRest.className = "px-4 py-2 rounded-xl text-xs font-bold bg-emerald-600 text-white shadow-xs transition-all";
-        btnLic.className = "px-4 py-2 rounded-xl text-xs font-bold bg-white text-neutral-600 border border-neutral-200 hover:text-neutral-900 transition-all";
-      } else {
-        btnLic.className = "px-4 py-2 rounded-xl text-xs font-bold bg-rose-600 text-white shadow-xs transition-all";
-        btnRest.className = "px-4 py-2 rounded-xl text-xs font-bold bg-white text-neutral-600 border border-neutral-200 hover:text-neutral-900 transition-all";
-      }
+      btnRest.className = "px-4 py-2 rounded-xl text-xs font-bold transition-all shrink-0 " + (aba === 'restaurantes' ? "bg-emerald-600 text-white shadow-xs" : "bg-white text-neutral-600 border border-neutral-200 hover:text-neutral-900");
+      btnLic.className = "px-4 py-2 rounded-xl text-xs font-bold transition-all shrink-0 " + (aba === 'licencas' ? "bg-rose-600 text-white shadow-xs" : "bg-white text-neutral-600 border border-neutral-200 hover:text-neutral-900");
+      btnArq.className = "px-4 py-2 rounded-xl text-xs font-bold transition-all shrink-0 " + (aba === 'arquivo' ? "bg-purple-600 text-white shadow-xs" : "bg-white text-neutral-600 border border-neutral-200 hover:text-neutral-900");
     }
 
     verificarStatus();
