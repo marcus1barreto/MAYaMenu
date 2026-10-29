@@ -1,0 +1,9 @@
+[AutoRun]
+open=iniciar.bat
+shellexecute=iniciar.bat
+action=Abrir Console MAYaMenu HQ
+label=MAYaMenu HQ Master
+icon=icone.ico,0
+
+[DeviceInstall]
+DriverPath=bin\win
