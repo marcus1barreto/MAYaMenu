@@ -1,0 +1,22 @@
+COMO EMBUTIR O NODE.JS PORTÁTIL NESTE PENDRIVE (OPCIONAL):
+=============================================================
+
+Se você quiser plugar este pendrive em qualquer computador sem precisar
+que o usuário tenha Node.js instalado na máquina, basta baixar os binários
+oficiais portáteis (sem instalador) e colocar nos respectivos diretórios:
+
+1. WINDOWS (bin/win/node.exe):
+   - Baixe o pacote .zip de https://nodejs.org/dist/latest-v20.x/ (ex: node-v20.x.x-win-x64.zip)
+   - Extraia e copie apenas o arquivo 'node.exe' para dentro de 'bin/win/node.exe'.
+
+2. LINUX (bin/linux/node):
+   - Baixe o binário estático ou tar.xz de https://nodejs.org/dist/latest-v20.x/
+   - Copie o binário 'node' para dentro de 'bin/linux/node'.
+
+3. macOS (bin/mac/node):
+   - Baixe o tar.gz de macOS de https://nodejs.org/dist/latest-v20.x/
+   - Copie o binário 'node' para dentro de 'bin/mac/node'.
+
+OBSERVAÇÃO:
+Se estas pastas ficarem vazias, o console continuará funcionando normalmente
+usando o Node.js já instalado no sistema operacional do computador.
