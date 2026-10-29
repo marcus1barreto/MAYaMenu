@@ -5,6 +5,8 @@
 
 set -e
 
+export PATH="/usr/local/bin:/usr/bin:/bin:${PATH}"
+
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PORTA=3333
 URL="http://localhost:${PORTA}"
