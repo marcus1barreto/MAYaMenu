@@ -12,6 +12,7 @@ import {
   escutarCardapio,
   escutarComandasSalão,
   escutarHistoricoSessoesMesas,
+  escutarMetricasConsolidadas,
   marcarComandaPagaFirestore,
   alternarDisponibilidadePrato,
   salvarItemCardapio,
@@ -25,6 +26,7 @@ import {
 import { GuidedEmptyCardapio } from "./guided-empty-cardapio";
 import { AdminQrScannerModal } from "./admin-qr-scanner-modal";
 import { ModificadorBuilder } from "./modificador-builder";
+import { GestaoEquipe } from "./gestao-equipe";
 import { MAYA_MEDIA_LIBRARY } from "@/lib/maya-media-library";
 
 import { Button } from "@/components/ui/button";
@@ -117,7 +119,7 @@ function ValorDinamicoMesa({
 
 export function AdminDashboard() {
   const { restaurante, logout, atualizarRestaurante } = useAuth();
-  const [abaAtiva, setAbaAtiva] = useState<"cardapio" | "mesas" | "analytics">("cardapio");
+  const [abaAtiva, setAbaAtiva] = useState<"cardapio" | "mesas" | "equipe" | "analytics">("cardapio");
   const [modalConfigAberto, setModalConfigAberto] = useState(false);
   const [modalProAberto, setModalProAberto] = useState(false);
   const [itensCardapio, setItensCardapio] = useState<MenuItem[]>([]);
@@ -151,14 +153,25 @@ export function AdminDashboard() {
   const [feedbackBalcao, setFeedbackBalcao] = useState<string | null>(null);
   const [subAbaAnalytics, setSubAbaAnalytics] = useState<"geral" | "laboratorio">("geral");
   const [sessoesHistorico, setSessoesHistorico] = useState<HistoricoSessaoMesa[]>([]);
+  const [metricasConsolidadas, setMetricasConsolidadas] = useState<{
+    totalFaturado: number;
+    totalSessoes: number;
+    totalClientes: number;
+  } | null>(null);
 
-  // Escuta o histórico de sessões encerradas no Firestore para dados reais de faturamento e giro
+  // Escuta o histórico de sessões encerradas e métricas agregadas econômicas
   useEffect(() => {
     if (!restaurante?.id) return;
     const unsub = escutarHistoricoSessoesMesas(restaurante.id, (dados) => {
       setSessoesHistorico(dados);
     });
-    return () => unsub();
+    const unsubMetricas = escutarMetricasConsolidadas(restaurante.id, (dados) => {
+      setMetricasConsolidadas(dados);
+    });
+    return () => {
+      unsub();
+      unsubMetricas();
+    };
   }, [restaurante?.id]);
 
   // Sincroniza cardápio em tempo real com o Firestore
@@ -948,6 +961,19 @@ export function AdminDashboard() {
 
           <button
             type="button"
+            onClick={() => setAbaAtiva("equipe")}
+            className={`py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all flex items-center gap-2 ${
+              abaAtiva === "equipe"
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Users className="w-4 h-4" />
+            <span>Equipe & Acessos</span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => setAbaAtiva("analytics")}
             className={`py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all flex items-center gap-2 relative ${
               abaAtiva === "analytics"
@@ -1276,6 +1302,11 @@ export function AdminDashboard() {
 
 
 
+        {/* ABA: EQUIPE & ACESSOS */}
+        {abaAtiva === "equipe" && (
+          <GestaoEquipe restauranteId={restaurante?.id || "demo"} />
+        )}
+
         {/* ABA: MAYA INTELIGÊNCIA / ANALYTICS (PREMIUM UPSELL) */}
         {abaAtiva === "analytics" && (
           <div className="relative min-h-[640px] rounded-3xl overflow-hidden border border-border bg-card p-4 sm:p-8 shadow-sm">
@@ -1496,60 +1527,91 @@ export function AdminDashboard() {
                   </div>
 
                   {/* Só mostra o cadeado e o overlay se for plano 'free' (ou undefined) */}
-                  {isFree && (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center bg-white/85 backdrop-blur-md z-20 animate-in fade-in">
-                      <div className="w-16 h-16 rounded-3xl bg-rose-50 border-2 border-rose-200 text-rose-600 flex items-center justify-center mb-4 shadow-lg shadow-rose-600/10 animate-pulse">
-                        <Lock className="w-8 h-8" />
+                  {isFree && (() => {
+                    const faturadoAcumulado = metricasConsolidadas?.totalFaturado || sessoesHistorico.reduce((acc, s) => acc + (Number(s.subtotalTotal) || 0), 0);
+                    const clientesAcumulados = metricasConsolidadas?.totalClientes || sessoesHistorico.reduce((acc, s) => acc + (Number(s.quantidadePagantes) || 1), 0);
+                    const sessoesAcumuladas = metricasConsolidadas?.totalSessoes || sessoesHistorico.length;
+
+                    return (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center bg-card/90 backdrop-blur-md z-20 animate-in fade-in">
+                        <div className="w-16 h-16 rounded-3xl bg-rose-500/10 border-2 border-rose-500/20 text-rose-600 flex items-center justify-center mb-4 shadow-lg shadow-rose-600/10 animate-pulse">
+                          <Lock className="w-8 h-8" />
+                        </div>
+
+                        <Badge className="bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30 text-[10px] font-black uppercase tracking-widest px-3 py-1 mb-3 shadow-xs">
+                          Módulo Exclusivo MAYaMenu PRO
+                        </Badge>
+
+                        <h2 className="text-2xl sm:text-3xl font-black text-foreground max-w-xl tracking-tight leading-tight">
+                          Descubra onde o seu restaurante <span className="text-rose-600">ganha e perde dinheiro</span>.
+                        </h2>
+
+                        {/* TEASER PERSUASIVO COM NÚMEROS REAIS ACUMULADOS */}
+                        {sessoesAcumuladas > 0 ? (
+                          <div className="my-4 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/25 max-w-lg w-full text-left space-y-2">
+                            <span className="text-[11px] font-black uppercase tracking-wider text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
+                              <Sparkles className="w-3.5 h-3.5" />
+                              Métricas capturadas na sua operação este mês:
+                            </span>
+                            <div className="grid grid-cols-2 gap-3 pt-1">
+                              <div>
+                                <span className="text-[10px] text-muted-foreground uppercase font-bold block">Faturamento Rastreado</span>
+                                <span className="text-base font-black text-foreground">
+                                  {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(faturadoAcumulado)}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-[10px] text-muted-foreground uppercase font-bold block">Pessoas Atendidas</span>
+                                <span className="text-base font-black text-foreground">{clientesAcumulados} clientes</span>
+                              </div>
+                            </div>
+                            <p className="text-[11px] text-muted-foreground pt-1 border-t border-amber-500/20">
+                              🔒 No plano Free, este histórico expira a cada 30 dias. Migre para o PRO para ter histórico vitalício, Curva ABC de pratos e mapa de calor do salão!
+                            </p>
+                          </div>
+                        ) : (
+                          <p className="text-xs sm:text-sm text-muted-foreground max-w-lg mt-3 leading-relaxed">
+                            Monitore a <strong>taxa de ociosidade das mesas</strong>, tempo médio de preparo do KDS, pratos mais lucrativos e ticket médio em tempo real com o poder da Inteligência MAYa.
+                          </p>
+                        )}
+
+                        <div className="flex flex-col sm:flex-row items-center gap-3 mt-4">
+                          <Button
+                            type="button"
+                            onClick={() => setModalProAberto(true)}
+                            className="h-11 px-6 bg-rose-600 hover:bg-rose-500 text-white font-black text-xs uppercase tracking-wider rounded-2xl shadow-lg shadow-rose-600/25 flex items-center gap-2 transform active:scale-95 transition-all"
+                          >
+                            <Sparkles className="w-4 h-4" />
+                            <span>Desbloquear Histórico Completo no PRO</span>
+                            <ArrowUpRight className="w-4 h-4 ml-1" />
+                          </Button>
+
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setModalProAberto(true)}
+                            className="h-11 px-5 border border-border bg-card hover:bg-muted text-foreground font-bold text-xs rounded-2xl"
+                          >
+                            Falar com Consultor
+                          </Button>
+                        </div>
+
+                        <div className="flex items-center gap-4 mt-6 text-xs text-muted-foreground font-semibold">
+                          <span className="flex items-center gap-1.5">
+                            <Check className="w-4 h-4 text-emerald-600 stroke-[3]" /> Sem taxa de adesão
+                          </span>
+                          <span>•</span>
+                          <span className="flex items-center gap-1.5">
+                            <Check className="w-4 h-4 text-emerald-600 stroke-[3]" /> Ativação instantânea
+                          </span>
+                          <span>•</span>
+                          <span className="flex items-center gap-1.5">
+                            <Check className="w-4 h-4 text-emerald-600 stroke-[3]" /> Suporte 24/7
+                          </span>
+                        </div>
                       </div>
-
-                      <Badge className="bg-rose-100 text-rose-800 border border-rose-200 text-[10px] font-black uppercase tracking-widest px-3 py-1 mb-3 shadow-xs">
-                        Módulo Exclusivo MAYaMenu PRO
-                      </Badge>
-
-                      <h2 className="text-2xl sm:text-3xl font-black text-neutral-950 max-w-xl tracking-tight leading-tight">
-                        Descubra onde o seu restaurante <span className="text-rose-600">perde dinheiro</span>.
-                      </h2>
-
-                      <p className="text-xs sm:text-sm text-neutral-600 max-w-lg mt-3 leading-relaxed">
-                        Monitore a <strong>taxa de ociosidade das mesas</strong>, tempo médio de preparo do KDS, pratos mais lucrativos e ticket médio em tempo real com o poder da Inteligência MAYa.
-                      </p>
-
-                      <div className="flex flex-col sm:flex-row items-center gap-3 mt-6">
-                        <Button
-                          type="button"
-                          onClick={() => setModalProAberto(true)}
-                          className="h-11 px-6 bg-rose-600 hover:bg-rose-500 text-white font-black text-xs uppercase tracking-wider rounded-2xl shadow-lg shadow-rose-600/25 flex items-center gap-2 transform active:scale-95 transition-all"
-                        >
-                          <Sparkles className="w-4 h-4" />
-                          <span>Desbloquear MAYaMenu PRO</span>
-                          <ArrowUpRight className="w-4 h-4 ml-1" />
-                        </Button>
-
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => setModalProAberto(true)}
-                          className="h-11 px-5 border-2 border-neutral-300 bg-white hover:bg-neutral-100 text-neutral-800 font-bold text-xs rounded-2xl"
-                        >
-                          Falar com Consultor
-                        </Button>
-                      </div>
-
-                      <div className="flex items-center gap-4 mt-6 text-xs text-neutral-600 font-semibold">
-                        <span className="flex items-center gap-1.5">
-                          <Check className="w-4 h-4 text-emerald-600 stroke-[3]" /> Sem taxa de adesão
-                        </span>
-                        <span>•</span>
-                        <span className="flex items-center gap-1.5">
-                          <Check className="w-4 h-4 text-emerald-600 stroke-[3]" /> Ativação instantânea
-                        </span>
-                        <span>•</span>
-                        <span className="flex items-center gap-1.5">
-                          <Check className="w-4 h-4 text-emerald-600 stroke-[3]" /> Suporte 24/7
-                        </span>
-                      </div>
-                    </div>
-                  )}
+                    );
+                  })()}
           </>
         );
       })()}

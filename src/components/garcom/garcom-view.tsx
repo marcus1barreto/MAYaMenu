@@ -23,7 +23,10 @@ import {
   WifiOff,
   RefreshCw,
   Loader2,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
+import { audioAlertService } from "@/lib/audio-alerts";
 import {
   Dialog,
   DialogContent,
@@ -216,6 +219,11 @@ export function GarcomView({
 
   const [pedidosOffline, setPedidosOffline] = useState<PedidoFilaOffline[]>([]);
   const [sincronizandoOffline, setSincronizandoOffline] = useState(false);
+  const [audioAtivo, setAudioAtivo] = useState(true);
+
+  useEffect(() => {
+    setAudioAtivo(audioAlertService.isHabilitado());
+  }, []);
 
   // Monitoramento e escuta reativa da fila offline (IndexedDB)
   useEffect(() => {
@@ -276,6 +284,11 @@ export function GarcomView({
                 lista = lista.filter((c) => c.id !== docId);
                 return;
               }
+              // Se a comanda tem chamado ativo e foi modificada/adicionada recentemente, emite sinal sonoro
+              if (data.chamadoGarcom?.ativo) {
+                audioAlertService.tocarChamadoGarcom();
+              }
+
               const comandaItem: ComandaCliente & { refPath: string } = {
                 ...data,
                 id: docId,
@@ -398,6 +411,13 @@ export function GarcomView({
               id: docSnap.id,
               refPath: docSnap.ref.path,
             });
+          }
+        });
+
+        // Se entraram novos pedidos prontos, emite alerta de entrega
+        snapshot.docChanges().forEach((change) => {
+          if (change.type === "added" && (change.doc.data() as PedidoRodada).status === "pronto") {
+            audioAlertService.tocarPedidoPronto();
           }
         });
 
@@ -656,6 +676,26 @@ export function GarcomView({
               </Button>
             </div>
           )}
+
+          {/* BOTÃO MUDO / ÁUDIO DO SALÃO */}
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              const novo = !audioAtivo;
+              audioAlertService.setHabilitado(novo);
+              setAudioAtivo(novo);
+            }}
+            className={`h-10 px-3 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-all ${
+              audioAtivo
+                ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400"
+                : "bg-muted border-border text-muted-foreground"
+            }`}
+            title={audioAtivo ? "Alertas sonoros ativados" : "Alertas sonoros silenciados"}
+          >
+            {audioAtivo ? <Volume2 className="w-4 h-4 text-emerald-500" /> : <VolumeX className="w-4 h-4 text-muted-foreground" />}
+            <span className="hidden sm:inline">{audioAtivo ? "Som Ativo" : "Silenciado"}</span>
+          </Button>
 
           <Button
             type="button"

@@ -777,6 +777,30 @@ export async function liberarMesaFirestore(
       pagaEm: pagaEmTimestamp || serverTimestamp(),
       liberadaEm: serverTimestamp(),
     });
+
+    // 3. Atualização econômica do Documento Agregador Resumo (Analytics Econômico para Free & PRO)
+    const agora = new Date();
+    const chaveMes = `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, "0")}`;
+    const resumoRef = doc(
+      db,
+      "restaurantes",
+      restauranteId,
+      "metricas_consolidadas",
+      chaveMes
+    );
+
+    batch.set(
+      resumoRef,
+      {
+        anoMes: chaveMes,
+        restauranteId,
+        totalFaturado: increment(subtotalTotal),
+        totalSessoes: increment(1),
+        totalClientes: increment(Math.max(quantidadePagantes, comandasIds.length)),
+        atualizadoEm: serverTimestamp(),
+      },
+      { merge: true }
+    );
   } catch (errHistorico) {
     console.warn("Falha ao preparar gravação de histórico de sessão no lote:", errHistorico);
   }
@@ -815,6 +839,42 @@ export function escutarHistoricoSessoesMesas(
       (err) => {
         console.warn("Falha ao escutar histórico de sessões das mesas:", err);
         onAtualizacao([]);
+      }
+    );
+  } catch {
+    return () => {};
+  }
+}
+
+/**
+ * Escuta as métricas consolidadas (documento agregador econômico) do mês atual
+ */
+export function escutarMetricasConsolidadas(
+  restauranteId: string,
+  onAtualizacao: (metricas: { totalFaturado: number; totalSessoes: number; totalClientes: number } | null) => void
+): Unsubscribe {
+  const agora = new Date();
+  const chaveMes = `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, "0")}`;
+  const docRef = doc(db, "restaurantes", restauranteId, "metricas_consolidadas", chaveMes);
+
+  try {
+    return onSnapshot(
+      docRef,
+      (snap) => {
+        if (snap.exists()) {
+          const d = snap.data();
+          onAtualizacao({
+            totalFaturado: Number(d.totalFaturado) || 0,
+            totalSessoes: Number(d.totalSessoes) || 0,
+            totalClientes: Number(d.totalClientes) || 0,
+          });
+        } else {
+          onAtualizacao(null);
+        }
+      },
+      (err) => {
+        console.warn("Falha ao escutar métricas consolidadas:", err);
+        onAtualizacao(null);
       }
     );
   } catch {

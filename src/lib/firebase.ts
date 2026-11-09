@@ -12,6 +12,7 @@ import {
   type Firestore,
 } from "firebase/firestore";
 import { getStorage, type FirebaseStorage } from "firebase/storage";
+import { getFunctions, type Functions } from "firebase/functions";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "AIzaSyDummyKeyForStaticBuildEvaluationOnly123",
@@ -55,6 +56,7 @@ function createFirestore(): Firestore {
 export const db: Firestore = createFirestore();
 export const auth: Auth = getAuth(app);
 export const storage: FirebaseStorage = getStorage(app);
+export const functions: Functions = getFunctions(app, "us-central1");
 
 const OFFLINE_SESSION_KEY = "mayamenu_cliente_session_id";
 

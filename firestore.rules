@@ -24,10 +24,29 @@ service cloud.firestore {
       );
     }
 
-    // Verifica se o usuário autenticado é o dono do restaurante
+    // -----------------------------------------------------------------
+    // Papéis personalizados (custom claims) – usado nas regras abaixo
+    // -----------------------------------------------------------------
+    function hasRole(restauranteId, role) {
+      return isSignedIn() &&
+        request.auth.token.role == role &&
+        (
+          request.auth.token.restauranteId == restauranteId ||
+          get(/databases/$(database)/documents/restaurantes/$(restauranteId)).data.ownerId == request.auth.uid
+        );
+    }
+
     function isOwner(restauranteId) {
-      return isSignedIn()
-        && get(/databases/$(database)/documents/restaurantes/$(restauranteId)).data.ownerId == request.auth.uid;
+      return (isSignedIn() && get(/databases/$(database)/documents/restaurantes/$(restauranteId)).data.ownerId == request.auth.uid)
+        || hasRole(restauranteId, "owner");
+    }
+
+    function isGarcom(restauranteId) {
+      return hasRole(restauranteId, "garcom");
+    }
+
+    function isCozinha(restauranteId) {
+      return hasRole(restauranteId, "cozinha");
     }
 
     // Transições de status permitidas para o Cliente na Comanda Pai
@@ -44,7 +63,7 @@ service cloud.firestore {
       allow get: if true; // Permite ler 1 licença na rota efêmera /ativar/[codigo]
       allow list: if isSuperAdmin(); // Apenas SuperAdmin lista todas as concessões
       allow create: if isSuperAdmin(); // Apenas SuperAdmin gera novas licenças
-      
+
       // Permite queima atômica pelo Lojista que está ativando OU gestão de status pelo SuperAdmin
       allow update: if (
         isNonAnonymous()
@@ -79,10 +98,10 @@ service cloud.firestore {
     match /restaurantes/{restauranteId} {
       // Leitura pública do restaurante
       allow read: if true;
-      
+
       // Criação inicial via runTransaction de ativação
       allow create: if isNonAnonymous() && request.resource.data.ownerId == request.auth.uid;
-      
+
       // Permite atualização de dados cadastrais/temas pelo Dono,
       // mas governança de plano/limites/suspensão é EXCLUSIVA do SuperAdmin
       allow update: if (
@@ -97,6 +116,12 @@ service cloud.firestore {
 
       allow delete: if isOwner(restauranteId) || isSuperAdmin();
 
+      // Gestão de Equipe (Garçons e Cozinha)
+      match /equipe/{membroId} {
+        allow read: if isOwner(restauranteId) || isSuperAdmin();
+        allow write: if isOwner(restauranteId) || isSuperAdmin();
+      }
+
       // Cardápio
       match /cardapio/{itemId} {
         allow read: if true;
@@ -108,9 +133,9 @@ service cloud.firestore {
         allow read: if true;
         // Cliente anônimo ou garçom cria com status 'a_fazer'
         allow create: if (isSignedIn() && request.resource.data.status == 'a_fazer')
-          || isOwner(restauranteId);
+          || isGarcom(restauranteId) || isCozinha(restauranteId);
         // Apenas a equipe (dono/tablet operacional) marcha, cancela ou remove tickets
-        allow update, delete: if isOwner(restauranteId) || isSuperAdmin();
+        allow update, delete: if isOwner(restauranteId) || isGarcom(restauranteId) || isSuperAdmin();
       }
 
       // Mesas e Salão
@@ -131,7 +156,6 @@ service cloud.firestore {
             (request.auth.uid == clienteId 
               && resource.data.status != 'pago'
               && (
-                // Permite chamar o garçom mantendo o status ou qualquer transição válida
                 request.resource.data.status == resource.data.status
                 || isAllowedClientStatus(resource.data.status, request.resource.data.status)
               ))
@@ -155,11 +179,11 @@ service cloud.firestore {
                 && request.resource.data.status == 'a_fazer'
                 && get(/databases/$(database)/documents/restaurantes/$(restauranteId)/mesas/$(numeroMesa)/comandas_abertas/$(clienteId)).data.status != 'pago'
               )
-              || isOwner(restauranteId)
+              || isGarcom(restauranteId) || isCozinha(restauranteId)
             )) || request.resource.data.status == 'a_fazer';
 
             // Apenas a equipe do restaurante pode alterar status ou cancelar pedidos
-            allow update, delete: if isOwner(restauranteId) || isSuperAdmin();
+            allow update, delete: if isGarcom(restauranteId) || isCozinha(restauranteId) || isSuperAdmin();
           }
         }
       }
@@ -170,6 +194,12 @@ service cloud.firestore {
         allow create: if isOwner(restauranteId) || isSuperAdmin();
         allow read: if isOwner(restauranteId) || isSuperAdmin();
         allow update, delete: if false; // Recibos históricos são estritamente imutáveis
+      }
+
+      // Métricas Consolidadas Econômicas (Resumo mensal para Free & PRO)
+      match /metricas_consolidadas/{anoMes} {
+        allow read: if isOwner(restauranteId) || isSuperAdmin();
+        allow write: if isOwner(restauranteId) || isSuperAdmin();
       }
     }
 

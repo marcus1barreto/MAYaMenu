@@ -4,10 +4,13 @@ import { useState, useEffect } from "react";
 import type { ComandaCliente, PedidoRodada } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Clock, CheckCircle, ChefHat, Sparkles, AlertTriangle, ArrowRight } from "lucide-react";
+import { Clock, CheckCircle, ChefHat, Sparkles, AlertTriangle, ArrowRight, Printer, Check, Volume2, VolumeX } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { collectionGroup, query, where, onSnapshot } from "firebase/firestore";
 import { escutarPedidosKds, atualizarStatusPedido } from "@/lib/restaurante-service";
+import { imprimirComandaKds } from "@/lib/kds-printer";
+import { obterImpressoraSalva, esquecerImpressoraUSB } from "@/lib/web-serial";
+import { audioAlertService } from "@/lib/audio-alerts";
 
 export interface PedidoKDS {
   id: string; // id do pedido
@@ -119,6 +122,29 @@ export function KdsView({
     return isSandbox ? PEDIDOS_INICIAIS_KDS : [];
   });
   const [filtro, setFiltro] = useState<"todos" | "a_fazer" | "pronto">("todos");
+  const [impressoraConectada, setImpressoraConectada] = useState<boolean>(false);
+  const [imprimindoId, setImprimindoId] = useState<string | null>(null);
+  const [audioAtivo, setAudioAtivo] = useState(true);
+
+  // Verifica se há impressora pareada e estado do áudio
+  useEffect(() => {
+    setImpressoraConectada(Boolean(obterImpressoraSalva()));
+    setAudioAtivo(audioAlertService.isHabilitado());
+  }, []);
+
+  const handleImprimirPedido = async (ped: PedidoKDS, forcarSelecao: boolean = false) => {
+    setImprimindoId(ped.id);
+    try {
+      const res = await imprimirComandaKds(ped, nomeRestaurante, forcarSelecao);
+      if (res.sucesso) {
+        setImpressoraConectada(true);
+      } else if (res.erro) {
+        alert(`Erro na impressão: ${res.erro}`);
+      }
+    } finally {
+      setImprimindoId(null);
+    }
+  };
 
   // Conecta ao Firestore em tempo real escutando a subcoleção isolada kds_tickets
   useEffect(() => {
@@ -127,7 +153,15 @@ export function KdsView({
     if (!idBusca) return;
 
     const unsub = escutarPedidosKds(idBusca, (listaAtualizada) => {
-      setPedidos(listaAtualizada);
+      // Se a lista aumentou e há novos pedidos 'a_fazer', toca o alerta sonoro de novo pedido
+      setPedidos((prev) => {
+        const novosAFazer = listaAtualizada.filter((p) => p.status === "a_fazer");
+        const anterioresAFazer = prev.filter((p) => p.status === "a_fazer");
+        if (novosAFazer.length > anterioresAFazer.length) {
+          audioAlertService.tocarNovoPedidoKds();
+        }
+        return listaAtualizada;
+      });
     });
 
     return () => unsub();
@@ -217,8 +251,8 @@ export function KdsView({
     filtro === "todos"
       ? pedidos
       : filtro === "a_fazer"
-      ? pedidosAFazer
-      : pedidosProntos;
+        ? pedidosAFazer
+        : pedidosProntos;
 
   const listaExibicao = ordenarLista(listaFiltrada);
 
@@ -252,27 +286,76 @@ export function KdsView({
 
         {/* CONTADORES RÁPIDOS E FILTROS */}
         <div className="flex flex-wrap items-center gap-2.5">
+          {/* BOTÃO MUDO / ÁUDIO DA COZINHA */}
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              const novo = !audioAtivo;
+              audioAlertService.setHabilitado(novo);
+              setAudioAtivo(novo);
+            }}
+            className={`h-9 px-3 rounded-xl text-xs font-bold flex items-center gap-1.5 border transition-all ${
+              audioAtivo
+                ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400"
+                : "bg-card border-border hover:bg-muted text-muted-foreground"
+            }`}
+            title={audioAtivo ? "Alertas sonoros ativados" : "Alertas sonoros silenciados"}
+          >
+            {audioAtivo ? <Volume2 className="w-3.5 h-3.5 text-emerald-500" /> : <VolumeX className="w-3.5 h-3.5 text-muted-foreground" />}
+            <span className="hidden sm:inline">{audioAtivo ? "Som Ativo" : "Silenciado"}</span>
+          </Button>
+
+          {/* BOTÃO PAREAMENTO DE IMPRESSORA TÉRMICA USB */}
+          <Button
+            type="button"
+            variant="outline"
+            onClick={async () => {
+              if (impressoraConectada) {
+                if (confirm("Deseja desconectar a impressora pareada?")) {
+                  esquecerImpressoraUSB();
+                  setImpressoraConectada(false);
+                }
+              } else {
+                try {
+                  const { obterPortaImpressora } = await import("@/lib/web-serial");
+                  await obterPortaImpressora(true);
+                  setImpressoraConectada(true);
+                } catch (e: any) {
+                  alert(e?.message || "Erro ao conectar impressora.");
+                }
+              }
+            }}
+            className={`h-9 px-3 rounded-xl text-xs font-bold flex items-center gap-1.5 border transition-all ${impressoraConectada
+                ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400"
+                : "bg-card border-border hover:bg-muted text-muted-foreground"
+              }`}
+            title="Conectar ou gerenciar impressora térmica de bobina USB"
+          >
+            <Printer className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">
+              {impressoraConectada ? "Impressora Conectada" : "Parear Impressora USB"}
+            </span>
+          </Button>
 
           <div className="flex items-center gap-1.5 bg-card p-1.5 rounded-2xl border border-border">
             <button
               type="button"
               onClick={() => setFiltro("todos")}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                filtro === "todos"
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${filtro === "todos"
                   ? "bg-primary text-primary-foreground shadow-xs"
                   : "text-muted-foreground hover:text-foreground"
-              }`}
+                }`}
             >
               Todos ({pedidos.length})
             </button>
             <button
               type="button"
               onClick={() => setFiltro("a_fazer")}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
-                filtro === "a_fazer"
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${filtro === "a_fazer"
                   ? "bg-amber-500 text-neutral-950 shadow-xs"
                   : "text-amber-500 hover:text-amber-600"
-              }`}
+                }`}
             >
               <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
               A Fazer ({pedidosAFazer.length})
@@ -280,11 +363,10 @@ export function KdsView({
             <button
               type="button"
               onClick={() => setFiltro("pronto")}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                filtro === "pronto"
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${filtro === "pronto"
                   ? "bg-emerald-600 text-white shadow-xs"
                   : "text-emerald-500 hover:text-emerald-600"
-              }`}
+                }`}
             >
               Prontos ({pedidosProntos.length})
             </button>
@@ -308,25 +390,22 @@ export function KdsView({
               return (
                 <div
                   key={ped.id}
-                  className={`flex flex-col rounded-3xl border-2 overflow-hidden shadow-2xl transition-all ${
-                    ehAFazer
+                  className={`flex flex-col rounded-3xl border-2 overflow-hidden shadow-2xl transition-all ${ehAFazer
                       ? "bg-neutral-900 border-amber-500/80 shadow-amber-950/20"
                       : "bg-neutral-900/60 border-emerald-600/40 opacity-75"
-                  }`}
+                    }`}
                 >
                   {/* CABEÇALHO DO CARD (Mesa e Nome do Cliente) */}
                   <div
-                    className={`p-4 flex items-center justify-between border-b ${
-                      ehAFazer
+                    className={`p-4 flex items-center justify-between border-b ${ehAFazer
                         ? "bg-amber-500/10 border-amber-500/30 text-amber-300"
                         : "bg-emerald-500/10 border-emerald-500/20 text-emerald-300"
-                    }`}
+                      }`}
                   >
                     <div className="flex items-center gap-2.5">
                       <div
-                        className={`w-10 h-10 rounded-2xl flex items-center justify-center font-black text-lg ${
-                          ehAFazer ? "bg-amber-500 text-neutral-950" : "bg-emerald-500 text-neutral-950"
-                        }`}
+                        className={`w-10 h-10 rounded-2xl flex items-center justify-center font-black text-lg ${ehAFazer ? "bg-amber-500 text-neutral-950" : "bg-emerald-500 text-neutral-950"
+                          }`}
                       >
                         {ped.mesa}
                       </div>
@@ -362,12 +441,11 @@ export function KdsView({
 
                           {/* Novo Badge Dinâmico de Tempo de Preparo */}
                           {it.tempoPreparoEstimado && (
-                            <div 
-                              className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-black shrink-0 ${
-                                it.tempoPreparoEstimado >= 30 
+                            <div
+                              className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-black shrink-0 ${it.tempoPreparoEstimado >= 30
                                   ? "bg-rose-500/20 text-rose-400" // Urgente/Demorado
                                   : "bg-amber-500/20 text-amber-400" // Padrão
-                              }`}
+                                }`}
                             >
                               <Clock className="w-3 h-3" />
                               <span>{it.tempoPreparoEstimado}m</span>
@@ -402,16 +480,27 @@ export function KdsView({
                     ))}
                   </div>
 
-                  {/* BOTÃO ÚNICO DE AÇÃO: "MARCHAR" */}
-                  <div className="p-4 bg-neutral-950/80 border-t border-neutral-800">
+                  {/* AÇÕES: IMPRIMIR CUPOM TÉRMICO E MARCHAR */}
+                  <div className="p-4 bg-neutral-950/80 border-t border-neutral-800 flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => handleImprimirPedido(ped)}
+                      disabled={imprimindoId === ped.id}
+                      className="h-14 px-4 rounded-2xl border-neutral-700 bg-neutral-900 hover:bg-neutral-800 text-neutral-200 flex items-center justify-center gap-1.5 shrink-0"
+                      title="Imprimir comanda de produção térmica (ESC/POS)"
+                    >
+                      <Printer className="w-5 h-5 text-amber-400" />
+                      <span className="hidden sm:inline text-xs font-bold">Imprimir</span>
+                    </Button>
+
                     <Button
                       type="button"
                       onClick={() => handleMarchar(ped.id)}
-                      className={`w-full h-14 rounded-2xl font-black text-base shadow-lg transition-transform active:scale-[0.98] flex items-center justify-center gap-2 ${
-                        ehAFazer
+                      className={`flex-1 h-14 rounded-2xl font-black text-base shadow-lg transition-transform active:scale-[0.98] flex items-center justify-center gap-2 ${ehAFazer
                           ? "bg-rose-600 hover:bg-rose-500 text-white shadow-rose-900/40"
                           : "bg-neutral-800 hover:bg-neutral-700 text-neutral-300"
-                      }`}
+                        }`}
                     >
                       {ehAFazer ? (
                         <>
