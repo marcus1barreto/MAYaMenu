@@ -1,6 +1,17 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
+const { getFirestore } = require('firebase-admin/firestore');
+
 admin.initializeApp();
+
+// Garante conexão ao banco com ID "mayamenu-bd" ou fallback ao default
+function getDb() {
+  try {
+    return getFirestore('mayamenu-bd');
+  } catch (err) {
+    return admin.firestore();
+  }
+}
 
 /**
  * Quando um documento em `restaurantes/{restId}` é criado, define o claim `owner`
@@ -57,11 +68,31 @@ exports.setStaffRole = functions.https.onCall(async (data, context) => {
   }
 
   // 2. Valida se o chamador é dono do restaurante
-  const restDoc = await admin.firestore().collection('restaurantes').doc(restauranteId).get();
+  const firestoreDb = getDb();
+  let restDoc = await firestoreDb.collection('restaurantes').doc(restauranteId).get();
+  
+  // Se não encontrou pelo ID direto, tenta por slug
+  if (!restDoc.exists) {
+    const q = await firestoreDb.collection('restaurantes').where('slug', '==', restauranteId).limit(1).get();
+    if (!q.empty) {
+      restDoc = q.docs[0];
+    }
+  }
+
+  // Se ainda assim não encontrou e for o banco default, tenta no banco padrão admin.firestore()
+  if (!restDoc.exists) {
+    const defaultDb = admin.firestore();
+    const tryDefault = await defaultDb.collection('restaurantes').doc(restauranteId).get();
+    if (tryDefault.exists) {
+      restDoc = tryDefault;
+    }
+  }
+
   if (!restDoc.exists) {
     throw new functions.https.HttpsError('not-found', 'Restaurante não encontrado.');
   }
 
+  const realRestauranteId = restDoc.id;
   const restData = restDoc.data();
   const isSuperadmin = context.auth.token?.superadmin === true;
   const isOwner = restData?.ownerId === callerUid || context.auth.token?.role === 'owner';
@@ -87,16 +118,13 @@ exports.setStaffRole = functions.https.onCall(async (data, context) => {
   // 4. Define os custom claims do colaborador
   const newClaims = {
     role,
-    restauranteId,
+    restauranteId: realRestauranteId,
   };
 
   await admin.auth().setCustomUserClaims(targetUser.uid, newClaims);
 
   // 5. Registra o membro na subcoleção do Firestore para listagem rápida no painel
-  await admin
-    .firestore()
-    .collection('restaurantes')
-    .doc(restauranteId)
+  await restDoc.ref
     .collection('equipe')
     .doc(targetUser.uid)
     .set({
@@ -107,7 +135,7 @@ exports.setStaffRole = functions.https.onCall(async (data, context) => {
       atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
     }, { merge: true });
 
-  console.info(`Papel '${role}' atribuído a ${email} (UID: ${targetUser.uid}) no restaurante ${restauranteId}`);
+  console.info(`Papel '${role}' atribuído a ${email} (UID: ${targetUser.uid}) no restaurante ${realRestauranteId}`);
 
   return {
     sucesso: true,
@@ -132,7 +160,18 @@ exports.removeStaffMember = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError('invalid-argument', 'Campos restauranteId e uid são obrigatórios.');
   }
 
-  const restDoc = await admin.firestore().collection('restaurantes').doc(restauranteId).get();
+  const firestoreDb = getDb();
+  let restDoc = await firestoreDb.collection('restaurantes').doc(restauranteId).get();
+  if (!restDoc.exists) {
+    const q = await firestoreDb.collection('restaurantes').where('slug', '==', restauranteId).limit(1).get();
+    if (!q.empty) {
+      restDoc = q.docs[0];
+    }
+  }
+  if (!restDoc.exists) {
+    const tryDefault = await admin.firestore().collection('restaurantes').doc(restauranteId).get();
+    if (tryDefault.exists) restDoc = tryDefault;
+  }
   if (!restDoc.exists) {
     throw new functions.https.HttpsError('not-found', 'Restaurante não encontrado.');
   }
@@ -152,10 +191,7 @@ exports.removeStaffMember = functions.https.onCall(async (data, context) => {
   }
 
   // Remove do Firestore
-  await admin
-    .firestore()
-    .collection('restaurantes')
-    .doc(restauranteId)
+  await restDoc.ref
     .collection('equipe')
     .doc(uid)
     .delete();
