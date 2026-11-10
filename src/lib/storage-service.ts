@@ -10,6 +10,39 @@ import {
 } from "firebase/storage";
 
 /**
+ * Faz upload da foto de perfil de um colaborador da equipe:
+ * /restaurantes/{restauranteId}/equipe/{fileName}
+ */
+export async function uploadFotoEquipe(
+  restauranteId: string,
+  arquivo: File
+): Promise<string> {
+  if (!restauranteId) {
+    throw new Error("restauranteId é obrigatório para fazer upload de foto de equipe.");
+  }
+
+  const extensaoOriginal = arquivo.name.split(".").pop()?.toLowerCase() || "jpg";
+  const extensao = ["jpg", "jpeg", "png", "webp"].includes(extensaoOriginal)
+    ? extensaoOriginal
+    : "jpg";
+
+  const nomeArquivo = `membro-${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${extensao}`;
+  const caminhoStorage = `restaurantes/${restauranteId}/equipe/${nomeArquivo}`;
+  const storageRef = ref(storage, caminhoStorage);
+
+  const metadata = {
+    contentType: arquivo.type || `image/${extensao === "jpg" ? "jpeg" : extensao}`,
+    customMetadata: {
+      restauranteId,
+      uploadEm: new Date().toISOString(),
+    },
+  };
+
+  const snapshot = await uploadBytes(storageRef, arquivo, metadata);
+  return await getDownloadURL(snapshot.ref);
+}
+
+/**
  * Faz upload da foto do prato para o Firebase Storage na pasta do restaurante:
  * /restaurantes/{restauranteId}/cardapio/{fileName}
  *

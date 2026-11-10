@@ -51,7 +51,7 @@ exports.setStaffRole = functions.https.onCall(async (data, context) => {
   }
 
   const callerUid = context.auth.uid;
-  const { restauranteId, email, role } = data || {};
+  const { restauranteId, email, role, nome, senha, fotoUrl } = data || {};
 
   if (!restauranteId || !email || !role) {
     throw new functions.https.HttpsError(
@@ -71,7 +71,6 @@ exports.setStaffRole = functions.https.onCall(async (data, context) => {
   const firestoreDb = getDb();
   let restDoc = await firestoreDb.collection('restaurantes').doc(restauranteId).get();
   
-  // Se não encontrou pelo ID direto, tenta por slug
   if (!restDoc.exists) {
     const q = await firestoreDb.collection('restaurantes').where('slug', '==', restauranteId).limit(1).get();
     if (!q.empty) {
@@ -79,7 +78,6 @@ exports.setStaffRole = functions.https.onCall(async (data, context) => {
     }
   }
 
-  // Se ainda assim não encontrou e for o banco default, tenta no banco padrão admin.firestore()
   if (!restDoc.exists) {
     const defaultDb = admin.firestore();
     const tryDefault = await defaultDb.collection('restaurantes').doc(restauranteId).get();
@@ -104,18 +102,44 @@ exports.setStaffRole = functions.https.onCall(async (data, context) => {
     );
   }
 
-  // 3. Busca o usuário pelo e-mail
+  const nomeFormatado = (nome || '').trim() || email.split('@')[0];
+  const senhaPadrao = senha && String(senha).length >= 6 ? String(senha) : '123456';
+
+  // 3. Busca ou CRIA AUTOMATICAMENTE o usuário no Firebase Auth
   let targetUser;
   try {
     targetUser = await admin.auth().getUserByEmail(email);
+    // Atualiza nome ou foto se informados
+    const updates = {};
+    if (nomeFormatado && targetUser.displayName !== nomeFormatado) updates.displayName = nomeFormatado;
+    if (fotoUrl) updates.photoURL = fotoUrl;
+    if (Object.keys(updates).length > 0) {
+      targetUser = await admin.auth().updateUser(targetUser.uid, updates);
+    }
   } catch (err) {
-    throw new functions.https.HttpsError(
-      'not-found',
-      `Usuário com e-mail "${email}" não encontrado no sistema. Ele precisa criar uma conta primeiro.`
-    );
+    // Se o usuário não existe, CRIA AUTOMATICAMENTE sem lançar 404
+    try {
+      targetUser = await admin.auth().createUser({
+        email,
+        password: senhaPadrao,
+        displayName: nomeFormatado,
+        photoURL: fotoUrl || null,
+      });
+      console.info(`Novo colaborador criado automaticamente: ${email} (UID: ${targetUser.uid})`);
+    } catch (createErr) {
+      console.error('Falha ao criar colaborador no Firebase Auth:', createErr);
+      throw new functions.https.HttpsError(
+        'internal',
+        `Não foi possível registrar o usuário no sistema: ${createErr.message}`
+      );
+    }
   }
 
-  // 4. Define os custom claims do colaborador
+  // 4. Gera token seguro para Crachá QR Code (para login rápido com câmera)
+  const crypto = require('crypto');
+  const crachaToken = crypto.randomBytes(16).toString('hex');
+
+  // 5. Define os custom claims do colaborador
   const newClaims = {
     role,
     restauranteId: realRestauranteId,
@@ -123,15 +147,17 @@ exports.setStaffRole = functions.https.onCall(async (data, context) => {
 
   await admin.auth().setCustomUserClaims(targetUser.uid, newClaims);
 
-  // 5. Registra o membro na subcoleção do Firestore para listagem rápida no painel
+  // 6. Registra o membro na subcoleção do Firestore para listagem rápida e geração de crachá
   await restDoc.ref
     .collection('equipe')
     .doc(targetUser.uid)
     .set({
       uid: targetUser.uid,
       email: targetUser.email,
-      nome: targetUser.displayName || email.split('@')[0],
+      nome: nomeFormatado,
       role,
+      fotoUrl: fotoUrl || targetUser.photoURL || null,
+      crachaToken,
       atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
     }, { merge: true });
 
@@ -141,7 +167,10 @@ exports.setStaffRole = functions.https.onCall(async (data, context) => {
     sucesso: true,
     uid: targetUser.uid,
     email: targetUser.email,
+    nome: nomeFormatado,
     role,
+    crachaToken,
+    fotoUrl: fotoUrl || targetUser.photoURL || null,
   };
 });
 
@@ -198,6 +227,53 @@ exports.removeStaffMember = functions.https.onCall(async (data, context) => {
 
   return { sucesso: true };
 });
+
+/**
+ * Cloud Function HTTPS Callable para autenticação rápida via QR Code de Crachá
+ */
+exports.loginComCracha = functions.https.onCall(async (data, context) => {
+  const { restauranteId, crachaToken } = data || {};
+  if (!restauranteId || !crachaToken) {
+    throw new functions.https.HttpsError('invalid-argument', 'Campos restauranteId e crachaToken são obrigatórios.');
+  }
+
+  const firestoreDb = getDb();
+  let restDoc = await firestoreDb.collection('restaurantes').doc(restauranteId).get();
+  if (!restDoc.exists) {
+    const q = await firestoreDb.collection('restaurantes').where('slug', '==', restauranteId).limit(1).get();
+    if (!q.empty) restDoc = q.docs[0];
+  }
+  if (!restDoc.exists) {
+    throw new functions.https.HttpsError('not-found', 'Restaurante não encontrado.');
+  }
+
+  // Busca membro com o crachaToken informado
+  const equipeSnap = await restDoc.ref.collection('equipe').where('crachaToken', '==', crachaToken).limit(1).get();
+  if (equipeSnap.empty) {
+    throw new functions.https.HttpsError('not-found', 'Crachá inválido ou não encontrado.');
+  }
+
+  const membroDoc = equipeSnap.docs[0];
+  const membroData = membroDoc.data();
+
+  // Gera um custom token do Firebase Auth para o cliente logar instantaneamente
+  const customToken = await admin.auth().createCustomToken(membroData.uid, {
+    role: membroData.role,
+    restauranteId: restDoc.id,
+  });
+
+  return {
+    sucesso: true,
+    token: customToken,
+    membro: {
+      uid: membroData.uid,
+      nome: membroData.nome,
+      role: membroData.role,
+      fotoUrl: membroData.fotoUrl || null,
+    },
+  };
+});
+
 
 /**
  * Webhook HTTPS para confirmação de pagamento Pix ou baixa automática.

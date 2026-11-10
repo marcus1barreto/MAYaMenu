@@ -1304,7 +1304,10 @@ export function AdminDashboard() {
 
         {/* ABA: EQUIPE & ACESSOS */}
         {abaAtiva === "equipe" && (
-          <GestaoEquipe restauranteId={restaurante?.id || "demo"} />
+          <GestaoEquipe
+            restauranteId={restaurante?.id || "demo"}
+            nomeRestaurante={restaurante?.nome || "MAYaMenu"}
+          />
         )}
 
         {/* ABA: MAYA INTELIGÊNCIA / ANALYTICS (PREMIUM UPSELL) */}
