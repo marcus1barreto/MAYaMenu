@@ -82,13 +82,13 @@ export function B2BCatalogoView({ patrocinadorId, itens }: B2BCatalogoViewProps)
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h3 className="text-lg font-black text-white tracking-tight flex items-center gap-2">
+          <h3 className="text-lg font-black text-neutral-950 tracking-tight flex items-center gap-2">
             <span>Catálogo Master de Produtos da Marca</span>
-            <span className="text-xs px-2.5 py-0.5 rounded-full bg-blue-500/20 text-blue-300 font-bold border border-blue-500/30">
+            <span className="text-xs px-2.5 py-0.5 rounded-full bg-rose-50 text-rose-700 font-bold border border-rose-200">
               {itens.length} produtos oficiais
             </span>
           </h3>
-          <p className="text-xs text-zinc-400">
+          <p className="text-xs text-neutral-500">
             Estes produtos são injetados automaticamente nos cardápios digitais dos restaurantes parceiros ao utilizarem seus vouchers.
           </p>
         </div>
@@ -96,7 +96,7 @@ export function B2BCatalogoView({ patrocinadorId, itens }: B2BCatalogoViewProps)
         <Button
           type="button"
           onClick={() => setModalAberto(true)}
-          className="h-10 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-black text-xs flex items-center gap-2 shadow-lg shadow-blue-600/25 transition-all"
+          className="h-10 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-black text-xs flex items-center gap-2 shadow-xs transition-all active:scale-95"
         >
           <Plus className="w-4 h-4" />
           <span>Cadastrar Produto Oficial</span>
@@ -104,10 +104,12 @@ export function B2BCatalogoView({ patrocinadorId, itens }: B2BCatalogoViewProps)
       </div>
 
       {itens.length === 0 ? (
-        <div className="p-12 text-center bg-zinc-900/50 rounded-3xl border border-white/5 flex flex-col items-center">
-          <UtensilsCrossed className="w-12 h-12 text-zinc-700 mb-3" />
-          <h4 className="text-base font-bold text-zinc-300">Nenhum produto oficial no catálogo</h4>
-          <p className="text-xs text-zinc-500 max-w-sm mt-1">
+        <div className="p-12 text-center bg-white rounded-3xl border border-neutral-200/80 shadow-xs flex flex-col items-center">
+          <div className="w-12 h-12 rounded-2xl bg-neutral-100 flex items-center justify-center text-neutral-400 mb-3">
+            <UtensilsCrossed className="w-6 h-6" />
+          </div>
+          <h4 className="text-base font-bold text-neutral-800">Nenhum produto oficial no catálogo</h4>
+          <p className="text-xs text-neutral-500 max-w-sm mt-1">
             Cadastre os itens que sua marca fornece para que eles constem com destaque nos estabelecimentos parceiros.
           </p>
         </div>
@@ -116,17 +118,17 @@ export function B2BCatalogoView({ patrocinadorId, itens }: B2BCatalogoViewProps)
           {itens.map((item) => (
             <div
               key={item.id}
-              className="p-5 rounded-3xl bg-zinc-900/90 border border-white/10 shadow-xl flex flex-col justify-between gap-4"
+              className="p-5 rounded-3xl bg-white border border-neutral-200/80 shadow-xs flex flex-col justify-between gap-4 hover:border-neutral-300 transition-colors"
             >
               <div>
                 <div className="flex items-start justify-between gap-3 mb-3">
                   <div className="flex items-center gap-2">
-                    <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                    <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200">
                       {item.seloPatrocinador || "Parceiro Oficial"}
                     </span>
                     {item.obrigatorioNoCardapio && (
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-300 border border-white/10 flex items-center gap-1">
-                        <Lock className="w-2.5 h-2.5" />
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-700 border border-neutral-200 flex items-center gap-1">
+                        <Lock className="w-2.5 h-2.5 text-neutral-500" />
                         Obrigatório
                       </span>
                     )}
@@ -135,15 +137,15 @@ export function B2BCatalogoView({ patrocinadorId, itens }: B2BCatalogoViewProps)
                   <button
                     type="button"
                     onClick={() => handleRemover(item.id, item.nome)}
-                    className="p-1.5 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"
+                    className="p-1.5 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
                     title="Remover produto do catálogo master"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
 
-                <div className="flex items-center gap-3">
-                  <div className="w-14 h-14 rounded-2xl bg-zinc-800 overflow-hidden shrink-0 border border-white/10">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-14 h-14 rounded-2xl bg-neutral-100 overflow-hidden shrink-0 border border-neutral-200/80 shadow-2xs">
                     <img
                       src={item.fotoOficialUrl || "/images/demo/coquetel.webp"}
                       alt={item.nome}
@@ -154,26 +156,26 @@ export function B2BCatalogoView({ patrocinadorId, itens }: B2BCatalogoViewProps)
                     />
                   </div>
                   <div>
-                    <span className="text-[10px] uppercase font-bold text-zinc-400 block">
+                    <span className="text-[10px] uppercase font-bold text-neutral-400 block">
                       {item.categoriaSugerida}
                     </span>
-                    <h4 className="text-sm font-black text-white leading-tight">
+                    <h4 className="text-sm font-black text-neutral-950 leading-tight">
                       {item.nome}
                     </h4>
-                    <span className="text-xs font-bold text-emerald-400 mt-1 block">
+                    <span className="text-xs font-bold text-rose-600 mt-1 block">
                       Sugerido: {item.precoSugerido.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
                     </span>
                   </div>
                 </div>
 
-                <p className="text-xs text-zinc-400 mt-3 line-clamp-2 leading-relaxed">
+                <p className="text-xs text-neutral-500 mt-3 line-clamp-2 leading-relaxed">
                   {item.descricaoOficial}
                 </p>
               </div>
 
-              <div className="pt-3 border-t border-white/5 flex items-center justify-between text-[11px] text-zinc-500">
-                <span>{item.posicaoFixaTopo ? "★ Fixado no Topo" : "Posição Dinâmica"}</span>
-                <span className="font-mono text-[10px] text-zinc-600 truncate max-w-[120px]">{item.id}</span>
+              <div className="pt-3 border-t border-neutral-100 flex items-center justify-between text-[11px] text-neutral-400">
+                <span className="font-semibold text-neutral-600">{item.posicaoFixaTopo ? "★ Fixado no Topo" : "Posição Dinâmica"}</span>
+                <span className="font-mono text-[10px] text-neutral-400 truncate max-w-[120px]">{item.id}</span>
               </div>
             </div>
           ))}
@@ -182,17 +184,17 @@ export function B2BCatalogoView({ patrocinadorId, itens }: B2BCatalogoViewProps)
 
       {/* MODAL DE CADASTRO DE ITEM NO CATÁLOGO */}
       <Dialog open={modalAberto} onOpenChange={setModalAberto}>
-        <DialogContent className="bg-zinc-900 border-white/10 text-white rounded-3xl max-w-md p-6">
+        <DialogContent className="bg-white border-neutral-200 text-neutral-900 rounded-3xl max-w-md p-6 shadow-xl">
           <DialogHeader>
-            <DialogTitle className="text-lg font-black text-white flex items-center gap-2">
-              <UtensilsCrossed className="w-5 h-5 text-blue-400" />
+            <DialogTitle className="text-lg font-black text-neutral-950 flex items-center gap-2">
+              <UtensilsCrossed className="w-5 h-5 text-rose-600" />
               <span>Cadastrar Produto Oficial da Marca</span>
             </DialogTitle>
           </DialogHeader>
 
           <form onSubmit={handleSalvarItem} className="space-y-3.5 mt-2">
             <div className="space-y-1">
-              <label className="text-xs font-bold text-zinc-300 uppercase tracking-wider">
+              <label className="text-xs font-bold text-neutral-700 uppercase tracking-wider">
                 Nome Oficial do Produto
               </label>
               <Input
@@ -201,13 +203,13 @@ export function B2BCatalogoView({ patrocinadorId, itens }: B2BCatalogoViewProps)
                 onChange={(e) => setNome(e.target.value)}
                 placeholder="Ex: Chopp Pilsen 500ml"
                 required
-                className="bg-zinc-950 border-zinc-800 text-white rounded-xl h-11"
+                className="bg-neutral-50 border-neutral-200 text-neutral-900 focus:bg-white focus:border-rose-500 rounded-xl h-11"
               />
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <label className="text-xs font-bold text-zinc-300 uppercase tracking-wider">
+                <label className="text-xs font-bold text-neutral-700 uppercase tracking-wider">
                   Categoria Sugerida
                 </label>
                 <Input
@@ -216,12 +218,12 @@ export function B2BCatalogoView({ patrocinadorId, itens }: B2BCatalogoViewProps)
                   onChange={(e) => setCategoria(e.target.value)}
                   placeholder="Ex: Chopps & Cervejas"
                   required
-                  className="bg-zinc-950 border-zinc-800 text-white rounded-xl h-11"
+                  className="bg-neutral-50 border-neutral-200 text-neutral-900 focus:bg-white focus:border-rose-500 rounded-xl h-11"
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-bold text-zinc-300 uppercase tracking-wider">
+                <label className="text-xs font-bold text-neutral-700 uppercase tracking-wider">
                   Preço Sugerido (R$)
                 </label>
                 <Input
@@ -230,13 +232,13 @@ export function B2BCatalogoView({ patrocinadorId, itens }: B2BCatalogoViewProps)
                   value={precoSugerido}
                   onChange={(e) => setPrecoSugerido(Number(e.target.value))}
                   required
-                  className="bg-zinc-950 border-zinc-800 text-white rounded-xl h-11"
+                  className="bg-neutral-50 border-neutral-200 text-neutral-900 focus:bg-white focus:border-rose-500 rounded-xl h-11"
                 />
               </div>
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-bold text-zinc-300 uppercase tracking-wider">
+              <label className="text-xs font-bold text-neutral-700 uppercase tracking-wider">
                 Descrição Institucional / Notas Sensoriais
               </label>
               <Input
@@ -245,12 +247,12 @@ export function B2BCatalogoView({ patrocinadorId, itens }: B2BCatalogoViewProps)
                 onChange={(e) => setDescricao(e.target.value)}
                 placeholder="Ex: Puro malte filtrado, notas leves de cereais nobres..."
                 required
-                className="bg-zinc-950 border-zinc-800 text-white rounded-xl h-11"
+                className="bg-neutral-50 border-neutral-200 text-neutral-900 focus:bg-white focus:border-rose-500 rounded-xl h-11"
               />
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-bold text-zinc-300 uppercase tracking-wider">
+              <label className="text-xs font-bold text-neutral-700 uppercase tracking-wider">
                 URL da Foto Oficial do Produto
               </label>
               <Input
@@ -259,12 +261,12 @@ export function B2BCatalogoView({ patrocinadorId, itens }: B2BCatalogoViewProps)
                 onChange={(e) => setFotoUrl(e.target.value)}
                 placeholder="/images/demo/coquetel.webp"
                 required
-                className="bg-zinc-950 border-zinc-800 text-white rounded-xl h-11"
+                className="bg-neutral-50 border-neutral-200 text-neutral-900 focus:bg-white focus:border-rose-500 rounded-xl h-11"
               />
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-bold text-zinc-300 uppercase tracking-wider">
+              <label className="text-xs font-bold text-neutral-700 uppercase tracking-wider">
                 Selo Exibido no Cardápio
               </label>
               <Input
@@ -273,19 +275,19 @@ export function B2BCatalogoView({ patrocinadorId, itens }: B2BCatalogoViewProps)
                 onChange={(e) => setSelo(e.target.value)}
                 placeholder="Ex: Cervejaria Oficial, Parceiro Master"
                 required
-                className="bg-zinc-950 border-zinc-800 text-white rounded-xl h-11"
+                className="bg-neutral-50 border-neutral-200 text-neutral-900 focus:bg-white focus:border-rose-500 rounded-xl h-11"
               />
             </div>
 
-            <div className="p-3 bg-zinc-950/80 border border-white/5 rounded-2xl space-y-2 text-xs">
+            <div className="p-3 bg-neutral-50 border border-neutral-200/80 rounded-2xl space-y-2 text-xs">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={obrigatorio}
                   onChange={(e) => setObrigatorio(e.target.checked)}
-                  className="rounded border-zinc-700 bg-zinc-800 text-blue-600"
+                  className="rounded border-neutral-300 text-rose-600 focus:ring-rose-500"
                 />
-                <span className="text-zinc-300 font-semibold">
+                <span className="text-neutral-700 font-semibold">
                   Obrigatório (o restaurante parceiro não pode deletar do cardápio)
                 </span>
               </label>
@@ -295,9 +297,9 @@ export function B2BCatalogoView({ patrocinadorId, itens }: B2BCatalogoViewProps)
                   type="checkbox"
                   checked={posicaoTopo}
                   onChange={(e) => setPosicaoTopo(e.target.checked)}
-                  className="rounded border-zinc-700 bg-zinc-800 text-blue-600"
+                  className="rounded border-neutral-300 text-rose-600 focus:ring-rose-500"
                 />
-                <span className="text-zinc-300 font-semibold">
+                <span className="text-neutral-700 font-semibold">
                   Fixar no Topo da Categoria no Cardápio Digital
                 </span>
               </label>
@@ -306,7 +308,7 @@ export function B2BCatalogoView({ patrocinadorId, itens }: B2BCatalogoViewProps)
             <Button
               type="submit"
               disabled={salvando}
-              className="w-full h-11 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-black text-xs shadow-lg shadow-blue-600/30 mt-2"
+              className="w-full h-11 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-black text-xs shadow-xs mt-2"
             >
               {salvando ? "Salvando Produto..." : "Adicionar ao Catálogo Master"}
             </Button>

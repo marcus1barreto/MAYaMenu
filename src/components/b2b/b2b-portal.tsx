@@ -70,13 +70,13 @@ export function B2BPortal({ patrocinador, onLogout }: B2BPortalProps) {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col font-sans selection:bg-blue-500 selection:text-white">
-      {/* BARRA SUPERIOR DO PORTAL B2B */}
-      <header className="sticky top-0 z-40 bg-zinc-900/90 backdrop-blur-xl border-b border-white/10 px-4 sm:px-8 py-3.5 shadow-xl">
+    <div className="min-h-screen bg-neutral-50 text-neutral-900 flex flex-col font-sans selection:bg-rose-600 selection:text-white">
+      {/* BARRA SUPERIOR DO PORTAL B2B (HARMONIZADA COM MAYAMENU) */}
+      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-neutral-200/80 px-4 sm:px-8 py-3.5 shadow-xs">
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
           {/* Identificação do Patrocinador */}
           <div className="flex items-center gap-3.5">
-            <div className="w-11 h-11 rounded-2xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400 shrink-0 shadow-lg shadow-blue-600/10 overflow-hidden">
+            <div className="w-11 h-11 rounded-2xl bg-neutral-100 border border-neutral-200/80 flex items-center justify-center text-neutral-700 shrink-0 shadow-xs overflow-hidden">
               {patrocinador.logoUrl ? (
                 <img
                   src={patrocinador.logoUrl}
@@ -87,19 +87,19 @@ export function B2BPortal({ patrocinador, onLogout }: B2BPortalProps) {
                   }}
                 />
               ) : (
-                <Building2 className="w-6 h-6" />
+                <Building2 className="w-6 h-6 text-neutral-500" />
               )}
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-base sm:text-lg font-black tracking-tight text-white leading-tight">
+                <h1 className="text-base sm:text-lg font-black tracking-tight text-neutral-950 leading-tight">
                   {patrocinador.nomeFantasia}
                 </h1>
-                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200">
                   Patrocinador Master
                 </span>
               </div>
-              <p className="text-xs text-zinc-400">
+              <p className="text-xs text-neutral-500">
                 CNPJ: {patrocinador.cnpj} • Trade Marketing & Concessões B2B
               </p>
             </div>
@@ -110,15 +110,15 @@ export function B2BPortal({ patrocinador, onLogout }: B2BPortalProps) {
             <button
               type="button"
               onClick={copiarChave}
-              className="px-3 py-1.5 rounded-xl bg-zinc-950/80 border border-white/10 hover:border-blue-500/40 text-xs font-mono text-zinc-300 flex items-center gap-2 transition-all"
+              className="px-3 py-1.5 rounded-xl bg-neutral-100 border border-neutral-200 hover:border-neutral-300 text-xs font-mono text-neutral-700 flex items-center gap-2 transition-all shadow-2xs"
               title="Copiar Chave de Acesso B2B"
             >
-              <span className="text-[10px] uppercase font-bold text-zinc-500">Chave:</span>
-              <span className="font-bold text-blue-400">{patrocinador.chaveAcessoB2B}</span>
+              <span className="text-[10px] uppercase font-bold text-neutral-500">Chave:</span>
+              <span className="font-bold text-neutral-900">{patrocinador.chaveAcessoB2B}</span>
               {chaveCopiada ? (
-                <Check className="w-3.5 h-3.5 text-emerald-400" />
+                <Check className="w-3.5 h-3.5 text-emerald-600" />
               ) : (
-                <Copy className="w-3.5 h-3.5 text-zinc-400" />
+                <Copy className="w-3.5 h-3.5 text-neutral-400" />
               )}
             </button>
 
@@ -127,7 +127,7 @@ export function B2BPortal({ patrocinador, onLogout }: B2BPortalProps) {
               variant="ghost"
               size="sm"
               onClick={onLogout}
-              className="h-9 px-3 rounded-xl text-xs text-zinc-400 hover:text-red-400 hover:bg-red-500/10 flex items-center gap-1.5 transition-colors"
+              className="h-9 px-3 rounded-xl text-xs text-neutral-600 hover:text-rose-600 hover:bg-rose-50 flex items-center gap-1.5 transition-colors"
             >
               <LogOut className="w-3.5 h-3.5" />
               <span className="hidden sm:inline font-bold">Sair</span>
@@ -139,56 +139,56 @@ export function B2BPortal({ patrocinador, onLogout }: B2BPortalProps) {
       {/* CONTEÚDO PRINCIPAL COM ABAS NAVEGÁVEIS */}
       <main className="max-w-7xl w-full mx-auto p-4 sm:p-8 flex-1 space-y-6">
         {/* NAVEGAÇÃO ENTRE ABAS DO PORTAL */}
-        <div className="flex items-center gap-2 p-1.5 bg-zinc-900/90 border border-white/10 rounded-2xl w-fit">
+        <div className="flex items-center gap-1.5 p-1.5 bg-neutral-200/60 border border-neutral-200/80 rounded-2xl w-fit flex-wrap">
           <button
             type="button"
             onClick={() => setAbaAtiva("lotes")}
-            className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 ${
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
               abaAtiva === "lotes"
-                ? "bg-blue-600 text-white shadow-lg shadow-blue-600/30"
-                : "text-zinc-400 hover:text-white"
+                ? "bg-white text-neutral-950 shadow-xs border border-neutral-200/80 font-black"
+                : "text-neutral-600 hover:text-neutral-950"
             }`}
           >
-            <Layers className="w-4 h-4" />
+            <Layers className="w-4 h-4 text-rose-600" />
             <span>Lotes & Vouchers ({lotes.length})</span>
           </button>
 
           <button
             type="button"
             onClick={() => setAbaAtiva("catalogo")}
-            className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 ${
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
               abaAtiva === "catalogo"
-                ? "bg-blue-600 text-white shadow-lg shadow-blue-600/30"
-                : "text-zinc-400 hover:text-white"
+                ? "bg-white text-neutral-950 shadow-xs border border-neutral-200/80 font-black"
+                : "text-neutral-600 hover:text-neutral-950"
             }`}
           >
-            <UtensilsCrossed className="w-4 h-4" />
+            <UtensilsCrossed className="w-4 h-4 text-rose-600" />
             <span>Catálogo Master ({itensMaster.length})</span>
           </button>
 
           <button
             type="button"
             onClick={() => setAbaAtiva("restaurantes")}
-            className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 ${
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
               abaAtiva === "restaurantes"
-                ? "bg-blue-600 text-white shadow-lg shadow-blue-600/30"
-                : "text-zinc-400 hover:text-white"
+                ? "bg-white text-neutral-950 shadow-xs border border-neutral-200/80 font-black"
+                : "text-neutral-600 hover:text-neutral-950"
             }`}
           >
-            <Store className="w-4 h-4" />
+            <Store className="w-4 h-4 text-emerald-600" />
             <span>Rede de Restaurantes</span>
           </button>
 
           <button
             type="button"
             onClick={() => setAbaAtiva("sellout")}
-            className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 ${
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
               abaAtiva === "sellout"
-                ? "bg-blue-600 text-white shadow-lg shadow-blue-600/30"
-                : "text-zinc-400 hover:text-white"
+                ? "bg-white text-neutral-950 shadow-xs border border-neutral-200/80 font-black"
+                : "text-neutral-600 hover:text-neutral-950"
             }`}
           >
-            <TrendingUp className="w-4 h-4" />
+            <TrendingUp className="w-4 h-4 text-amber-600" />
             <span>Sell-Out no PDV</span>
           </button>
         </div>
