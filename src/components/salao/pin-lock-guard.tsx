@@ -135,9 +135,16 @@ export function PinLockGuard({ role, restauranteId, slug, children }: PinLockGua
   const pinDica = PINS_CONFIG[role];
 
   return (
-    <div className="min-h-screen bg-neutral-950 flex flex-col items-center justify-center p-4 select-none">
-      <div className="w-full max-w-sm p-6 bg-neutral-900 border border-neutral-800 rounded-3xl shadow-2xl flex flex-col items-center text-center relative overflow-hidden">
-        {/* Glow de fundo */}
+    <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center p-4 select-none relative overflow-hidden selection:bg-rose-500 selection:text-white">
+      {/* Glow de fundo */}
+      <div
+        className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 rounded-full blur-[100px] opacity-15 pointer-events-none ${
+          ehCozinha ? "bg-amber-500" : "bg-rose-600"
+        }`}
+      />
+
+      <div className="relative w-full max-w-sm p-6 sm:p-8 bg-zinc-900/90 backdrop-blur-2xl border border-white/10 rounded-3xl shadow-2xl flex flex-col items-center text-center overflow-hidden">
+        {/* Glow de ambientação interna */}
         <div
           className={`absolute -top-16 -left-16 w-36 h-36 rounded-full blur-3xl opacity-20 pointer-events-none ${
             ehCozinha ? "bg-amber-500" : "bg-rose-500"
@@ -146,7 +153,9 @@ export function PinLockGuard({ role, restauranteId, slug, children }: PinLockGua
 
         <div
           className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-3 shadow-lg ${
-            ehCozinha ? "bg-amber-500 text-neutral-950" : "bg-rose-600 text-white"
+            ehCozinha
+              ? "bg-amber-500 text-zinc-950 shadow-amber-500/20"
+              : "bg-rose-600 text-white shadow-rose-600/30"
           }`}
         >
           {ehCozinha ? <ChefHat className="w-7 h-7" /> : <Receipt className="w-7 h-7" />}
@@ -155,14 +164,14 @@ export function PinLockGuard({ role, restauranteId, slug, children }: PinLockGua
         <h2 className="text-xl font-black text-white tracking-tight">
           {ehCozinha ? "Modo Cozinha (KDS)" : "Terminal do Garçom"}
         </h2>
-        <p className="text-xs text-neutral-400 mt-1 max-w-xs">
-          Identifique-se com seu <strong className="text-neutral-200">PIN</strong> ou aproxime seu <strong className="text-neutral-200">Crachá</strong>.
+        <p className="text-xs text-zinc-400 mt-1 max-w-xs">
+          Identifique-se com seu <strong className="text-zinc-200">PIN</strong> ou aproxime seu <strong className="text-zinc-200">Crachá</strong>.
         </p>
 
         {/* Indicador de 4 dígitos */}
         <div className="flex items-center gap-3 my-5">
           {autenticando ? (
-            <div className="flex items-center gap-2 text-xs font-bold text-neutral-300 py-1">
+            <div className="flex items-center gap-2 text-xs font-bold text-zinc-300 py-1">
               <Loader2 className="w-4 h-4 animate-spin text-rose-500" />
               <span>Autenticando colaborador...</span>
             </div>
@@ -177,9 +186,9 @@ export function PinLockGuard({ role, restauranteId, slug, children }: PinLockGua
                       ? "bg-red-500 animate-bounce"
                       : preenchido
                       ? ehCozinha
-                        ? "bg-amber-400 scale-110"
-                        : "bg-rose-500 scale-110"
-                      : "bg-neutral-800 border border-neutral-700"
+                        ? "bg-amber-400 scale-110 shadow-sm shadow-amber-400/50"
+                        : "bg-rose-500 scale-110 shadow-sm shadow-rose-500/50"
+                      : "bg-zinc-800 border border-zinc-700"
                   }`}
                 />
               );
@@ -189,7 +198,7 @@ export function PinLockGuard({ role, restauranteId, slug, children }: PinLockGua
 
         {/* Feedback de erro */}
         {erro && (
-          <div className="flex items-center gap-1.5 text-[11px] font-semibold text-red-400 mb-3 animate-in fade-in">
+          <div className="flex items-center gap-1.5 text-[11px] font-semibold text-red-400 mb-3 animate-in fade-in bg-red-950/40 px-3 py-1.5 rounded-xl border border-red-500/30">
             <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
             <span>{erro}</span>
           </div>
@@ -210,8 +219,8 @@ export function PinLockGuard({ role, restauranteId, slug, children }: PinLockGua
         </Button>
 
         {/* Dica discreta de PIN padrão */}
-        <span className="text-[10px] font-mono text-neutral-500 mb-4 bg-neutral-950/80 px-3 py-1 rounded-full border border-neutral-800">
-          PIN padrão salão: <strong className="text-neutral-300">{pinDica}</strong>
+        <span className="text-[10px] font-mono text-zinc-500 mb-4 bg-zinc-950/80 px-3 py-1 rounded-full border border-zinc-800">
+          PIN padrão salão: <strong className="text-zinc-300">{pinDica}</strong>
         </span>
 
         {/* Teclado Numérico Fat-Finger */}
@@ -222,7 +231,7 @@ export function PinLockGuard({ role, restauranteId, slug, children }: PinLockGua
               type="button"
               disabled={autenticando}
               onClick={() => handleTecla(num)}
-              className="h-14 rounded-2xl bg-neutral-800 hover:bg-neutral-700 active:scale-95 text-white font-black text-lg transition-all shadow-sm disabled:opacity-50"
+              className="h-14 rounded-2xl bg-zinc-800/90 hover:bg-zinc-700 active:scale-95 text-white font-black text-xl transition-all shadow-md border border-white/5 disabled:opacity-50"
             >
               {num}
             </button>
@@ -231,7 +240,7 @@ export function PinLockGuard({ role, restauranteId, slug, children }: PinLockGua
             type="button"
             disabled={autenticando}
             onClick={handleApagar}
-            className="h-14 rounded-2xl bg-neutral-850 hover:bg-neutral-800 active:scale-95 text-neutral-400 text-xs font-bold transition-all disabled:opacity-50"
+            className="h-14 rounded-2xl bg-zinc-800/50 hover:bg-zinc-800 active:scale-95 text-zinc-400 text-xs font-bold transition-all border border-white/5 disabled:opacity-50"
           >
             Limpar
           </button>
@@ -239,7 +248,7 @@ export function PinLockGuard({ role, restauranteId, slug, children }: PinLockGua
             type="button"
             disabled={autenticando}
             onClick={() => handleTecla("0")}
-            className="h-14 rounded-2xl bg-neutral-800 hover:bg-neutral-700 active:scale-95 text-white font-black text-lg transition-all shadow-sm disabled:opacity-50"
+            className="h-14 rounded-2xl bg-zinc-800/90 hover:bg-zinc-700 active:scale-95 text-white font-black text-xl transition-all shadow-md border border-white/5 disabled:opacity-50"
           >
             0
           </button>
@@ -250,7 +259,7 @@ export function PinLockGuard({ role, restauranteId, slug, children }: PinLockGua
               sessionStorage.setItem(`mayamenu_pin_unlocked_${role}`, "true");
               setDesbloqueado(true);
             }}
-            className="h-14 rounded-2xl bg-neutral-850 hover:bg-neutral-800 active:scale-95 text-neutral-400 text-[10px] uppercase font-bold transition-all disabled:opacity-50"
+            className="h-14 rounded-2xl bg-zinc-800/50 hover:bg-zinc-800 active:scale-95 text-zinc-400 text-[10px] uppercase font-bold transition-all border border-white/5 disabled:opacity-50"
           >
             Pular
           </button>

@@ -16,8 +16,8 @@ function GarcomPageContent() {
 
   if (carregando) {
     return (
-      <div className="min-h-screen bg-neutral-950 flex items-center justify-center text-white">
-        <div className="text-sm font-semibold tracking-wider uppercase animate-pulse">
+      <div className="min-h-screen bg-zinc-950 flex items-center justify-center text-white">
+        <div className="text-sm font-semibold tracking-wider uppercase animate-pulse text-zinc-400">
           Carregando Terminal do Garçom...
         </div>
       </div>
@@ -27,8 +27,8 @@ function GarcomPageContent() {
   // Se o usuário optar explicitamente pelo login tradicional de e-mail/senha
   if (usarLoginAdmin && (!user || user.isAnonymous)) {
     return (
-      <div className="min-h-screen bg-neutral-950 flex flex-col items-center justify-center p-4">
-        <div className="mb-6 text-center text-neutral-400 max-w-sm text-xs">
+      <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center p-4">
+        <div className="mb-6 text-center text-zinc-400 max-w-sm text-xs">
           Identifique-se com sua conta de acesso do restaurante.
         </div>
         <AdminLoginForm />
@@ -36,7 +36,7 @@ function GarcomPageContent() {
           variant="ghost"
           size="sm"
           onClick={() => setUsarLoginAdmin(false)}
-          className="mt-4 text-xs text-neutral-400 hover:text-white"
+          className="mt-4 text-xs text-zinc-400 hover:text-white"
         >
           Voltar para Acesso por PIN / Crachá
         </Button>

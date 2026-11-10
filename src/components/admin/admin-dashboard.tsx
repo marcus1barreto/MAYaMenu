@@ -181,7 +181,14 @@ export function AdminDashboard() {
     if (!restaurante?.id) return;
 
     setCarregandoCardapio(true);
+    let jaSemeado = false;
     const unsub = escutarCardapio(restaurante.id, (novosItens) => {
+      if (novosItens.length === 0 && !jaSemeado) {
+        jaSemeado = true;
+        popularCardapioInicialSeVazio(restaurante.id).catch((err) =>
+          console.warn("Falha ao inicializar cardápio de testes:", err)
+        );
+      }
       setItensCardapio(novosItens);
       setCarregandoCardapio(false);
     });

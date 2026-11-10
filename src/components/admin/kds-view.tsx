@@ -70,16 +70,16 @@ export const PEDIDOS_INICIAIS_KDS: PedidoKDS[] = [
     clienteId: "user-cliente-b",
     nomeCliente: "Cliente B",
     horario: "19:48",
-    subtotal: 62.0,
+    subtotal: 38.0,
     status: "a_fazer",
     itens: [
       {
-        menuItemId: "item-pizza-napolitana",
-        nome: "Pizza Napolitana Rústica",
+        menuItemId: "item-burguer-artesanal",
+        nome: "MAYaBurger Especial",
         quantidade: 1,
-        precoFinal: 62.0,
-        modificadores: [{ grupo: "Borda Recheada", opcao: "Catupiry Original" }],
-        observacoes: "Massa bem dourada por favor",
+        precoFinal: 38.0,
+        modificadores: [{ grupo: "Ponto da Carne", opcao: "Bem Passado" }],
+        observacoes: "Pão bem tostado por favor",
       },
     ],
   },
@@ -258,30 +258,30 @@ export function KdsView({
   const listaExibicao = ordenarLista(listaFiltrada);
 
   return (
-    <div className="min-h-screen bg-background text-foreground p-4 sm:p-6 flex flex-col">
-      {/* BARRA SUPERIOR DO KDS */}
-      <header className="flex flex-wrap items-center justify-between gap-4 pb-6 border-b border-border">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-rose-600 rounded-2xl shadow-lg">
+    <div className="min-h-screen bg-zinc-950 text-zinc-100 p-4 sm:p-6 flex flex-col relative selection:bg-rose-500 selection:text-white">
+      {/* BARRA SUPERIOR DO KDS COM GLASSMORPHISM */}
+      <header className="flex flex-wrap items-center justify-between gap-4 p-4 sm:p-5 rounded-3xl bg-zinc-900/80 backdrop-blur-xl border border-white/10 shadow-2xl mb-6">
+        <div className="flex items-center gap-3.5">
+          <div className="p-3 bg-rose-600 rounded-2xl shadow-lg shadow-rose-600/30 flex items-center justify-center">
             <ChefHat className="w-6 h-6 text-white" />
           </div>
           <div>
-            <h1 className="text-xl sm:text-2xl font-black tracking-tight flex items-center gap-2">
+            <h1 className="text-xl sm:text-2xl font-black tracking-tight flex items-center gap-2 text-white">
               <span>KDS da Cozinha</span>
-              <span className="text-xs px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-500 font-bold">
+              <span className="text-xs px-2.5 py-0.5 rounded-full bg-rose-500/20 text-rose-400 font-bold border border-rose-500/30">
                 AO VIVO
               </span>
               {modoFilaKds === "agrupamento" ? (
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-300 font-bold uppercase tracking-wider">
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold uppercase tracking-wider border border-emerald-500/30">
                   Agrupamento Ágil Pro
                 </span>
               ) : (
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground font-bold uppercase tracking-wider">
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400 font-bold uppercase tracking-wider border border-white/5">
                   Fila Sequencial (FIFO)
                 </span>
               )}
             </h1>
-            <p className="text-xs text-muted-foreground">{nomeRestaurante} • Visão Operacional</p>
+            <p className="text-xs text-zinc-400">{nomeRestaurante} • Visão Operacional da Cozinha</p>
           </div>
         </div>
 
@@ -298,12 +298,12 @@ export function KdsView({
             }}
             className={`h-9 px-3 rounded-xl text-xs font-bold flex items-center gap-1.5 border transition-all ${
               audioAtivo
-                ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400"
-                : "bg-card border-border hover:bg-muted text-muted-foreground"
+                ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-400"
+                : "bg-zinc-900 border-white/10 hover:bg-zinc-800 text-zinc-400"
             }`}
             title={audioAtivo ? "Alertas sonoros ativados" : "Alertas sonoros silenciados"}
           >
-            {audioAtivo ? <Volume2 className="w-3.5 h-3.5 text-emerald-500" /> : <VolumeX className="w-3.5 h-3.5 text-muted-foreground" />}
+            {audioAtivo ? <Volume2 className="w-3.5 h-3.5 text-emerald-400" /> : <VolumeX className="w-3.5 h-3.5 text-zinc-500" />}
             <span className="hidden sm:inline">{audioAtivo ? "Som Ativo" : "Silenciado"}</span>
           </Button>
 
@@ -327,10 +327,11 @@ export function KdsView({
                 }
               }
             }}
-            className={`h-9 px-3 rounded-xl text-xs font-bold flex items-center gap-1.5 border transition-all ${impressoraConectada
-                ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400"
-                : "bg-card border-border hover:bg-muted text-muted-foreground"
-              }`}
+            className={`h-9 px-3 rounded-xl text-xs font-bold flex items-center gap-1.5 border transition-all ${
+              impressoraConectada
+                ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-400"
+                : "bg-zinc-900 border-white/10 hover:bg-zinc-800 text-zinc-400"
+            }`}
             title="Conectar ou gerenciar impressora térmica de bobina USB"
           >
             <Printer className="w-3.5 h-3.5" />
@@ -339,24 +340,26 @@ export function KdsView({
             </span>
           </Button>
 
-          <div className="flex items-center gap-1.5 bg-card p-1.5 rounded-2xl border border-border">
+          <div className="flex items-center gap-1.5 bg-zinc-950/80 p-1.5 rounded-2xl border border-white/10">
             <button
               type="button"
               onClick={() => setFiltro("todos")}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${filtro === "todos"
-                  ? "bg-primary text-primary-foreground shadow-xs"
-                  : "text-muted-foreground hover:text-foreground"
-                }`}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                filtro === "todos"
+                  ? "bg-zinc-800 text-white shadow-sm border border-white/10"
+                  : "text-zinc-400 hover:text-white"
+              }`}
             >
               Todos ({pedidos.length})
             </button>
             <button
               type="button"
               onClick={() => setFiltro("a_fazer")}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${filtro === "a_fazer"
-                  ? "bg-amber-500 text-neutral-950 shadow-xs"
-                  : "text-amber-500 hover:text-amber-600"
-                }`}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                filtro === "a_fazer"
+                  ? "bg-amber-500 text-zinc-950 shadow-sm font-black"
+                  : "text-amber-400 hover:text-amber-300"
+              }`}
             >
               <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
               A Fazer ({pedidosAFazer.length})
@@ -364,10 +367,11 @@ export function KdsView({
             <button
               type="button"
               onClick={() => setFiltro("pronto")}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${filtro === "pronto"
-                  ? "bg-emerald-600 text-white shadow-xs"
-                  : "text-emerald-500 hover:text-emerald-600"
-                }`}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                filtro === "pronto"
+                  ? "bg-emerald-600 text-white shadow-sm font-black"
+                  : "text-emerald-400 hover:text-emerald-300"
+              }`}
             >
               Prontos ({pedidosProntos.length})
             </button>
@@ -376,12 +380,12 @@ export function KdsView({
       </header>
 
       {/* QUADRO DE COMANDAS / PEDIDOS */}
-      <main className="flex-1 mt-6">
+      <main className="flex-1">
         {listaExibicao.length === 0 ? (
-          <div className="h-64 flex flex-col items-center justify-center text-center text-neutral-500">
-            <CheckCircle className="w-12 h-12 text-neutral-700 mb-2" />
-            <p className="text-base font-bold">Nenhum pedido nesta seção.</p>
-            <p className="text-xs">Aguardando novas entradas do cardápio digital.</p>
+          <div className="h-64 flex flex-col items-center justify-center text-center text-zinc-500 bg-zinc-900/40 rounded-3xl border border-white/5">
+            <CheckCircle className="w-12 h-12 text-zinc-700 mb-2" />
+            <p className="text-base font-bold text-zinc-300">Nenhum pedido nesta seção.</p>
+            <p className="text-xs text-zinc-500">Aguardando novas entradas do cardápio digital.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6 items-start">
@@ -391,22 +395,25 @@ export function KdsView({
               return (
                 <div
                   key={ped.id}
-                  className={`flex flex-col rounded-3xl border-2 overflow-hidden shadow-2xl transition-all ${ehAFazer
-                      ? "bg-neutral-900 border-amber-500/80 shadow-amber-950/20"
-                      : "bg-neutral-900/60 border-emerald-600/40 opacity-75"
-                    }`}
+                  className={`flex flex-col rounded-3xl border overflow-hidden shadow-2xl transition-all ${
+                    ehAFazer
+                      ? "bg-zinc-900/95 border-amber-500/40 shadow-amber-950/20"
+                      : "bg-zinc-900/60 border-emerald-500/30 opacity-80"
+                  }`}
                 >
                   {/* CABEÇALHO DO CARD (Mesa e Nome do Cliente) */}
                   <div
-                    className={`p-4 flex items-center justify-between border-b ${ehAFazer
-                        ? "bg-amber-500/10 border-amber-500/30 text-amber-300"
+                    className={`p-4 flex items-center justify-between border-b ${
+                      ehAFazer
+                        ? "bg-amber-500/10 border-amber-500/20 text-amber-300"
                         : "bg-emerald-500/10 border-emerald-500/20 text-emerald-300"
-                      }`}
+                    }`}
                   >
                     <div className="flex items-center gap-2.5">
                       <div
-                        className={`w-10 h-10 rounded-2xl flex items-center justify-center font-black text-lg ${ehAFazer ? "bg-amber-500 text-neutral-950" : "bg-emerald-500 text-neutral-950"
-                          }`}
+                        className={`w-10 h-10 rounded-2xl flex items-center justify-center font-black text-lg ${
+                          ehAFazer ? "bg-amber-500 text-zinc-950 shadow-md shadow-amber-500/20" : "bg-emerald-500 text-zinc-950 shadow-md shadow-emerald-500/20"
+                        }`}
                       >
                         {ped.mesa}
                       </div>
@@ -420,19 +427,19 @@ export function KdsView({
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-1.5 text-xs font-semibold text-neutral-400">
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-zinc-400">
                       <Clock className="w-3.5 h-3.5" />
                       <span>{ped.horario}</span>
                     </div>
                   </div>
 
                   {/* ITENS DO PEDIDO COM DESTAQUE EM VERMELHO PARA MODIFICADORES */}
-                  <div className="p-4 flex-1 space-y-3.5 divide-y divide-neutral-800/80">
+                  <div className="p-4 flex-1 space-y-3.5 divide-y divide-zinc-800/80">
                     {ped.itens.map((it, idx) => (
                       <div key={idx} className={idx > 0 ? "pt-3.5" : ""}>
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex items-start gap-2">
-                            <span className="w-6 h-6 mt-0.5 rounded-lg bg-neutral-800 text-white font-black text-xs flex items-center justify-center flex-shrink-0">
+                            <span className="w-6 h-6 mt-0.5 rounded-lg bg-zinc-800 border border-white/5 text-white font-black text-xs flex items-center justify-center flex-shrink-0">
                               {it.quantidade}x
                             </span>
                             <span className="text-sm font-bold text-white leading-snug">
@@ -440,13 +447,14 @@ export function KdsView({
                             </span>
                           </div>
 
-                          {/* Novo Badge Dinâmico de Tempo de Preparo */}
+                          {/* Badge Dinâmico de Tempo de Preparo */}
                           {it.tempoPreparoEstimado && (
                             <div
-                              className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-black shrink-0 ${it.tempoPreparoEstimado >= 30
-                                  ? "bg-rose-500/20 text-rose-400" // Urgente/Demorado
-                                  : "bg-amber-500/20 text-amber-400" // Padrão
-                                }`}
+                              className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-black shrink-0 ${
+                                it.tempoPreparoEstimado >= 30
+                                  ? "bg-rose-500/20 text-rose-400 border border-rose-500/30"
+                                  : "bg-amber-500/20 text-amber-400 border border-amber-500/30"
+                              }`}
                             >
                               <Clock className="w-3 h-3" />
                               <span>{it.tempoPreparoEstimado}m</span>
@@ -460,7 +468,7 @@ export function KdsView({
                             {it.modificadores.map((mod, mIdx) => (
                               <div
                                 key={mIdx}
-                                className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-rose-500/20 border border-rose-500/40 text-rose-300 text-xs font-black uppercase tracking-wider mr-1.5 mb-1"
+                                className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs font-black uppercase tracking-wider mr-1.5 mb-1"
                               >
                                 <span>{mod.grupo}:</span>
                                 <span className="underline decoration-rose-400">{mod.opcao}</span>
@@ -472,7 +480,7 @@ export function KdsView({
                         {/* Observações da cozinha */}
                         {it.observacoes && (
                           <div className="mt-1.5 pl-8">
-                            <span className="text-xs font-semibold text-amber-300 italic bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20 block">
+                            <span className="text-xs font-semibold text-amber-300 italic bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/20 block">
                               Obs: {it.observacoes}
                             </span>
                           </div>
@@ -482,13 +490,13 @@ export function KdsView({
                   </div>
 
                   {/* AÇÕES: IMPRIMIR CUPOM TÉRMICO E MARCHAR */}
-                  <div className="p-4 bg-neutral-950/80 border-t border-neutral-800 flex items-center gap-2">
+                  <div className="p-4 bg-zinc-950/80 border-t border-white/10 flex items-center gap-2">
                     <Button
                       type="button"
                       variant="outline"
                       onClick={() => handleImprimirPedido(ped)}
                       disabled={imprimindoId === ped.id}
-                      className="h-14 px-4 rounded-2xl border-neutral-700 bg-neutral-900 hover:bg-neutral-800 text-neutral-200 flex items-center justify-center gap-1.5 shrink-0"
+                      className="h-14 px-4 rounded-2xl border-white/10 bg-zinc-900/90 hover:bg-zinc-800 text-zinc-200 flex items-center justify-center gap-1.5 shrink-0"
                       title="Imprimir comanda de produção térmica (ESC/POS)"
                     >
                       <Printer className="w-5 h-5 text-amber-400" />
@@ -498,10 +506,11 @@ export function KdsView({
                     <Button
                       type="button"
                       onClick={() => handleMarchar(ped.id)}
-                      className={`flex-1 h-14 rounded-2xl font-black text-base shadow-lg transition-transform active:scale-[0.98] flex items-center justify-center gap-2 ${ehAFazer
-                          ? "bg-rose-600 hover:bg-rose-500 text-white shadow-rose-900/40"
-                          : "bg-neutral-800 hover:bg-neutral-700 text-neutral-300"
-                        }`}
+                      className={`flex-1 h-14 rounded-2xl font-black text-base shadow-xl transition-all active:scale-[0.98] flex items-center justify-center gap-2 ${
+                        ehAFazer
+                          ? "bg-rose-600 hover:bg-rose-500 text-white shadow-rose-600/30"
+                          : "bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-white/10"
+                      }`}
                     >
                       {ehAFazer ? (
                         <>

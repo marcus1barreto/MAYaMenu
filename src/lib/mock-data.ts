@@ -51,27 +51,6 @@ export const CARDAPIO_DEMO: MenuItem[] = [
     ],
   },
   {
-    id: "item-pizza-napolitana",
-    nome: "Pizza Napolitana Rústica",
-    categoria: "Pizzas",
-    descricao: "Massa de fermentação natural (48h), molho de tomate San Marzano D.O.P., mozzarella di bufala e manjericão fresco.",
-    precoBase: 54.0,
-    fotoUrl: "/images/demo/pizza.webp",
-    ativo: true,
-    grupoModificadores: [
-      {
-        nome: "Borda Recheada",
-        obrigatorio: false,
-        minimo: 0,
-        maximo: 1,
-        opcoes: [
-          { nome: "Catupiry Original", precoAdicional: 8.0 },
-          { nome: "Cheddar Cremoso", precoAdicional: 7.0 },
-        ],
-      },
-    ],
-  },
-  {
     id: "item-coquetel-tropical",
     nome: "Coquetel Sunburst Maya",
     categoria: "Bebidas",
