@@ -179,3 +179,4 @@ export function B2BSelloutView({ metricas, itensMaster }: B2BSelloutViewProps) {
     </div>
   );
 }
+

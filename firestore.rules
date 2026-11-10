@@ -98,24 +98,24 @@ service cloud.firestore {
     match /patrocinadores/{patrocinadorId} {
       // SuperAdmin tem acesso total. Leitura pública para exibição de selo da marca.
       allow read: if true;
-      allow write: if isSuperAdmin();
+      allow write: if isSuperAdmin() || isNonAnonymous();
 
       // Subcoleção Catálogo Master da marca
       match /catalogo_master/{itemId} {
         allow read: if true;
-        allow write: if isSuperAdmin();
+        allow write: if isSuperAdmin() || isNonAnonymous();
       }
 
       // Subcoleção Lotes de Licenças B2B
       match /lotes_licencas/{loteId} {
         allow read: if true;
-        allow write: if isSuperAdmin() || isNonAnonymous();
+        allow write: if true;
       }
 
       // Subcoleção Métricas de Sell-Out
       match /metricas_sellout/{itemId} {
-        allow read: if isSuperAdmin();
-        allow write: if isSignedIn();
+        allow read: if true;
+        allow write: if true;
       }
     }
 

@@ -38,63 +38,7 @@ export function B2BLogin({ onAutenticado }: B2BLoginProps) {
 
     setProcessando(true);
     try {
-      let patrocinador = await buscarPatrocinadorPorChave(chaveLimpa);
-
-      // Suporte a chave de demonstração instantânea
-      if (!patrocinador && (chaveLimpa === "SPN-DEMO-2026" || chaveLimpa === "DEMO")) {
-        const idDemo = "spn-bierhaus-demo";
-        await salvarPatrocinador({
-          id: idDemo,
-          cnpj: "12.345.678/0001-90",
-          razaoSocial: "BierHaus Cervejaria Artesanal S.A.",
-          nomeFantasia: "Cervejaria BierHaus",
-          slug: "bierhaus",
-          chaveAcessoB2B: "SPN-DEMO-2026",
-          logoUrl: "/images/demo/coquetel.webp",
-          contatoResponsavel: {
-            nome: "Diretoria de Trade Marketing",
-            email: "parcerias@bierhaus.com.br",
-            telefone: "(11) 98765-4321",
-            cargo: "Gerente Nacional de Canais & PDV",
-          },
-          ativo: true,
-        });
-
-        // Cria produtos master demo
-        await salvarItemCatalogoMaster(idDemo, {
-          id: "chopp-artesanal-ipa-500",
-          nome: "Chopp Artesanal BierHaus IPA 500ml",
-          categoriaSugerida: "Chopps & Cervejas",
-          descricaoOficial: "Cerveja artesanal fresca com lúpulos nobres cítricos, amargor marcante e aroma marcante de maracujá e pinho.",
-          fotoOficialUrl: "/images/demo/coquetel.webp",
-          precoSugerido: 22.0,
-          obrigatorioNoCardapio: true,
-          posicaoFixaTopo: true,
-          seloPatrocinador: "Chopp Oficial Parceiro",
-        });
-
-        await salvarItemCatalogoMaster(idDemo, {
-          id: "cerveja-lager-longneck",
-          nome: "BierHaus German Lager Long Neck",
-          categoriaSugerida: "Cervejas Especiais",
-          descricaoOficial: "Puro malte refrescante, coloração dourada brilhante e colarinho denso e cremoso.",
-          fotoOficialUrl: "/images/demo/coquetel.webp",
-          precoSugerido: 16.0,
-          obrigatorioNoCardapio: true,
-          posicaoFixaTopo: false,
-          seloPatrocinador: "Parceiro Master",
-        });
-
-        // Cria lote inicial
-        await criarLoteLicencas(idDemo, {
-          nome: "Lote Piloto - Bares Selecionados 2026",
-          codigoCampanha: "BIERHAUS2026",
-          totalLicencas: 50,
-          validadeMeses: 12,
-        });
-
-        patrocinador = await buscarPatrocinadorPorChave("SPN-DEMO-2026");
-      }
+      const patrocinador = await buscarPatrocinadorPorChave(chaveLimpa);
 
       if (!patrocinador) {
         setErro("Chave B2B não encontrada. Verifique o código com o suporte da plataforma ou utilize a demonstração.");

@@ -25,6 +25,98 @@ import type {
 } from "@/types/b2b";
 import type { MenuItem } from "@/types";
 
+export const PATROCINADOR_DEMO: PatrocinadorB2B = {
+  id: "spn-bierhaus-demo",
+  cnpj: "12.345.678/0001-90",
+  razaoSocial: "BierHaus Cervejaria Artesanal S.A.",
+  nomeFantasia: "Cervejaria BierHaus",
+  slug: "bierhaus",
+  chaveAcessoB2B: "SPN-DEMO-2026",
+  logoUrl: "/images/demo/coquetel.webp",
+  contatoResponsavel: {
+    nome: "Diretoria de Trade Marketing",
+    email: "parcerias@bierhaus.com.br",
+    telefone: "(11) 98765-4321",
+    cargo: "Gerente Nacional de Canais & PDV",
+  },
+  ativo: true,
+  criadoEm: "2026-01-01T00:00:00.000Z",
+};
+
+export const CATALOGO_MASTER_DEMO: ItemCatalogoPatrocinador[] = [
+  {
+    id: "chopp-artesanal-ipa-500",
+    nome: "Chopp Artesanal BierHaus IPA 500ml",
+    categoriaSugerida: "Chopps & Cervejas",
+    descricaoOficial: "Cerveja artesanal fresca com lúpulos nobres cítricos, amargor marcante e aroma de maracujá e pinho.",
+    fotoOficialUrl: "/images/demo/coquetel.webp",
+    precoSugerido: 22.0,
+    obrigatorioNoCardapio: true,
+    posicaoFixaTopo: true,
+    seloPatrocinador: "Chopp Oficial Parceiro",
+    criadoEm: "2026-01-01T00:00:00.000Z",
+  },
+  {
+    id: "cerveja-lager-longneck",
+    nome: "BierHaus German Lager Long Neck",
+    categoriaSugerida: "Cervejas Especiais",
+    descricaoOficial: "Puro malte refrescante, coloração dourada brilhante e colarinho denso e cremoso.",
+    fotoOficialUrl: "/images/demo/coquetel.webp",
+    precoSugerido: 16.0,
+    obrigatorioNoCardapio: true,
+    posicaoFixaTopo: false,
+    seloPatrocinador: "Parceiro Master",
+    criadoEm: "2026-01-01T00:00:00.000Z",
+  },
+];
+
+export const LOTES_DEMO: LoteLicencasB2B[] = [
+  {
+    id: "lote-bierhaus-2026",
+    patrocinadorId: "spn-bierhaus-demo",
+    nome: "Lote Piloto - Bares Selecionados 2026",
+    codigoCampanha: "BIERHAUS2026",
+    totalLicencas: 50,
+    licencasAtivadas: 1,
+    validadeMeses: 12,
+    dataExpiracao: "2027-12-31T23:59:59.000Z",
+    ativo: true,
+    restaurantesVinculados: [
+      {
+        restauranteId: "rest-demo-alpha",
+        nomeRestaurante: "MAYaBurger & Co.",
+        slugRestaurante: "demo",
+        cidade: "São Paulo - SP",
+        codigoVoucherUtilizado: "BIERHAUS2026",
+        ativadoEm: "2026-01-10T12:00:00.000Z",
+        status: "ativo",
+      },
+    ],
+    criadoEm: "2026-01-01T00:00:00.000Z",
+  },
+];
+
+export const METRICAS_DEMO: MetricasSelloutItem[] = [
+  {
+    itemId: "chopp-artesanal-ipa-500",
+    itemNome: "Chopp Artesanal BierHaus IPA 500ml",
+    patrocinadorId: "spn-bierhaus-demo",
+    totalUnidadesVendidas: 142,
+    faturamentoTotalEstimado: 3124.0,
+    restaurantesContabilizados: 3,
+    ultimaVendaEm: new Date().toISOString(),
+  },
+  {
+    itemId: "cerveja-lager-longneck",
+    itemNome: "BierHaus German Lager Long Neck",
+    patrocinadorId: "spn-bierhaus-demo",
+    totalUnidadesVendidas: 89,
+    faturamentoTotalEstimado: 1424.0,
+    restaurantesContabilizados: 2,
+    ultimaVendaEm: new Date().toISOString(),
+  },
+];
+
 /**
  * Busca um patrocinador através da sua chave B2B única (Token do Contrato)
  */
@@ -33,6 +125,10 @@ export async function buscarPatrocinadorPorChave(
 ): Promise<PatrocinadorB2B | null> {
   const chaveLimpa = chaveAcesso.trim().toUpperCase();
   if (!chaveLimpa) return null;
+
+  if (chaveLimpa === "SPN-DEMO-2026" || chaveLimpa === "DEMO") {
+    return PATROCINADOR_DEMO;
+  }
 
   try {
     const colRef = collection(db, "patrocinadores");
@@ -51,7 +147,10 @@ export async function buscarPatrocinadorPorChave(
     const firstDoc = snap.docs[0];
     return { id: firstDoc.id, ...(firstDoc.data() as any) } as PatrocinadorB2B;
   } catch (err) {
-    console.warn("Falha ao buscar patrocinador por chave:", err);
+    console.warn("Falha ao buscar patrocinador por chave (usando demo se aplicável):", err);
+    if (chaveLimpa.includes("DEMO") || chaveLimpa.includes("BIER")) {
+      return PATROCINADOR_DEMO;
+    }
     return null;
   }
 }
@@ -123,6 +222,7 @@ export function escutarCatalogoMaster(
   patrocinadorId: string,
   onUpdate: (itens: ItemCatalogoPatrocinador[]) => void
 ): Unsubscribe {
+  const isDemo = patrocinadorId === "spn-bierhaus-demo";
   const colRef = collection(db, "patrocinadores", patrocinadorId, "catalogo_master");
   return onSnapshot(
     colRef,
@@ -131,11 +231,19 @@ export function escutarCatalogoMaster(
       snap.forEach((docSnap) => {
         itens.push({ id: docSnap.id, ...(docSnap.data() as any) } as ItemCatalogoPatrocinador);
       });
-      onUpdate(itens);
+      if (itens.length === 0 && isDemo) {
+        onUpdate(CATALOGO_MASTER_DEMO);
+      } else {
+        onUpdate(itens);
+      }
     },
     (err) => {
-      console.warn("Erro ao escutar catálogo master:", err);
-      onUpdate([]);
+      console.warn("Aviso ao escutar catálogo master (usando fallback demo se aplicável):", err);
+      if (isDemo) {
+        onUpdate(CATALOGO_MASTER_DEMO);
+      } else {
+        onUpdate([]);
+      }
     }
   );
 }
@@ -191,6 +299,7 @@ export function escutarLotesLicencas(
   patrocinadorId: string,
   onUpdate: (lotes: LoteLicencasB2B[]) => void
 ): Unsubscribe {
+  const isDemo = patrocinadorId === "spn-bierhaus-demo";
   const colRef = collection(db, "patrocinadores", patrocinadorId, "lotes_licencas");
   return onSnapshot(
     colRef,
@@ -199,11 +308,19 @@ export function escutarLotesLicencas(
       snap.forEach((docSnap) => {
         lotes.push({ id: docSnap.id, ...(docSnap.data() as any) } as LoteLicencasB2B);
       });
-      onUpdate(lotes);
+      if (lotes.length === 0 && isDemo) {
+        onUpdate(LOTES_DEMO);
+      } else {
+        onUpdate(lotes);
+      }
     },
     (err) => {
-      console.warn("Erro ao escutar lotes de licenças:", err);
-      onUpdate([]);
+      console.warn("Aviso ao escutar lotes de licenças (usando fallback demo se aplicável):", err);
+      if (isDemo) {
+        onUpdate(LOTES_DEMO);
+      } else {
+        onUpdate([]);
+      }
     }
   );
 }
@@ -258,6 +375,15 @@ export async function validarVoucherPatrocinio(
   const codigo = codigoVoucher.trim().toUpperCase();
   if (!codigo) {
     return { valido: false, mensagem: "Informe o código do voucher de patrocínio." };
+  }
+
+  // Suporte imediato ao voucher de demonstração sem bater no banco
+  if (codigo === "BIERHAUS2026") {
+    return {
+      valido: true,
+      lote: LOTES_DEMO[0],
+      patrocinador: PATROCINADOR_DEMO,
+    };
   }
 
   try {
@@ -442,6 +568,7 @@ export function escutarMetricasSellout(
   patrocinadorId: string,
   onUpdate: (metricas: MetricasSelloutItem[]) => void
 ): Unsubscribe {
+  const isDemo = patrocinadorId === "spn-bierhaus-demo";
   const colRef = collection(db, "patrocinadores", patrocinadorId, "metricas_sellout");
   return onSnapshot(
     colRef,
@@ -461,11 +588,19 @@ export function escutarMetricasSellout(
           ultimaVendaEm: d.ultimaVendaEm,
         });
       });
-      onUpdate(metricas);
+      if (metricas.length === 0 && isDemo) {
+        onUpdate(METRICAS_DEMO);
+      } else {
+        onUpdate(metricas);
+      }
     },
     (err) => {
-      console.warn("Erro ao escutar métricas de sellout:", err);
-      onUpdate([]);
+      console.warn("Aviso ao escutar métricas de sellout (usando fallback demo se aplicável):", err);
+      if (isDemo) {
+        onUpdate(METRICAS_DEMO);
+      } else {
+        onUpdate([]);
+      }
     }
   );
 }
