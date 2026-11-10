@@ -137,6 +137,13 @@ export interface ComandaCliente {
     solicitadoEm: any;
     motivo?: string;
   };
+  garcomResponsavel?: {
+    uid: string;
+    nome: string;
+    fotoUrl?: string;
+    assumidoEm?: any;
+    transferidoDe?: string;
+  };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -62,6 +62,8 @@ import {
   atenderGarcomFirestore,
   lancarItemManualFirestore,
   atualizarStatusPedido,
+  assumirAtendimentoMesa,
+  transferirAtendimentoMesa,
 } from "@/lib/restaurante-service";
 import {
   escutarFilaOffline,
@@ -93,6 +95,13 @@ export interface ComandaGarcom {
     solicitadoEm?: any;
     motivo?: string;
   };
+  garcomResponsavel?: {
+    uid: string;
+    nome: string;
+    fotoUrl?: string;
+    assumidoEm?: any;
+    transferidoDe?: string;
+  };
 }
 
 export interface MesaOperacional {
@@ -102,6 +111,13 @@ export interface MesaOperacional {
   alertaUpsell?: boolean;
   pagoEm?: any;
   comandas: ComandaGarcom[];
+  garcomResponsavel?: {
+    uid: string;
+    nome: string;
+    fotoUrl?: string;
+    assumidoEm?: any;
+    transferidoDe?: string;
+  };
 }
 
 export const TEMPO_TOLERANCIA_MINUTOS = 15;
@@ -679,6 +695,118 @@ export function GarcomView({
     }
   };
 
+  // Garçom assume o atendimento das comandas ativas de uma mesa
+  const handleAssumirMesa = async (mesaNumero: number) => {
+    const idRest = restauranteId || restaurante?.id;
+    const garcomAtual = colaboradorAtivo || (user ? { uid: user.uid, nome: user.displayName || "Garçom" } : null);
+    if (!idRest || !garcomAtual?.uid) return;
+
+    try {
+      await assumirAtendimentoMesa(idRest, mesaNumero, {
+        uid: garcomAtual.uid,
+        nome: garcomAtual.nome || "Garçom",
+        fotoUrl: garcomAtual.fotoUrl,
+      });
+
+      const dadosGarcom = {
+        uid: garcomAtual.uid,
+        nome: garcomAtual.nome || "Garçom",
+        fotoUrl: garcomAtual.fotoUrl,
+      };
+
+      setMesas((prev) =>
+        prev.map((m) =>
+          m.numero === mesaNumero
+            ? {
+                ...m,
+                chamandoGarcom: false,
+                garcomResponsavel: dadosGarcom,
+                comandas: m.comandas.map((c) => ({
+                  ...c,
+                  chamadoGarcom: { ativo: false },
+                  garcomResponsavel: dadosGarcom,
+                })),
+              }
+            : m
+        )
+      );
+
+      if (mesaSelecionada?.numero === mesaNumero) {
+        setMesaSelecionada((prev) =>
+          prev
+            ? {
+                ...prev,
+                chamandoGarcom: false,
+                garcomResponsavel: dadosGarcom,
+                comandas: prev.comandas.map((c) => ({
+                  ...c,
+                  chamadoGarcom: { ativo: false },
+                  garcomResponsavel: dadosGarcom,
+                })),
+              }
+            : null
+        );
+      }
+    } catch (err) {
+      console.error("Falha ao assumir atendimento da mesa:", err);
+      alert("Erro ao assumir a mesa. Tente novamente.");
+    }
+  };
+
+  // Transfere o atendimento da mesa para outro garçom em serviço
+  const handleTransferirMesa = async (
+    mesaNumero: number,
+    novoGarcom: { uid: string; nome: string; fotoUrl?: string }
+  ) => {
+    const idRest = restauranteId || restaurante?.id;
+    const garcomAtualNome = colaboradorAtivo?.nome || user?.displayName || "Garçom";
+    if (!idRest) return;
+
+    try {
+      await transferirAtendimentoMesa(idRest, mesaNumero, novoGarcom, garcomAtualNome);
+
+      setMesas((prev) =>
+        prev.map((m) =>
+          m.numero === mesaNumero
+            ? {
+                ...m,
+                garcomResponsavel: novoGarcom,
+                comandas: m.comandas.map((c) => ({
+                  ...c,
+                  garcomResponsavel: {
+                    ...novoGarcom,
+                    transferidoDe: garcomAtualNome,
+                  },
+                })),
+              }
+            : m
+        )
+      );
+
+      if (mesaSelecionada?.numero === mesaNumero) {
+        setMesaSelecionada((prev) =>
+          prev
+            ? {
+                ...prev,
+                garcomResponsavel: novoGarcom,
+                comandas: prev.comandas.map((c) => ({
+                  ...c,
+                  garcomResponsavel: {
+                    ...novoGarcom,
+                    transferidoDe: garcomAtualNome,
+                  },
+                })),
+              }
+            : null
+        );
+      }
+      alert(`Mesa ${mesaNumero} transferida com sucesso para ${novoGarcom.nome}!`);
+    } catch (err) {
+      console.error("Falha ao transferir mesa:", err);
+      alert("Erro ao transferir a mesa. Tente novamente.");
+    }
+  };
+
   // Injetar pedido resgatado pelo leitor de QR de contingência diretamente no Firestore (MAYa Sync-QR)
   const handleTicketLido = async (ticket: TicketPayload) => {
     const mesaNum = Number(ticket.t) || 1;
@@ -1240,6 +1368,10 @@ export function GarcomView({
         restauranteId={restauranteId}
         pedidosOffline={pedidosOffline}
         taxaServicoPercentual={restaurante?.configuracoes?.taxaServico}
+        garcomLogado={colaboradorAtivo || (user ? { uid: user.uid, nome: user.displayName || "Garçom" } : undefined)}
+        garconsDisponiveis={garconsAtivos}
+        onAssumirMesa={handleAssumirMesa}
+        onTransferirMesa={handleTransferirMesa}
         onMarcarPago={handleMarcarComoPago}
         onLiberarMesa={handleLiberarMesa}
         onAtenderGarcom={handleAtenderGarcom}

@@ -35,6 +35,8 @@ import {
   Loader2,
   Check,
   WifiOff,
+  UserCheck,
+  ArrowRightLeft,
 } from "lucide-react";
 import Link from "next/link";
 import { QRCodeSVG } from "qrcode.react";
@@ -62,6 +64,10 @@ interface MesaDetalheModalProps {
   onSalvarObservacao?: (mesaNumero: number, observacao: string) => void;
   observacaoInicial?: string;
   taxaServicoPercentual?: number;
+  garcomLogado?: { uid?: string; nome?: string; fotoUrl?: string };
+  garconsDisponiveis?: Array<{ uid: string; nome: string; fotoUrl?: string }>;
+  onAssumirMesa?: (mesaNumero: number) => void;
+  onTransferirMesa?: (mesaNumero: number, novoGarcom: { uid: string; nome: string; fotoUrl?: string }) => void;
 }
 
 export function MesaDetalheModal({
@@ -79,6 +85,10 @@ export function MesaDetalheModal({
   onSalvarObservacao,
   observacaoInicial = "",
   taxaServicoPercentual,
+  garcomLogado,
+  garconsDisponiveis,
+  onAssumirMesa,
+  onTransferirMesa,
 }: MesaDetalheModalProps) {
   // ✅ 1. TODOS OS HOOKS NO TOPO ABSOLUTO (Regra dos Hooks do React - Sem early return antes)
   const [abaInterna, setAbaInterna] = useState<"comandas" | "lancar" | "qrcode">("comandas");
@@ -86,6 +96,9 @@ export function MesaDetalheModal({
   const [taxaServicoAtiva, setTaxaServicoAtiva] = useState(true);
   const [encerrando, setEncerrando] = useState(false);
   const [atualizandoEntregaId, setAtualizandoEntregaId] = useState<string | null>(null);
+  const [modalTransferirAberto, setModalTransferirAberto] = useState(false);
+  const [garcomDestinoId, setGarcomDestinoId] = useState<string>("");
+  const [salvandoAtribuicao, setSalvandoAtribuicao] = useState(false);
 
   const handleMarcarEntregue = async (refPath?: string) => {
     if (!refPath) {
@@ -255,6 +268,10 @@ export function MesaDetalheModal({
     setAbaInterna("comandas");
   };
 
+  const garcomResponsavel =
+    mesa?.comandas?.find((c) => c.garcomResponsavel)?.garcomResponsavel ||
+    (mesa as any)?.garcomResponsavel;
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="w-[95vw] sm:max-w-4xl max-h-[92vh] bg-card border-border text-card-foreground p-0 flex flex-col rounded-3xl overflow-hidden shadow-2xl">
@@ -320,6 +337,87 @@ export function MesaDetalheModal({
               </span>
             </div>
           </div>
+
+          {/* BLOCO DE ATENDENTE RESPONSÁVEL & TRANSFERÊNCIA */}
+          {mesa.comandas.length > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-2xl bg-card border border-border text-xs shadow-2xs">
+              <div className="flex items-center gap-2">
+                {garcomResponsavel ? (
+                  <>
+                    {garcomResponsavel.fotoUrl ? (
+                      <img
+                        src={garcomResponsavel.fotoUrl}
+                        alt={garcomResponsavel.nome}
+                        className="w-7 h-7 rounded-full object-cover border border-border"
+                      />
+                    ) : (
+                      <div className="w-7 h-7 rounded-full bg-blue-500/20 text-blue-500 font-black text-xs flex items-center justify-center">
+                        {garcomResponsavel.nome ? garcomResponsavel.nome[0].toUpperCase() : "G"}
+                      </div>
+                    )}
+                    <div className="flex flex-col text-left">
+                      <span className="text-[10px] uppercase font-bold text-muted-foreground leading-tight">
+                        Garçom da Mesa
+                      </span>
+                      <span className="font-bold text-foreground">
+                        {garcomResponsavel.nome}
+                        {garcomResponsavel.transferidoDe && (
+                          <span className="text-[10px] text-muted-foreground font-normal ml-1">
+                            (recebeu de {garcomResponsavel.transferidoDe})
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <UserCheck className="w-4 h-4 text-amber-500" />
+                    <span>Mesa em Pool Livre (Aguardando atendente)</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Ações de Atendimento */}
+              {!modoSomenteLeitura && (
+                <div className="flex items-center gap-2">
+                  {(!garcomResponsavel || (garcomLogado && garcomResponsavel.uid !== garcomLogado.uid)) && onAssumirMesa && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={salvandoAtribuicao}
+                      onClick={async () => {
+                        setSalvandoAtribuicao(true);
+                        try {
+                          await onAssumirMesa(mesa.numero);
+                        } finally {
+                          setSalvandoAtribuicao(false);
+                        }
+                      }}
+                      className="h-7 px-2.5 text-xs font-bold border-blue-500/40 text-blue-500 hover:bg-blue-500/10"
+                    >
+                      <UserCheck className="w-3.5 h-3.5 mr-1" />
+                      Assumir Atendimento
+                    </Button>
+                  )}
+
+                  {garcomResponsavel && onTransferirMesa && garconsDisponiveis && garconsDisponiveis.length > 0 && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      disabled={salvandoAtribuicao}
+                      onClick={() => setModalTransferirAberto(true)}
+                      className="h-7 px-2 text-xs font-bold text-muted-foreground hover:text-foreground"
+                    >
+                      <ArrowRightLeft className="w-3.5 h-3.5 mr-1" />
+                      Transferir Mesa
+                    </Button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* ABAS INTERNAS */}
           <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-border">
@@ -888,6 +986,70 @@ export function MesaDetalheModal({
           )}
             </div>
       </DialogContent>
+
+      {/* SUB-MODAL DE TRANSFERÊNCIA DE MESA */}
+      <Dialog open={modalTransferirAberto} onOpenChange={setModalTransferirAberto}>
+        <DialogContent className="max-w-xs p-5 bg-card border border-border rounded-3xl text-card-foreground shadow-2xl">
+          <DialogHeader className="pb-2 border-b border-border">
+            <DialogTitle className="text-sm font-black flex items-center gap-2">
+              <ArrowRightLeft className="w-4 h-4 text-blue-500" />
+              <span>Transferir Mesa {mesa.numero}</span>
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-3 py-2">
+            <p className="text-xs text-muted-foreground">
+              Selecione o colega que continuará o atendimento desta mesa:
+            </p>
+
+            <select
+              value={garcomDestinoId}
+              onChange={(e) => setGarcomDestinoId(e.target.value)}
+              className="w-full h-9 px-3 rounded-xl bg-background border border-border text-xs font-semibold text-foreground focus:outline-hidden focus:ring-1 focus:ring-primary"
+            >
+              <option value="">Selecione um garçom em serviço...</option>
+              {garconsDisponiveis
+                ?.filter((g) => g.uid !== garcomResponsavel?.uid)
+                .map((g) => (
+                  <option key={g.uid} value={g.uid}>
+                    👤 {g.nome}
+                  </option>
+                ))}
+            </select>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-border">
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setModalTransferirAberto(false)}
+                className="text-xs"
+              >
+                Cancelar
+              </Button>
+              <Button
+                size="sm"
+                disabled={!garcomDestinoId || salvandoAtribuicao}
+                onClick={async () => {
+                  const colega = garconsDisponiveis?.find((g) => g.uid === garcomDestinoId);
+                  if (colega && onTransferirMesa) {
+                    setSalvandoAtribuicao(true);
+                    try {
+                      await onTransferirMesa(mesa.numero, colega);
+                      setModalTransferirAberto(false);
+                      setGarcomDestinoId("");
+                    } finally {
+                      setSalvandoAtribuicao(false);
+                    }
+                  }
+                }}
+                className="bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs"
+              >
+                {salvandoAtribuicao ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Confirmar"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 }

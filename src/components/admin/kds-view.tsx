@@ -18,6 +18,7 @@ export interface PedidoKDS {
   mesa: number | string;
   clienteId: string;
   nomeCliente: string;
+  garcomNome?: string;
   horario: string;
   subtotal: number;
   status: "a_fazer" | "pronto" | "entregue";
@@ -411,7 +412,7 @@ export function KdsView({
                       </div>
                       <div>
                         <span className="text-[10px] uppercase font-bold tracking-widest opacity-80 block">
-                          Mesa {ped.mesa}
+                          Mesa {ped.mesa} {ped.garcomNome ? `• 👤 ${ped.garcomNome}` : ""}
                         </span>
                         <h3 className="text-base font-black text-white leading-tight">
                           {ped.nomeCliente}

@@ -1258,3 +1258,84 @@ export async function fecharContaMesa(
   // 4. Executa a transação completa de uma vez só
   await batch.commit();
 }
+
+/**
+ * Garçom assume o atendimento das comandas ativas de uma mesa
+ */
+export async function assumirAtendimentoMesa(
+  restauranteId: string,
+  mesaNumero: number | string,
+  garcom: { uid: string; nome: string; fotoUrl?: string }
+): Promise<void> {
+  const comandasCol = collection(
+    db,
+    "restaurantes",
+    restauranteId,
+    "mesas",
+    String(mesaNumero),
+    "comandas_abertas"
+  );
+
+  const snap = await getDocs(comandasCol);
+  const { writeBatch } = await import("firebase/firestore");
+  const batch = writeBatch(db);
+
+  snap.forEach((d) => {
+    const data = d.data();
+    if (data.status !== "pago" && !data.arquivada) {
+      batch.update(d.ref, {
+        garcomResponsavel: {
+          uid: garcom.uid,
+          nome: garcom.nome,
+          fotoUrl: garcom.fotoUrl || null,
+          assumidoEm: serverTimestamp(),
+        },
+        "chamadoGarcom.ativo": false,
+        atualizadoEm: serverTimestamp(),
+      });
+    }
+  });
+
+  await batch.commit();
+}
+
+/**
+ * Transfere o atendimento da mesa para outro garçom (troca de turno / substituição)
+ */
+export async function transferirAtendimentoMesa(
+  restauranteId: string,
+  mesaNumero: number | string,
+  novoGarcom: { uid: string; nome: string; fotoUrl?: string },
+  garcomAnteriorNome?: string
+): Promise<void> {
+  const comandasCol = collection(
+    db,
+    "restaurantes",
+    restauranteId,
+    "mesas",
+    String(mesaNumero),
+    "comandas_abertas"
+  );
+
+  const snap = await getDocs(comandasCol);
+  const { writeBatch } = await import("firebase/firestore");
+  const batch = writeBatch(db);
+
+  snap.forEach((d) => {
+    const data = d.data();
+    if (data.status !== "pago" && !data.arquivada) {
+      batch.update(d.ref, {
+        garcomResponsavel: {
+          uid: novoGarcom.uid,
+          nome: novoGarcom.nome,
+          fotoUrl: novoGarcom.fotoUrl || null,
+          assumidoEm: serverTimestamp(),
+          transferidoDe: garcomAnteriorNome || "Outro Garçom",
+        },
+        atualizadoEm: serverTimestamp(),
+      });
+    }
+  });
+
+  await batch.commit();
+}

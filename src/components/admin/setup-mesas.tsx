@@ -482,3 +482,4 @@ export function SetupMesas({ restauranteId, maxMesas }: SetupMesasProps) {
     </div>
   );
 }
+
