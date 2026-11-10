@@ -39,6 +39,7 @@ import {
   escutarGarconsEmServico,
   type StatusTurno,
 } from "@/lib/turno-service";
+import { escutarConfigsMesas, type ConfigMesa } from "@/lib/mesas-service";
 import { audioAlertService } from "@/lib/audio-alerts";
 import {
   Dialog,
@@ -240,6 +241,17 @@ export function GarcomView({
   const [statusTurno, setStatusTurno] = useState<StatusTurno>("fora_de_turno");
   const [garconsAtivos, setGarconsAtivos] = useState<Array<{ uid: string; nome: string; fotoUrl?: string }>>([]);
   const [alterandoTurno, setAlterandoTurno] = useState(false);
+  const [configsMesas, setConfigsMesas] = useState<Record<number, ConfigMesa>>({});
+
+  // Escuta configurações estruturais de mesas (ativas, reservas, praças)
+  useEffect(() => {
+    const restId = restauranteId || restaurante?.id;
+    if (!restId) return;
+    const unsub = escutarConfigsMesas(restId, (dados) => {
+      setConfigsMesas(dados);
+    });
+    return () => unsub();
+  }, [restauranteId, restaurante?.id]);
 
   // Carrega dados da sessão do colaborador
   useEffect(() => {
@@ -1079,12 +1091,24 @@ export function GarcomView({
             const ehOcupada = m.status === "ocupada";
             const totalMesa = m.comandas.reduce((acc, c) => acc + c.subtotal, 0);
 
+            const cfg = configsMesas[m.numero];
+            const isAtiva = cfg ? cfg.ativa !== false : true;
+            const isReservada = cfg?.statusEstrutural === "reservada";
+            const garcomTitular = cfg?.modoAtendimento === "garcom_fixo" ? cfg.garcomFixoNome : null;
+            const ehMinhaPraca = cfg?.garcomFixoId && (cfg.garcomFixoId === colaboradorAtivo?.uid || cfg.garcomFixoId === user?.uid);
+
             return (
               <div
                 key={m.numero}
                 onClick={() => m.comandas.length > 0 && setMesaSelecionada(m)}
                 className={`p-5 rounded-3xl border-2 text-left transition-all relative overflow-hidden flex flex-col justify-between h-40 select-none ${
                   m.comandas.length > 0 ? "cursor-pointer active:scale-95" : "cursor-default opacity-40"
+                } ${
+                  !isAtiva
+                    ? "opacity-30 border-dashed border-border bg-muted/20"
+                    : ehMinhaPraca && isAtiva
+                    ? "ring-1 ring-blue-500/50 shadow-md"
+                    : ""
                 } ${
                   ehChamado
                     ? "bg-amber-950/30 border-amber-400 ring-2 ring-amber-400/50 shadow-xl shadow-amber-950/50 animate-pulse"
@@ -1100,7 +1124,9 @@ export function GarcomView({
                 <div className="flex items-start justify-between">
                   <div
                     className={`w-10 h-10 rounded-2xl flex items-center justify-center font-black text-lg ${
-                      ehChamado
+                      !isAtiva
+                        ? "bg-neutral-800 text-neutral-500"
+                        : ehChamado
                         ? "bg-amber-400 text-neutral-950 animate-bounce"
                         : ehConta
                         ? "bg-rose-600 text-white"
@@ -1115,6 +1141,24 @@ export function GarcomView({
                   </div>
 
                   <div className="flex flex-col items-end gap-1">
+                    {!isAtiva && (
+                      <Badge variant="outline" className="text-[9px] uppercase font-bold text-neutral-500 border-neutral-700">
+                        Inativa
+                      </Badge>
+                    )}
+
+                    {isReservada && isAtiva && (
+                      <Badge className="bg-purple-600/90 text-white text-[9px] font-black uppercase tracking-wider px-2 py-0.5 shadow-sm">
+                        Reserva {cfg.reserva?.horario ? `(${cfg.reserva.horario})` : ""}
+                      </Badge>
+                    )}
+
+                    {garcomTitular && isAtiva && (
+                      <span className="text-[10px] font-bold text-blue-400 bg-blue-500/10 border border-blue-500/30 px-1.5 py-0.5 rounded-md truncate max-w-[100px]">
+                        👤 {garcomTitular}
+                      </span>
+                    )}
+
                     {ehChamado && (
                       <Badge className="bg-amber-400 text-neutral-950 text-[10px] font-black uppercase tracking-wider px-2 py-0.5 flex items-center gap-1 shadow-md">
                         <Bell className="w-3 h-3 fill-neutral-950" />

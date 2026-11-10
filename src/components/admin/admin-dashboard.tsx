@@ -27,6 +27,7 @@ import { GuidedEmptyCardapio } from "./guided-empty-cardapio";
 import { AdminQrScannerModal } from "./admin-qr-scanner-modal";
 import { ModificadorBuilder } from "./modificador-builder";
 import { GestaoEquipe } from "./gestao-equipe";
+import { SetupMesas } from "./setup-mesas";
 import { MAYA_MEDIA_LIBRARY } from "@/lib/maya-media-library";
 
 import { Button } from "@/components/ui/button";
@@ -152,6 +153,7 @@ export function AdminDashboard() {
   const [scannerBalcaoAberto, setScannerBalcaoAberto] = useState(false);
   const [feedbackBalcao, setFeedbackBalcao] = useState<string | null>(null);
   const [subAbaAnalytics, setSubAbaAnalytics] = useState<"geral" | "laboratorio">("geral");
+  const [subAbaMesas, setSubAbaMesas] = useState<"monitor" | "setup">("monitor");
   const [sessoesHistorico, setSessoesHistorico] = useState<HistoricoSessaoMesa[]>([]);
   const [metricasConsolidadas, setMetricasConsolidadas] = useState<{
     totalFaturado: number;
@@ -1159,28 +1161,64 @@ export function AdminDashboard() {
               <div>
                 <h2 className="text-lg font-bold text-white">Controle de Mesas do Salão</h2>
                 <p className="text-xs text-neutral-400">
-                  Clique numa mesa para ver os pedidos, comandas por cliente, rateio de conta ou imprimir o QR Code.
+                  Monitore o consumo ao vivo ou configure a disponibilidade física, reservas e praças de atendimento.
                 </p>
               </div>
 
-              {/* Legenda de Status */}
-              <div className="flex items-center gap-3 text-xs font-semibold">
-                <span className="flex items-center gap-1.5 text-neutral-400">
-                  <span className="w-2.5 h-2.5 rounded-full bg-neutral-700" />
-                  Livre
-                </span>
-                <span className="flex items-center gap-1.5 text-neutral-400">
-                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
-                  Ocupada
-                </span>
-                <span className="flex items-center gap-1.5 text-rose-400 font-bold">
-                  <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping" />
-                  Pediu Conta
-                </span>
+              {/* Sub-menu: Monitor ao Vivo vs Setup & Praças */}
+              <div className="flex items-center gap-1.5 p-1 bg-card border border-border rounded-xl shadow-xs">
+                <button
+                  type="button"
+                  onClick={() => setSubAbaMesas("monitor")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                    subAbaMesas === "monitor"
+                      ? "bg-primary text-primary-foreground shadow-xs"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <QrCode className="w-3.5 h-3.5" />
+                  <span>Monitor ao Vivo</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setSubAbaMesas("setup")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                    subAbaMesas === "setup"
+                      ? "bg-primary text-primary-foreground shadow-xs"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <Settings className="w-3.5 h-3.5" />
+                  <span>Setup & Praças</span>
+                </button>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+            {subAbaMesas === "setup" ? (
+              <SetupMesas
+                restauranteId={restaurante?.id || "demo"}
+                maxMesas={maxMesas}
+              />
+            ) : (
+              <>
+                {/* Legenda de Status */}
+                <div className="flex items-center justify-end gap-3 text-xs font-semibold">
+                  <span className="flex items-center gap-1.5 text-neutral-400">
+                    <span className="w-2.5 h-2.5 rounded-full bg-neutral-700" />
+                    Livre
+                  </span>
+                  <span className="flex items-center gap-1.5 text-neutral-400">
+                    <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
+                    Ocupada
+                  </span>
+                  <span className="flex items-center gap-1.5 text-rose-400 font-bold">
+                    <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping" />
+                    Pediu Conta
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
               {mesas.map((mesa) => {
                 const num = mesa.numero;
                 const ehChamado = Boolean(mesa.chamandoGarcom);
@@ -1297,8 +1335,10 @@ export function AdminDashboard() {
                 );
               })}
             </div>
-          </div>
+          </>
         )}
+      </div>
+    )}
 
 
 
