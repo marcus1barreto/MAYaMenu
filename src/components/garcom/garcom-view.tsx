@@ -25,7 +25,20 @@ import {
   Loader2,
   Volume2,
   VolumeX,
+  Play,
+  Pause,
+  Square,
+  UserCheck,
+  LogOut,
 } from "lucide-react";
+import {
+  iniciarTurno,
+  pausarTurno,
+  encerrarTurno,
+  escutarStatusTurno,
+  escutarGarconsEmServico,
+  type StatusTurno,
+} from "@/lib/turno-service";
 import { audioAlertService } from "@/lib/audio-alerts";
 import {
   Dialog,
@@ -193,6 +206,7 @@ export function GarcomView({
 }) {
   const auth = useSafeAuth();
   const restaurante = auth?.restaurante;
+  const user = auth?.user;
   const { maxMesas } = getLimitesLicenca(restaurante);
 
   // Trava de Autoatendimento (Modo Balcão): apenas sinaliza; o retorno visual ocorre após todos os hooks
@@ -220,6 +234,103 @@ export function GarcomView({
   const [pedidosOffline, setPedidosOffline] = useState<PedidoFilaOffline[]>([]);
   const [sincronizandoOffline, setSincronizandoOffline] = useState(false);
   const [audioAtivo, setAudioAtivo] = useState(true);
+
+  // Estados de Turno e Identidade do Garçom
+  const [colaboradorAtivo, setColaboradorAtivo] = useState<{ uid?: string; nome?: string; fotoUrl?: string } | null>(null);
+  const [statusTurno, setStatusTurno] = useState<StatusTurno>("fora_de_turno");
+  const [garconsAtivos, setGarconsAtivos] = useState<Array<{ uid: string; nome: string; fotoUrl?: string }>>([]);
+  const [alterandoTurno, setAlterandoTurno] = useState(false);
+
+  // Carrega dados da sessão do colaborador
+  useEffect(() => {
+    const salvo = sessionStorage.getItem("mayamenu_colaborador_garcom");
+    if (salvo) {
+      try {
+        setColaboradorAtivo(JSON.parse(salvo));
+      } catch {}
+    } else if (user) {
+      setColaboradorAtivo({
+        uid: user.uid,
+        nome: user.displayName || "Garçom",
+        fotoUrl: user.photoURL || undefined,
+      });
+    }
+  }, [user]);
+
+  // Escuta status do turno do garçom logado e lista de garçons em serviço
+  useEffect(() => {
+    const restId = restauranteId || restaurante?.id;
+    const uid = colaboradorAtivo?.uid || user?.uid;
+    if (!restId || !uid) return;
+
+    const unsubTurno = escutarStatusTurno(restId, uid, (st) => {
+      setStatusTurno(st);
+      if (st === "fora_de_turno" || st === "pausa") {
+        audioAlertService.setHabilitado(false);
+        setAudioAtivo(false);
+      }
+    });
+
+    const unsubGarcons = escutarGarconsEmServico(restId, (lista) => {
+      setGarconsAtivos(lista);
+    });
+
+    return () => {
+      unsubTurno();
+      unsubGarcons();
+    };
+  }, [restauranteId, restaurante?.id, colaboradorAtivo?.uid, user?.uid]);
+
+  const handleIniciarTurno = async () => {
+    const restId = restauranteId || restaurante?.id;
+    const uid = colaboradorAtivo?.uid || user?.uid;
+    if (!restId || !uid) return;
+    setAlterandoTurno(true);
+    try {
+      await iniciarTurno(restId, uid);
+      audioAlertService.setHabilitado(true);
+      setAudioAtivo(true);
+    } catch (e) {
+      console.warn("Falha ao iniciar turno:", e);
+    } finally {
+      setAlterandoTurno(false);
+    }
+  };
+
+  const handlePausarTurno = async () => {
+    const restId = restauranteId || restaurante?.id;
+    const uid = colaboradorAtivo?.uid || user?.uid;
+    if (!restId || !uid) return;
+    setAlterandoTurno(true);
+    try {
+      await pausarTurno(restId, uid);
+    } catch (e) {
+      console.warn("Falha ao pausar turno:", e);
+    } finally {
+      setAlterandoTurno(false);
+    }
+  };
+
+  const handleEncerrarTurno = async () => {
+    const restId = restauranteId || restaurante?.id;
+    const uid = colaboradorAtivo?.uid || user?.uid;
+    if (!restId || !uid) return;
+    if (!confirm("Deseja realmente encerrar seu serviço por hoje?")) return;
+    setAlterandoTurno(true);
+    try {
+      await encerrarTurno(restId, uid);
+    } catch (e) {
+      console.warn("Falha ao encerrar turno:", e);
+    } finally {
+      setAlterandoTurno(false);
+    }
+  };
+
+  const handleBloquearTerminal = () => {
+    sessionStorage.removeItem("mayamenu_pin_unlocked_garcom");
+    sessionStorage.removeItem("mayamenu_colaborador_garcom");
+    window.location.reload();
+  };
 
   useEffect(() => {
     setAudioAtivo(audioAlertService.isHabilitado());
@@ -656,7 +767,122 @@ export function GarcomView({
         </div>
 
         {/* BOTÃO DE CONTINGÊNCIA & STATUS OFFLINE */}
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          {/* IDENTIDADE DO GARÇOM & STATUS DO TURNO */}
+          <div className="flex items-center gap-2 p-1.5 sm:px-3 sm:py-1.5 rounded-xl bg-card border border-border shadow-xs text-xs">
+            {colaboradorAtivo?.fotoUrl ? (
+              <img
+                src={colaboradorAtivo.fotoUrl}
+                alt={colaboradorAtivo.nome || "Garçom"}
+                className="w-7 h-7 rounded-full object-cover border border-border"
+              />
+            ) : (
+              <div className="w-7 h-7 rounded-full bg-rose-500/20 text-rose-500 font-black text-xs flex items-center justify-center">
+                {colaboradorAtivo?.nome ? colaboradorAtivo.nome[0].toUpperCase() : "G"}
+              </div>
+            )}
+            <div className="flex flex-col text-left pr-1">
+              <span className="font-bold leading-tight text-foreground truncate max-w-[110px] sm:max-w-[150px]">
+                {colaboradorAtivo?.nome || "Garçom"}
+              </span>
+              <div className="flex items-center gap-1.5">
+                {statusTurno === "em_servico" ? (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-500">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+                    Em Serviço
+                  </span>
+                ) : statusTurno === "pausa" ? (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-500">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                    Em Pausa
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-muted-foreground">
+                    <span className="w-1.5 h-1.5 rounded-full bg-neutral-500" />
+                    Fora de Turno
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Ações Rápidas de Turno */}
+            <div className="flex items-center gap-1 border-l border-border pl-2">
+              {statusTurno === "em_servico" ? (
+                <>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    disabled={alterandoTurno}
+                    onClick={handlePausarTurno}
+                    title="Pausar serviço (refeição ou descanso)"
+                    className="h-7 px-2 text-[10px] text-amber-500 hover:text-amber-400 hover:bg-amber-500/10 rounded-lg flex items-center gap-1"
+                  >
+                    <Pause className="w-3 h-3" />
+                    <span className="hidden md:inline">Pausar</span>
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    disabled={alterandoTurno}
+                    onClick={handleEncerrarTurno}
+                    title="Encerrar turno de serviço"
+                    className="h-7 px-2 text-[10px] text-neutral-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg flex items-center gap-1"
+                  >
+                    <Square className="w-3 h-3" />
+                    <span className="hidden md:inline">Sair</span>
+                  </Button>
+                </>
+              ) : statusTurno === "pausa" ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  disabled={alterandoTurno}
+                  onClick={handleIniciarTurno}
+                  title="Retomar serviço ativo"
+                  className="h-7 px-2 text-[10px] text-emerald-500 hover:text-emerald-400 hover:bg-emerald-500/10 rounded-lg flex items-center gap-1 font-bold"
+                >
+                  <Play className="w-3 h-3 fill-emerald-500" />
+                  <span>Retomar</span>
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  disabled={alterandoTurno}
+                  onClick={handleIniciarTurno}
+                  title="Abrir turno de serviço"
+                  className="h-7 px-2 text-[10px] text-emerald-500 hover:text-emerald-400 hover:bg-emerald-500/10 rounded-lg flex items-center gap-1 font-bold"
+                >
+                  <Play className="w-3 h-3 fill-emerald-500" />
+                  <span>Iniciar</span>
+                </Button>
+              )}
+
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={handleBloquearTerminal}
+                title="Trocar colaborador (bloquear com PIN)"
+                className="h-7 px-1.5 text-muted-foreground hover:text-foreground rounded-lg"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+              </Button>
+            </div>
+          </div>
+
+          {/* INDICADOR DE GARÇONS EM SERVIÇO */}
+          {garconsAtivos.length > 0 && (
+            <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-card border border-border text-xs text-muted-foreground" title="Total de garçons em serviço ativo no momento">
+              <Users className="w-3.5 h-3.5 text-emerald-500" />
+              <span className="font-bold text-foreground">{garconsAtivos.length}</span>
+              <span>no salão</span>
+            </div>
+          )}
           {pedidosOffline.length > 0 && (
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-500 text-xs font-semibold shadow-xs">
               <WifiOff className="w-4 h-4 text-amber-500 shrink-0 animate-pulse" />
@@ -707,6 +933,55 @@ export function GarcomView({
           </Button>
         </div>
       </header>
+
+      {/* BANNER DE STATUS DE TURNO DO GARÇOM */}
+      {statusTurno === "fora_de_turno" && (
+        <div className="mt-4 p-4 rounded-2xl bg-amber-500/10 border-2 border-amber-500/30 shadow-md flex flex-col sm:flex-row items-center justify-between gap-3 text-amber-500">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center shrink-0">
+              <Clock className="w-5 h-5 text-amber-500" />
+            </div>
+            <div className="text-left">
+              <h3 className="text-sm font-black text-foreground">Você está Fora de Serviço</h3>
+              <p className="text-xs text-muted-foreground">
+                Inicie seu serviço para se tornar apto a aceitar mesas e receber alertas sonoros de chamados.
+              </p>
+            </div>
+          </div>
+          <Button
+            type="button"
+            disabled={alterandoTurno}
+            onClick={handleIniciarTurno}
+            className="w-full sm:w-auto h-10 px-5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md transition-all shrink-0"
+          >
+            {alterandoTurno ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Play className="w-4 h-4 fill-white" />
+            )}
+            <span>Iniciar Serviço Agora</span>
+          </Button>
+        </div>
+      )}
+
+      {statusTurno === "pausa" && (
+        <div className="mt-4 p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2 text-amber-500 font-bold">
+            <Pause className="w-4 h-4 shrink-0" />
+            <span>Serviço em pausa (refeição/descanso). Alertas sonoros silenciados temporariamente.</span>
+          </div>
+          <Button
+            type="button"
+            size="sm"
+            disabled={alterandoTurno}
+            onClick={handleIniciarTurno}
+            className="h-8 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shrink-0 flex items-center gap-1.5"
+          >
+            <Play className="w-3.5 h-3.5 fill-white" />
+            <span>Retomar</span>
+          </Button>
+        </div>
+      )}
 
       {/* ALERTA DE SUCESSO DE INJEÇÃO */}
       {feedbackInjecao && (
