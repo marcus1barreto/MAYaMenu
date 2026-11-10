@@ -16,6 +16,14 @@ export interface Restaurante {
   maxPratos?: number;
   suspenso?: boolean;
   licenca?: Partial<Licenca>;
+  patrocinio?: {
+    ativo: boolean;
+    patrocinadorId: string;
+    patrocinadorNome: string;
+    loteId: string;
+    dataExpiracao: string;
+    itensInjetados: string[];
+  };
   configuracoes: {
     corPrimaria: string; // Injetada no Tailwind
     tema:
@@ -203,3 +211,5 @@ export interface HistoricoSessaoMesa {
   liberadaEm: any;
   duracaoTotalMinutos?: number;
 }
+
+export * from "./b2b";

@@ -93,6 +93,37 @@ service cloud.firestore {
       allow create, update, delete: if isNonAnonymous() && request.resource.data.ownerId == request.auth.uid;
     }
 
+    // ─────────────────────────── Módulo B2B & Patrocinadores ───────────────────────────
+
+    match /patrocinadores/{patrocinadorId} {
+      // SuperAdmin tem acesso total. Leitura pública para exibição de selo da marca.
+      allow read: if true;
+      allow write: if isSuperAdmin();
+
+      // Subcoleção Catálogo Master da marca
+      match /catalogo_master/{itemId} {
+        allow read: if true;
+        allow write: if isSuperAdmin();
+      }
+
+      // Subcoleção Lotes de Licenças B2B
+      match /lotes_licencas/{loteId} {
+        allow read: if true;
+        allow write: if isSuperAdmin() || isNonAnonymous();
+      }
+
+      // Subcoleção Métricas de Sell-Out
+      match /metricas_sellout/{itemId} {
+        allow read: if isSuperAdmin();
+        allow write: if isSignedIn();
+      }
+    }
+
+    // Leitura global de lotes para validação instantânea de voucher de campanha
+    match /{path=**}/lotes_licencas/{loteId} {
+      allow read: if true;
+    }
+
     // ─────────────────────────── Restaurantes e Operação ───────────────────────────
 
     match /restaurantes/{restauranteId} {
