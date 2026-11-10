@@ -118,7 +118,7 @@ service cloud.firestore {
 
       // Gestão de Equipe (Garçons e Cozinha)
       match /equipe/{membroId} {
-        allow read: if isOwner(restauranteId) || isSuperAdmin();
+        allow read: if isOwner(restauranteId) || isSuperAdmin() || (isSignedIn() && request.auth.uid == membroId);
         allow write: if isOwner(restauranteId) || isSuperAdmin();
       }
 
@@ -135,13 +135,13 @@ service cloud.firestore {
         allow create: if (isSignedIn() && request.resource.data.status == 'a_fazer')
           || isGarcom(restauranteId) || isCozinha(restauranteId);
         // Apenas a equipe (dono/tablet operacional) marcha, cancela ou remove tickets
-        allow update, delete: if isOwner(restauranteId) || isGarcom(restauranteId) || isSuperAdmin();
+        allow update, delete: if isOwner(restauranteId) || isGarcom(restauranteId) || isCozinha(restauranteId) || isSuperAdmin();
       }
 
       // Mesas e Salão
       match /mesas/{numeroMesa} {
         allow read: if true;
-        allow write: if isOwner(restauranteId) || isSuperAdmin();
+        allow write: if isOwner(restauranteId) || isGarcom(restauranteId) || isSuperAdmin();
 
         // NÓ PAI: Comanda da Sessão do Cliente (agrega o subtotal)
         match /comandas_abertas/{clienteId} {
@@ -160,6 +160,7 @@ service cloud.firestore {
                 || isAllowedClientStatus(resource.data.status, request.resource.data.status)
               ))
             || isOwner(restauranteId)
+            || isGarcom(restauranteId)
           )) || (
             // Permite atualização de chamado do garçom pelo cliente
             request.resource.data.id == resource.data.id
@@ -168,7 +169,7 @@ service cloud.firestore {
 
           // Apenas o Garçom/Dono do restaurante pode libertar e encerrar a mesa
           // O cliente NÃO pode apagar a própria dívida ativa
-          allow delete: if isOwner(restauranteId) || isSuperAdmin();
+          allow delete: if isOwner(restauranteId) || isGarcom(restauranteId) || isSuperAdmin();
 
           // NÓ FILHO: Rodadas do Cliente (Vai para o KDS da Cozinha)
           match /pedidos/{pedidoId} {
@@ -191,8 +192,8 @@ service cloud.firestore {
       // Histórico de Sessões de Mesas (WORM - Write Once, Read Many)
       match /historico_sessoes_mesas/{historicoId} {
         // Apenas Garçom, Dono ou SuperAdmin registram o recibo no encerramento da mesa
-        allow create: if isOwner(restauranteId) || isSuperAdmin();
-        allow read: if isOwner(restauranteId) || isSuperAdmin();
+        allow create: if isOwner(restauranteId) || isGarcom(restauranteId) || isSuperAdmin();
+        allow read: if isOwner(restauranteId) || isGarcom(restauranteId) || isSuperAdmin();
         allow update, delete: if false; // Recibos históricos são estritamente imutáveis
       }
 

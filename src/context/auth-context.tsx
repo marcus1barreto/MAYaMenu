@@ -17,6 +17,7 @@ import { RESTAURANTE_DEMO } from "@/lib/mock-data";
 interface AuthContextType {
   user: User | null;
   restaurante: Restaurante | null;
+  role: "owner" | "garcom" | "cozinha" | "superadmin" | null;
   carregando: boolean;
   login: (email: string, pass: string) => Promise<void>;
   cadastrar: (
@@ -36,6 +37,7 @@ const AuthContext = createContext<AuthContextType | null>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [restaurante, setRestaurante] = useState<Restaurante | null>(null);
+  const [role, setRole] = useState<"owner" | "garcom" | "cozinha" | "superadmin" | null>(null);
   const [carregando, setCarregando] = useState(true);
 
   // Monitora estado do Auth e escuta o documento do restaurante em tempo real
@@ -66,8 +68,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (currentUser && !currentUser.isAnonymous) {
         try {
-          const { onSnapshot, collection, query, where, getDocs } = await import("firebase/firestore");
-          const restRef = doc(db, "restaurantes", currentUser.uid);
+          const { onSnapshot, collection, query, where, getDocs, doc } = await import("firebase/firestore");
+          
+          // Inspeciona claims do token (role e restauranteId para colaboradores da equipe)
+          let targetRestId = currentUser.uid;
+          try {
+            const tokenResult = await currentUser.getIdTokenResult();
+            const roleClaim = (tokenResult.claims.role as any) || (tokenResult.claims.superadmin ? "superadmin" : null);
+            setRole(roleClaim);
+            if (tokenResult.claims.restauranteId) {
+              targetRestId = tokenResult.claims.restauranteId as string;
+            }
+          } catch (e) {
+            console.warn("Não foi possível inspecionar claims do token:", e);
+          }
+
+          const restRef = doc(db, "restaurantes", targetRestId);
 
           unsubRestaurante = onSnapshot(
             restRef,
@@ -76,7 +92,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 setRestaurante({ id: snap.id, ...snap.data() } as Restaurante);
                 setCarregando(false);
               } else {
-                // Se não encontrar diretamente pelo doc(uid), busca por ownerId
+                // Se não encontrar diretamente pelo doc(targetRestId), busca por ownerId
                 try {
                   const q = query(collection(db, "restaurantes"), where("ownerId", "==", currentUser.uid));
                   const querySnap = await getDocs(q);
@@ -311,6 +327,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       value={{
         user,
         restaurante,
+        role,
         carregando,
         login,
         cadastrar,

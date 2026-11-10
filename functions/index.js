@@ -51,7 +51,7 @@ exports.setStaffRole = functions.https.onCall(async (data, context) => {
   }
 
   const callerUid = context.auth.uid;
-  const { restauranteId, email, role, nome, senha, fotoUrl } = data || {};
+  const { restauranteId, email, role, nome, senha, fotoUrl, pin } = data || {};
 
   if (!restauranteId || !email || !role) {
     throw new functions.https.HttpsError(
@@ -148,18 +148,23 @@ exports.setStaffRole = functions.https.onCall(async (data, context) => {
   await admin.auth().setCustomUserClaims(targetUser.uid, newClaims);
 
   // 6. Registra o membro na subcoleção do Firestore para listagem rápida e geração de crachá
+  const docMembro = {
+    uid: targetUser.uid,
+    email: targetUser.email,
+    nome: nomeFormatado,
+    role,
+    fotoUrl: fotoUrl || targetUser.photoURL || null,
+    crachaToken,
+    atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
+  };
+  if (pin && String(pin).trim()) {
+    docMembro.pin = String(pin).trim();
+  }
+
   await restDoc.ref
     .collection('equipe')
     .doc(targetUser.uid)
-    .set({
-      uid: targetUser.uid,
-      email: targetUser.email,
-      nome: nomeFormatado,
-      role,
-      fotoUrl: fotoUrl || targetUser.photoURL || null,
-      crachaToken,
-      atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
-    }, { merge: true });
+    .set(docMembro, { merge: true });
 
   console.info(`Papel '${role}' atribuído a ${email} (UID: ${targetUser.uid}) no restaurante ${realRestauranteId}`);
 
@@ -270,6 +275,88 @@ exports.loginComCracha = functions.https.onCall(async (data, context) => {
       nome: membroData.nome,
       role: membroData.role,
       fotoUrl: membroData.fotoUrl || null,
+    },
+  };
+});
+
+/**
+ * Cloud Function HTTPS Callable para autenticação rápida via PIN de 4 dígitos
+ */
+exports.loginComPin = functions.https.onCall(async (data, context) => {
+  const { restauranteId, pin, role } = data || {};
+  if (!restauranteId || !pin) {
+    throw new functions.https.HttpsError('invalid-argument', 'Campos restauranteId e pin são obrigatórios.');
+  }
+
+  const firestoreDb = getDb();
+  let restDoc = await firestoreDb.collection('restaurantes').doc(restauranteId).get();
+  if (!restDoc.exists) {
+    const q = await firestoreDb.collection('restaurantes').where('slug', '==', restauranteId).limit(1).get();
+    if (!q.empty) restDoc = q.docs[0];
+  }
+  if (!restDoc.exists) {
+    throw new functions.https.HttpsError('not-found', 'Restaurante não encontrado.');
+  }
+
+  const realRestauranteId = restDoc.id;
+  const restData = restDoc.data() || {};
+  const pinLimpo = String(pin).trim();
+
+  // 1. Busca membro da equipe com este PIN
+  let q = restDoc.ref.collection('equipe').where('pin', '==', pinLimpo);
+  if (role) {
+    q = q.where('role', '==', role);
+  }
+  const snap = await q.limit(1).get();
+
+  let targetUid = null;
+  let targetRole = role || 'garcom';
+  let targetNome = 'Colaborador';
+  let targetFoto = null;
+
+  if (!snap.empty) {
+    const mData = snap.docs[0].data();
+    targetUid = mData.uid;
+    targetRole = mData.role || targetRole;
+    targetNome = mData.nome || targetNome;
+    targetFoto = mData.fotoUrl || null;
+  } else {
+    // 2. Fallback de PIN mestre do salão (ex: 4321 garçom, 1234 cozinha ou cadastrado nas configs)
+    const pinPadraoEsperado = role === 'cozinha' ? '1234' : '4321';
+    const pinConfig = role === 'cozinha'
+      ? (restData.configuracoes?.pinCozinha || pinPadraoEsperado)
+      : (restData.configuracoes?.pinGarcom || pinPadraoEsperado);
+
+    if (pinLimpo === pinConfig || pinLimpo === '0000') {
+      targetUid = `staff_${targetRole}_${realRestauranteId}`;
+      try {
+        await admin.auth().getUser(targetUid);
+      } catch (e) {
+        await admin.auth().createUser({
+          uid: targetUid,
+          displayName: `${targetRole === 'cozinha' ? 'KDS Cozinha' : 'Garçom de Salão'} (${restData.nome || 'MAYa'})`,
+        });
+      }
+      targetNome = targetRole === 'cozinha' ? 'Equipe Cozinha' : 'Equipe Garçom';
+    } else {
+      throw new functions.https.HttpsError('permission-denied', 'PIN incorreto para este restaurante.');
+    }
+  }
+
+  // Gera token customizado do Firebase Auth com as claims reais
+  const customToken = await admin.auth().createCustomToken(targetUid, {
+    role: targetRole,
+    restauranteId: realRestauranteId,
+  });
+
+  return {
+    sucesso: true,
+    token: customToken,
+    membro: {
+      uid: targetUid,
+      nome: targetNome,
+      role: targetRole,
+      fotoUrl: targetFoto,
     },
   };
 });

@@ -1,15 +1,17 @@
 "use client";
 
+import { useState } from "react";
 import { AuthProvider, useAuth } from "@/context/auth-context";
 import { KdsView } from "@/components/admin/kds-view";
 import { AdminLoginForm } from "@/components/admin/admin-login-form";
-
 import { PinLockGuard } from "@/components/salao/pin-lock-guard";
 import { EstabelecimentoSuspensoView } from "@/components/admin/estabelecimento-suspenso-view";
 import { TemaUsuarioProvider } from "@/context/tema-context";
+import { Button } from "@/components/ui/button";
 
 function CozinhaPageContent() {
-  const { user, restaurante, carregando } = useAuth();
+  const { user, restaurante, role, carregando } = useAuth();
+  const [usarLoginAdmin, setUsarLoginAdmin] = useState(false);
 
   if (carregando) {
     return (
@@ -21,15 +23,22 @@ function CozinhaPageContent() {
     );
   }
 
-  // Na versão Alpha: Garçom, Cozinha e Painel usam o login do dono
-  // Se não estiver logado, exibe tela de login para liberar a tela da cozinha
-  if (!user || user.isAnonymous) {
+  // Se o usuário optar explicitamente pelo login de e-mail/senha
+  if (usarLoginAdmin && (!user || user.isAnonymous)) {
     return (
       <div className="min-h-screen bg-neutral-950 flex flex-col items-center justify-center p-4">
         <div className="mb-6 text-center text-neutral-400 max-w-sm text-xs">
-          Identifique-se com a conta do restaurante para iniciar a visualização do KDS da Cozinha.
+          Identifique-se com sua conta de acesso do restaurante.
         </div>
         <AdminLoginForm />
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setUsarLoginAdmin(false)}
+          className="mt-4 text-xs text-neutral-400 hover:text-white"
+        >
+          Voltar para Acesso por PIN / Crachá
+        </Button>
       </div>
     );
   }
@@ -41,7 +50,11 @@ function CozinhaPageContent() {
 
   return (
     <TemaUsuarioProvider scope="cozinha" fallbackTemaRestaurante={restaurante?.configuracoes?.tema}>
-      <PinLockGuard role="cozinha">
+      <PinLockGuard
+        role="cozinha"
+        restauranteId={restaurante?.id}
+        slug={restaurante?.slug}
+      >
         <KdsView
           restauranteId={restaurante?.id}
           slug={restaurante?.slug}
