@@ -867,8 +867,8 @@ export function AdminDashboard() {
                 {restaurante?.nome || "Painel MAYaMenu"}
               </h1>
               {restaurante?.patrocinio?.ativo && (
-                <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-blue-500/15 text-blue-500 border border-blue-500/30 flex items-center gap-1 shrink-0">
-                  <Sparkles className="w-2.5 h-2.5 text-blue-500" />
+                <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 flex items-center gap-1 shrink-0 shadow-2xs">
+                  <Sparkles className="w-2.5 h-2.5 text-amber-600" />
                   Patrocinado por {restaurante.patrocinio.patrocinadorNome}
                 </span>
               )}
@@ -1161,17 +1161,17 @@ export function AdminDashboard() {
                                     type="button"
                                     onClick={() => handleExcluirPrato(item.id, item.fotoUrl)}
                                     className={`p-1.5 rounded-lg text-xs transition-colors border ${
-                                      (item as any).bloqueadoParaExclusao
-                                        ? "bg-zinc-100 text-zinc-400 hover:bg-blue-50 hover:text-blue-600 border-zinc-200 cursor-help"
+                                      item.bloqueadoParaExclusao
+                                        ? "bg-amber-50 text-amber-700 hover:bg-amber-100 hover:text-amber-800 border-amber-200 cursor-help"
                                         : "bg-red-500/10 hover:bg-red-500/20 text-red-500 border-red-500/20"
                                     }`}
                                     title={
-                                      (item as any).bloqueadoParaExclusao
+                                      item.bloqueadoParaExclusao
                                         ? "Item oficial do patrocínio (bloqueado para exclusão)"
                                         : "Excluir item"
                                     }
                                   >
-                                    {(item as any).bloqueadoParaExclusao ? (
+                                    {item.bloqueadoParaExclusao ? (
                                       <Lock className="w-3.5 h-3.5" />
                                     ) : (
                                       <Trash2 className="w-3.5 h-3.5" />

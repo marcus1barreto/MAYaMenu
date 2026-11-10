@@ -8,15 +8,37 @@ export const RESTAURANTE_DEMO: Restaurante = {
   ownerId: "owner-demo-uid",
   slug: "demo",
   nome: "MAYaBurger & Co.",
+  plano: "pro",
   configuracoes: {
     corPrimaria: "#E11D48", // Rose-600 vibrante e elegante
     tema: "light",
     capaUrl: "/images/capa-padrao.webp",
     modoOperacao: "hibrido",
   },
+  patrocinio: {
+    ativo: true,
+    patrocinadorId: "spn-bierhaus-demo",
+    patrocinadorNome: "Cervejaria BierHaus",
+    loteId: "lote-bierhaus-2026",
+    dataExpiracao: "2027-12-31T23:59:59.000Z",
+    itensInjetados: ["spn-chopp-artesanal-ipa-500"],
+  },
 };
 
 export const CARDAPIO_DEMO: MenuItem[] = [
+  {
+    id: "spn-chopp-artesanal-ipa-500",
+    nome: "Chopp Artesanal BierHaus IPA 500ml",
+    categoria: "Chopps & Cervejas",
+    descricao: "Cerveja artesanal fresca com lúpulos nobres cítricos, amargor marcante e aroma marcante de maracujá e pinho.",
+    precoBase: 22.0,
+    fotoUrl: "/images/demo/coquetel.webp",
+    ativo: true,
+    origemPatrocinadorId: "spn-bierhaus-demo",
+    bloqueadoParaExclusao: true,
+    seloPatrocinador: "Chopp Oficial Parceiro",
+    tempoPreparoEstimado: 3,
+  },
   {
     id: "item-burguer-artesanal",
     nome: "MAYaBurger Especial",

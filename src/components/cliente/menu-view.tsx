@@ -779,10 +779,10 @@ export function MenuView({ restaurante: restauranteInicial, cardapio: cardapioIn
                         <h3 className="text-[17px] sm:text-lg font-bold font-heading text-foreground group-hover:text-primary transition-colors line-clamp-1 tracking-tight">
                           {item.nome}
                         </h3>
-                        {(item as any).seloPatrocinador && (
-                          <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-500 border border-blue-500/30 flex items-center gap-1 shrink-0">
-                            <Sparkles className="w-2.5 h-2.5 text-blue-500" />
-                            {(item as any).seloPatrocinador}
+                        {item.seloPatrocinador && (
+                          <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200/80 flex items-center gap-1 shrink-0 shadow-2xs">
+                            <Sparkles className="w-2.5 h-2.5 text-amber-600" />
+                            {item.seloPatrocinador}
                           </span>
                         )}
                       </div>

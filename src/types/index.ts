@@ -77,6 +77,10 @@ export interface MenuItem {
   ordem?: number; // Posição de ordenação tátil dentro da categoria ou cardápio
   tempoPreparoEstimado?: number; // Em minutos para otimização de KDS/cozinha
   grupoModificadores?: GrupoModificador[];
+  // Integração B2B / Patrocinador Master
+  origemPatrocinadorId?: string;
+  bloqueadoParaExclusao?: boolean;
+  seloPatrocinador?: string;
 }
 
 export interface OpcaoModificador {
