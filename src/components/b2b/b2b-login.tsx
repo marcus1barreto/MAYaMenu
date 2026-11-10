@@ -191,3 +191,4 @@ export function B2BLogin({ onAutenticado }: B2BLoginProps) {
     </div>
   );
 }
+

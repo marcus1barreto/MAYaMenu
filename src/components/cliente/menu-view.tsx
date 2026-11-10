@@ -775,9 +775,17 @@ export function MenuView({ restaurante: restauranteInicial, cardapio: cardapioIn
                   {/* Informações Textuais */}
                   <div className="flex-1 min-w-0 flex flex-col justify-between">
                     <div>
-                      <h3 className="text-[17px] sm:text-lg font-bold font-heading text-foreground group-hover:text-primary transition-colors line-clamp-1 tracking-tight">
-                        {item.nome}
-                      </h3>
+                      <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
+                        <h3 className="text-[17px] sm:text-lg font-bold font-heading text-foreground group-hover:text-primary transition-colors line-clamp-1 tracking-tight">
+                          {item.nome}
+                        </h3>
+                        {(item as any).seloPatrocinador && (
+                          <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-500 border border-blue-500/30 flex items-center gap-1 shrink-0">
+                            <Sparkles className="w-2.5 h-2.5 text-blue-500" />
+                            {(item as any).seloPatrocinador}
+                          </span>
+                        )}
+                      </div>
                       <p className="text-sm text-muted-foreground leading-relaxed mt-1 line-clamp-2">
                         {item.descricao}
                       </p>

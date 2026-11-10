@@ -316,3 +316,4 @@ export function B2BCatalogoView({ patrocinadorId, itens }: B2BCatalogoViewProps)
     </div>
   );
 }
+

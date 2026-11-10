@@ -109,3 +109,4 @@ export function B2BRestaurantesView({ lotes }: B2BRestaurantesViewProps) {
     </div>
   );
 }
+

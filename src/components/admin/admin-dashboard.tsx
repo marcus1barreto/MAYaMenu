@@ -807,6 +807,14 @@ export function AdminDashboard() {
   };
 
   const handleExcluirPrato = async (id: string, fotoUrl?: string) => {
+    const itemAlvo = itensCardapio.find((it) => it.id === id);
+    if (itemAlvo && ((itemAlvo as any).bloqueadoParaExclusao || (itemAlvo as any).origemPatrocinadorId)) {
+      alert(
+        "Este produto faz parte do programa de patrocínio oficial com a marca parceira e não pode ser excluído do cardápio enquanto a concessão patrocinada estiver ativa. Você pode alterar o preço de venda ou desativar temporariamente a disponibilidade se estiver sem estoque."
+      );
+      return;
+    }
+
     if (!window.confirm("Tem certeza que deseja excluir este prato do cardápio?")) return;
     if (restaurante?.id) {
       try {
@@ -854,9 +862,17 @@ export function AdminDashboard() {
             M
           </div>
           <div>
-            <h1 className="text-base sm:text-lg font-black tracking-tight leading-tight">
-              {restaurante?.nome || "Painel MAYaMenu"}
-            </h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-base sm:text-lg font-black tracking-tight leading-tight">
+                {restaurante?.nome || "Painel MAYaMenu"}
+              </h1>
+              {restaurante?.patrocinio?.ativo && (
+                <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-blue-500/15 text-blue-500 border border-blue-500/30 flex items-center gap-1 shrink-0">
+                  <Sparkles className="w-2.5 h-2.5 text-blue-500" />
+                  Patrocinado por {restaurante.patrocinio.patrocinadorNome}
+                </span>
+              )}
+            </div>
             <p className="text-[11px] text-muted-foreground">Administração & Operação</p>
           </div>
         </div>
@@ -1077,6 +1093,12 @@ export function AdminDashboard() {
                                 <div className="min-w-0">
                                   <div className="flex items-center gap-2">
                                     <h4 className="text-sm font-black text-neutral-950 truncate">{item.nome}</h4>
+                                    {(item as any).seloPatrocinador && (
+                                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-600 border border-blue-500/30 flex items-center gap-1 shrink-0">
+                                        <Sparkles className="w-2.5 h-2.5" />
+                                        {(item as any).seloPatrocinador}
+                                      </span>
+                                    )}
                                     <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-600 border border-neutral-200 font-bold">
                                       #{idx + 1}
                                     </span>
@@ -1138,10 +1160,22 @@ export function AdminDashboard() {
                                   <button
                                     type="button"
                                     onClick={() => handleExcluirPrato(item.id, item.fotoUrl)}
-                                    className="p-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg text-xs transition-colors border border-red-500/20"
-                                    title="Excluir item"
+                                    className={`p-1.5 rounded-lg text-xs transition-colors border ${
+                                      (item as any).bloqueadoParaExclusao
+                                        ? "bg-zinc-100 text-zinc-400 hover:bg-blue-50 hover:text-blue-600 border-zinc-200 cursor-help"
+                                        : "bg-red-500/10 hover:bg-red-500/20 text-red-500 border-red-500/20"
+                                    }`}
+                                    title={
+                                      (item as any).bloqueadoParaExclusao
+                                        ? "Item oficial do patrocínio (bloqueado para exclusão)"
+                                        : "Excluir item"
+                                    }
                                   >
-                                    <Trash2 className="w-3.5 h-3.5" />
+                                    {(item as any).bloqueadoParaExclusao ? (
+                                      <Lock className="w-3.5 h-3.5" />
+                                    ) : (
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    )}
                                   </button>
                                   <Switch
                                     checked={item.ativo}

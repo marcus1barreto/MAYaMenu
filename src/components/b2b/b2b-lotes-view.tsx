@@ -328,3 +328,4 @@ export function B2BLotesView({ patrocinadorId, lotes }: B2BLotesViewProps) {
     </div>
   );
 }
+

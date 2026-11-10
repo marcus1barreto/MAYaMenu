@@ -196,3 +196,4 @@ export function B2BPortal({ patrocinador, onLogout }: B2BPortalProps) {
     </div>
   );
 }
+

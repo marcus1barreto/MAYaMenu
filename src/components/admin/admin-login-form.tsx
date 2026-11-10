@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useAuth } from "@/context/auth-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,8 +15,12 @@ import {
   ShieldCheck,
   CheckCircle2,
   BookOpen,
+  Tag,
+  Gift,
 } from "lucide-react";
 import { CartaoConcessaoModal } from "./cartao-concessao-modal";
+import { validarVoucherPatrocinio, ativarPatrocinioNoRestaurante } from "@/lib/b2b-service";
+import { auth } from "@/lib/firebase";
 import type { ModoOperacao } from "@/types";
 
 function slugify(text: string): string {
@@ -36,14 +40,63 @@ export function AdminLoginForm({ onLogado }: { onLogado?: () => void }) {
   const [loginEmail, setLoginEmail] = useState("");
   const [loginSenha, setLoginSenha] = useState("");
 
-  // Campos de Cadastro Free (Opção C)
+  // Campos de Cadastro Free ou Patrocinado
   const [nomeRestaurante, setNomeRestaurante] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
   const [cadastroEmail, setCadastroEmail] = useState("");
   const [cadastroSenha, setCadastroSenha] = useState("");
+  const [voucherPatrocinio, setVoucherPatrocinio] = useState("");
+  const [patrocinioValidado, setPatrocinioValidado] = useState<{
+    patrocinadorNome: string;
+    campanhaNome: string;
+  } | null>(null);
 
   const [erro, setErro] = useState<string | null>(null);
   const [submetendo, setSubmetendo] = useState(false);
+
+  // Lê voucher da URL se fornecido (ex: /admin?voucher=BIERHAUS2026)
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const voucherParam = params.get("voucher") || params.get("sponsor") || "";
+      if (voucherParam) {
+        setVoucherPatrocinio(voucherParam.toUpperCase());
+        setAbaAtiva("cadastro");
+        validarVoucherPatrocinio(voucherParam).then((res) => {
+          if (res.valido && res.patrocinador && res.lote) {
+            setPatrocinioValidado({
+              patrocinadorNome: res.patrocinador.nomeFantasia,
+              campanhaNome: res.lote.nome,
+            });
+          }
+        });
+      }
+    }
+  }, []);
+
+  const handleValidarVoucherAoSair = async () => {
+    const cod = voucherPatrocinio.trim().toUpperCase();
+    if (!cod) {
+      setPatrocinioValidado(null);
+      return;
+    }
+
+    try {
+      const res = await validarVoucherPatrocinio(cod);
+      if (res.valido && res.patrocinador && res.lote) {
+        setPatrocinioValidado({
+          patrocinadorNome: res.patrocinador.nomeFantasia,
+          campanhaNome: res.lote.nome,
+        });
+        setErro(null);
+      } else {
+        setPatrocinioValidado(null);
+        if (res.mensagem) setErro(res.mensagem);
+      }
+    } catch {
+      // Ignora erro momentâneo
+    }
+  };
 
   // Estado para transição do Cartão de Concessão Digital
   const [concessaoEmitida, setConcessaoEmitida] = useState<{
@@ -95,12 +148,24 @@ export function AdminLoginForm({ onLogado }: { onLogado?: () => void }) {
         slugFinal = `${slugBase}-${Math.floor(100 + Math.random() * 900)}`;
       }
 
-      // 2. Emissão automática de concessão Free Oficial
+      // Valida voucher se informado
+      const codVoucher = voucherPatrocinio.trim().toUpperCase();
+      let validacaoVoucher: any = null;
+      if (codVoucher) {
+        validacaoVoucher = await validarVoucherPatrocinio(codVoucher);
+        if (!validacaoVoucher.valido) {
+          throw new Error(validacaoVoucher.mensagem || "Voucher de patrocínio inválido ou expirado.");
+        }
+      }
+
+      // 2. Emissão automática de concessão (Plus se patrocinado, Free se comum)
       const { criarNovaLicenca } = await import("@/lib/licenca-service");
       const licenca = await criarNovaLicenca({
-        plano: "free",
+        plano: validacaoVoucher ? "pro" : "free",
         responsavel: cadastroEmail.trim(),
-        notas: `Cadastro Direto Web. WhatsApp: ${whatsapp.trim() || "Não informado"}`,
+        notas: validacaoVoucher
+          ? `Concessão Patrocinada por ${validacaoVoucher.patrocinador?.nomeFantasia} (Campanha ${validacaoVoucher.lote?.nome} / Voucher ${codVoucher}). WhatsApp: ${whatsapp.trim() || "Não informado"}`
+          : `Cadastro Direto Web. WhatsApp: ${whatsapp.trim() || "Não informado"}`,
       });
 
       // 3. Cadastra usuário e instância de salão
@@ -113,7 +178,17 @@ export function AdminLoginForm({ onLogado }: { onLogado?: () => void }) {
         "hibrido"
       );
 
-      // 4. Aciona a transição do Cartão de Concessão Digital (Opção C)
+      // 4. Se for patrocinado, injeta automaticamente os itens do catálogo master e vincula a cota
+      if (validacaoVoucher && auth.currentUser?.uid) {
+        await ativarPatrocinioNoRestaurante({
+          restauranteId: auth.currentUser.uid,
+          nomeRestaurante: nomeRestaurante.trim(),
+          slugRestaurante: slugFinal,
+          codigoVoucher: codVoucher,
+        });
+      }
+
+      // 5. Aciona a transição do Cartão de Concessão Digital
       setConcessaoEmitida({
         restauranteNome: nomeRestaurante.trim(),
         codigoLicenca: licenca.id,
@@ -260,10 +335,20 @@ export function AdminLoginForm({ onLogado }: { onLogado?: () => void }) {
         {/* ABA: CADASTRAR GRÁTIS (OPÇÃO C) */}
         {abaAtiva === "cadastro" && (
           <form onSubmit={handleCadastroSubmit} className="relative space-y-3.5">
-            <div className="p-3 bg-rose-950/30 border border-rose-500/20 rounded-2xl flex items-center gap-2.5 text-xs text-rose-300">
-              <ShieldCheck className="w-4 h-4 text-rose-400 flex-shrink-0" />
-              <span>Concessão Free Vitalícia: sem mensalidade, sem cartão de crédito.</span>
-            </div>
+            {patrocinioValidado ? (
+              <div className="p-3 bg-blue-950/50 border border-blue-500/30 rounded-2xl flex items-center gap-2.5 text-xs text-blue-200 shadow-md shadow-blue-500/10">
+                <Sparkles className="w-4 h-4 text-blue-400 flex-shrink-0" />
+                <div>
+                  <strong className="text-white block">Patrocínio Master Confirmado!</strong>
+                  <span>Concessão Plus subsidiada por <strong>{patrocinioValidado.patrocinadorNome}</strong> ({patrocinioValidado.campanhaNome}).</span>
+                </div>
+              </div>
+            ) : (
+              <div className="p-3 bg-rose-950/30 border border-rose-500/20 rounded-2xl flex items-center gap-2.5 text-xs text-rose-300">
+                <ShieldCheck className="w-4 h-4 text-rose-400 flex-shrink-0" />
+                <span>Concessão Free Vitalícia: sem mensalidade, sem cartão de crédito.</span>
+              </div>
+            )}
 
             <div className="space-y-1">
               <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-300 flex items-center gap-1">
@@ -325,12 +410,41 @@ export function AdminLoginForm({ onLogado }: { onLogado?: () => void }) {
               />
             </div>
 
+            {/* Voucher de Patrocínio Opcional */}
+            <div className="space-y-1">
+              <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-300 flex items-center justify-between">
+                <span className="flex items-center gap-1">
+                  <Tag className="w-3 h-3 text-zinc-500" />
+                  Voucher de Patrocínio / Parceria
+                </span>
+                <span className="text-[10px] text-zinc-500 font-normal">Opcional</span>
+              </label>
+              <Input
+                type="text"
+                value={voucherPatrocinio}
+                onChange={(e) => setVoucherPatrocinio(e.target.value.toUpperCase())}
+                onBlur={handleValidarVoucherAoSair}
+                placeholder="Ex: BIERHAUS2026"
+                className="bg-zinc-950/60 border-zinc-800 text-zinc-100 placeholder:text-zinc-600 rounded-xl h-10 text-xs font-mono uppercase focus:border-blue-500 focus:ring-1 focus:ring-blue-500/40"
+              />
+            </div>
+
             <Button
               type="submit"
               disabled={submetendo}
-              className="w-full h-11 bg-rose-600 hover:bg-rose-500 text-white font-black rounded-xl shadow-lg shadow-rose-600/30 mt-2 transition-all flex items-center justify-center gap-2"
+              className={`w-full h-11 text-white font-black rounded-xl shadow-lg mt-2 transition-all flex items-center justify-center gap-2 ${
+                patrocinioValidado
+                  ? "bg-blue-600 hover:bg-blue-500 shadow-blue-600/30"
+                  : "bg-rose-600 hover:bg-rose-500 shadow-rose-600/30"
+              }`}
             >
-              <span>{submetendo ? "Emitindo Concessão..." : "Emitir Meu Cartão de Acesso Free"}</span>
+              <span>
+                {submetendo
+                  ? "Emitindo Concessão..."
+                  : patrocinioValidado
+                  ? "Ativar Meu Acesso Patrocinado Plus"
+                  : "Emitir Meu Cartão de Acesso Free"}
+              </span>
               <ArrowRight className="w-4 h-4" />
             </Button>
           </form>
