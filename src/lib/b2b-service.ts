@@ -388,3 +388,4 @@ export async function ativarPatrocinioNoRestaurante(params: {
     return { sucesso: false, mensagem: err?.message || "Erro durante a ativação do patrocínio." };
   }
 }
+

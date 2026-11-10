@@ -79,3 +79,4 @@ export interface MetricasSelloutItem {
   restaurantesContabilizados: number;
   ultimaVendaEm?: string;
 }
+
