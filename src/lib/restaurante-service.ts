@@ -562,6 +562,31 @@ export async function marcarComandaPagaFirestore(
     clienteId
   );
   await updateDoc(comandaRef, { status: "pago" });
+
+  // Telemetria automática de Sell-Out para itens de patrocinadores
+  try {
+    const pedidosCol = collection(comandaRef, "pedidos");
+    const pedidosSnap = await getDocs(pedidosCol);
+    for (const pedDoc of pedidosSnap.docs) {
+      const pedData = pedDoc.data() as PedidoRodada;
+      for (const it of pedData.itens || []) {
+        if ((it as any).origemPatrocinadorId || String(it.menuItemId).startsWith("spn-")) {
+          const { registrarVendaItemPatrocinado } = await import("@/lib/b2b-service");
+          const patId = (it as any).origemPatrocinadorId || "spn-bierhaus-demo";
+          await registrarVendaItemPatrocinado({
+            patrocinadorId: patId,
+            itemId: it.menuItemId,
+            itemNome: it.nome,
+            quantidade: it.quantidade || 1,
+            valorTotal: (it.precoFinal || 0) * (it.quantidade || 1),
+            restauranteId,
+          });
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("Telemetria de sellout não pôde ser enviada:", err);
+  }
 }
 
 /**

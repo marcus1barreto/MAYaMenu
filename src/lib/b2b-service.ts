@@ -14,6 +14,7 @@ import {
   where,
   onSnapshot,
   serverTimestamp,
+  increment,
   type Unsubscribe,
 } from "firebase/firestore";
 import type {
@@ -387,5 +388,85 @@ export async function ativarPatrocinioNoRestaurante(params: {
     console.error("Falha ao ativar patrocínio:", err);
     return { sucesso: false, mensagem: err?.message || "Erro durante a ativação do patrocínio." };
   }
+}
+
+/**
+ * Registra a venda de um item patrocinado para telemetria agregada de Sell-Out
+ */
+export async function registrarVendaItemPatrocinado(params: {
+  patrocinadorId: string;
+  itemId: string;
+  itemNome: string;
+  quantidade: number;
+  valorTotal: number;
+  restauranteId: string;
+}): Promise<void> {
+  if (!params.patrocinadorId || !params.itemId) return;
+
+  try {
+    const cleanItemId = params.itemId.replace(/^spn-/, "");
+    const docRef = doc(db, "patrocinadores", params.patrocinadorId, "metricas_sellout", cleanItemId);
+
+    const docSnap = await getDoc(docRef);
+    if (!docSnap.exists()) {
+      await setDoc(docRef, {
+        itemId: cleanItemId,
+        itemNome: params.itemNome,
+        patrocinadorId: params.patrocinadorId,
+        totalUnidadesVendidas: params.quantidade,
+        faturamentoTotalEstimado: params.valorTotal,
+        restaurantesContabilizados: [params.restauranteId],
+        ultimaVendaEm: new Date().toISOString(),
+      });
+    } else {
+      const data = docSnap.data();
+      const rests = new Set(data?.restaurantesContabilizados || []);
+      rests.add(params.restauranteId);
+
+      await updateDoc(docRef, {
+        totalUnidadesVendidas: increment(params.quantidade),
+        faturamentoTotalEstimado: increment(params.valorTotal),
+        restaurantesContabilizados: Array.from(rests),
+        ultimaVendaEm: new Date().toISOString(),
+      });
+    }
+  } catch (err) {
+    console.warn("Falha ao registrar sellout:", err);
+  }
+}
+
+/**
+ * Escuta as métricas agregadas de Sell-Out em tempo real para o patrocinador
+ */
+export function escutarMetricasSellout(
+  patrocinadorId: string,
+  onUpdate: (metricas: MetricasSelloutItem[]) => void
+): Unsubscribe {
+  const colRef = collection(db, "patrocinadores", patrocinadorId, "metricas_sellout");
+  return onSnapshot(
+    colRef,
+    (snap) => {
+      const metricas: MetricasSelloutItem[] = [];
+      snap.forEach((docSnap) => {
+        const d = docSnap.data();
+        metricas.push({
+          itemId: docSnap.id,
+          itemNome: d.itemNome || docSnap.id,
+          patrocinadorId,
+          totalUnidadesVendidas: d.totalUnidadesVendidas || 0,
+          faturamentoTotalEstimado: d.faturamentoTotalEstimado || 0,
+          restaurantesContabilizados: Array.isArray(d.restaurantesContabilizados)
+            ? d.restaurantesContabilizados.length
+            : (d.restaurantesContabilizados || 0),
+          ultimaVendaEm: d.ultimaVendaEm,
+        });
+      });
+      onUpdate(metricas);
+    },
+    (err) => {
+      console.warn("Erro ao escutar métricas de sellout:", err);
+      onUpdate([]);
+    }
+  );
 }
 

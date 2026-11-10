@@ -14,12 +14,14 @@ import {
   ShieldCheck,
   Check,
   Copy,
+  TrendingUp,
 } from "lucide-react";
-import { escutarCatalogoMaster, escutarLotesLicencas } from "@/lib/b2b-service";
-import type { PatrocinadorB2B, ItemCatalogoPatrocinador, LoteLicencasB2B } from "@/types/b2b";
+import { escutarCatalogoMaster, escutarLotesLicencas, escutarMetricasSellout } from "@/lib/b2b-service";
+import type { PatrocinadorB2B, ItemCatalogoPatrocinador, LoteLicencasB2B, MetricasSelloutItem } from "@/types/b2b";
 import { B2BLotesView } from "./b2b-lotes-view";
 import { B2BCatalogoView } from "./b2b-catalogo-view";
 import { B2BRestaurantesView } from "./b2b-restaurantes-view";
+import { B2BSelloutView } from "./b2b-sellout-view";
 
 interface B2BPortalProps {
   patrocinador: PatrocinadorB2B;
@@ -27,9 +29,10 @@ interface B2BPortalProps {
 }
 
 export function B2BPortal({ patrocinador, onLogout }: B2BPortalProps) {
-  const [abaAtiva, setAbaAtiva] = useState<"lotes" | "catalogo" | "restaurantes">("lotes");
+  const [abaAtiva, setAbaAtiva] = useState<"lotes" | "catalogo" | "restaurantes" | "sellout">("lotes");
   const [itensMaster, setItensMaster] = useState<ItemCatalogoPatrocinador[]>([]);
   const [lotes, setLotes] = useState<LoteLicencasB2B[]>([]);
+  const [metricasSellout, setMetricasSellout] = useState<MetricasSelloutItem[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [chaveCopiada, setChaveCopiada] = useState(false);
 
@@ -44,12 +47,17 @@ export function B2BPortal({ patrocinador, onLogout }: B2BPortalProps) {
 
     const unsubLotes = escutarLotesLicencas(patrocinador.id, (novosLotes) => {
       setLotes(novosLotes);
+    });
+
+    const unsubSellout = escutarMetricasSellout(patrocinador.id, (novasMetricas) => {
+      setMetricasSellout(novasMetricas);
       setCarregando(false);
     });
 
     return () => {
       unsubCatalogo();
       unsubLotes();
+      unsubSellout();
     };
   }, [patrocinador?.id]);
 
@@ -170,6 +178,19 @@ export function B2BPortal({ patrocinador, onLogout }: B2BPortalProps) {
             <Store className="w-4 h-4" />
             <span>Rede de Restaurantes</span>
           </button>
+
+          <button
+            type="button"
+            onClick={() => setAbaAtiva("sellout")}
+            className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 ${
+              abaAtiva === "sellout"
+                ? "bg-blue-600 text-white shadow-lg shadow-blue-600/30"
+                : "text-zinc-400 hover:text-white"
+            }`}
+          >
+            <TrendingUp className="w-4 h-4" />
+            <span>Sell-Out no PDV</span>
+          </button>
         </div>
 
         {/* RENDERIZAÇÃO DA ABA ATIVA */}
@@ -190,6 +211,13 @@ export function B2BPortal({ patrocinador, onLogout }: B2BPortalProps) {
         {abaAtiva === "restaurantes" && (
           <B2BRestaurantesView
             lotes={lotes}
+          />
+        )}
+
+        {abaAtiva === "sellout" && (
+          <B2BSelloutView
+            metricas={metricasSellout}
+            itensMaster={itensMaster}
           />
         )}
       </main>
