@@ -23,6 +23,16 @@ export interface Restaurante {
     loteId: string;
     dataExpiracao: string;
     itensInjetados: string[];
+    slots?: Array<{
+      patrocinadorId: string;
+      patrocinadorNome: string;
+      categoriaSugerida: string;
+      loteId: string;
+      codigoVoucher: string;
+      itensInjetados: string[];
+      mesesAdicionados: number;
+      vinculadoEm: string;
+    }>;
   };
   configuracoes: {
     corPrimaria: string; // Injetada no Tailwind

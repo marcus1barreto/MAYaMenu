@@ -78,8 +78,8 @@ export const LOTES_DEMO: LoteLicencasB2B[] = [
     codigoCampanha: "BIERHAUS2026",
     totalLicencas: 50,
     licencasAtivadas: 1,
-    validadeMeses: 12,
-    dataExpiracao: "2027-12-31T23:59:59.000Z",
+    validadeMeses: 6,
+    dataExpiracao: "2026-12-31T23:59:59.000Z",
     ativo: true,
     restaurantesVinculados: [
       {
@@ -431,13 +431,19 @@ export async function validarVoucherPatrocinio(
 /**
  * Ativa uma licença patrocinada no restaurante e injeta automaticamente
  * os itens do Catálogo Master da marca no cardápio do restaurante.
+ *
+ * REGRAS DE NEGÓCIO B2B MULTI-PATROCÍNIO:
+ * 1. Cada patrocínio adiciona por padrão +6 MESES de validade cumulativa.
+ * 2. Trava de Categoria (Category Lock): bloqueia marcas concorrentes no mesmo segmento.
+ * 3. Patrocinadores não concorrentes somam tempo e ganham visibilidade conjunta no cardápio.
+ * 4. O estabelecimento é promovido aos benefícios da linha PRO (KDS, mesas, comandas).
  */
 export async function ativarPatrocinioNoRestaurante(params: {
   restauranteId: string;
   nomeRestaurante: string;
   slugRestaurante: string;
   codigoVoucher: string;
-}): Promise<{ sucesso: boolean; mensagem?: string }> {
+}): Promise<{ sucesso: boolean; mensagem?: string; novaDataExpiracao?: string; mesesAdicionados?: number }> {
   const validacao = await validarVoucherPatrocinio(params.codigoVoucher);
   if (!validacao.valido || !validacao.lote || !validacao.patrocinador) {
     return { sucesso: false, mensagem: validacao.mensagem || "Voucher inválido." };
@@ -446,17 +452,78 @@ export async function ativarPatrocinioNoRestaurante(params: {
   const { lote, patrocinador } = validacao;
 
   try {
+    const restRef = doc(db, "restaurantes", params.restauranteId);
+    const restSnap = await getDoc(restRef);
+    const restData = restSnap.exists() ? (restSnap.data() as any) : null;
+
     // 1. Busca os itens do Catálogo Master do Patrocinador
     const colMaster = collection(db, "patrocinadores", patrocinador.id, "catalogo_master");
     const snapMaster = await getDocs(colMaster);
     const itensInjetadosIds: string[] = [];
 
-    // 2. Injeta os itens no cardápio do restaurante
+    // Extrai as categorias representadas pelos itens desta marca
+    const categoriasNovas = new Set<string>();
+    snapMaster.forEach((docSnap) => {
+      const it = docSnap.data() as ItemCatalogoPatrocinador;
+      if (it.categoriaSugerida) {
+        categoriasNovas.add(it.categoriaSugerida.trim().toLowerCase());
+      }
+    });
+
+    // Se o catálogo estiver vazio no banco (ex: demo), usa as categorias do demo
+    if (categoriasNovas.size === 0 && patrocinador.id === "spn-bierhaus-demo") {
+      CATALOGO_MASTER_DEMO.forEach((it) => {
+        if (it.categoriaSugerida) categoriasNovas.add(it.categoriaSugerida.trim().toLowerCase());
+      });
+    }
+
+    // 2. Trava de Categoria (Category Lock) & Verificação de Marcas Concorrentes
+    const patrocinioExistente = restData?.patrocinio;
+    const slotsExistentes = Array.isArray(patrocinioExistente?.slots)
+      ? patrocinioExistente.slots
+      : patrocinioExistente?.ativo
+        ? [
+            {
+              patrocinadorId: patrocinioExistente.patrocinadorId,
+              patrocinadorNome: patrocinioExistente.patrocinadorNome,
+              categoriaSugerida: "Chopps & Cervejas",
+              loteId: patrocinioExistente.loteId || "",
+              codigoVoucher: "",
+              itensInjetados: patrocinioExistente.itensInjetados || [],
+              mesesAdicionados: 6,
+              vinculadoEm: new Date().toISOString(),
+            },
+          ]
+        : [];
+
+    // Verifica se a mesma marca já está vinculada
+    if (slotsExistentes.some((s: any) => s.patrocinadorId === patrocinador.id)) {
+      return {
+        sucesso: false,
+        mensagem: `O estabelecimento já possui o patrocínio oficial da marca ${patrocinador.nomeFantasia}.`,
+      };
+    }
+
+    // Trava de exclusividade: não permite outra marca na mesma categoria
+    for (const slot of slotsExistentes) {
+      const catExistente = (slot.categoriaSugerida || "").trim().toLowerCase();
+      if (catExistente && categoriasNovas.has(catExistente)) {
+        return {
+          sucesso: false,
+          mensagem: `Conflito de Categoria: Este estabelecimento já possui a marca oficial "${slot.patrocinadorNome}" na categoria "${slot.categoriaSugerida}". Patrocinadores adicionais devem ser de segmentos complementares (ex: Carnes, Cafés, Destilados).`,
+        };
+      }
+    }
+
+    // 3. Injeta os itens no cardápio do restaurante
     const colCardapioRest = collection(db, "restaurantes", params.restauranteId, "cardapio");
 
-    for (const itemDoc of snapMaster.docs) {
-      const itemMaster = itemDoc.data() as ItemCatalogoPatrocinador;
-      const idNoRestaurante = `spn-${itemDoc.id}`;
+    const itensParaInjetar = snapMaster.empty && patrocinador.id === "spn-bierhaus-demo"
+      ? CATALOGO_MASTER_DEMO
+      : snapMaster.docs.map((d) => d.data() as ItemCatalogoPatrocinador);
+
+    for (const itemMaster of itensParaInjetar) {
+      const idNoRestaurante = `spn-${itemMaster.id}`;
 
       const menuItem: Partial<MenuItem> & {
         origemPatrocinadorId: string;
@@ -471,7 +538,7 @@ export async function ativarPatrocinioNoRestaurante(params: {
         fotoUrl: itemMaster.fotoOficialUrl || "",
         ativo: true,
         origemPatrocinadorId: patrocinador.id,
-        bloqueadoParaExclusao: itemMaster.obrigatorioNoCardapio,
+        bloqueadoParaExclusao: itemMaster.obrigatorioNoCardapio ?? true,
         seloPatrocinador: itemMaster.seloPatrocinador || "Parceiro Oficial",
       };
 
@@ -479,21 +546,55 @@ export async function ativarPatrocinioNoRestaurante(params: {
       itensInjetadosIds.push(idNoRestaurante);
     }
 
-    // 3. Atualiza o documento do restaurante com o patrocínio e concede o Plano Plus
-    const restRef = doc(db, "restaurantes", params.restauranteId);
+    // 4. Extensão Cumulativa de Tempo (+6 meses por padrão)
+    const mesesAdicionar = lote.validadeMeses || 6;
+    const agora = new Date();
+    let dataBase = agora;
+
+    if (patrocinioExistente?.dataExpiracao) {
+      const expExistente = new Date(patrocinioExistente.dataExpiracao);
+      if (!isNaN(expExistente.getTime()) && expExistente > agora) {
+        dataBase = expExistente;
+      }
+    }
+
+    const novaDataExpiracao = new Date(dataBase);
+    novaDataExpiracao.setMonth(novaDataExpiracao.getMonth() + mesesAdicionar);
+
+    const categoriaPrincipal =
+      Array.from(categoriasNovas)[0] || "Especiais da Marca";
+
+    const novoSlot = {
+      patrocinadorId: patrocinador.id,
+      patrocinadorNome: patrocinador.nomeFantasia,
+      categoriaSugerida: categoriaPrincipal,
+      loteId: lote.id,
+      codigoVoucher: params.codigoVoucher.toUpperCase(),
+      itensInjetados: itensInjetadosIds,
+      mesesAdicionados: mesesAdicionar,
+      vinculadoEm: new Date().toISOString(),
+    };
+
+    const slotsAtualizados = [...slotsExistentes, novoSlot];
+    const todosItensInjetados = Array.from(
+      new Set([...(patrocinioExistente?.itensInjetados || []), ...itensInjetadosIds])
+    );
+
+    // 5. Atualiza o restaurante com Linha PRO e dados do patrocínio cumulativo
     await updateDoc(restRef, {
-      plano: "pro", // Eleva o restaurante para Pro/Plus com ferramentas liberadas
+      plano: "pro", // Concede os benefícios da linha PRO
       patrocinio: {
         ativo: true,
         patrocinadorId: patrocinador.id,
         patrocinadorNome: patrocinador.nomeFantasia,
         loteId: lote.id,
-        dataExpiracao: lote.dataExpiracao,
-        itensInjetados: itensInjetadosIds,
+        dataExpiracao: novaDataExpiracao.toISOString(),
+        itensInjetados: todosItensInjetados,
+        slots: slotsAtualizados,
       },
     });
 
-    // 4. Registra a ativação no Lote do Patrocinador
+    // 6. Registra a ativação no Lote do Patrocinador
     const loteRef = doc(db, "patrocinadores", patrocinador.id, "lotes_licencas", lote.id);
     const novoVinculo = {
       restauranteId: params.restauranteId,
@@ -509,7 +610,11 @@ export async function ativarPatrocinioNoRestaurante(params: {
       restaurantesVinculados: [...(lote.restaurantesVinculados || []), novoVinculo],
     });
 
-    return { sucesso: true };
+    return {
+      sucesso: true,
+      mesesAdicionados: mesesAdicionar,
+      novaDataExpiracao: novaDataExpiracao.toISOString(),
+    };
   } catch (err: any) {
     console.error("Falha ao ativar patrocínio:", err);
     return { sucesso: false, mensagem: err?.message || "Erro durante a ativação do patrocínio." };
@@ -687,7 +792,7 @@ export async function cadastrarPatrocinadorSuperadmin(dados: {
     nome: `Lote Contratual - ${dados.nomeFantasia} ${new Date().getFullYear()}`,
     codigoCampanha: codigoVoucherInicial,
     totalLicencas: dados.totalCotasContratadas,
-    validadeMeses: dados.validadeMeses || 12,
+    validadeMeses: dados.validadeMeses || 6,
   });
 
   return { id, chaveAcessoB2B, codigoVoucherInicial };

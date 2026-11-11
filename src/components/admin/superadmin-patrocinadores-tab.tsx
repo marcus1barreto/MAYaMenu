@@ -78,7 +78,7 @@ export function SuperadminPatrocinadoresTab({
   const [contatoTelefone, setContatoTelefone] = useState("");
   const [contatoCargo, setContatoCargo] = useState("");
   const [totalCotas, setTotalCotas] = useState("50");
-  const [validadeMeses, setValidadeMeses] = useState("12");
+  const [validadeMeses, setValidadeMeses] = useState("6");
 
   // Modal de sucesso pós-criação
   const [patrocinadorRecemCriado, setPatrocinadorRecemCriado] = useState<{
@@ -127,7 +127,7 @@ export function SuperadminPatrocinadoresTab({
         contatoTelefone: contatoTelefone.trim() || "(00) 00000-0000",
         contatoCargo: contatoCargo.trim() || "Gestor de Contas B2B",
         totalCotasContratadas: parseInt(totalCotas, 10) || 50,
-        validadeMeses: parseInt(validadeMeses, 10) || 12,
+        validadeMeses: parseInt(validadeMeses, 10) || 6,
       });
 
       setPatrocinadorRecemCriado({
@@ -145,7 +145,7 @@ export function SuperadminPatrocinadoresTab({
       setContatoTelefone("");
       setContatoCargo("");
       setTotalCotas("50");
-      setValidadeMeses("12");
+      setValidadeMeses("6");
       setModalNovoAberto(false);
 
       onNotificarSucesso(`Patrocinador ${nomeFantasia} cadastrado com sucesso!`);
@@ -669,3 +669,4 @@ export function SuperadminPatrocinadoresTab({
     </div>
   );
 }
+

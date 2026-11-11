@@ -61,6 +61,17 @@ export interface LoteLicencasB2B {
   criadoEm: any;
 }
 
+export interface SlotPatrocinioRestaurante {
+  patrocinadorId: string;
+  patrocinadorNome: string;
+  categoriaSugerida: string;
+  loteId: string;
+  codigoVoucher: string;
+  itensInjetados: string[];
+  mesesAdicionados: number;
+  vinculadoEm: string;
+}
+
 export interface PatrocinioRestauranteInfo {
   ativo: boolean;
   patrocinadorId: string;
@@ -68,6 +79,7 @@ export interface PatrocinioRestauranteInfo {
   loteId: string;
   dataExpiracao: string;
   itensInjetados: string[]; // IDs dos itens do catálogo master vinculados
+  slots?: SlotPatrocinioRestaurante[];
 }
 
 export interface MetricasSelloutItem {
