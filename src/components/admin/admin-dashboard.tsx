@@ -74,7 +74,10 @@ import {
   Zap,
   Percent,
   BookOpen,
+  CreditCard,
+  ShieldCheck,
 } from "lucide-react";
+import confetti from "canvas-confetti";
 import Link from "next/link";
 import Image from "next/image";
 import { uploadFotoPrato, excluirFotoPrato } from "@/lib/storage-service";
@@ -120,10 +123,13 @@ function ValorDinamicoMesa({
 }
 
 export function AdminDashboard() {
-  const { restaurante, logout, atualizarRestaurante } = useAuth();
+  const { restaurante, user, logout, atualizarRestaurante } = useAuth();
   const [abaAtiva, setAbaAtiva] = useState<"cardapio" | "mesas" | "equipe" | "analytics">("cardapio");
   const [modalConfigAberto, setModalConfigAberto] = useState(false);
   const [modalProAberto, setModalProAberto] = useState(false);
+  const [planoCheckoutSelecionado, setPlanoCheckoutSelecionado] = useState<"pro_mensal" | "pro_semestral">("pro_mensal");
+  const [iniciandoCheckout, setIniciandoCheckout] = useState(false);
+  const [avisoCheckout, setAvisoCheckout] = useState<{ tipo: "sucesso" | "erro" | "info"; msg: string } | null>(null);
   const [itensCardapio, setItensCardapio] = useState<MenuItem[]>([]);
   const [carregandoCardapio, setCarregandoCardapio] = useState(true);
   const [modoOperacao, setModoOperacao] = useState<"com_garcom" | "hibrido" | "balcao">(
@@ -201,6 +207,113 @@ export function AdminDashboard() {
       setErroPatrocinio(err?.message || "Falha ao ativar patrocínio.");
     } finally {
       setAtivandoPatrocinio(false);
+    }
+  };
+
+  // Processa retorno de pagamento do Mercado Pago (via URL query params)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const params = new URLSearchParams(window.location.search);
+    const statusPagamento = params.get("status_pagamento");
+    const planoId = (params.get("plano") as "pro_mensal" | "pro_semestral") || "pro_mensal";
+    const paymentId = params.get("payment_id") || params.get("collection_id") || undefined;
+    const restParam = params.get("rest");
+
+    if (statusPagamento === "sucesso") {
+      try {
+        confetti({
+          particleCount: 90,
+          spread: 60,
+          origin: { y: 0.6 },
+        });
+      } catch (e) {
+        // ignora se canvas falhar
+      }
+
+      setAvisoCheckout({
+        tipo: "sucesso",
+        msg: "Parabéns! Sua assinatura MAYaMenu PRO foi confirmada. Seus limites foram atualizados para 30 mesas e 60 pratos!",
+      });
+
+      // Confirmação no backend para sincronização imediata
+      const targetRestId = restaurante?.id || restParam;
+      if (targetRestId) {
+        fetch("/api/pagamentos/mercadopago/confirmar-retorno", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            restauranteId: targetRestId,
+            planoId,
+            paymentId,
+          }),
+        }).catch((err) => console.error("Erro ao sincronizar retorno de pagamento:", err));
+      }
+
+      const novaUrl = window.location.pathname;
+      window.history.replaceState({}, "", novaUrl);
+    } else if (statusPagamento === "pendente") {
+      setAvisoCheckout({
+        tipo: "info",
+        msg: "Seu pagamento está em processamento pelo Mercado Pago. Se pagou por Pix ou boleto, a ativação ocorrerá assim que compensado.",
+      });
+      const novaUrl = window.location.pathname;
+      window.history.replaceState({}, "", novaUrl);
+    } else if (statusPagamento === "falha") {
+      setAvisoCheckout({
+        tipo: "erro",
+        msg: "O checkout não foi finalizado. Nenhuma cobrança foi realizada. Você pode tentar novamente a qualquer momento.",
+      });
+      const novaUrl = window.location.pathname;
+      window.history.replaceState({}, "", novaUrl);
+    }
+  }, [restaurante?.id]);
+
+  // Inicia o Checkout Oficial do Mercado Pago
+  const handleIniciarCheckoutMercadoPago = async () => {
+    if (!restaurante?.id) return;
+    setIniciandoCheckout(true);
+    setAvisoCheckout(null);
+
+    try {
+      const res = await fetch("/api/pagamentos/mercadopago/criar-preferencia", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          restauranteId: restaurante.id,
+          planoId: planoCheckoutSelecionado,
+          userEmail: user?.email || "lojista@mayamenu.com.br",
+          userName: restaurante.nome || "Restaurante MAYaMenu",
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.sucesso) {
+        if (data.modoDemo) {
+          setAvisoCheckout({
+            tipo: "info",
+            msg: "Modo Demonstração: Configure o MERCADO_PAGO_ACCESS_TOKEN no arquivo .env.local para processar cobranças reais.",
+          });
+        } else {
+          setAvisoCheckout({
+            tipo: "erro",
+            msg: data.erro || "Não foi possível criar a sessão de pagamento no Mercado Pago.",
+          });
+        }
+        return;
+      }
+
+      if (data.initPoint) {
+        window.location.href = data.initPoint;
+      }
+    } catch (err: any) {
+      setAvisoCheckout({
+        tipo: "erro",
+        msg: err?.message || "Erro de conexão com o serviço de pagamentos.",
+      });
+    } finally {
+      setIniciandoCheckout(false);
     }
   };
 
@@ -914,16 +1027,31 @@ export function AdminDashboard() {
                   <Sparkles className="w-2.5 h-2.5 text-amber-600" />
                   Patrocinado por {restaurante.patrocinio.patrocinadorNome}
                 </span>
+              ) : restaurante?.plano === "pro" ? (
+                <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center gap-1 shrink-0 shadow-2xs">
+                  <Sparkles className="w-2.5 h-2.5 text-emerald-600" />
+                  Plano PRO Ativo
+                </span>
               ) : (
-                <button
-                  type="button"
-                  onClick={() => setModalConfigAberto(true)}
-                  className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 flex items-center gap-1 shrink-0 transition-colors cursor-pointer"
-                  title="Possui um voucher de patrocinador? Clique para ativar o Plano PRO"
-                >
-                  <Sparkles className="w-2.5 h-2.5 text-rose-600" />
-                  <span>Voucher Patrocinador (+6 Meses PRO)</span>
-                </button>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setModalProAberto(true)}
+                    className="text-[10px] font-black px-2.5 py-0.5 rounded-full bg-rose-600 text-white hover:bg-rose-500 flex items-center gap-1 shrink-0 transition-colors shadow-2xs cursor-pointer"
+                    title="Assinar MAYaMenu PRO por R$ 49,90/mês"
+                  >
+                    <Sparkles className="w-2.5 h-2.5 text-white" />
+                    <span>Assinar PRO (R$ 49,90)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setModalConfigAberto(true)}
+                    className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200 flex items-center gap-1 shrink-0 transition-colors cursor-pointer"
+                    title="Possui um voucher de patrocinador? Clique para ativar o Plano PRO"
+                  >
+                    <span>Voucher</span>
+                  </button>
+                </div>
               )}
             </div>
             <p className="text-[11px] text-muted-foreground">Administração & Operação</p>
@@ -1005,6 +1133,38 @@ export function AdminDashboard() {
         <div className="bg-emerald-50 border-b border-emerald-200 px-4 py-2 text-center text-emerald-800 text-xs font-bold flex items-center justify-center gap-2 animate-in fade-in">
           <Check className="w-3.5 h-3.5 text-emerald-600" />
           <span>{feedbackBalcao}</span>
+        </div>
+      )}
+
+      {/* BANNER DE AVISO DO CHECKOUT / PAGAMENTO */}
+      {avisoCheckout && (
+        <div
+          className={`px-4 py-2.5 text-center text-xs font-bold flex items-center justify-between gap-3 border-b animate-in fade-in ${
+            avisoCheckout.tipo === "sucesso"
+              ? "bg-emerald-50 border-emerald-200 text-emerald-900"
+              : avisoCheckout.tipo === "info"
+              ? "bg-blue-50 border-blue-200 text-blue-900"
+              : "bg-rose-50 border-rose-200 text-rose-900"
+          }`}
+        >
+          <div className="flex items-center justify-center gap-2 mx-auto">
+            {avisoCheckout.tipo === "sucesso" ? (
+              <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+            ) : avisoCheckout.tipo === "info" ? (
+              <Sparkles className="w-4 h-4 text-blue-600 shrink-0" />
+            ) : (
+              <Lock className="w-4 h-4 text-rose-600 shrink-0" />
+            )}
+            <span>{avisoCheckout.msg}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setAvisoCheckout(null)}
+            className="text-muted-foreground hover:text-foreground text-xs p-1"
+            title="Fechar aviso"
+          >
+            ✕
+          </button>
         </div>
       )}
 
@@ -1787,63 +1947,206 @@ export function AdminDashboard() {
   )}
       </main>
 
-      {/* MODAL DE CONTATO / UPSELL PRO */}
+      {/* MODAL DE ASSINATURA MAYAMENU PRO (MERCADO PAGO) */}
       <Dialog open={modalProAberto} onOpenChange={(open) => setModalProAberto(open)}>
-        <DialogContent className="max-w-md bg-card border-border text-card-foreground rounded-3xl p-6 shadow-2xl">
-          <DialogHeader className="text-center sm:text-center">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500 to-rose-600 mx-auto flex items-center justify-center mb-3 shadow-lg">
+        <DialogContent className="max-w-lg bg-card border-border text-card-foreground rounded-3xl p-6 sm:p-7 shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto">
+          <DialogHeader className="text-center sm:text-center pb-1">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-rose-500 via-rose-600 to-amber-500 mx-auto flex items-center justify-center mb-2.5 shadow-lg shadow-rose-600/20">
               <Sparkles className="w-6 h-6 text-white" />
             </div>
-            <DialogTitle className="text-xl font-black text-foreground">
+            <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-rose-50 dark:bg-rose-950/40 text-rose-600 text-[10px] font-black uppercase tracking-wider mx-auto mb-1 border border-rose-200 dark:border-rose-800">
+              ⚡ Ativação Instantânea via Mercado Pago
+            </div>
+            <DialogTitle className="text-2xl font-black text-foreground tracking-tight">
               Evolua para o MAYaMenu PRO
             </DialogTitle>
-            <DialogDescription className="text-xs text-muted-foreground mt-1">
-              O módulo completo de Inteligência Analítica & Insights em tempo real estará disponível na próxima rodada de ativações.
+            <DialogDescription className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
+              Desbloqueie todo o potencial do seu salão com mais mesas, cardápio estendido, KDS Cozinha e garçom digital ilimitados.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-3 py-3 border-y border-border my-2">
-            <div className="flex items-start gap-3">
-              <div className="p-1.5 rounded-lg bg-primary/10 text-primary mt-0.5">
-                <BarChart3 className="w-4 h-4" />
-              </div>
+          {/* MENSAGEM DE AVISO / RETORNO SE HOUVER */}
+          {avisoCheckout && (
+            <div
+              className={`p-3 rounded-2xl text-xs font-semibold border flex items-start gap-2.5 ${
+                avisoCheckout.tipo === "sucesso"
+                  ? "bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 text-emerald-800 dark:text-emerald-300"
+                  : avisoCheckout.tipo === "info"
+                  ? "bg-blue-50 dark:bg-blue-950/30 border-blue-200 text-blue-800 dark:text-blue-300"
+                  : "bg-rose-50 dark:bg-rose-950/30 border-rose-200 text-rose-800 dark:text-rose-300"
+              }`}
+            >
+              {avisoCheckout.tipo === "sucesso" ? (
+                <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+              ) : (
+                <Sparkles className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+              )}
+              <div className="flex-1">{avisoCheckout.msg}</div>
+            </div>
+          )}
+
+          {/* SELEÇÃO DO PLANO: MENSAL VS SEMESTRAL */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 my-2">
+            {/* PLANO MENSAL */}
+            <div
+              onClick={() => setPlanoCheckoutSelecionado("pro_mensal")}
+              className={`relative cursor-pointer rounded-2xl p-4 border-2 transition-all flex flex-col justify-between ${
+                planoCheckoutSelecionado === "pro_mensal"
+                  ? "border-rose-600 bg-rose-50/40 dark:bg-rose-950/20 shadow-md ring-2 ring-rose-600/20"
+                  : "border-border bg-card hover:border-slate-300 dark:hover:border-slate-700"
+              }`}
+            >
               <div>
-                <span className="text-xs font-bold text-foreground block">Histórico Completo de Sessões</span>
-                <span className="text-[11px] text-muted-foreground">Todas as mesas e rodadas já estão sendo salvas no histórico seguro do Firestore.</span>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs font-bold text-foreground">Mensal Flexível</span>
+                  <input
+                    type="radio"
+                    name="plano"
+                    checked={planoCheckoutSelecionado === "pro_mensal"}
+                    onChange={() => setPlanoCheckoutSelecionado("pro_mensal")}
+                    className="accent-rose-600"
+                  />
+                </div>
+                <div className="flex items-baseline gap-1 my-1">
+                  <span className="text-2xl font-black text-rose-600 tracking-tight">R$ 49,90</span>
+                  <span className="text-[11px] text-muted-foreground">/mês</span>
+                </div>
+                <p className="text-[11px] text-muted-foreground leading-snug">
+                  Cobrança mensal com cancelamento a qualquer momento.
+                </p>
+              </div>
+              <div className="mt-3 pt-2 border-t border-border/60 text-[10px] font-semibold text-muted-foreground">
+                Ideal para testar o ritmo
               </div>
             </div>
 
-            <div className="flex items-start gap-3">
-              <div className="p-1.5 rounded-lg bg-amber-500/10 text-amber-500 mt-0.5">
-                <TrendingUp className="w-4 h-4" />
+            {/* PLANO SEMESTRAL */}
+            <div
+              onClick={() => setPlanoCheckoutSelecionado("pro_semestral")}
+              className={`relative cursor-pointer rounded-2xl p-4 border-2 transition-all flex flex-col justify-between ${
+                planoCheckoutSelecionado === "pro_semestral"
+                  ? "border-rose-600 bg-rose-50/40 dark:bg-rose-950/20 shadow-md ring-2 ring-rose-600/20"
+                  : "border-border bg-card hover:border-slate-300 dark:hover:border-slate-700"
+              }`}
+            >
+              <div className="absolute -top-2.5 right-3 bg-gradient-to-r from-amber-500 to-rose-600 text-white text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full shadow-xs">
+                Economize 17%
               </div>
               <div>
-                <span className="text-xs font-bold text-foreground block">Taxa de Ociosidade & Giro de Mesas</span>
-                <span className="text-[11px] text-muted-foreground">Descubra quais mesas geram mais receita por minuto de ocupação.</span>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs font-bold text-foreground">Semestral (6 meses)</span>
+                  <input
+                    type="radio"
+                    name="plano"
+                    checked={planoCheckoutSelecionado === "pro_semestral"}
+                    onChange={() => setPlanoCheckoutSelecionado("pro_semestral")}
+                    className="accent-rose-600"
+                  />
+                </div>
+                <div className="flex items-baseline gap-1 my-1">
+                  <span className="text-2xl font-black text-rose-600 tracking-tight">R$ 249,00</span>
+                  <span className="text-[11px] text-muted-foreground">/6 meses</span>
+                </div>
+                <p className="text-[11px] text-muted-foreground leading-snug">
+                  Apenas <strong>R$ 41,50/mês</strong>. Até 12x no cartão de crédito.
+                </p>
+              </div>
+              <div className="mt-3 pt-2 border-t border-border/60 text-[10px] font-bold text-amber-600 dark:text-amber-400">
+                ⭐ Mais vantajoso
               </div>
             </div>
           </div>
 
-          <div className="space-y-2">
+          {/* BENEFÍCIOS INCLUSOS */}
+          <div className="space-y-2 py-3 border-y border-border my-2">
+            <span className="text-[11px] font-black uppercase tracking-wider text-muted-foreground block">
+              Tudo o que está incluso no seu plano:
+            </span>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+              <div className="flex items-center gap-2">
+                <Check className="w-4 h-4 text-emerald-600 stroke-[3] shrink-0" />
+                <span><strong>Até 30 Mesas</strong> no Salão</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Check className="w-4 h-4 text-emerald-600 stroke-[3] shrink-0" />
+                <span><strong>Até 60 Pratos</strong> no Cardápio</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Check className="w-4 h-4 text-emerald-600 stroke-[3] shrink-0" />
+                <span>KDS Cozinha em Tempo Real</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Check className="w-4 h-4 text-emerald-600 stroke-[3] shrink-0" />
+                <span>App do Garçom com Chamados</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Check className="w-4 h-4 text-emerald-600 stroke-[3] shrink-0" />
+                <span>Relatórios de Giro & Vendas</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Check className="w-4 h-4 text-emerald-600 stroke-[3] shrink-0" />
+                <span>Suporte Prioritário</span>
+              </div>
+            </div>
+          </div>
+
+          {/* FORMAS DE PAGAMENTO E SEGURANÇA */}
+          <div className="flex items-center justify-between text-[11px] text-muted-foreground px-1">
+            <div className="flex items-center gap-1.5 font-medium">
+              <ShieldCheck className="w-4 h-4 text-emerald-600" />
+              <span>Checkout Seguro Mercado Pago</span>
+            </div>
+            <div className="flex items-center gap-2 font-semibold text-foreground">
+              <CreditCard className="w-3.5 h-3.5 text-muted-foreground" />
+              <span>Cartão até 12x ou Pix</span>
+            </div>
+          </div>
+
+          {/* BOTÕES DE AÇÃO */}
+          <div className="space-y-2 pt-2">
             <Button
               type="button"
-              onClick={() => {
-                alert("Obrigado pelo interesse! Seu restaurante foi adicionado na lista prioritária de acesso antecipado ao MAYaMenu PRO.");
-                setModalProAberto(false);
-              }}
-              className="w-full h-11 bg-primary hover:bg-primary/90 text-primary-foreground font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-xs"
+              disabled={iniciandoCheckout}
+              onClick={handleIniciarCheckoutMercadoPago}
+              className="w-full h-12 bg-rose-600 hover:bg-rose-500 text-white font-black rounded-2xl text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg shadow-rose-600/25 active:scale-98 transition-all cursor-pointer"
             >
-              <span>Solicitar Acesso Antecipado</span>
+              {iniciandoCheckout ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Conectando ao Mercado Pago...</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4" />
+                  <span>
+                    Assinar Agora por{" "}
+                    {planoCheckoutSelecionado === "pro_mensal" ? "R$ 49,90" : "R$ 249,00"}
+                  </span>
+                  <ArrowUpRight className="w-4 h-4 ml-1" />
+                </>
+              )}
             </Button>
 
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => setModalProAberto(false)}
-              className="w-full h-9 text-muted-foreground hover:text-foreground rounded-xl text-xs"
-            >
-              Voltar ao Salão
-            </Button>
+            <div className="flex items-center justify-between pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setModalProAberto(false);
+                  setModalConfigAberto(true);
+                }}
+                className="text-[11px] font-medium text-muted-foreground hover:text-foreground underline underline-offset-2"
+              >
+                Possui voucher de parceiro? Ative aqui
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setModalProAberto(false)}
+                className="text-[11px] font-medium text-muted-foreground hover:text-foreground"
+              >
+                Voltar ao Salão
+              </button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
