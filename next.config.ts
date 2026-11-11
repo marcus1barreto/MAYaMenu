@@ -21,6 +21,30 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  async redirects() {
+    return [
+      {
+        source: "/super-admin",
+        destination: "/superadmin",
+        permanent: true,
+      },
+      {
+        source: "/super_admin",
+        destination: "/superadmin",
+        permanent: true,
+      },
+      {
+        source: "/admin/superadmin",
+        destination: "/superadmin",
+        permanent: true,
+      },
+      {
+        source: "/gerencia",
+        destination: "/superadmin",
+        permanent: true,
+      },
+    ];
+  },
   turbopack: {
     rules: {
       "*.css": {
