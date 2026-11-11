@@ -75,10 +75,21 @@ export function MenuView({ restaurante: restauranteInicial, cardapio: cardapioIn
     }
   }, []);
 
-  // Categorias únicas disponíveis no cardápio na ordem em que aparecem no cardápio ordenado
+  // Categorias únicas disponíveis no cardápio, com prioridade para categorias que possuem itens patrocinados
+  const todasCategoriasUnicas = Array.from(new Set(cardapio.map((i) => i.categoria || "Geral")));
+  const categoriasComPatrocinio = todasCategoriasUnicas.filter((cat) =>
+    cardapio.some(
+      (i) =>
+        (i.categoria || "Geral") === cat &&
+        Boolean(i.origemPatrocinadorId || i.seloPatrocinador || (i as any).posicaoFixaTopo)
+    )
+  );
+  const outrasCategorias = todasCategoriasUnicas.filter((cat) => !categoriasComPatrocinio.includes(cat));
+
   const categorias = [
     "Todas",
-    ...Array.from(new Set(cardapio.map((i) => i.categoria || "Geral"))),
+    ...categoriasComPatrocinio,
+    ...outrasCategorias,
   ];
 
   // Escuta o restaurante em tempo real (mudança de tema, logo, cores)
@@ -344,7 +355,20 @@ export function MenuView({ restaurante: restauranteInicial, cardapio: cardapioIn
         item.descricao.toLowerCase().includes(b)
       );
     })
-    .sort((a, b) => (a.ordem ?? 9999) - (b.ordem ?? 9999));
+    .sort((a, b) => {
+      // Prioridade máxima: itens patrocinados sempre no topo geral e no topo de suas categorias
+      const aPat = Boolean(a.origemPatrocinadorId || a.seloPatrocinador || (a as any).posicaoFixaTopo);
+      const bPat = Boolean(b.origemPatrocinadorId || b.seloPatrocinador || (b as any).posicaoFixaTopo);
+
+      if (aPat && !bPat) return -1;
+      if (!aPat && bPat) return 1;
+
+      const ordemA = a.ordem !== undefined ? a.ordem : 9999;
+      const ordemB = b.ordem !== undefined ? b.ordem : 9999;
+      if (ordemA !== ordemB) return ordemA - ordemB;
+
+      return a.nome.localeCompare(b.nome);
+    });
 
   if (restaurante.suspenso || restaurante.configuracoes?.suspenso) {
     return (

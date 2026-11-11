@@ -236,6 +236,26 @@ export async function obterCardapioDoRestaurante(restauranteId: string): Promise
  * Escuta o cardápio em tempo real com onSnapshot (usado pelo Admin e Cliente).
  * Respeita coleções vazias para que novos restaurantes entrem no Guided Empty State.
  */
+/**
+ * Função de ordenação com prioridade contratual para itens de patrocinadores B2B
+ * (ficam no topo geral e no topo de suas categorias).
+ */
+export function ordenarItensCardapioPatrocinio(itens: MenuItem[]): MenuItem[] {
+  return [...itens].sort((a, b) => {
+    const aPat = Boolean(a.origemPatrocinadorId || a.seloPatrocinador || (a as any).posicaoFixaTopo);
+    const bPat = Boolean(b.origemPatrocinadorId || b.seloPatrocinador || (b as any).posicaoFixaTopo);
+
+    if (aPat && !bPat) return -1;
+    if (!aPat && bPat) return 1;
+
+    const ordemA = a.ordem !== undefined ? a.ordem : 9999;
+    const ordemB = b.ordem !== undefined ? b.ordem : 9999;
+    if (ordemA !== ordemB) return ordemA - ordemB;
+
+    return a.nome.localeCompare(b.nome);
+  });
+}
+
 export function escutarCardapio(
   restauranteId: string,
   onAtualizacao: (itens: MenuItem[]) => void
@@ -251,8 +271,8 @@ export function escutarCardapio(
         snapshot.forEach((d) => {
           itens.push(normalizarItemCardapio({ id: d.id, ...(d.data() as Omit<MenuItem, "id">) }));
         });
-        itens.sort((a, b) => (a.ordem ?? 9999) - (b.ordem ?? 9999));
-        onAtualizacao(itens);
+        const itensOrdenados = ordenarItensCardapioPatrocinio(itens);
+        onAtualizacao(itensOrdenados);
       } else {
         onAtualizacao(isDemo ? CARDAPIO_DEMO : []);
       }

@@ -91,6 +91,7 @@ export interface MenuItem {
   origemPatrocinadorId?: string;
   bloqueadoParaExclusao?: boolean;
   seloPatrocinador?: string;
+  posicaoFixaTopo?: boolean;
 }
 
 export interface OpcaoModificador {

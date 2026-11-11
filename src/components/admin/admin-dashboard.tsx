@@ -1108,141 +1108,172 @@ export function AdminDashboard() {
                   </Button>
                 </div>
 
-                {/* AGRUPAMENTO POR CATEGORIAS COM ORDENAÇÃO TÁTIL */}
-                {Array.from(new Set(itensCardapio.map((i) => i.categoria || "Geral"))).map((catNome) => {
-                  const itensDaCat = itensCardapio
-                    .filter((i) => (i.categoria || "Geral") === catNome)
-                    .sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0));
+                {/* AGRUPAMENTO POR CATEGORIAS COM ORDENAÇÃO TÁTIL (Patrocinadas em 1º lugar) */}
+                {(() => {
+                  const todasCats = Array.from(new Set(itensCardapio.map((i) => i.categoria || "Geral")));
+                  const catsComPatrocinio = todasCats.filter((cat) =>
+                    itensCardapio.some(
+                      (i) =>
+                        (i.categoria || "Geral") === cat &&
+                        Boolean(i.origemPatrocinadorId || i.seloPatrocinador || (i as any).posicaoFixaTopo)
+                    )
+                  );
+                  const outrasCats = todasCats.filter((cat) => !catsComPatrocinio.includes(cat));
+                  const categoriasOrdenadas = [...catsComPatrocinio, ...outrasCats];
 
-                  return (
-                    <div key={catNome} className="space-y-2.5">
-                      <div className="flex items-center gap-2 px-1">
-                        <span className="w-2 h-2 rounded-full bg-rose-600" />
-                        <h3 className="text-xs font-black uppercase tracking-wider text-neutral-900">
-                          {catNome} ({itensDaCat.length})
-                        </h3>
-                      </div>
+                  return categoriasOrdenadas.map((catNome) => {
+                    const itensDaCat = itensCardapio
+                      .filter((i) => (i.categoria || "Geral") === catNome)
+                      .sort((a, b) => {
+                        const aPat = Boolean(a.origemPatrocinadorId || a.seloPatrocinador || (a as any).posicaoFixaTopo);
+                        const bPat = Boolean(b.origemPatrocinadorId || b.seloPatrocinador || (b as any).posicaoFixaTopo);
+                        if (aPat && !bPat) return -1;
+                        if (!aPat && bPat) return 1;
+                        return (a.ordem ?? 0) - (b.ordem ?? 0);
+                      });
 
-                      <div className="grid grid-cols-1 gap-2.5">
-                        {itensDaCat.map((item, idx) => {
-                          const ehPrimeiro = idx === 0;
-                          const ehUltimo = idx === itensDaCat.length - 1;
+                    const temPatrocinadoNestaCat = itensDaCat.some(
+                      (i) => Boolean(i.origemPatrocinadorId || i.seloPatrocinador || (i as any).posicaoFixaTopo)
+                    );
 
-                          return (
-                            <div
-                              key={item.id}
-                              className={`p-3.5 sm:p-4 rounded-2xl border-2 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
-                                item.ativo
-                                  ? "bg-white border-neutral-200/90 hover:border-neutral-300 shadow-sm hover:shadow-md"
-                                  : "bg-neutral-50 border-neutral-200/70 opacity-60"
-                              }`}
-                            >
-                              <div className="flex items-center gap-3 min-w-0">
-                                {item.fotoUrl && (
-                                  <div className="relative w-14 h-14 rounded-xl overflow-hidden bg-neutral-100 flex-shrink-0 border-2 border-neutral-200 shadow-xs">
-                                    <Image src={item.fotoUrl} alt={item.nome} fill className="object-cover" />
-                                  </div>
-                                )}
-                                <div className="min-w-0">
-                                  <div className="flex items-center gap-2">
-                                    <h4 className="text-sm font-black text-neutral-950 truncate">{item.nome}</h4>
-                                    {(item as any).seloPatrocinador && (
-                                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-600 border border-blue-500/30 flex items-center gap-1 shrink-0">
-                                        <Sparkles className="w-2.5 h-2.5" />
-                                        {(item as any).seloPatrocinador}
+                    return (
+                      <div key={catNome} className="space-y-2.5">
+                        <div className="flex items-center gap-2 px-1">
+                          <span className={`w-2 h-2 rounded-full ${temPatrocinadoNestaCat ? "bg-amber-500" : "bg-rose-600"}`} />
+                          <h3 className="text-xs font-black uppercase tracking-wider text-neutral-900 flex items-center gap-1.5">
+                            <span>{catNome} ({itensDaCat.length})</span>
+                            {temPatrocinadoNestaCat && (
+                              <span className="text-[9px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 font-bold uppercase">
+                                Patrocinador Master
+                              </span>
+                            )}
+                          </h3>
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-2.5">
+                          {itensDaCat.map((item, idx) => {
+                            const ehPrimeiro = idx === 0;
+                            const ehUltimo = idx === itensDaCat.length - 1;
+                            const ehPatrocinado = Boolean(item.origemPatrocinadorId || item.seloPatrocinador || (item as any).posicaoFixaTopo);
+
+                            return (
+                              <div
+                                key={item.id}
+                                className={`p-3.5 sm:p-4 rounded-2xl border-2 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                                  ehPatrocinado
+                                    ? "bg-amber-50/20 border-amber-300/80 shadow-xs hover:border-amber-400"
+                                    : item.ativo
+                                      ? "bg-white border-neutral-200/90 hover:border-neutral-300 shadow-sm hover:shadow-md"
+                                      : "bg-neutral-50 border-neutral-200/70 opacity-60"
+                                }`}
+                              >
+                                <div className="flex items-center gap-3 min-w-0">
+                                  {item.fotoUrl && (
+                                    <div className="relative w-14 h-14 rounded-xl overflow-hidden bg-neutral-100 flex-shrink-0 border-2 border-neutral-200 shadow-xs">
+                                      <Image src={item.fotoUrl} alt={item.nome} fill className="object-cover" />
+                                    </div>
+                                  )}
+                                  <div className="min-w-0">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <h4 className="text-sm font-black text-neutral-950 truncate">{item.nome}</h4>
+                                      {ehPatrocinado && (
+                                        <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 flex items-center gap-1 shrink-0 shadow-2xs">
+                                          <Sparkles className="w-2.5 h-2.5 text-amber-600" />
+                                          {item.seloPatrocinador || "Parceiro Oficial"} • Fixado no Topo
+                                        </span>
+                                      )}
+                                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-600 border border-neutral-200 font-bold">
+                                        #{idx + 1}
                                       </span>
-                                    )}
-                                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-600 border border-neutral-200 font-bold">
-                                      #{idx + 1}
+                                    </div>
+                                    <p className="text-xs text-neutral-500 truncate max-w-md mt-0.5">
+                                      {item.descricao}
+                                    </p>
+                                    <span className="text-xs font-black text-rose-600 mt-1 block">
+                                      {item.precoBase.toLocaleString("pt-BR", {
+                                        style: "currency",
+                                        currency: "BRL",
+                                      })}
                                     </span>
                                   </div>
-                                  <p className="text-xs text-neutral-500 truncate max-w-md mt-0.5">
-                                    {item.descricao}
-                                  </p>
-                                  <span className="text-xs font-black text-rose-600 mt-1 block">
-                                    {item.precoBase.toLocaleString("pt-BR", {
-                                      style: "currency",
-                                      currency: "BRL",
-                                    })}
-                                  </span>
-                                </div>
-                              </div>
-
-                              <div className="flex items-center justify-between sm:justify-end gap-2.5 pt-2 sm:pt-0 border-t sm:border-t-0 border-border">
-                                {/* CONTROLES TÁTEIS DE ORDENAÇÃO */}
-                                <div className="flex items-center gap-1 bg-muted/60 border border-border p-1 rounded-xl">
-                                  <button
-                                    type="button"
-                                    onClick={() => handleMoverItem(item, "cima")}
-                                    disabled={ehPrimeiro}
-                                    title="Mover para cima"
-                                    className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-30 disabled:pointer-events-none transition-all active:scale-90"
-                                  >
-                                    <ArrowUp className="w-3.5 h-3.5" />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleMoverItem(item, "baixo")}
-                                    disabled={ehUltimo}
-                                    title="Mover para baixo"
-                                    className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-30 disabled:pointer-events-none transition-all active:scale-90"
-                                  >
-                                    <ArrowDown className="w-3.5 h-3.5" />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleFixarTopo(item)}
-                                    disabled={ehPrimeiro}
-                                    title="Destacar no Topo desta categoria"
-                                    className="px-2 py-1 rounded-lg text-[10px] font-black uppercase text-amber-500 hover:bg-amber-500/10 disabled:opacity-30 disabled:pointer-events-none transition-all flex items-center gap-1"
-                                  >
-                                    <Pin className="w-3 h-3" />
-                                    <span>Topo</span>
-                                  </button>
                                 </div>
 
-                                {/* AÇÕES DE EDIÇÃO & DISPONIBILIDADE */}
-                                <div className="flex items-center gap-2">
-                                  <button
-                                    type="button"
-                                    onClick={() => handleEditarPrato(item)}
-                                    className="px-2.5 py-1.5 bg-muted hover:bg-muted/80 text-foreground rounded-lg text-xs font-semibold transition-colors border border-border"
-                                  >
-                                    Editar
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleExcluirPrato(item.id, item.fotoUrl)}
-                                    className={`p-1.5 rounded-lg text-xs transition-colors border ${
-                                      item.bloqueadoParaExclusao
-                                        ? "bg-amber-50 text-amber-700 hover:bg-amber-100 hover:text-amber-800 border-amber-200 cursor-help"
-                                        : "bg-red-500/10 hover:bg-red-500/20 text-red-500 border-red-500/20"
-                                    }`}
-                                    title={
-                                      item.bloqueadoParaExclusao
-                                        ? "Item oficial do patrocínio (bloqueado para exclusão)"
-                                        : "Excluir item"
-                                    }
-                                  >
-                                    {item.bloqueadoParaExclusao ? (
-                                      <Lock className="w-3.5 h-3.5" />
-                                    ) : (
-                                      <Trash2 className="w-3.5 h-3.5" />
-                                    )}
-                                  </button>
-                                  <Switch
-                                    checked={item.ativo}
-                                    onCheckedChange={() => handleToggleAtivo(item.id)}
-                                  />
+                                <div className="flex items-center justify-between sm:justify-end gap-2.5 pt-2 sm:pt-0 border-t sm:border-t-0 border-border">
+                                  {/* CONTROLES TÁTEIS DE ORDENAÇÃO */}
+                                  <div className="flex items-center gap-1 bg-muted/60 border border-border p-1 rounded-xl">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleMoverItem(item, "cima")}
+                                      disabled={ehPrimeiro || ehPatrocinado}
+                                      title={ehPatrocinado ? "Item patrocinado com posição contratual fixa no topo" : "Mover para cima"}
+                                      className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-30 disabled:pointer-events-none transition-all active:scale-90"
+                                    >
+                                      <ArrowUp className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleMoverItem(item, "baixo")}
+                                      disabled={ehUltimo || ehPatrocinado}
+                                      title={ehPatrocinado ? "Item patrocinado com posição contratual fixa no topo" : "Mover para baixo"}
+                                      className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-30 disabled:pointer-events-none transition-all active:scale-90"
+                                    >
+                                      <ArrowDown className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleFixarTopo(item)}
+                                      disabled={ehPrimeiro || ehPatrocinado}
+                                      title={ehPatrocinado ? "Item já está no topo por patrocínio" : "Destacar no Topo desta categoria"}
+                                      className="px-2 py-1 rounded-lg text-[10px] font-black uppercase text-amber-500 hover:bg-amber-500/10 disabled:opacity-30 disabled:pointer-events-none transition-all flex items-center gap-1"
+                                    >
+                                      <Pin className="w-3 h-3" />
+                                      <span>Topo</span>
+                                    </button>
+                                  </div>
+
+                                  {/* AÇÕES DE EDIÇÃO & DISPONIBILIDADE */}
+                                  <div className="flex items-center gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleEditarPrato(item)}
+                                      className="px-2.5 py-1.5 bg-muted hover:bg-muted/80 text-foreground rounded-lg text-xs font-semibold transition-colors border border-border"
+                                    >
+                                      Editar
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleExcluirPrato(item.id, item.fotoUrl)}
+                                      className={`p-1.5 rounded-lg text-xs transition-colors border ${
+                                        item.bloqueadoParaExclusao
+                                          ? "bg-amber-50 text-amber-700 hover:bg-amber-100 hover:text-amber-800 border-amber-200 cursor-help"
+                                          : "bg-red-500/10 hover:bg-red-500/20 text-red-500 border-red-500/20"
+                                      }`}
+                                      title={
+                                        item.bloqueadoParaExclusao
+                                          ? "Item oficial do patrocínio (bloqueado para exclusão)"
+                                          : "Excluir item"
+                                      }
+                                    >
+                                      {item.bloqueadoParaExclusao ? (
+                                        <Lock className="w-3.5 h-3.5" />
+                                      ) : (
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      )}
+                                    </button>
+                                    <Switch
+                                      checked={item.ativo}
+                                      onCheckedChange={() => handleToggleAtivo(item.id)}
+                                    />
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          );
-                        })}
+                            );
+                          })}
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  });
+                })()}
               </div>
             )}
           </div>

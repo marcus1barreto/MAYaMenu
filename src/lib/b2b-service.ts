@@ -534,6 +534,7 @@ export async function ativarPatrocinioNoRestaurante(params: {
         origemPatrocinadorId: string;
         bloqueadoParaExclusao: boolean;
         seloPatrocinador: string;
+        posicaoFixaTopo: boolean;
       } = {
         id: idNoRestaurante,
         nome: itemMaster.nome,
@@ -542,6 +543,8 @@ export async function ativarPatrocinioNoRestaurante(params: {
         precoBase: itemMaster.precoSugerido || 0,
         fotoUrl: itemMaster.fotoOficialUrl || "",
         ativo: true,
+        ordem: -100, // Topo absoluto garantido
+        posicaoFixaTopo: true,
         origemPatrocinadorId: patrocinador.id,
         bloqueadoParaExclusao: itemMaster.obrigatorioNoCardapio ?? true,
         seloPatrocinador: itemMaster.seloPatrocinador || "Parceiro Oficial",
