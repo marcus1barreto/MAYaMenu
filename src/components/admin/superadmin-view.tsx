@@ -570,6 +570,85 @@ export function SuperAdminView() {
   );
 
   if (!isSuperAdminAutorizado) {
+    // Se o usuário não estiver logado, exibe diretamente a tela de login de Operador
+    if (!usuarioAuth || usuarioAuth.isAnonymous) {
+      return (
+        <div className="min-h-screen bg-neutral-50 flex items-center justify-center p-4 selection:bg-rose-600 selection:text-white">
+          <div className="max-w-md w-full p-8 bg-white border border-neutral-200/80 rounded-3xl shadow-xl text-neutral-900 space-y-6">
+            <div className="text-center space-y-2">
+              <div className="w-14 h-14 mx-auto rounded-2xl bg-rose-50 border border-rose-100 text-rose-600 flex items-center justify-center shadow-xs">
+                <ShieldCheck className="w-8 h-8" />
+              </div>
+              <h2 className="text-2xl font-black text-neutral-950 tracking-tight">
+                MAYaRAnas • SuperAdmin
+              </h2>
+              <p className="text-xs text-neutral-500">
+                Identifique-se com sua conta de operador para acessar a Gerência Geral.
+              </p>
+            </div>
+
+            {erroAuth && (
+              <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-xs flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 shrink-0" />
+                <span>{erroAuth}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleLoginOperador} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-neutral-600">
+                  E-mail do Operador
+                </label>
+                <Input
+                  type="email"
+                  value={loginEmail}
+                  onChange={(e) => setLoginEmail(e.target.value)}
+                  placeholder="admin@mayamenu.com ou marcus1fialho@gmail.com"
+                  required
+                  className="bg-neutral-50 border-neutral-200 text-neutral-900 rounded-xl h-11 text-xs focus:bg-white"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-neutral-600">
+                  Senha
+                </label>
+                <Input
+                  type="password"
+                  value={loginSenha}
+                  onChange={(e) => setLoginSenha(e.target.value)}
+                  placeholder="••••••••"
+                  required
+                  className="bg-neutral-50 border-neutral-200 text-neutral-900 rounded-xl h-11 text-xs focus:bg-white"
+                />
+              </div>
+
+              <Button
+                type="submit"
+                disabled={autenticando}
+                className="w-full bg-rose-600 hover:bg-rose-500 text-white font-bold h-11 rounded-xl text-xs uppercase tracking-wider shadow-md shadow-rose-600/20"
+              >
+                {autenticando ? "Autenticando..." : "Entrar como Operador"}
+              </Button>
+            </form>
+
+            <div className="pt-2 text-center border-t border-neutral-100">
+              <Link href="/admin">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="text-xs text-neutral-500 hover:text-neutral-900 h-8"
+                >
+                  Ir para Login de Restaurantes
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Se estiver logado com uma conta que não possui permissão de SuperAdmin
     return (
       <div className="min-h-screen bg-neutral-50 flex items-center justify-center p-4 selection:bg-rose-600 selection:text-white">
         <div className="max-w-md w-full p-8 bg-white border border-rose-200/80 rounded-3xl shadow-xl shadow-rose-900/5 text-center space-y-6 animate-in fade-in zoom-in-95 duration-200">
@@ -579,14 +658,14 @@ export function SuperAdminView() {
 
           <div>
             <h2 className="text-2xl font-black text-neutral-950 tracking-tight">
-              Acesso Negado
+              Acesso Restrito
             </h2>
             <p className="text-sm text-neutral-600 mt-2 leading-relaxed">
-              Sua conta (
+              Sua conta atual (
               <strong className="text-neutral-900 font-semibold">
                 {usuarioAuth?.email || "Desconhecida"}
               </strong>
-              ) não possui privilégios de SuperAdmin para acessar a gestão global do MAYaMenu.
+              ) não possui privilégios de Operador SuperAdmin.
             </p>
           </div>
 
@@ -596,7 +675,7 @@ export function SuperAdminView() {
               <span>Controle de Acesso MAYaRAnas</span>
             </div>
             <p>
-              Para acessar o painel administrativo geral, encerre esta sessão e faça login com uma conta de operador registrada.
+              Para acessar o painel de Gerência Geral, entre com um dos e-mails autorizados (ex: admin@mayamenu.com ou marcus1fialho@gmail.com).
             </p>
           </div>
 
@@ -607,7 +686,7 @@ export function SuperAdminView() {
               className="w-full bg-rose-600 hover:bg-rose-700 text-white font-bold h-11 rounded-2xl shadow-md transition-colors"
             >
               <LogOut className="w-4 h-4 mr-2" />
-              Sair e Trocar de Conta
+              Sair e Entrar com Conta de Operador
             </Button>
 
             <Link href="/admin">
