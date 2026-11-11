@@ -49,7 +49,11 @@ import type { PatrocinadorB2B } from "@/types/b2b";
 import {
   cadastrarPatrocinadorSuperadmin,
   alternarStatusPatrocinador,
+  vincularRestauranteManualSuperadmin,
+  escutarLotesLicencas,
 } from "@/lib/b2b-service";
+import { db } from "@/lib/firebase";
+import { collection, getDocs } from "firebase/firestore";
 
 interface SuperadminPatrocinadoresTabProps {
   patrocinadores: PatrocinadorB2B[];
@@ -86,6 +90,105 @@ export function SuperadminPatrocinadoresTab({
     chaveAcessoB2B: string;
     codigoVoucherInicial: string;
   } | null>(null);
+
+  // Estados para Vinculação Manual de Restaurante Existente a Lote de Patrocínio
+  const [modalVincularAberto, setModalVincularAberto] = useState(false);
+  const [restaurantesDisponiveis, setRestaurantesDisponiveis] = useState<Array<{ id: string; nome: string; slug: string; plano?: string }>>([]);
+  const [patrocinadorSelecionadoId, setPatrocinadorSelecionadoId] = useState<string>("");
+  const [lotesPatrocinador, setLotesPatrocinador] = useState<any[]>([]);
+  const [loteSelecionadoId, setLoteSelecionadoId] = useState<string>("");
+  const [restauranteSelecionadoId, setRestauranteSelecionadoId] = useState<string>("");
+  const [vinculandoManual, setVinculandoManual] = useState(false);
+
+  const handleAbrirModalVincular = async () => {
+    setModalVincularAberto(true);
+    try {
+      const snap = await getDocs(collection(db, "restaurantes"));
+      const lista: Array<{ id: string; nome: string; slug: string; plano?: string }> = [];
+      snap.forEach((d) => {
+        const data = d.data() as any;
+        lista.push({
+          id: d.id,
+          nome: data.nome || "Sem Nome",
+          slug: data.slug || "",
+          plano: data.plano || "free",
+        });
+      });
+      lista.sort((a, b) => a.nome.localeCompare(b.nome));
+      setRestaurantesDisponiveis(lista);
+      if (lista.length > 0 && !restauranteSelecionadoId) {
+        setRestauranteSelecionadoId(lista[0].id);
+      }
+
+      const patIdInicial = patrocinadorSelecionadoId || patrocinadores[0]?.id || "";
+      if (patIdInicial) {
+        setPatrocinadorSelecionadoId(patIdInicial);
+        carregarLotesDoPatrocinador(patIdInicial);
+      }
+    } catch (err: any) {
+      console.warn("Falha ao carregar restaurantes para vinculo:", err);
+    }
+  };
+
+  const carregarLotesDoPatrocinador = async (patId: string) => {
+    try {
+      const colLotes = collection(db, "patrocinadores", patId, "lotes_licencas");
+      const snapLotes = await getDocs(colLotes);
+      const listaLotes: any[] = [];
+      snapLotes.forEach((d) => {
+        listaLotes.push({ id: d.id, ...d.data() });
+      });
+      setLotesPatrocinador(listaLotes);
+      if (listaLotes.length > 0) {
+        setLoteSelecionadoId(listaLotes[0].id);
+      } else {
+        setLoteSelecionadoId("");
+      }
+    } catch (err) {
+      console.warn("Falha ao buscar lotes:", err);
+    }
+  };
+
+  const handleTrocarPatrocinador = (patId: string) => {
+    setPatrocinadorSelecionadoId(patId);
+    carregarLotesDoPatrocinador(patId);
+  };
+
+  const handleConfirmarVinculoManual = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!patrocinadorSelecionadoId || !loteSelecionadoId || !restauranteSelecionadoId) {
+      onNotificarErro("Selecione o Patrocinador, o Lote e o Restaurante.");
+      return;
+    }
+
+    const rest = restaurantesDisponiveis.find((r) => r.id === restauranteSelecionadoId);
+    if (!rest) {
+      onNotificarErro("Restaurante selecionado inválido.");
+      return;
+    }
+
+    setVinculandoManual(true);
+    try {
+      const res = await vincularRestauranteManualSuperadmin({
+        patrocinadorId: patrocinadorSelecionadoId,
+        loteId: loteSelecionadoId,
+        restauranteId: rest.id,
+        nomeRestaurante: rest.nome,
+        slugRestaurante: rest.slug,
+      });
+
+      if (!res.sucesso) {
+        throw new Error(res.mensagem || "Falha ao vincular restaurante.");
+      }
+
+      onNotificarSucesso(`Restaurante "${rest.nome}" vinculado ao patrocínio com sucesso! +6 meses e itens injetados.`);
+      setModalVincularAberto(false);
+    } catch (err: any) {
+      onNotificarErro(err?.message || "Erro durante o vínculo manual.");
+    } finally {
+      setVinculandoManual(false);
+    }
+  };
 
   const patrocinadoresFiltrados = patrocinadores.filter((p) => {
     const q = filtro.toLowerCase();
@@ -197,6 +300,16 @@ export function SuperadminPatrocinadoresTab({
               className="bg-card border-border text-foreground pl-9 rounded-xl h-9 text-xs shadow-xs focus-visible:ring-1 focus-visible:ring-rose-500"
             />
           </div>
+
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleAbrirModalVincular}
+            className="h-9 px-3 rounded-xl text-xs font-bold border-rose-200 text-rose-700 bg-rose-50/50 hover:bg-rose-100 flex items-center gap-1.5 shadow-xs"
+          >
+            <Store className="w-4 h-4 text-rose-600" />
+            <span>Vincular Restaurante a Lote</span>
+          </Button>
 
           <Button
             type="button"
@@ -660,6 +773,108 @@ export function SuperadminPatrocinadoresTab({
           </DialogContent>
         </Dialog>
       )}
+
+      {/* MODAL: VINCULAR RESTAURANTE EXISTENTE A UM LOTE (SUPERADMIN) */}
+      <Dialog open={modalVincularAberto} onOpenChange={setModalVincularAberto}>
+        <DialogContent className="max-w-md bg-card border-border text-foreground rounded-3xl p-6 shadow-2xl">
+          <DialogHeader className="space-y-2 mb-2">
+            <DialogTitle className="text-lg font-black flex items-center gap-2 text-foreground">
+              <Store className="w-5 h-5 text-rose-600" />
+              <span>Vincular Restaurante ao Patrocínio</span>
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground">
+              Atrele um estabelecimento cadastrado no MAYaMenu (como o <strong>BiGula</strong>) ao lote de cotas de um patrocinador. Ele receberá o Plano PRO (+6 meses) e os itens do catálogo master.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleConfirmarVinculoManual} className="space-y-4 pt-2">
+            {/* 1. Seleciona o Patrocinador */}
+            <div className="space-y-1">
+              <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                Marca Patrocinadora *
+              </label>
+              <select
+                value={patrocinadorSelecionadoId}
+                onChange={(e) => handleTrocarPatrocinador(e.target.value)}
+                className="w-full h-10 px-3 bg-background border border-border rounded-xl text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-rose-500 font-bold"
+                required
+              >
+                {patrocinadores.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.nomeFantasia} ({p.cnpj})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* 2. Seleciona o Lote / Campanha */}
+            <div className="space-y-1">
+              <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                Lote de Licenças / Campanha *
+              </label>
+              {lotesPatrocinador.length === 0 ? (
+                <p className="text-xs text-amber-600 p-2.5 bg-amber-50 border border-amber-200 rounded-xl">
+                  Nenhum lote emitido para esta marca. Acesse o portal B2B para emitir um lote.
+                </p>
+              ) : (
+                <select
+                  value={loteSelecionadoId}
+                  onChange={(e) => setLoteSelecionadoId(e.target.value)}
+                  className="w-full h-10 px-3 bg-background border border-border rounded-xl text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-rose-500 font-mono"
+                  required
+                >
+                  {lotesPatrocinador.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.nome} [Voucher: {l.codigoCampanha}] ({l.licencasAtivadas || 0}/{l.totalLicencas} cotas)
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+
+            {/* 3. Seleciona o Restaurante */}
+            <div className="space-y-1">
+              <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                Restaurante Cadastrado *
+              </label>
+              {restaurantesDisponiveis.length === 0 ? (
+                <p className="text-xs text-muted-foreground">Carregando lista de estabelecimentos...</p>
+              ) : (
+                <select
+                  value={restauranteSelecionadoId}
+                  onChange={(e) => setRestauranteSelecionadoId(e.target.value)}
+                  className="w-full h-10 px-3 bg-background border border-border rounded-xl text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-rose-500 font-bold"
+                  required
+                >
+                  {restaurantesDisponiveis.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.nome} (/r/{r.slug}) - [{r.plano?.toUpperCase() || "FREE"}]
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-border">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setModalVincularAberto(false)}
+                className="text-xs text-muted-foreground hover:text-foreground rounded-xl"
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                disabled={vinculandoManual || lotesPatrocinador.length === 0}
+                className="bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl text-xs h-10 px-5 shadow-md shadow-rose-600/20"
+              >
+                {vinculandoManual ? "Vinculando..." : "Confirmar Vínculo (+6m PRO)"}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

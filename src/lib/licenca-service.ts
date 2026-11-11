@@ -351,6 +351,28 @@ export async function validarLicencaParaAtivacao(codigo: string): Promise<{
     return checarLicenca(localEncontrada);
   }
 
+  // 3. Checa se é um voucher corporativo de patrocínio B2B
+  try {
+    const { validarVoucherPatrocinio } = await import("@/lib/b2b-service");
+    const resVoucher = await validarVoucherPatrocinio(codigoFormatado);
+    if (resVoucher.valido && resVoucher.lote && resVoucher.patrocinador) {
+      const licencaPatrocinada: Licenca = {
+        id: codigoFormatado,
+        status: "disponivel",
+        plano: "pro",
+        limites: { maxPratos: 60, maxMesas: 30 },
+        criadaEm: new Date(),
+        responsavel: `Patrocinado por ${resVoucher.patrocinador.nomeFantasia}`,
+        notas: `Campanha B2B: ${resVoucher.lote.nome} (Voucher ${codigoFormatado})`,
+      };
+      return { valida: true, licenca: licencaPatrocinada };
+    } else if (resVoucher.mensagem && !resVoucher.mensagem.includes("não encontrado")) {
+      return { valida: false, motivo: resVoucher.mensagem };
+    }
+  } catch (errVoucher) {
+    console.warn("Checagem de voucher de patrocínio falhou:", errVoucher);
+  }
+
   return { valida: false, motivo: "Link de ativação inválido ou inexistente." };
 }
 
@@ -570,6 +592,25 @@ export async function ativarLicencaEInstanciaAtomica(params: {
       slug: slugLimpo,
     },
   });
+
+  // 10. Se for um voucher de patrocínio corporativo B2B, vincula ao lote e injeta itens
+  try {
+    const { validarVoucherPatrocinio, ativarPatrocinioNoRestaurante } = await import("@/lib/b2b-service");
+    const checagemVoucher = await validarVoucherPatrocinio(codigoFormatado);
+    if (checagemVoucher.valido && checagemVoucher.lote && checagemVoucher.patrocinador) {
+      await ativarPatrocinioNoRestaurante({
+        restauranteId: params.ownerUid,
+        nomeRestaurante: nomeLimpo,
+        slugRestaurante: slugLimpo,
+        codigoVoucher: codigoFormatado,
+      });
+      novoRest.plano = "pro";
+      novoRest.maxMesas = 30;
+      novoRest.maxPratos = 60;
+    }
+  } catch (errPat) {
+    console.warn("Ativação complementar de patrocínio falhou:", errPat);
+  }
 
   return novoRest;
 }

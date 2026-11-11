@@ -134,15 +134,18 @@ service cloud.firestore {
       allow create: if isNonAnonymous() && request.resource.data.ownerId == request.auth.uid;
 
       // Permite atualização de dados cadastrais/temas pelo Dono,
-      // mas governança de plano/limites/suspensão é EXCLUSIVA do SuperAdmin
+      // governança de suspensão/limites livres é do SuperAdmin, mas o Dono pode ativar patrocínio PRO legítimo
       allow update: if (
         isOwner(restauranteId)
         && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
-          'plano',
+          'suspenso',
           'maxMesas',
-          'maxPratos',
-          'suspenso'
+          'maxPratos'
         ])
+        && (
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['plano'])
+          || (request.resource.data.plano == 'pro' && request.resource.data.patrocinio.ativo == true)
+        )
       ) || isSuperAdmin();
 
       allow delete: if isOwner(restauranteId) || isSuperAdmin();

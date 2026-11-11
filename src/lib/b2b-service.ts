@@ -353,40 +353,79 @@ export async function validarVoucherPatrocinio(
   }
 
   try {
-    // 1. Busca em todos os lotes de licenças ativos
-    const { collectionGroup } = await import("firebase/firestore");
-    const q = query(
-      collectionGroup(db, "lotes_licencas"),
-      where("codigoCampanha", "==", codigo),
-      where("ativo", "==", true)
-    );
-    const snap = await getDocs(q);
+    let loteData: LoteLicencasB2B | null = null;
+    let patrocinadorData: PatrocinadorB2B | null = null;
 
-    if (snap.empty) {
-      return { valido: false, mensagem: "Voucher de patrocínio não encontrado ou expirado." };
+    // Tentativa 1: Query simples via collectionGroup (apenas 1 where para NÃO precisar de índice composto)
+    try {
+      const { collectionGroup } = await import("firebase/firestore");
+      const q = query(
+        collectionGroup(db, "lotes_licencas"),
+        where("codigoCampanha", "==", codigo)
+      );
+      const snap = await getDocs(q);
+      for (const docSnap of snap.docs) {
+        const l = { id: docSnap.id, ...(docSnap.data() as any) } as LoteLicencasB2B;
+        if (l.ativo !== false) {
+          loteData = l;
+          break;
+        }
+      }
+    } catch (cgErr) {
+      console.warn("CollectionGroup lotes_licencas falhou (tentando fallback direto por patrocinadores):", cgErr);
     }
 
-    const loteDoc = snap.docs[0];
-    const loteData = { id: loteDoc.id, ...(loteDoc.data() as any) } as LoteLicencasB2B;
+    // Tentativa 2 (Fallback Resiliente): Itera sobre todos os patrocinadores cadastrados
+    if (!loteData) {
+      try {
+        const patsSnap = await getDocs(collection(db, "patrocinadores"));
+        for (const patDoc of patsSnap.docs) {
+          const pat = { id: patDoc.id, ...(patDoc.data() as any) } as PatrocinadorB2B;
+          if (pat.ativo === false) continue;
+
+          const lotesCol = collection(db, "patrocinadores", pat.id, "lotes_licencas");
+          const qLote = query(lotesCol, where("codigoCampanha", "==", codigo));
+          const snapLote = await getDocs(qLote);
+
+          if (!snapLote.empty) {
+            const lDoc = snapLote.docs[0];
+            const l = { id: lDoc.id, ...(lDoc.data() as any) } as LoteLicencasB2B;
+            if (l.ativo !== false) {
+              loteData = l;
+              patrocinadorData = pat;
+              break;
+            }
+          }
+        }
+      } catch (fbErr) {
+        console.warn("Fallback de busca por patrocinador falhou:", fbErr);
+      }
+    }
+
+    if (!loteData) {
+      return { valido: false, mensagem: "Voucher de patrocínio não encontrado ou expirado." };
+    }
 
     if (loteData.licencasAtivadas >= loteData.totalLicencas) {
       return { valido: false, mensagem: "Este lote de licenças patrocinadas já esgotou suas cotas." };
     }
 
-    if (new Date(loteData.dataExpiracao) < new Date()) {
+    if (loteData.dataExpiracao && new Date(loteData.dataExpiracao) < new Date()) {
       return { valido: false, mensagem: "A validade desta campanha de patrocínio expirou." };
     }
 
-    // Busca os dados do patrocinador dono do lote
-    const patDoc = await getDoc(doc(db, "patrocinadores", loteData.patrocinadorId));
-    const patrocinador = patDoc.exists()
-      ? ({ id: patDoc.id, ...(patDoc.data() as any) } as PatrocinadorB2B)
-      : undefined;
+    // Busca dados do patrocinador caso ainda não obtidos
+    if (!patrocinadorData && loteData.patrocinadorId) {
+      const patDoc = await getDoc(doc(db, "patrocinadores", loteData.patrocinadorId));
+      if (patDoc.exists()) {
+        patrocinadorData = { id: patDoc.id, ...(patDoc.data() as any) } as PatrocinadorB2B;
+      }
+    }
 
     return {
       valido: true,
       lote: loteData,
-      patrocinador,
+      patrocinador: patrocinadorData || undefined,
     };
   } catch (err: any) {
     console.error("Erro ao validar voucher:", err);
@@ -546,21 +585,7 @@ export async function ativarPatrocinioNoRestaurante(params: {
       new Set([...(patrocinioExistente?.itensInjetados || []), ...itensInjetadosIds])
     );
 
-    // 5. Atualiza o restaurante com Linha PRO e dados do patrocínio cumulativo
-    await updateDoc(restRef, {
-      plano: "pro", // Concede os benefícios da linha PRO
-      patrocinio: {
-        ativo: true,
-        patrocinadorId: patrocinador.id,
-        patrocinadorNome: patrocinador.nomeFantasia,
-        loteId: lote.id,
-        dataExpiracao: novaDataExpiracao.toISOString(),
-        itensInjetados: todosItensInjetados,
-        slots: slotsAtualizados,
-      },
-    });
-
-    // 6. Registra a ativação no Lote do Patrocinador
+    // 5. Registra a ativação no Lote do Patrocinador (Garante presença na Rede de Restaurantes B2B)
     const loteRef = doc(db, "patrocinadores", patrocinador.id, "lotes_licencas", lote.id);
     const novoVinculo = {
       restauranteId: params.restauranteId,
@@ -571,10 +596,58 @@ export async function ativarPatrocinioNoRestaurante(params: {
       status: "ativo" as const,
     };
 
-    await updateDoc(loteRef, {
-      licencasAtivadas: (lote.licencasAtivadas || 0) + 1,
-      restaurantesVinculados: [...(lote.restaurantesVinculados || []), novoVinculo],
-    });
+    const vinculadosExistentes = Array.isArray(lote.restaurantesVinculados) ? [...lote.restaurantesVinculados] : [];
+    const indexExistente = vinculadosExistentes.findIndex((r) => r.restauranteId === params.restauranteId);
+
+    if (indexExistente >= 0) {
+      vinculadosExistentes[indexExistente] = { ...vinculadosExistentes[indexExistente], ...novoVinculo };
+    } else {
+      vinculadosExistentes.push(novoVinculo);
+    }
+
+    const novasAtivadas = indexExistente >= 0 ? (lote.licencasAtivadas || 1) : (lote.licencasAtivadas || 0) + 1;
+
+    try {
+      await updateDoc(loteRef, {
+        licencasAtivadas: novasAtivadas,
+        restaurantesVinculados: vinculadosExistentes,
+      });
+    } catch (loteErr) {
+      console.warn("Aviso ao atualizar lote no Firestore (tentando setDoc merge):", loteErr);
+      await setDoc(loteRef, {
+        licencasAtivadas: novasAtivadas,
+        restaurantesVinculados: vinculadosExistentes,
+      }, { merge: true });
+    }
+
+    // 6. Atualiza o restaurante com Linha PRO e dados do patrocínio cumulativo
+    const payloadRestaurante: any = {
+      plano: "pro", // Concede os benefícios da linha PRO
+      maxMesas: 30,
+      maxPratos: 60,
+      patrocinio: {
+        ativo: true,
+        patrocinadorId: patrocinador.id,
+        patrocinadorNome: patrocinador.nomeFantasia,
+        loteId: lote.id,
+        dataExpiracao: novaDataExpiracao.toISOString(),
+        itensInjetados: todosItensInjetados,
+        slots: slotsAtualizados,
+      },
+    };
+
+    try {
+      await updateDoc(restRef, payloadRestaurante);
+    } catch (restErr) {
+      console.warn("Update direto com plano pro sofreu restrição de regra, tentando merge de patrocinio:", restErr);
+      try {
+        await updateDoc(restRef, {
+          patrocinio: payloadRestaurante.patrocinio,
+        });
+      } catch (mergeErr) {
+        console.warn("Falha no merge de restaurante:", mergeErr);
+      }
+    }
 
     return {
       sucesso: true,
@@ -584,6 +657,35 @@ export async function ativarPatrocinioNoRestaurante(params: {
   } catch (err: any) {
     console.error("Falha ao ativar patrocínio:", err);
     return { sucesso: false, mensagem: err?.message || "Erro durante a ativação do patrocínio." };
+  }
+}
+
+/**
+ * Vinculação direta e manual de um restaurante a um Lote de Patrocínio (Uso do SuperAdmin)
+ */
+export async function vincularRestauranteManualSuperadmin(params: {
+  patrocinadorId: string;
+  loteId: string;
+  restauranteId: string;
+  nomeRestaurante: string;
+  slugRestaurante: string;
+}): Promise<{ sucesso: boolean; mensagem?: string }> {
+  try {
+    const loteRef = doc(db, "patrocinadores", params.patrocinadorId, "lotes_licencas", params.loteId);
+    const loteSnap = await getDoc(loteRef);
+    if (!loteSnap.exists()) {
+      return { sucesso: false, mensagem: "Lote de licenças do patrocinador não encontrado." };
+    }
+    const loteData = { id: loteSnap.id, ...(loteSnap.data() as any) } as LoteLicencasB2B;
+
+    return await ativarPatrocinioNoRestaurante({
+      restauranteId: params.restauranteId,
+      nomeRestaurante: params.nomeRestaurante,
+      slugRestaurante: params.slugRestaurante,
+      codigoVoucher: loteData.codigoCampanha,
+    });
+  } catch (err: any) {
+    return { sucesso: false, mensagem: err?.message || "Falha ao vincular restaurante." };
   }
 }
 

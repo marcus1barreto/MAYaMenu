@@ -29,6 +29,7 @@ import { ModificadorBuilder } from "./modificador-builder";
 import { GestaoEquipe } from "./gestao-equipe";
 import { SetupMesas } from "./setup-mesas";
 import { MAYA_MEDIA_LIBRARY } from "@/lib/maya-media-library";
+import { validarVoucherPatrocinio, ativarPatrocinioNoRestaurante } from "@/lib/b2b-service";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -160,6 +161,48 @@ export function AdminDashboard() {
     totalSessoes: number;
     totalClientes: number;
   } | null>(null);
+
+  // Estados para Gestão de Patrocínio & Extensão Cumulativa (+6 meses)
+  const [voucherPatrocinioInput, setVoucherPatrocinioInput] = useState("");
+  const [ativandoPatrocinio, setAtivandoPatrocinio] = useState(false);
+  const [erroPatrocinio, setErroPatrocinio] = useState<string | null>(null);
+  const [sucessoPatrocinio, setSucessoPatrocinio] = useState<string | null>(null);
+
+  const handleAtivarPatrocinio = async () => {
+    const cod = voucherPatrocinioInput.trim().toUpperCase();
+    if (!cod) {
+      setErroPatrocinio("Informe o código do voucher.");
+      return;
+    }
+    if (!restaurante?.id) return;
+
+    setAtivandoPatrocinio(true);
+    setErroPatrocinio(null);
+    setSucessoPatrocinio(null);
+
+    try {
+      const res = await ativarPatrocinioNoRestaurante({
+        restauranteId: restaurante.id,
+        nomeRestaurante: restaurante.nome,
+        slugRestaurante: restaurante.slug,
+        codigoVoucher: cod,
+      });
+
+      if (!res.sucesso) {
+        setErroPatrocinio(res.mensagem || "Não foi possível validar este voucher.");
+        return;
+      }
+
+      setSucessoPatrocinio(
+        `Patrocínio ativado com sucesso! Foram adicionados +${res.mesesAdicionados || 6} meses ao seu plano PRO.`
+      );
+      setVoucherPatrocinioInput("");
+    } catch (err: any) {
+      setErroPatrocinio(err?.message || "Falha ao ativar patrocínio.");
+    } finally {
+      setAtivandoPatrocinio(false);
+    }
+  };
 
   // Escuta o histórico de sessões encerradas e métricas agregadas econômicas
   useEffect(() => {
@@ -866,11 +909,21 @@ export function AdminDashboard() {
               <h1 className="text-base sm:text-lg font-black tracking-tight leading-tight">
                 {restaurante?.nome || "Painel MAYaMenu"}
               </h1>
-              {restaurante?.patrocinio?.ativo && (
+              {restaurante?.patrocinio?.ativo ? (
                 <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 flex items-center gap-1 shrink-0 shadow-2xs">
                   <Sparkles className="w-2.5 h-2.5 text-amber-600" />
                   Patrocinado por {restaurante.patrocinio.patrocinadorNome}
                 </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setModalConfigAberto(true)}
+                  className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 flex items-center gap-1 shrink-0 transition-colors cursor-pointer"
+                  title="Possui um voucher de patrocinador? Clique para ativar o Plano PRO"
+                >
+                  <Sparkles className="w-2.5 h-2.5 text-rose-600" />
+                  <span>Voucher Patrocinador (+6 Meses PRO)</span>
+                </button>
               )}
             </div>
             <p className="text-[11px] text-muted-foreground">Administração & Operação</p>
@@ -2361,6 +2414,100 @@ export function AdminDashboard() {
                       <span className="text-[10px] text-muted-foreground">Máximo 15 caracteres (padrão BACEN)</span>
                     </div>
                   </div>
+                </div>
+              )}
+            </div>
+
+            {/* PATROCÍNIO OFICIAL DE MARCAS & ATIVAÇÃO DE VOUCHER B2B (+6 MESES PRO) */}
+            <div className="space-y-3 p-4 rounded-xl bg-rose-50/40 border border-rose-200/80">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-black uppercase tracking-wider text-rose-950 flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-rose-600" />
+                  Patrocínio de Marcas & Voucher Corporativo B2B
+                </label>
+                {restaurante?.patrocinio?.ativo && (
+                  <Badge className="bg-emerald-50 text-emerald-800 border-emerald-200 text-[10px] font-bold uppercase">
+                    PRO Patrocinado Ativo
+                  </Badge>
+                )}
+              </div>
+
+              {restaurante?.patrocinio?.ativo ? (
+                <div className="space-y-3">
+                  <div className="p-3 bg-white rounded-xl border border-rose-100 text-xs space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-neutral-900">
+                        {restaurante.patrocinio.patrocinadorNome}
+                      </span>
+                      {restaurante.patrocinio.dataExpiracao && (
+                        <span className="text-[11px] text-muted-foreground font-mono">
+                          Validade: {new Date(restaurante.patrocinio.dataExpiracao).toLocaleDateString("pt-BR")}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-muted-foreground leading-relaxed">
+                      Sua conta conta com todos os recursos da <strong>Linha PRO</strong> subsidiados por marcas parceiras.
+                    </p>
+                  </div>
+
+                  {/* Campo para Inserir Patrocinador Complementar (+6 meses adicionais) */}
+                  <div className="pt-2 border-t border-rose-100 space-y-2">
+                    <label className="text-[11px] font-bold text-neutral-800 block">
+                      Adicionar Novo Patrocinador Não Concorrente (+6 Meses Grátis):
+                    </label>
+                    <div className="flex gap-2">
+                      <Input
+                        type="text"
+                        placeholder="Ex: NOVOVOUCHER2026"
+                        value={voucherPatrocinioInput}
+                        onChange={(e) => setVoucherPatrocinioInput(e.target.value.toUpperCase())}
+                        className="bg-white border-rose-200 text-neutral-900 font-mono text-xs h-9 uppercase"
+                      />
+                      <Button
+                        type="button"
+                        onClick={handleAtivarPatrocinio}
+                        disabled={ativandoPatrocinio}
+                        className="bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs h-9 px-4 rounded-xl shrink-0"
+                      >
+                        {ativandoPatrocinio ? "Validando..." : "Somar +6 Meses"}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2.5">
+                  <p className="text-xs text-neutral-600 leading-relaxed">
+                    Recebeu o MAYaMenu de uma marca parceira (cervejaria, indústria de carnes ou destilados)? Insira o código do voucher para liberar todos os recursos da <strong>Linha PRO</strong> por 6 meses:
+                  </p>
+                  <div className="flex gap-2">
+                    <Input
+                      type="text"
+                      placeholder="Ex: BIGULA2026 ou VOUCHER"
+                      value={voucherPatrocinioInput}
+                      onChange={(e) => setVoucherPatrocinioInput(e.target.value.toUpperCase())}
+                      className="bg-white border-rose-200 text-neutral-900 font-mono text-xs h-10 uppercase"
+                    />
+                    <Button
+                      type="button"
+                      onClick={handleAtivarPatrocinio}
+                      disabled={ativandoPatrocinio}
+                      className="bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs h-10 px-5 rounded-xl shrink-0 shadow-sm"
+                    >
+                      {ativandoPatrocinio ? "Ativando..." : "Ativar Patrocínio (+6m PRO)"}
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {erroPatrocinio && (
+                <div className="p-2.5 rounded-lg bg-rose-100 border border-rose-300 text-rose-800 text-xs font-medium">
+                  {erroPatrocinio}
+                </div>
+              )}
+
+              {sucessoPatrocinio && (
+                <div className="p-2.5 rounded-lg bg-emerald-100 border border-emerald-300 text-emerald-800 text-xs font-medium">
+                  {sucessoPatrocinio}
                 </div>
               )}
             </div>
