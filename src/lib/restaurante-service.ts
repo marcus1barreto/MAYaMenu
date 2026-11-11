@@ -570,9 +570,9 @@ export async function marcarComandaPagaFirestore(
     for (const pedDoc of pedidosSnap.docs) {
       const pedData = pedDoc.data() as PedidoRodada;
       for (const it of pedData.itens || []) {
-        if ((it as any).origemPatrocinadorId || String(it.menuItemId).startsWith("spn-")) {
+        const patId = (it as any).origemPatrocinadorId;
+        if (patId) {
           const { registrarVendaItemPatrocinado } = await import("@/lib/b2b-service");
-          const patId = (it as any).origemPatrocinadorId || "spn-bierhaus-demo";
           await registrarVendaItemPatrocinado({
             patrocinadorId: patId,
             itemId: it.menuItemId,

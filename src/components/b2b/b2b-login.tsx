@@ -56,10 +56,6 @@ export function B2BLogin({ onAutenticado }: B2BLoginProps) {
     }
   };
 
-  const handleEntrarDemo = () => {
-    setChave("SPN-DEMO-2026");
-  };
-
   return (
     <div className="relative w-full max-w-lg mx-auto p-6 sm:p-10 bg-white border border-neutral-200/80 rounded-3xl shadow-xl text-neutral-900 overflow-hidden">
       {/* Glows de ambientação corporativa suave */}
@@ -120,18 +116,6 @@ export function B2BLogin({ onAutenticado }: B2BLoginProps) {
           <ArrowRight className="w-4 h-4" />
         </Button>
       </form>
-
-      {/* BOTÃO DE DEMO RÁPIDO PARA TESTADORES */}
-      <div className="relative mt-6 pt-5 border-t border-neutral-100 flex flex-col items-center gap-3">
-        <button
-          type="button"
-          onClick={handleEntrarDemo}
-          className="text-xs text-neutral-500 hover:text-neutral-900 flex items-center gap-1.5 transition-colors group"
-        >
-          <Sparkles className="w-3.5 h-3.5 text-amber-500 group-hover:scale-110 transition-transform" />
-          <span>Usar Chave de Demonstração: <strong className="text-rose-600 font-mono">SPN-DEMO-2026</strong></span>
-        </button>
-      </div>
     </div>
   );
 }

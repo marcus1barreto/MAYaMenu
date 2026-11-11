@@ -263,7 +263,6 @@ export function SuperadminPatrocinadoresTab({
       ) : (
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
           {patrocinadoresFiltrados.map((pat) => {
-            const ehDemo = pat.id === "spn-bierhaus-demo";
             const linkPortal = `/parceiros?chave=${encodeURIComponent(pat.chaveAcessoB2B || pat.id)}`;
 
             return (
@@ -284,11 +283,6 @@ export function SuperadminPatrocinadoresTab({
                         <h3 className="text-base font-black text-foreground">
                           {pat.nomeFantasia}
                         </h3>
-                        {ehDemo && (
-                          <span className="text-[9px] px-2 py-0.5 rounded-full font-bold uppercase bg-amber-50 text-amber-800 border border-amber-200">
-                            Modelo Demonstração
-                          </span>
-                        )}
                       </div>
                       <p className="text-xs text-muted-foreground">
                         {pat.razaoSocial} • <span className="font-mono">{pat.cnpj}</span>
@@ -315,13 +309,13 @@ export function SuperadminPatrocinadoresTab({
                     </span>
                     <div className="flex items-center gap-1.5">
                       <span className="font-mono font-bold text-foreground bg-background px-2 py-1 rounded-lg border border-border text-[11px]">
-                        {pat.chaveAcessoB2B || "SPN-DEMO-2026"}
+                        {pat.chaveAcessoB2B || pat.id}
                       </span>
                       <Button
                         type="button"
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleCopiar(pat.chaveAcessoB2B || "SPN-DEMO-2026", pat.id)}
+                        onClick={() => handleCopiar(pat.chaveAcessoB2B || pat.id, pat.id)}
                         className="h-7 px-2 text-xs rounded-lg text-muted-foreground hover:text-foreground"
                         title="Copiar Chave do Patrocinador"
                       >

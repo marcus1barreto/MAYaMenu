@@ -126,10 +126,6 @@ export async function buscarPatrocinadorPorChave(
   const chaveLimpa = chaveAcesso.trim().toUpperCase();
   if (!chaveLimpa) return null;
 
-  if (chaveLimpa === "SPN-DEMO-2026" || chaveLimpa === "DEMO") {
-    return PATROCINADOR_DEMO;
-  }
-
   try {
     const colRef = collection(db, "patrocinadores");
     const q = query(colRef, where("chaveAcessoB2B", "==", chaveLimpa), where("ativo", "==", true));
@@ -147,10 +143,7 @@ export async function buscarPatrocinadorPorChave(
     const firstDoc = snap.docs[0];
     return { id: firstDoc.id, ...(firstDoc.data() as any) } as PatrocinadorB2B;
   } catch (err) {
-    console.warn("Falha ao buscar patrocinador por chave (usando demo se aplicável):", err);
-    if (chaveLimpa.includes("DEMO") || chaveLimpa.includes("BIER")) {
-      return PATROCINADOR_DEMO;
-    }
+    console.warn("Falha ao buscar patrocinador por chave:", err);
     return null;
   }
 }
@@ -222,7 +215,6 @@ export function escutarCatalogoMaster(
   patrocinadorId: string,
   onUpdate: (itens: ItemCatalogoPatrocinador[]) => void
 ): Unsubscribe {
-  const isDemo = patrocinadorId === "spn-bierhaus-demo";
   const colRef = collection(db, "patrocinadores", patrocinadorId, "catalogo_master");
   return onSnapshot(
     colRef,
@@ -231,19 +223,11 @@ export function escutarCatalogoMaster(
       snap.forEach((docSnap) => {
         itens.push({ id: docSnap.id, ...(docSnap.data() as any) } as ItemCatalogoPatrocinador);
       });
-      if (itens.length === 0 && isDemo) {
-        onUpdate(CATALOGO_MASTER_DEMO);
-      } else {
-        onUpdate(itens);
-      }
+      onUpdate(itens);
     },
     (err) => {
-      console.warn("Aviso ao escutar catálogo master (usando fallback demo se aplicável):", err);
-      if (isDemo) {
-        onUpdate(CATALOGO_MASTER_DEMO);
-      } else {
-        onUpdate([]);
-      }
+      console.warn("Aviso ao escutar catálogo master:", err);
+      onUpdate([]);
     }
   );
 }
@@ -299,7 +283,6 @@ export function escutarLotesLicencas(
   patrocinadorId: string,
   onUpdate: (lotes: LoteLicencasB2B[]) => void
 ): Unsubscribe {
-  const isDemo = patrocinadorId === "spn-bierhaus-demo";
   const colRef = collection(db, "patrocinadores", patrocinadorId, "lotes_licencas");
   return onSnapshot(
     colRef,
@@ -308,19 +291,11 @@ export function escutarLotesLicencas(
       snap.forEach((docSnap) => {
         lotes.push({ id: docSnap.id, ...(docSnap.data() as any) } as LoteLicencasB2B);
       });
-      if (lotes.length === 0 && isDemo) {
-        onUpdate(LOTES_DEMO);
-      } else {
-        onUpdate(lotes);
-      }
+      onUpdate(lotes);
     },
     (err) => {
-      console.warn("Aviso ao escutar lotes de licenças (usando fallback demo se aplicável):", err);
-      if (isDemo) {
-        onUpdate(LOTES_DEMO);
-      } else {
-        onUpdate([]);
-      }
+      console.warn("Aviso ao escutar lotes de licenças:", err);
+      onUpdate([]);
     }
   );
 }
@@ -375,15 +350,6 @@ export async function validarVoucherPatrocinio(
   const codigo = codigoVoucher.trim().toUpperCase();
   if (!codigo) {
     return { valido: false, mensagem: "Informe o código do voucher de patrocínio." };
-  }
-
-  // Suporte imediato ao voucher de demonstração sem bater no banco
-  if (codigo === "BIERHAUS2026") {
-    return {
-      valido: true,
-      lote: LOTES_DEMO[0],
-      patrocinador: PATROCINADOR_DEMO,
-    };
   }
 
   try {
@@ -673,7 +639,6 @@ export function escutarMetricasSellout(
   patrocinadorId: string,
   onUpdate: (metricas: MetricasSelloutItem[]) => void
 ): Unsubscribe {
-  const isDemo = patrocinadorId === "spn-bierhaus-demo";
   const colRef = collection(db, "patrocinadores", patrocinadorId, "metricas_sellout");
   return onSnapshot(
     colRef,
@@ -693,19 +658,11 @@ export function escutarMetricasSellout(
           ultimaVendaEm: d.ultimaVendaEm,
         });
       });
-      if (metricas.length === 0 && isDemo) {
-        onUpdate(METRICAS_DEMO);
-      } else {
-        onUpdate(metricas);
-      }
+      onUpdate(metricas);
     },
     (err) => {
-      console.warn("Aviso ao escutar métricas de sellout (usando fallback demo se aplicável):", err);
-      if (isDemo) {
-        onUpdate(METRICAS_DEMO);
-      } else {
-        onUpdate([]);
-      }
+      console.warn("Aviso ao escutar métricas de sellout:", err);
+      onUpdate([]);
     }
   );
 }
@@ -724,18 +681,11 @@ export function escutarTodosPatrocinadores(
       snap.forEach((docSnap) => {
         lista.push({ id: docSnap.id, ...(docSnap.data() as any) } as PatrocinadorB2B);
       });
-
-      // Se banco estiver vazio ou sem o demo, garante a visualização do patrocinador demonstrativo
-      const temDemo = lista.some((p) => p.id === PATROCINADOR_DEMO.id);
-      if (!temDemo) {
-        lista.unshift(PATROCINADOR_DEMO);
-      }
-
       onUpdate(lista);
     },
     (err) => {
-      console.warn("Aviso ao escutar todos os patrocinadores (usando fallback demo):", err);
-      onUpdate([PATROCINADOR_DEMO]);
+      console.warn("Aviso ao escutar todos os patrocinadores:", err);
+      onUpdate([]);
     }
   );
 }
@@ -805,10 +755,6 @@ export async function alternarStatusPatrocinador(
   patrocinadorId: string,
   ativo: boolean
 ): Promise<void> {
-  if (patrocinadorId === PATROCINADOR_DEMO.id) {
-    PATROCINADOR_DEMO.ativo = ativo;
-    return;
-  }
   const docRef = doc(db, "patrocinadores", patrocinadorId);
   await updateDoc(docRef, {
     ativo,
