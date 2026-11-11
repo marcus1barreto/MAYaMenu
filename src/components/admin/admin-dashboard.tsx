@@ -76,6 +76,8 @@ import {
   BookOpen,
   CreditCard,
   ShieldCheck,
+  Globe,
+  CheckCircle2,
 } from "lucide-react";
 import confetti from "canvas-confetti";
 import Link from "next/link";
@@ -1985,6 +1987,32 @@ export function AdminDashboard() {
             </div>
           )}
 
+          {/* DESTAQUE PIX INSTANTÂNEO */}
+          <div className="p-3 rounded-2xl bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-emerald-500/5 border border-emerald-500/30 flex items-center justify-between gap-3 shadow-2xs">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-black text-xs shadow-md shadow-emerald-600/20 shrink-0">
+                PIX
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-black text-foreground">Pagamento Instantâneo via PIX</span>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
+                    ⚡ Libera na Hora
+                  </span>
+                </div>
+                <p className="text-[11px] text-muted-foreground leading-snug mt-0.5">
+                  Gere o QR Code ou Copia & Cola e tenha seu plano PRO liberado em segundos na tela.
+                </p>
+              </div>
+            </div>
+            <div className="hidden sm:flex flex-col items-end shrink-0">
+              <span className="text-[11px] font-extrabold text-emerald-600 flex items-center gap-1">
+                <CheckCircle2 className="w-3.5 h-3.5" /> 100% Automático
+              </span>
+              <span className="text-[10px] text-muted-foreground">Sem espera bancária</span>
+            </div>
+          </div>
+
           {/* SELEÇÃO DO PLANO: MENSAL VS SEMESTRAL */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 my-2">
             {/* PLANO MENSAL */}
@@ -2048,7 +2076,7 @@ export function AdminDashboard() {
                   <span className="text-[11px] text-muted-foreground">/6 meses</span>
                 </div>
                 <p className="text-[11px] text-muted-foreground leading-snug">
-                  Apenas <strong>R$ 41,50/mês</strong>. Até 12x no cartão de crédito.
+                  Apenas <strong>R$ 41,50/mês</strong>. Até 12x no cartão de crédito ou Pix.
                 </p>
               </div>
               <div className="mt-3 pt-2 border-t border-border/60 text-[10px] font-bold text-amber-600 dark:text-amber-400">
@@ -2090,15 +2118,62 @@ export function AdminDashboard() {
             </div>
           </div>
 
-          {/* FORMAS DE PAGAMENTO E SEGURANÇA */}
-          <div className="flex items-center justify-between text-[11px] text-muted-foreground px-1">
-            <div className="flex items-center gap-1.5 font-medium">
-              <ShieldCheck className="w-4 h-4 text-emerald-600" />
-              <span>Checkout Seguro Mercado Pago</span>
+          {/* BANDEIRAS HONESTAS DE SEGURANÇA E CONFIANÇA */}
+          <div className="space-y-2 my-2 bg-slate-50 dark:bg-slate-900/50 p-3 rounded-2xl border border-border">
+            <div className="flex items-center gap-2 text-[11px] font-black uppercase tracking-wider text-muted-foreground mb-1">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Ambiente de Pagamento Certificado & Seguro</span>
             </div>
-            <div className="flex items-center gap-2 font-semibold text-foreground">
-              <CreditCard className="w-3.5 h-3.5 text-muted-foreground" />
-              <span>Cartão até 12x ou Pix</span>
+            <div className="grid grid-cols-2 gap-2 text-[11px]">
+              <div className="flex items-center gap-2 p-1.5 rounded-lg bg-card border border-border">
+                <div className="w-6 h-6 rounded-md bg-[#009EE3] text-white flex items-center justify-center font-black text-[9px] shrink-0 shadow-2xs">
+                  MP
+                </div>
+                <div>
+                  <span className="font-bold text-foreground block leading-tight">Mercado Pago</span>
+                  <span className="text-[10px] text-muted-foreground">Checkout Oficial</span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 p-1.5 rounded-lg bg-card border border-border">
+                <div className="w-6 h-6 rounded-md bg-emerald-600 text-white flex items-center justify-center font-black text-[9px] shrink-0 shadow-2xs">
+                  SSL
+                </div>
+                <div>
+                  <span className="font-bold text-foreground block leading-tight">Site Seguro</span>
+                  <span className="text-[10px] text-muted-foreground">Criptografia 256-Bit</span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 p-1.5 rounded-lg bg-card border border-border">
+                <div className="w-6 h-6 rounded-md bg-rose-600 text-white flex items-center justify-center font-black text-[9px] shrink-0 shadow-2xs">
+                  ⚡
+                </div>
+                <div>
+                  <span className="font-bold text-foreground block leading-tight">Pix ou Cartão</span>
+                  <span className="text-[10px] text-muted-foreground">Até 12x no Crédito</span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 p-1.5 rounded-lg bg-card border border-border">
+                <div className="w-6 h-6 rounded-md bg-blue-600 text-white flex items-center justify-center font-black text-[9px] shrink-0 shadow-2xs">
+                  LGPD
+                </div>
+                <div>
+                  <span className="font-bold text-foreground block leading-tight">Privacidade</span>
+                  <span className="text-[10px] text-muted-foreground">Dados Protegidos</span>
+                </div>
+              </div>
+            </div>
+
+            {/* AVISO TRANSPARENTE SOBRE PAYPAL */}
+            <div className="mt-2 pt-2 border-t border-border flex items-start gap-2 text-[10px] text-muted-foreground">
+              <div className="w-4 h-4 rounded bg-[#003087] text-white flex items-center justify-center font-black text-[8px] shrink-0 mt-0.5">
+                P
+              </div>
+              <p className="leading-snug">
+                <strong className="text-foreground">Prefere pagar ou faturar via PayPal?</strong> Aceitamos faturamento internacional e contas multimoeda através do PayPal sob consulta via suporte.
+              </p>
             </div>
           </div>
 
@@ -2119,7 +2194,7 @@ export function AdminDashboard() {
                 <>
                   <Sparkles className="w-4 h-4" />
                   <span>
-                    Assinar Agora por{" "}
+                    Pagar com PIX ou Cartão •{" "}
                     {planoCheckoutSelecionado === "pro_mensal" ? "R$ 49,90" : "R$ 249,00"}
                   </span>
                   <ArrowUpRight className="w-4 h-4 ml-1" />

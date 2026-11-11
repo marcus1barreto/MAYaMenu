@@ -18,6 +18,7 @@ import {
   Boxes,
   Cpu,
   FileSpreadsheet,
+  Lock,
 } from "lucide-react";
 
 export const metadata: Metadata = {
@@ -459,6 +460,33 @@ export default function LandingPage() {
                     <Store className="w-3.5 h-3.5 text-rose-600" />
                     <span>Ou visite o Restaurante Modelo para degustar</span>
                   </Link>
+                </div>
+              </div>
+
+              {/* FAIXA DE SEGURANÇA E BANDEIRAS DE PAGAMENTO */}
+              <div className="mt-8 pt-6 border-t border-neutral-100">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2.5 text-xs text-neutral-700">
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 font-bold">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                      <span>PIX Instantâneo</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-sky-50 border border-sky-200 text-sky-800 font-bold">
+                      <ShieldCheck className="w-3.5 h-3.5 text-sky-600" />
+                      <span>Mercado Pago Protegido</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-neutral-100 border border-neutral-200 text-neutral-800 font-bold">
+                      <Lock className="w-3.5 h-3.5 text-neutral-700" />
+                      <span>Site Seguro SSL 256-Bit</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-rose-50 border border-rose-200 text-rose-800 font-bold">
+                      <span>Cartão em até 12x</span>
+                    </div>
+                  </div>
+
+                  <div className="text-[11px] text-neutral-500 text-center sm:text-right">
+                    <span>Opção de faturamento internacional via <strong className="text-neutral-800">PayPal</strong> sob consulta.</span>
+                  </div>
                 </div>
               </div>
             </div>
