@@ -82,7 +82,12 @@ import {
   FileDown,
   Boxes,
   BookOpen,
+  Building2,
+  Handshake,
 } from "lucide-react";
+import { SuperadminPatrocinadoresTab } from "./superadmin-patrocinadores-tab";
+import { escutarTodosPatrocinadores } from "@/lib/b2b-service";
+import type { PatrocinadorB2B } from "@/types/b2b";
 
 export const EMAILS_SUPERADMIN_AUTORIZADOS = [
   "admin@mayamenu.com",
@@ -94,7 +99,8 @@ export function SuperAdminView() {
   const [licencas, setLicencas] = useState<Licenca[]>([]);
   const [arquivoMorto, setArquivoMorto] = useState<LicencaArquivada[]>([]);
   const [restaurantes, setRestaurantes] = useState<Restaurante[]>([]);
-  const [abaAtiva, setAbaAtiva] = useState<"restaurantes" | "ativas" | "vencidas" | "arquivo_morto">("restaurantes");
+  const [patrocinadores, setPatrocinadores] = useState<PatrocinadorB2B[]>([]);
+  const [abaAtiva, setAbaAtiva] = useState<"restaurantes" | "ativas" | "vencidas" | "arquivo_morto" | "patrocinadores">("restaurantes");
   const [filtro, setFiltro] = useState<string>("");
   const [planoSelecionado, setPlanoSelecionado] = useState<PlanoTipo>("free");
   const [responsavel, setResponsavel] = useState("");
@@ -143,6 +149,9 @@ export function SuperAdminView() {
     const unsubRestaurantes = escutarRestaurantes((dados) => {
       setRestaurantes(dados);
     });
+    const unsubPatrocinadores = escutarTodosPatrocinadores((dados) => {
+      setPatrocinadores(dados);
+    });
     const unsubAuth = onAuthStateChanged(auth, async (user) => {
       setUsuarioAuth(user);
       if (user) {
@@ -161,6 +170,7 @@ export function SuperAdminView() {
       unsubLicencas();
       unsubArquivo();
       unsubRestaurantes();
+      unsubPatrocinadores();
       unsubAuth();
     };
   }, []);
@@ -732,6 +742,16 @@ export function SuperAdminView() {
             </span>
             <span className="text-xl font-black text-purple-600">{arquivoMorto.length}</span>
           </div>
+          <div
+            onClick={() => setAbaAtiva("patrocinadores")}
+            className="px-4 py-2 bg-card border border-border rounded-2xl text-center cursor-pointer hover:border-rose-400 transition-colors shadow-xs"
+          >
+            <span className="block text-xs uppercase tracking-wider text-muted-foreground font-bold flex items-center justify-center gap-1">
+              <Building2 className="w-3 h-3 text-rose-600" />
+              Patrocinadores B2B
+            </span>
+            <span className="text-xl font-black text-rose-600">{patrocinadores.length}</span>
+          </div>
         </div>
       </div>
 
@@ -835,6 +855,17 @@ export function SuperAdminView() {
         >
           <Archive className="w-4 h-4" />
           Arquivo Morto / JSONs ({arquivoMorto.length})
+        </button>
+        <button
+          onClick={() => setAbaAtiva("patrocinadores")}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+            abaAtiva === "patrocinadores"
+              ? "bg-rose-600 text-white shadow-md shadow-rose-600/30"
+              : "bg-card text-muted-foreground hover:text-foreground border border-border"
+          }`}
+        >
+          <Building2 className="w-4 h-4" />
+          Patrocinadores B2B ({patrocinadores.length})
         </button>
       </div>
 
@@ -1690,7 +1721,7 @@ export function SuperAdminView() {
             </div>
           )}
         </div>
-      ) : (
+      ) : abaAtiva === "arquivo_morto" ? (
         /* ABA ARQUIVO MORTO / REGISTROS EM JSON */
         <div className="space-y-6">
           <div className="p-6 bg-card border border-border rounded-3xl space-y-2 shadow-xs">
@@ -1816,6 +1847,20 @@ export function SuperAdminView() {
             </div>
           )}
         </div>
+      ) : (
+        /* ABA PATROCINADORES B2B (TRADE MARKETING) */
+        <SuperadminPatrocinadoresTab
+          patrocinadores={patrocinadores}
+          ehSuperAdmin={ehSuperAdmin}
+          onNotificarSucesso={(msg) => {
+            setAlertaSucesso(msg);
+            setAlertaErro(null);
+          }}
+          onNotificarErro={(msg) => {
+            setAlertaErro(msg);
+            setAlertaSucesso(null);
+          }}
+        />
       )}
 
       {/* MODAL INSPECIONADOR DE JSON DO ARQUIVO MORTO */}

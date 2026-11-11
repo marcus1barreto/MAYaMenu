@@ -605,3 +605,110 @@ export function escutarMetricasSellout(
   );
 }
 
+/**
+ * Escuta TODOS os patrocinadores cadastrados (Visão do Superadmin HQ)
+ */
+export function escutarTodosPatrocinadores(
+  onUpdate: (patrocinadores: PatrocinadorB2B[]) => void
+): Unsubscribe {
+  const colRef = collection(db, "patrocinadores");
+  return onSnapshot(
+    colRef,
+    (snap) => {
+      const lista: PatrocinadorB2B[] = [];
+      snap.forEach((docSnap) => {
+        lista.push({ id: docSnap.id, ...(docSnap.data() as any) } as PatrocinadorB2B);
+      });
+
+      // Se banco estiver vazio ou sem o demo, garante a visualização do patrocinador demonstrativo
+      const temDemo = lista.some((p) => p.id === PATROCINADOR_DEMO.id);
+      if (!temDemo) {
+        lista.unshift(PATROCINADOR_DEMO);
+      }
+
+      onUpdate(lista);
+    },
+    (err) => {
+      console.warn("Aviso ao escutar todos os patrocinadores (usando fallback demo):", err);
+      onUpdate([PATROCINADOR_DEMO]);
+    }
+  );
+}
+
+/**
+ * Cria ou atualiza um Patrocinador B2B via Superadmin com Lote Inicial de Licenças
+ */
+export async function cadastrarPatrocinadorSuperadmin(dados: {
+  nomeFantasia: string;
+  razaoSocial: string;
+  cnpj: string;
+  contatoNome: string;
+  contatoEmail: string;
+  contatoTelefone: string;
+  contatoCargo?: string;
+  totalCotasContratadas: number;
+  validadeMeses: number;
+}): Promise<{ id: string; chaveAcessoB2B: string; codigoVoucherInicial: string }> {
+  const slug = dados.nomeFantasia
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)+/g, "");
+
+  const id = `spn-${slug}-${Date.now().toString().slice(-4)}`;
+  const chaveAcessoB2B = `SPN-${slug.toUpperCase().slice(0, 8)}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+  const codigoVoucherInicial = `${slug.toUpperCase().slice(0, 8)}${new Date().getFullYear()}`;
+
+  // 1. Cria o registro do Patrocinador
+  const docRef = doc(db, "patrocinadores", id);
+  const patrocinadorPayload: PatrocinadorB2B = {
+    id,
+    cnpj: dados.cnpj,
+    razaoSocial: dados.razaoSocial,
+    nomeFantasia: dados.nomeFantasia,
+    slug,
+    chaveAcessoB2B,
+    logoUrl: "/images/demo/coquetel.webp",
+    contatoResponsavel: {
+      nome: dados.contatoNome,
+      email: dados.contatoEmail,
+      telefone: dados.contatoTelefone,
+      cargo: dados.contatoCargo || "Gestor de Trade Marketing",
+    },
+    ativo: true,
+    criadoEm: serverTimestamp(),
+  };
+
+  await setDoc(docRef, patrocinadorPayload);
+
+  // 2. Cria o lote inicial de cotas contratadas
+  await criarLoteLicencas(id, {
+    nome: `Lote Contratual - ${dados.nomeFantasia} ${new Date().getFullYear()}`,
+    codigoCampanha: codigoVoucherInicial,
+    totalLicencas: dados.totalCotasContratadas,
+    validadeMeses: dados.validadeMeses || 12,
+  });
+
+  return { id, chaveAcessoB2B, codigoVoucherInicial };
+}
+
+/**
+ * Altera o status de um patrocinador (Ativo / Suspenso) via Superadmin
+ */
+export async function alternarStatusPatrocinador(
+  patrocinadorId: string,
+  ativo: boolean
+): Promise<void> {
+  if (patrocinadorId === PATROCINADOR_DEMO.id) {
+    PATROCINADOR_DEMO.ativo = ativo;
+    return;
+  }
+  const docRef = doc(db, "patrocinadores", patrocinadorId);
+  await updateDoc(docRef, {
+    ativo,
+    atualizadoEm: serverTimestamp(),
+  });
+}
+
+
