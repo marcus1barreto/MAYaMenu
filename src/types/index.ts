@@ -14,6 +14,8 @@ export interface Restaurante {
   plano?: PlanoTipo; // 'free' | 'pro' | 'enterprise'
   maxMesas?: number;
   maxPratos?: number;
+  maxItensMenu?: number; // Nomenclatura oficial unificada (itens de menu)
+  assinatura?: AssinaturaContrato;
   suspenso?: boolean;
   licenca?: Partial<Licenca>;
   patrocinio?: {
@@ -176,8 +178,62 @@ export interface ComandaCliente {
 export type PlanoTipo = 'free' | 'pro' | 'enterprise';
 
 export interface LimitesPlano {
-  maxPratos: number; // ex: 15 no free, 999 no pro/enterprise
-  maxMesas: number;  // ex: 5 no free, 999 no pro/enterprise
+  maxPratos: number; // mantido para compatibilidade retroativa
+  maxItensMenu?: number; // nomenclatura oficial unificada
+  maxMesas: number;  // ex: 10 no free, 30 no pro, 999 no enterprise
+  modulosPermitidos?: string[];
+}
+
+/**
+ * Snapshot do Acordo Contratual (Grandfathering)
+ * Gravado de forma invariante no perfil do restaurante no momento da contratação.
+ */
+export interface AssinaturaContrato {
+  planoId: string; // ID único do plano contratado (Ex: "plan_pro_mensal_v1")
+  apelido: string; // Apelido comercial (Ex: "MAYaMenu PRO Mensal")
+  versao: string; // Versão do termo/acordo (Ex: "1.0.0")
+  contratadoEm: string; // ISO String
+  dataExpiracao?: string; // ISO String da validade atual
+  valorContratado: number;
+  periodicidade: "mensal" | "semestral" | "anual" | "vitalicio" | "patrocinado";
+  limites: {
+    maxMesas: number;
+    maxItensMenu: number;
+    modulosPermitidos: string[];
+  };
+  garantiaAcordo: "inalteravel";
+  status: "ativa" | "em_carencia" | "suspensa" | "cancelada";
+}
+
+/**
+ * Modelo do Catálogo Central de Planos do MAYaMenu (Coleção Firestore: catalogo_planos)
+ */
+export interface PlanoCatalogo {
+  id: string; // ID único invariante (Ex: "plan_pro_mensal_v1")
+  apelido: string; // Ex: "MAYaMenu PRO Mensal"
+  descricao: string;
+  versao: string; // Ex: "1.0.0"
+  status: "ativo" | "legado" | "rascunho" | "arquivado";
+  limites: {
+    maxMesas: number;
+    maxItensMenu: number;
+    modulosPermitidos: string[];
+  };
+  comercial: {
+    preco: number;
+    moeda: "BRL" | "USD";
+    periodicidade: "mensal" | "semestral" | "anual" | "patrocinado";
+    diasToleranciaInadimplencia: number;
+    gatewayPadrao: "mercadopago" | "b2b_voucher" | "paypal" | "gratis";
+    destaque?: boolean;
+    seloPromocional?: string;
+  };
+  metadata: {
+    criadoEm: string;
+    totalAssinantesAtivos?: number;
+    vigenciaInicio: string;
+    vigenciaFim?: string;
+  };
 }
 
 export interface Licenca {

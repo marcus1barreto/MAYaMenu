@@ -235,7 +235,7 @@ export function AdminDashboard() {
 
       setAvisoCheckout({
         tipo: "sucesso",
-        msg: "Parabéns! Sua assinatura MAYaMenu PRO foi confirmada. Seus limites foram atualizados para 30 mesas e 60 pratos!",
+        msg: "Parabéns! Sua assinatura MAYaMenu PRO foi confirmada. Seus limites foram atualizados para 30 mesas e 60 itens de menu!",
       });
 
       // Confirmação no backend para sincronização imediata
@@ -846,7 +846,7 @@ export function AdminDashboard() {
     // Bloqueio de limite de pratos conforme o plano
     const { maxPratos } = getLimitesLicenca(restaurante);
     if (!itemEmEdicao.id && itensCardapio.length >= maxPratos) {
-      alert(`O seu plano permite no máximo ${maxPratos} pratos. Faça upgrade!`);
+      alert(`O seu plano permite no máximo ${maxPratos} itens de menu. Faça upgrade para o Plano PRO para liberar até 60 itens!`);
       return;
     }
 
@@ -2097,7 +2097,7 @@ export function AdminDashboard() {
               </div>
               <div className="flex items-center gap-2">
                 <Check className="w-4 h-4 text-emerald-600 stroke-[3] shrink-0" />
-                <span><strong>Até 60 Pratos</strong> no Cardápio</span>
+                <span><strong>Até 60 Itens</strong> no Menu</span>
               </div>
               <div className="flex items-center gap-2">
                 <Check className="w-4 h-4 text-emerald-600 stroke-[3] shrink-0" />

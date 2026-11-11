@@ -628,6 +628,23 @@ export async function ativarPatrocinioNoRestaurante(params: {
       plano: "pro", // Concede os benefícios da linha PRO
       maxMesas: 30,
       maxPratos: 60,
+      maxItensMenu: 60,
+      assinatura: {
+        planoId: "plan_b2b_patrocinado_v1",
+        apelido: `Patrocinado por ${patrocinador.nomeFantasia}`,
+        versao: "1.0.0",
+        contratadoEm: new Date().toISOString(),
+        dataExpiracao: novaDataExpiracao.toISOString(),
+        valorContratado: 0,
+        periodicidade: "patrocinado",
+        limites: {
+          maxMesas: 30,
+          maxItensMenu: 60,
+          modulosPermitidos: ["cardapio", "mesas", "kds", "garcom", "analytics", "patrocinio_topo"],
+        },
+        garantiaAcordo: "inalteravel",
+        status: "ativa",
+      },
       patrocinio: {
         ativo: true,
         patrocinadorId: patrocinador.id,

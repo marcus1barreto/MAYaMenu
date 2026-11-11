@@ -21,15 +21,18 @@ import { parseDateToMillis, millisOu } from "@/lib/datas";
 
 export const LIMITES_POR_PLANO: Record<PlanoTipo, LimitesPlano> = {
   free: {
-    maxPratos: 15,
-    maxMesas: 5,
+    maxPratos: 20,
+    maxItensMenu: 20,
+    maxMesas: 10,
   },
   pro: {
     maxPratos: 60,
+    maxItensMenu: 60,
     maxMesas: 30,
   },
   enterprise: {
     maxPratos: 999,
+    maxItensMenu: 999,
     maxMesas: 999,
   },
 };

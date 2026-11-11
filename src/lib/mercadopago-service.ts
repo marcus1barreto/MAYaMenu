@@ -194,18 +194,30 @@ export async function ativarPlanoProPorPagamento(params: {
       provedor: "mercadopago" as const,
       planoId: plano.id,
       planoTitulo: plano.titulo,
+      apelido: plano.titulo,
+      versao: "1.0.0",
       valorPago: params.valorPago || plano.preco,
+      valorContratado: params.valorPago || plano.preco,
       paymentId: params.paymentId ? String(params.paymentId) : "confirmacao_manual",
       metodoPagamento: params.metodoPagamento || "checkout_pro",
       mesesAdicionados: plano.mesesValidade,
       atualizadoEm: new Date().toISOString(),
+      contratadoEm: new Date().toISOString(),
       dataExpiracao: novaDataExpiracao.toISOString(),
+      limites: {
+        maxMesas: 30,
+        maxItensMenu: 60,
+        modulosPermitidos: ["cardapio", "mesas", "kds", "garcom", "analytics", "historico"],
+      },
+      garantiaAcordo: "inalteravel" as const,
+      status: "ativa" as const,
     };
 
     await updateDoc(restRef, {
       plano: "pro",
       maxMesas: 30,
       maxPratos: 60,
+      maxItensMenu: 60,
       assinatura: payloadAssinatura,
       "configuracoes.suspenso": false,
     });
