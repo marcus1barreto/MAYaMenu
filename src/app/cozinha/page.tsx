@@ -15,9 +15,14 @@ function CozinhaPageContent() {
 
   if (carregando) {
     return (
-      <div className="min-h-screen bg-zinc-950 flex items-center justify-center text-white">
-        <div className="text-sm font-semibold tracking-wider uppercase animate-pulse text-zinc-400">
-          Carregando KDS da Cozinha...
+      <div className="min-h-screen bg-neutral-50 flex items-center justify-center text-neutral-900">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-amber-500 flex items-center justify-center text-white font-black text-lg animate-pulse shadow-md shadow-amber-500/20">
+            K
+          </div>
+          <div className="text-xs font-bold tracking-wider uppercase text-neutral-400">
+            Carregando KDS da Cozinha...
+          </div>
         </div>
       </div>
     );
@@ -26,8 +31,8 @@ function CozinhaPageContent() {
   // Se o usuário optar explicitamente pelo login de e-mail/senha
   if (usarLoginAdmin && (!user || user.isAnonymous)) {
     return (
-      <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center p-4">
-        <div className="mb-6 text-center text-zinc-400 max-w-sm text-xs">
+      <div className="min-h-screen bg-neutral-50 flex flex-col items-center justify-center p-4">
+        <div className="mb-6 text-center text-neutral-500 max-w-sm text-xs">
           Identifique-se com sua conta de acesso do restaurante.
         </div>
         <AdminLoginForm />
@@ -35,7 +40,7 @@ function CozinhaPageContent() {
           variant="ghost"
           size="sm"
           onClick={() => setUsarLoginAdmin(false)}
-          className="mt-4 text-xs text-zinc-400 hover:text-white"
+          className="mt-4 text-xs text-neutral-500 hover:text-neutral-900"
         >
           Voltar para Acesso por PIN / Crachá
         </Button>
