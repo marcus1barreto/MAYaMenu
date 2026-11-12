@@ -52,23 +52,32 @@ async function runUnitTests() {
 
   let passed = 0;
 
-  // 1. EXTRAÇÃO SEGURA DE IP E ANTI-SPOOFING DE X-FORWARDED-FOR
-  // Cenário 1: Atacante forja cabeçalho X-Forwarded-For com múltiplos IPs tentando burlar rate limit
-  const mockReqSpoofing = {
+  // 1. EXTRAÇÃO SEGURA DE IP E ANTI-SPOOFING DE X-FORWARDED-FOR (GOOGLE CLOUD GFE SPEC)
+  // Cenário 1: Topologia Google Cloud External Load Balancer:
+  // O GFE anexa DOIS IPs: o client IP real e o forwarding rule IP do balanceador.
+  // X-Forwarded-For: <ips_spoofados_pelo_atacante>, <CLIENT_IP_REAL>, <FORWARDING_RULE_IP>
+  const mockReqGoogleLb = {
     headers: {
-      'x-forwarded-for': '198.51.100.1, 203.0.113.195, 172.56.21.89', // 198.51 e 203.0 forjados pelo cliente, 172.56 anexado pelo proxy
+      'x-forwarded-for': '1.2.3.4, 187.45.10.22, 34.100.200.10',
+      // 1.2.3.4 = forjado pelo atacante à esquerda
+      // 187.45.10.22 = CLIENT_IP real validado pelo Google Load Balancer (penúltimo)
+      // 34.100.200.10 = FORWARDING_RULE_IP do Google Cloud (último nó)
     },
   };
-  const ipExtraido = extrairIpConviavel(mockReqSpoofing);
-  assert.strictEqual(ipExtraido, '172.56.21.89', 'Deve rejeitar IPs falsificados e extrair o nó confiável da infraestrutura');
-  console.log("[PASSOU] Extração de IP com proteção ativa contra spoofing de X-Forwarded-For");
+  const ipExtraidoLb = extrairIpConviavel(mockReqGoogleLb);
+  assert.strictEqual(
+    ipExtraidoLb,
+    '187.45.10.22',
+    'Deve extrair o penúltimo nó (CLIENT_IP) e descartar tanto os nós forjados quanto o Forwarding Rule IP do balanceador'
+  );
+  console.log("[PASSOU] Extração correta do CLIENT_IP sob topologia Google Cloud Load Balancer (penúltimo nó)");
   passed++;
 
   // Cenário 2: Atacante tenta falsificar 'fastly-client-ip' em Cloud Run Functions sem VCL garantido
   const mockReqSpoofingFastly = {
     headers: {
       'fastly-client-ip': '1.2.3.4', // Forjado pelo invasor
-      'x-forwarded-for': '1.2.3.4, 187.45.10.22', // Nó real da conexão anexado pelo GFE
+      'x-forwarded-for': '1.2.3.4, 187.45.10.22, 34.100.200.10', // Cadeia real com forwarding rule
     },
   };
   assert.strictEqual(
@@ -79,7 +88,17 @@ async function runUnitTests() {
   console.log("[PASSOU] Rejeição de cabeçalho arbitrário fastly-client-ip não autenticado");
   passed++;
 
-  // Cenário 3: Requisição sem proxy com socket direto
+  // Cenário 3: Requisição direta de salto único (apenas o IP do cliente no header)
+  const mockReqSaltoUnico = {
+    headers: {
+      'x-forwarded-for': '200.180.50.15',
+    },
+  };
+  assert.strictEqual(extrairIpConviavel(mockReqSaltoUnico), '200.180.50.15', 'Deve extrair o único IP disponível');
+  console.log("[PASSOU] Extração correta em requisição direta de salto único");
+  passed++;
+
+  // Cenário 4: Requisição sem proxy com socket direto
   const mockReqDireto = {
     socket: { remoteAddress: '10.0.0.5' },
   };

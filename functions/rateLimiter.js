@@ -25,25 +25,28 @@ const LIMITE_TENTATIVAS_GLOBAL = 20;
 /**
  * Extrai o IP real do cliente com validação rigorosa da cadeia de proxies reversos do Google Cloud / Cloud Run / GFE
  * 
- * Topologia de Infraestrutura Google Cloud Functions Gen 2 / Cloud Run:
- * 1. O Google Front End (GFE) atua como proxy reverso de borda e terminação TLS.
- * 2. Em relação a 'X-Forwarded-For': Qualquer valor enviado pelo cliente é mantido à esquerda,
- *    e o GFE ANEXA o IP público de conexão do cliente ao final da cadeia (RFC 7239 / GCP GFE spec):
- *    [ip_injetado_1, ip_injetado_2, ..., ip_real_cliente]
- * 3. Cabeçalhos de salto como 'fastly-client-ip' ou 'x-appengine-user-ip' só são confiáveis se garantidamente
- *    injetados pela infraestrutura. Para eliminar riscos de falsificação direta em Cloud Run Functions
- *    (onde fastly não está presente diretamente ou pode ser repassado), NÃO priorizamos 'fastly-client-ip'
- *    como autoritativo isolado. Em vez disso, analisamos a cadeia X-Forwarded-For adicionada pelo GFE.
- * 4. Ao ler o último IP anexado pelo Google Front End na cadeia X-Forwarded-For, o sistema obtém
- *    comprovadamente o endereço IP do hop anterior (cliente ou proxy de borda legítimo),
- *    rejeitando tentativas de evasão por injeção de múltiplos IPs falsos no cabeçalho.
+ * Topologia de Infraestrutura Google Cloud Functions & External Application Load Balancers:
+ * Conforme a documentação oficial da Google Cloud (docs.cloud.google.com/load-balancing/docs/https):
+ * 1. Ao receber tráfego através de Google Cloud External Application Load Balancers (GFE),
+ *    a infraestrutura anexa DOIS endereços IP ao cabeçalho 'X-Forwarded-For':
+ *      X-Forwarded-For: <CLIENT_IP>, <FORWARDING_RULE_IP>
+ *    onde:
+ *      - Penúltimo nó (ips[ips.length - 2]): É o IP real do CLIENTE que se conectou ao balanceador.
+ *      - Último nó (ips[ips.length - 1]): É o IP da Regra de Encaminhamento (Forwarding Rule) do balanceador Google.
+ * 2. Se a requisição chega via Cloud Run Functions direto (sem balanceador extra à frente) com apenas 1 IP
+ *    ou invocação direta local, ips[0] é o próprio cliente.
+ * 3. Se um atacante tentar forjar cabeçalhos injetando IPs à esquerda:
+ *      X-Forwarded-For: <ip_falso_1>, <ip_falso_2>, <CLIENT_IP_REAL>, <FORWARDING_RULE_IP>
+ *    Ao descartar os nós forjados e o nó de infraestrutura do balanceador (último nó),
+ *    o IP legítimo do cliente é estritamente o penúltimo elemento: ips[ips.length - 2].
+ * 4. Para máxima robustez defensiva em qualquer topologia Google Cloud:
+ *    - Se a cadeia tiver 2 ou mais IPs: o IP do cliente é ips[ips.length - 2] (descartando o forwarding rule IP).
+ *    - Se a cadeia tiver exatamente 1 IP: o IP do cliente é ips[0].
  */
 function extrairIpConviavel(rawRequest) {
   if (!rawRequest) return 'unknown_ip';
 
-  // 1. Análise da cadeia X-Forwarded-For no Google Cloud Run / Functions:
-  // O GFE appenda o IP de conexão do cliente ao final da lista.
-  // Seleciona o salto confiável de borda (último nó adicionado pela malha Google)
+  // 1. Análise da cadeia X-Forwarded-For segundo a especificação GFE / Google Cloud Load Balancing:
   const rawXff = rawRequest.headers?.['x-forwarded-for'];
   if (rawXff) {
     const ips = String(rawXff)
@@ -52,7 +55,13 @@ function extrairIpConviavel(rawRequest) {
       .filter((s) => s.length > 0 && /^[a-fA-F0-9:.]+$/.test(s));
 
     if (ips.length > 0) {
-      return ips[ips.length - 1];
+      if (ips.length >= 2) {
+        // Topologia Google Cloud Load Balancer: [..., CLIENT_IP, FORWARDING_RULE_IP]
+        // O penúltimo IP é o endereço real do cliente validado pelo balanceador
+        return ips[ips.length - 2];
+      }
+      // Topologia de salto único ou Cloud Run direto: [CLIENT_IP]
+      return ips[0];
     }
   }
 
@@ -62,12 +71,12 @@ function extrairIpConviavel(rawRequest) {
     return String(gcpUserIp).trim();
   }
 
-  // 3. Fallback para conexão de socket direto (emulação local / testes)
-  if (rawRequest.socket?.remoteAddress) {
-    return rawRequest.socket.remoteAddress;
-  }
+  // 3. Fallback para conexão de socket direto (emulação local / Express)
   if (rawRequest.ip) {
     return rawRequest.ip;
+  }
+  if (rawRequest.socket?.remoteAddress) {
+    return rawRequest.socket.remoteAddress;
   }
 
   return 'unknown_ip';
