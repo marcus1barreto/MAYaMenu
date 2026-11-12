@@ -22,6 +22,7 @@ import { CartaoConcessaoModal } from "./cartao-concessao-modal";
 import { validarVoucherPatrocinio, ativarPatrocinioNoRestaurante } from "@/lib/b2b-service";
 import { auth } from "@/lib/firebase";
 import type { ModoOperacao } from "@/types";
+import Link from "next/link";
 
 function slugify(text: string): string {
   return text
@@ -53,6 +54,7 @@ export function AdminLoginForm({ onLogado }: { onLogado?: () => void }) {
 
   const [erro, setErro] = useState<string | null>(null);
   const [submetendo, setSubmetendo] = useState(false);
+  const [aceitouTermos, setAceitouTermos] = useState(false);
 
   // Lê voucher da URL se fornecido (ex: /admin?voucher=BIERHAUS2026)
   useEffect(() => {
@@ -128,6 +130,9 @@ export function AdminLoginForm({ onLogado }: { onLogado?: () => void }) {
     setSubmetendo(true);
 
     try {
+      if (!aceitouTermos) {
+        throw new Error("Você precisa ler e concordar com os Termos de Uso e a Política de Privacidade para cadastrar seu estabelecimento.");
+      }
       if (!nomeRestaurante.trim()) {
         throw new Error("Informe o nome do seu estabelecimento.");
       }
@@ -168,14 +173,18 @@ export function AdminLoginForm({ onLogado }: { onLogado?: () => void }) {
           : `Cadastro Direto Web. WhatsApp: ${whatsapp.trim() || "Não informado"}`,
       });
 
-      // 3. Cadastra usuário e instância de salão
+      // 3. Cadastra usuário e instância de salão com registro de consentimento LGPD
       await cadastrar(
         cadastroEmail.trim(),
         cadastroSenha,
         nomeRestaurante.trim(),
         slugFinal,
         licenca.id,
-        "hibrido"
+        "hibrido",
+        {
+          termsAcceptedAt: new Date().toISOString(),
+          termsVersion: "1.0.0",
+        }
       );
 
       // 4. Se for patrocinado, injeta automaticamente os itens do catálogo master e vincula a cota
@@ -429,10 +438,50 @@ export function AdminLoginForm({ onLogado }: { onLogado?: () => void }) {
               />
             </div>
 
+            {/* Checkbox de Aceite LGPD Obrigatório */}
+            <div className="pt-2 pb-1">
+              <label className="flex items-start gap-2.5 text-xs text-neutral-600 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={aceitouTermos}
+                  onChange={(e) => setAceitouTermos(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-neutral-300 text-rose-600 focus:ring-rose-500 accent-rose-600 cursor-pointer shrink-0"
+                  required
+                />
+                <span className="leading-snug text-[11px] text-neutral-600">
+                  Li e concordo com os{" "}
+                  <Link
+                    href="/termos-de-uso"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-bold text-rose-600 hover:text-rose-700 underline underline-offset-2"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    Termos de Uso
+                  </Link>{" "}
+                  e a{" "}
+                  <Link
+                    href="/politica-de-privacidade"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-bold text-rose-600 hover:text-rose-700 underline underline-offset-2"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    Política de Privacidade (LGPD)
+                  </Link>{" "}
+                  da MAYaMenu.
+                </span>
+              </label>
+            </div>
+
             <Button
               type="submit"
-              disabled={submetendo}
-              className="w-full h-11 text-white font-black rounded-xl shadow-xs mt-2 transition-all flex items-center justify-center gap-2 bg-rose-600 hover:bg-rose-700 active:scale-95"
+              disabled={submetendo || !aceitouTermos}
+              className={`w-full h-11 text-white font-black rounded-xl shadow-xs mt-2 transition-all flex items-center justify-center gap-2 ${
+                !aceitouTermos
+                  ? "bg-neutral-300 dark:bg-neutral-800 text-neutral-500 cursor-not-allowed"
+                  : "bg-rose-600 hover:bg-rose-700 active:scale-95 cursor-pointer"
+              }`}
             >
               <span>
                 {submetendo
@@ -446,18 +495,30 @@ export function AdminLoginForm({ onLogado }: { onLogado?: () => void }) {
           </form>
         )}
 
-        {/* RODAPÉ COM LINK PARA MANUAL E AJUDA */}
-        <div className="relative mt-6 pt-5 border-t border-neutral-100 flex items-center justify-between text-xs text-neutral-500">
-          <span>Precisa de ajuda?</span>
-          <a
-            href="/manual"
-            target="_blank"
-            rel="noreferrer"
-            className="font-bold text-rose-600 hover:text-rose-700 underline flex items-center gap-1"
-          >
-            <BookOpen className="w-3.5 h-3.5" />
-            Manual & Instruções
-          </a>
+        {/* RODAPÉ COM LINK PARA MANUAL E POLÍTICAS LEGAIS */}
+        <div className="relative mt-6 pt-5 border-t border-neutral-100 flex flex-col gap-2 text-xs text-neutral-500">
+          <div className="flex items-center justify-between">
+            <span>Precisa de ajuda?</span>
+            <a
+              href="/manual"
+              target="_blank"
+              rel="noreferrer"
+              className="font-bold text-rose-600 hover:text-rose-700 underline flex items-center gap-1"
+            >
+              <BookOpen className="w-3.5 h-3.5" />
+              Manual & Instruções
+            </a>
+          </div>
+
+          <div className="flex items-center justify-center gap-3 pt-2 text-[11px] text-neutral-400 border-t border-neutral-100">
+            <Link href="/termos-de-uso" target="_blank" className="hover:text-rose-600 underline">
+              Termos de Uso
+            </Link>
+            <span>•</span>
+            <Link href="/politica-de-privacidade" target="_blank" className="hover:text-rose-600 underline">
+              Privacidade (LGPD)
+            </Link>
+          </div>
         </div>
       </div>
     </>

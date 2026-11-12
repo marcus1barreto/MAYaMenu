@@ -43,6 +43,16 @@ const nextConfig: NextConfig = {
         destination: "/superadmin",
         permanent: true,
       },
+      {
+        source: "/termos",
+        destination: "/termos-de-uso",
+        permanent: true,
+      },
+      {
+        source: "/privacidade",
+        destination: "/politica-de-privacidade",
+        permanent: true,
+      },
     ];
   },
   turbopack: {

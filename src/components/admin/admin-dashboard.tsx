@@ -2921,6 +2921,28 @@ export function AdminDashboard() {
               )}
             </div>
 
+            {/* LINKS JURÍDICOS E CONFORMIDADE */}
+            <div className="pt-3 border-t border-border flex items-center justify-between text-[11px] text-muted-foreground">
+              <span>Conformidade & Legal</span>
+              <div className="flex items-center gap-3">
+                <Link
+                  href="/termos-de-uso"
+                  target="_blank"
+                  className="hover:text-primary underline underline-offset-2"
+                >
+                  Termos de Uso
+                </Link>
+                <span>•</span>
+                <Link
+                  href="/politica-de-privacidade"
+                  target="_blank"
+                  className="hover:text-primary underline underline-offset-2"
+                >
+                  Privacidade (LGPD)
+                </Link>
+              </div>
+            </div>
+
             <div className="flex items-center justify-end gap-2 pt-2">
               <Button
                 type="button"

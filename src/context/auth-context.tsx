@@ -26,7 +26,11 @@ interface AuthContextType {
     nomeRestaurante: string,
     slug: string,
     codigoLicenca: string,
-    modoOperacao?: "com_garcom" | "hibrido" | "balcao"
+    modoOperacao?: "com_garcom" | "hibrido" | "balcao",
+    consentimento?: {
+      termsAcceptedAt: string;
+      termsVersion: string;
+    }
   ) => Promise<void>;
   logout: () => Promise<void>;
   atualizarRestaurante: (dados: Partial<Restaurante>) => Promise<void>;
@@ -218,7 +222,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     nomeRestaurante: string,
     slug: string,
     codigoLicenca: string,
-    modoOperacao?: "com_garcom" | "hibrido" | "balcao"
+    modoOperacao?: "com_garcom" | "hibrido" | "balcao",
+    consentimento?: {
+      termsAcceptedAt: string;
+      termsVersion: string;
+    }
   ) => {
     setCarregando(true);
     try {
@@ -285,6 +293,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         restauranteNome: nomeLimpo,
         slug: slugLimpo,
         modoOperacao: modoOperacao || "hibrido",
+        termsAcceptedAt: consentimento?.termsAcceptedAt,
+        termsVersion: consentimento?.termsVersion,
       });
 
       // Salva referência do restaurante criado para resiliência local

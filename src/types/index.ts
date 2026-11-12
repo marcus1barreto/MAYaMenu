@@ -16,6 +16,8 @@ export interface Restaurante {
   maxPratos?: number;
   maxItensMenu?: number; // Nomenclatura oficial unificada (itens de menu)
   assinatura?: AssinaturaContrato;
+  termsAcceptedAt?: string; // Carimbo de data/hora do consentimento LGPD (ISO String)
+  termsVersion?: string; // Versão dos termos aceitos (Ex: "1.0.0")
   suspenso?: boolean;
   licenca?: Partial<Licenca>;
   patrocinio?: {

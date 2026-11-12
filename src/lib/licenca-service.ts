@@ -390,6 +390,8 @@ export async function ativarLicencaEInstanciaAtomica(params: {
   restauranteNome: string;
   slug: string;
   modoOperacao?: "com_garcom" | "hibrido" | "balcao";
+  termsAcceptedAt?: string;
+  termsVersion?: string;
 }): Promise<Restaurante> {
   const codigoFormatado = params.codigo.trim().toUpperCase();
   const licencaRef = doc(db, "concessoes", codigoFormatado);
@@ -404,6 +406,8 @@ export async function ativarLicencaEInstanciaAtomica(params: {
     ownerId: params.ownerUid,
     slug: slugLimpo,
     nome: nomeLimpo,
+    termsAcceptedAt: params.termsAcceptedAt || new Date().toISOString(),
+    termsVersion: params.termsVersion || "1.0.0",
     configuracoes: {
       corPrimaria: "#E11D48",
       tema: "light",

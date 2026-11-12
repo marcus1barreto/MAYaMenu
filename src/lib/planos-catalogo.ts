@@ -228,3 +228,4 @@ export function gerarSnapshotContrato(
     status: "ativa",
   };
 }
+

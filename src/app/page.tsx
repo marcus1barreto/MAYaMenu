@@ -564,13 +564,19 @@ export default function LandingPage() {
             <Link href="/manual" className="hover:text-rose-600 transition-colors">
               Manual & FAQ
             </Link>
-            <a href="#precos" className="hover:text-rose-600 transition-colors">
-              Tarifa Flexível
-            </a>
+            <Link href="/termos-de-uso" className="hover:text-rose-600 transition-colors">
+              Termos de Uso
+            </Link>
+            <Link href="/politica-de-privacidade" className="hover:text-rose-600 transition-colors">
+              Privacidade (LGPD)
+            </Link>
           </div>
 
-          <div className="text-xs text-neutral-500 text-center md:text-right">
-            © 2026 MAYaMenu. Todos os direitos reservados.
+          <div className="text-xs text-neutral-500 text-center md:text-right space-y-0.5">
+            <div>© 2026 MAYaMenu • Todos os direitos reservados.</div>
+            <div className="text-[10px] text-neutral-400">
+              MAYARANAS SISTEMAS INOVA SIMPLES (I.S.) • CNPJ 70.099.118/0001-02 • Horizonte/CE
+            </div>
           </div>
         </div>
       </footer>
