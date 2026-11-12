@@ -96,32 +96,33 @@ service cloud.firestore {
     // ─────────────────────────── Módulo B2B & Patrocinadores ───────────────────────────
 
     match /patrocinadores/{patrocinadorId} {
-      // SuperAdmin tem acesso total. Leitura pública para exibição de selo da marca.
+      // Leitura pública para exibição de selo da marca parceira nos cardápios
       allow read: if true;
-      allow write: if isSuperAdmin() || isNonAnonymous();
+      // Escrita restrita ao SuperAdmin ou ao próprio patrocinador autenticado
+      allow write: if isSuperAdmin() || (isSignedIn() && request.auth.uid == patrocinadorId);
 
       // Subcoleção Catálogo Master da marca
       match /catalogo_master/{itemId} {
         allow read: if true;
-        allow write: if isSuperAdmin() || isNonAnonymous();
+        allow write: if isSuperAdmin() || (isSignedIn() && request.auth.uid == patrocinadorId);
       }
 
-      // Subcoleção Lotes de Licenças B2B
+      // Subcoleção Lotes de Licenças B2B (Geração exclusiva pelo SuperAdmin ou Backend Admin SDK)
       match /lotes_licencas/{loteId} {
-        allow read: if true;
-        allow write: if true;
+        allow read: if isSuperAdmin() || (isSignedIn() && request.auth.uid == patrocinadorId);
+        allow write: if isSuperAdmin();
       }
 
-      // Subcoleção Métricas de Sell-Out
+      // Subcoleção Métricas de Sell-Out (Gravação consolidada pelo Backend / Admin SDK)
       match /metricas_sellout/{itemId} {
-        allow read: if true;
-        allow write: if true;
+        allow read: if isSuperAdmin() || (isSignedIn() && request.auth.uid == patrocinadorId);
+        allow write: if isSuperAdmin();
       }
     }
 
-    // Leitura global de lotes para validação instantânea de voucher de campanha
+    // Validação de lote de licença apenas por SuperAdmin ou Dono ativando voucher
     match /{path=**}/lotes_licencas/{loteId} {
-      allow read: if true;
+      allow read: if isSuperAdmin() || isNonAnonymous();
     }
 
     // ─────────────────────────── Restaurantes e Operação ───────────────────────────
@@ -190,16 +191,22 @@ service cloud.firestore {
 
         // NÓ PAI: Comanda da Sessão do Cliente (agrega o subtotal)
         match /comandas_abertas/{clienteId} {
-          allow read: if true;
+          // Leitura restrita: apenas o dono, garçom, superadmin ou o titular da sessão
+          allow read: if isOwner(restauranteId)
+            || isGarcom(restauranteId)
+            || isSuperAdmin()
+            || (isSignedIn() && request.auth.uid == clienteId);
 
           // Criação: somente se NÃO estiver criando já como pago
-          allow create: if (isSignedIn() || request.resource.data.id == clienteId)
+          allow create: if (isSignedIn() && request.auth.uid == clienteId)
             && request.resource.data.status in ['pedindo', 'aguardando_pratos'];
 
           // Trava mestra: Se está pago, o cliente não toca mais!
+          // Cliente só pode transitar estados operacionais permitidos (nunca para 'pago')
           allow update: if (isSignedIn() && (
             (request.auth.uid == clienteId 
               && resource.data.status != 'pago'
+              && request.resource.data.status != 'pago'
               && (
                 request.resource.data.status == resource.data.status
                 || isAllowedClientStatus(resource.data.status, request.resource.data.status)
@@ -207,9 +214,12 @@ service cloud.firestore {
             || isOwner(restauranteId)
             || isGarcom(restauranteId)
           )) || (
-            // Permite atualização de chamado do garçom pelo cliente
-            request.resource.data.id == resource.data.id
+            // Permite atualização de chamado do garçom pelo cliente daquela sessão
+            isSignedIn()
+            && request.auth.uid == clienteId
+            && request.resource.data.id == resource.data.id
             && resource.data.status != 'pago'
+            && request.resource.data.status != 'pago'
           );
 
           // Apenas o Garçom/Dono do restaurante pode libertar e encerrar a mesa
@@ -218,7 +228,11 @@ service cloud.firestore {
 
           // NÓ FILHO: Rodadas do Cliente (Vai para o KDS da Cozinha)
           match /pedidos/{pedidoId} {
-            allow read: if true;
+            allow read: if isOwner(restauranteId)
+              || isGarcom(restauranteId)
+              || isCozinha(restauranteId)
+              || isSuperAdmin()
+              || (isSignedIn() && request.auth.uid == clienteId);
 
             allow create: if (isSignedIn() && (
               (request.auth.uid == clienteId 
@@ -226,7 +240,7 @@ service cloud.firestore {
                 && get(/databases/$(database)/documents/restaurantes/$(restauranteId)/mesas/$(numeroMesa)/comandas_abertas/$(clienteId)).data.status != 'pago'
               )
               || isGarcom(restauranteId) || isCozinha(restauranteId)
-            )) || request.resource.data.status == 'a_fazer';
+            )) || (isSignedIn() && request.resource.data.status == 'a_fazer');
 
             // Apenas a equipe do restaurante pode alterar status ou cancelar pedidos
             allow update, delete: if isGarcom(restauranteId) || isCozinha(restauranteId) || isSuperAdmin();
@@ -250,13 +264,21 @@ service cloud.firestore {
     }
 
     // ──────────────────────────── CollectionGroup Queries (Leitura KDS/Garçom) ────────────────────────────
-    // Leitura operacional para os monitores de salão e garçom
+    // Leitura operacional restrita à equipe autenticada ou ao titular do pedido
     match /{path=**}/comandas_abertas/{clienteId} {
-      allow read: if true;
+      allow read: if isSignedIn() && (
+        request.auth.token.role in ['owner', 'garcom', 'cozinha']
+        || request.auth.uid == clienteId
+        || isSuperAdmin()
+      );
     }
 
     match /{path=**}/pedidos/{pedidoId} {
-      allow read: if true;
+      allow read: if isSignedIn() && (
+        request.auth.token.role in ['owner', 'garcom', 'cozinha']
+        || request.auth.uid == clienteId
+        || isSuperAdmin()
+      );
     }
 
   }
