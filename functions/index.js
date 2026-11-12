@@ -357,73 +357,64 @@ exports.loginComPin = functions.https.onCall(async (data, context) => {
   const userRateLimitRef = restDoc.ref.collection('_pin_rate_limits').doc(`user_${sanitizarChave(colaboradorId)}`);
   const globalRestRateLimitRef = restDoc.ref.collection('_pin_rate_limits').doc('tenant_global');
 
-  // 2. Verificação prévia atômica de bloqueio ativo em qualquer uma das três dimensões
-  const [ipSnap, userSnap, globalSnap] = await Promise.all([
-    ipRateLimitRef.get(),
-    userRateLimitRef.get(),
-    globalRestRateLimitRef.get(),
-  ]);
-
-  const ipData = ipSnap.exists ? ipSnap.data() : null;
-  const userData = userSnap.exists ? userSnap.data() : null;
-  const globalData = globalSnap.exists ? globalSnap.data() : null;
-
-  const bloqueio = verificarBloqueioAtivo({ ipData, userData, globalData, agora });
-  if (bloqueio.bloqueado) {
-    throw new functions.https.HttpsError('resource-exhausted', bloqueio.mensagem);
-  }
-
-  let targetUid = null;
-  let targetRole = role || 'garcom';
-  let targetNome = 'Colaborador';
-  let targetFoto = null;
-
-  // 3. Validação estrita por hash scrypt + salt diretamente do colaborador selecionado
+  // 2. Busca os dados do colaborador para validação do hash scrypt + salt
   const memDoc = await restDoc.ref.collection('equipe').doc(colaboradorId).get();
-  if (memDoc.exists) {
-    const mData = memDoc.data() || {};
-    if (mData.pinHash && mData.pinSalt) {
-      if (verifyPin(pinLimpo, mData.pinHash, mData.pinSalt)) {
-        targetUid = mData.uid || memDoc.id;
-        targetRole = mData.role || targetRole;
-        targetNome = mData.nome || targetNome;
-        targetFoto = mData.fotoUrl || null;
-      }
+  const mData = memDoc.exists ? (memDoc.data() || {}) : {};
+  const pinCorreto = Boolean(mData.pinHash && mData.pinSalt && verifyPin(pinLimpo, mData.pinHash, mData.pinSalt));
+
+  // 3. EXECUÇÃO ATÔMICA COORDENADA: Verificação de Admissão e Atualização de Bloqueio dentro da Transação
+  // Impede que rajadas simultâneas contornem o limite antes que o bloqueio seja percebido
+  await firestoreDb.runTransaction(async (t) => {
+    // Leituras transacionais obrigatórias (garantem isolamento SERIALIZABLE do Firestore)
+    const curIpDoc = await t.get(ipRateLimitRef);
+    const curUserDoc = await t.get(userRateLimitRef);
+    const curGlobalDoc = await t.get(globalRestRateLimitRef);
+
+    const curIpData = curIpDoc.exists ? curIpDoc.data() : null;
+    const curUserData = curUserDoc.exists ? curUserDoc.data() : null;
+    const curGlobalData = curGlobalDoc.exists ? curGlobalDoc.data() : null;
+
+    // A) Decisão de Admissão estritamente DENTRO da transação
+    const bloqueioTransacional = verificarBloqueioAtivo({
+      ipData: curIpData,
+      userData: curUserData,
+      globalData: curGlobalData,
+      agora,
+    });
+
+    if (bloqueioTransacional.bloqueado) {
+      throw new functions.https.HttpsError('resource-exhausted', bloqueioTransacional.mensagem);
     }
-  }
 
-  // 4. Se falhou na validação do PIN: atualização atômica de tentativas via módulo centralizado
-  if (!targetUid) {
-    await firestoreDb.runTransaction(async (t) => {
-      // Leituras transacionais
-      const curIpDoc = await t.get(ipRateLimitRef);
-      const curUserDoc = await t.get(userRateLimitRef);
-      const curGlobalDoc = await t.get(globalRestRateLimitRef);
-
-      const curIpData = curIpDoc.exists ? curIpDoc.data() : {};
-      const curUserData = curUserDoc.exists ? curUserDoc.data() : {};
-      const curGlobalData = curGlobalDoc.exists ? curGlobalDoc.data() : {};
-
+    // B) Se o PIN estiver incorreto: incrementa e grava contadores/bloqueios na mesma transação atômica
+    if (!pinCorreto) {
       const { ipPayload, userPayload, globalPayload } = calcularPayloadsFalha({
-        curIpData,
-        curUserData,
-        curGlobalData,
+        curIpData: curIpData || {},
+        curUserData: curUserData || {},
+        curGlobalData: curGlobalData || {},
         agora,
       });
 
       t.set(ipRateLimitRef, ipPayload, { merge: true });
       t.set(userRateLimitRef, userPayload, { merge: true });
       t.set(globalRestRateLimitRef, globalPayload, { merge: true });
-    });
+    } else {
+      // C) Se o PIN estiver correto: limpa atômica do rate limiting individual
+      t.delete(ipRateLimitRef);
+      t.delete(userRateLimitRef);
+    }
+  });
 
+  // Se falhou na validação de PIN (após contadores atômicos serem devidamente persistidos)
+  if (!pinCorreto) {
     throw new functions.https.HttpsError('permission-denied', 'PIN incorreto para este colaborador.');
   }
 
-  // 5. Se o login foi bem-sucedido: limpa atômica do rate limiting individual e decrementa/limpa IP
-  const deleteBatch = firestoreDb.batch();
-  deleteBatch.delete(ipRateLimitRef);
-  deleteBatch.delete(userRateLimitRef);
-  await deleteBatch.commit().catch(() => null);
+  // 4. Se o login foi bem-sucedido: extrai dados e emite token
+  const targetUid = mData.uid || memDoc.id;
+  const targetRole = mData.role || (role || 'garcom');
+  const targetNome = mData.nome || 'Colaborador';
+  const targetFoto = mData.fotoUrl || null;
 
   // Gera token customizado do Firebase Auth com as claims reais
   const customToken = await admin.auth().createCustomToken(targetUid, {

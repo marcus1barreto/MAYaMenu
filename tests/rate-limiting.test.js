@@ -53,19 +53,33 @@ async function runUnitTests() {
   let passed = 0;
 
   // 1. EXTRAÇÃO SEGURA DE IP E ANTI-SPOOFING DE X-FORWARDED-FOR
-  // Cenário: Atacante forja cabeçalho X-Forwarded-For com múltiplos IPs tentando burlar rate limit
+  // Cenário 1: Atacante forja cabeçalho X-Forwarded-For com múltiplos IPs tentando burlar rate limit
   const mockReqSpoofing = {
     headers: {
       'x-forwarded-for': '198.51.100.1, 203.0.113.195, 172.56.21.89', // 198.51 e 203.0 forjados pelo cliente, 172.56 anexado pelo proxy
     },
   };
   const ipExtraido = extrairIpConviavel(mockReqSpoofing);
-  // Deve selecionar o último nó (adicionado pelo proxy GFE do Google Cloud) e ignorar os nós iniciais forjados
   assert.strictEqual(ipExtraido, '172.56.21.89', 'Deve rejeitar IPs falsificados e extrair o nó confiável da infraestrutura');
   console.log("[PASSOU] Extração de IP com proteção ativa contra spoofing de X-Forwarded-For");
   passed++;
 
-  // Cenário: Requisição sem proxy com socket direto
+  // Cenário 2: Atacante tenta falsificar 'fastly-client-ip' em Cloud Run Functions sem VCL garantido
+  const mockReqSpoofingFastly = {
+    headers: {
+      'fastly-client-ip': '1.2.3.4', // Forjado pelo invasor
+      'x-forwarded-for': '1.2.3.4, 187.45.10.22', // Nó real da conexão anexado pelo GFE
+    },
+  };
+  assert.strictEqual(
+    extrairIpConviavel(mockReqSpoofingFastly),
+    '187.45.10.22',
+    'Não deve confiar cegamente em fastly-client-ip forjado pelo cliente'
+  );
+  console.log("[PASSOU] Rejeição de cabeçalho arbitrário fastly-client-ip não autenticado");
+  passed++;
+
+  // Cenário 3: Requisição sem proxy com socket direto
   const mockReqDireto = {
     socket: { remoteAddress: '10.0.0.5' },
   };

@@ -23,32 +23,25 @@ const LIMITE_TENTATIVAS_USER = 5;
 const LIMITE_TENTATIVAS_GLOBAL = 20;
 
 /**
- * Extrai o IP real do cliente com validação da cadeia de proxies reversos do Google Cloud / GFE / Firebase Hosting
+ * Extrai o IP real do cliente com validação rigorosa da cadeia de proxies reversos do Google Cloud / Cloud Run / GFE
  * 
- * Topologia de Infraestrutura Google Cloud Functions / Cloud Run:
- * 1. O cliente se conecta ao Google Front End (GFE) ou ao Firebase Hosting Proxy.
- * 2. O Firebase Hosting e o Google Cloud adicionam o cabeçalho 'fastly-client-ip' ou 'x-appengine-user-ip',
- *    que é inserido EXCLUSIVAMENTE pelo proxy reverso de borda e NUNCA é aceito de clientes externos.
- * 3. No cabeçalho standard 'x-forwarded-for', o GFE anexa o IP real de conexão do salto anterior
- *    ao final da cadeia: [cliente_spoofed, ..., proxy_borda_confiavel, gfe].
- *    Portanto, nós anteriores controlados pelo chamador são descartados, e o salto confiável
- *    de borda comprovado é selecionado.
+ * Topologia de Infraestrutura Google Cloud Functions Gen 2 / Cloud Run:
+ * 1. O Google Front End (GFE) atua como proxy reverso de borda e terminação TLS.
+ * 2. Em relação a 'X-Forwarded-For': Qualquer valor enviado pelo cliente é mantido à esquerda,
+ *    e o GFE ANEXA o IP público de conexão do cliente ao final da cadeia (RFC 7239 / GCP GFE spec):
+ *    [ip_injetado_1, ip_injetado_2, ..., ip_real_cliente]
+ * 3. Cabeçalhos de salto como 'fastly-client-ip' ou 'x-appengine-user-ip' só são confiáveis se garantidamente
+ *    injetados pela infraestrutura. Para eliminar riscos de falsificação direta em Cloud Run Functions
+ *    (onde fastly não está presente diretamente ou pode ser repassado), NÃO priorizamos 'fastly-client-ip'
+ *    como autoritativo isolado. Em vez disso, analisamos a cadeia X-Forwarded-For adicionada pelo GFE.
+ * 4. Ao ler o último IP anexado pelo Google Front End na cadeia X-Forwarded-For, o sistema obtém
+ *    comprovadamente o endereço IP do hop anterior (cliente ou proxy de borda legítimo),
+ *    rejeitando tentativas de evasão por injeção de múltiplos IPs falsos no cabeçalho.
  */
 function extrairIpConviavel(rawRequest) {
   if (!rawRequest) return 'unknown_ip';
 
-  // 1. Cabeçalhos de salto único inseridos de forma inviolável pela infraestrutura do Google
-  const gcpUserIp = rawRequest.headers?.['x-appengine-user-ip'];
-  if (gcpUserIp && /^[a-fA-F0-9:.]+$/.test(String(gcpUserIp).trim())) {
-    return String(gcpUserIp).trim();
-  }
-
-  const fastlyClientIp = rawRequest.headers?.['fastly-client-ip'];
-  if (fastlyClientIp && /^[a-fA-F0-9:.]+$/.test(String(fastlyClientIp).trim())) {
-    return String(fastlyClientIp).trim();
-  }
-
-  // 2. Análise da cadeia X-Forwarded-For no Google Cloud Run / Functions:
+  // 1. Análise da cadeia X-Forwarded-For no Google Cloud Run / Functions:
   // O GFE appenda o IP de conexão do cliente ao final da lista.
   // Seleciona o salto confiável de borda (último nó adicionado pela malha Google)
   const rawXff = rawRequest.headers?.['x-forwarded-for'];
@@ -61,6 +54,12 @@ function extrairIpConviavel(rawRequest) {
     if (ips.length > 0) {
       return ips[ips.length - 1];
     }
+  }
+
+  // 2. Cabeçalho de usuário AppEngine/GCP caso injetado pela infraestrutura gerenciada
+  const gcpUserIp = rawRequest.headers?.['x-appengine-user-ip'];
+  if (gcpUserIp && /^[a-fA-F0-9:.]+$/.test(String(gcpUserIp).trim())) {
+    return String(gcpUserIp).trim();
   }
 
   // 3. Fallback para conexão de socket direto (emulação local / testes)
