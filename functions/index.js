@@ -421,35 +421,61 @@ exports.loginComPin = functions.https.onCall(async (data, context) => {
     }
   }
 
-  // 4. Se falhou na validação do PIN: atualização atômica de tentativas em todas as 3 dimensões
+  // 4. Se falhou na validação do PIN: atualização atômica de tentativas com janelas deslizantes explícitas
   if (!targetUid) {
+    const JANELA_GLOBAL_MS = 15 * 60 * 1000; // Janela deslizante de 15 minutos para falhas globais do tenant
+    const JANELA_INDIVIDUAL_MS = 15 * 60 * 1000;
+
     await firestoreDb.runTransaction(async (t) => {
       // Leituras transacionais
       const curIpDoc = await t.get(ipRateLimitRef);
       const curUserDoc = await t.get(userRateLimitRef);
       const curGlobalDoc = await t.get(globalRestRateLimitRef);
 
-      // Incremento IP (limite de 5 tentativas)
-      const curIpTentativas = (curIpDoc.exists ? curIpDoc.data()?.tentativas || 0 : 0) + 1;
-      const ipPayload = { tentativas: curIpTentativas, ultimoErro: agora };
+      // Incremento IP (limite de 5 tentativas por janela)
+      const curIpData = curIpDoc.exists ? curIpDoc.data() : {};
+      const ipJanelaExpirada = !curIpData.janelaIniciadaEm || (agora - curIpData.janelaIniciadaEm > JANELA_INDIVIDUAL_MS);
+      const curIpTentativas = (ipJanelaExpirada ? 0 : (curIpData.tentativas || 0)) + 1;
+      const ipPayload = {
+        tentativas: curIpTentativas,
+        ultimoErro: agora,
+        janelaIniciadaEm: ipJanelaExpirada ? agora : curIpData.janelaIniciadaEm,
+      };
       if (curIpTentativas >= 5) {
         ipPayload.bloqueadoAte = agora + 15 * 60 * 1000;
       }
       t.set(ipRateLimitRef, ipPayload, { merge: true });
 
-      // Incremento Colaborador (limite de 5 tentativas)
-      const curUserTentativas = (curUserDoc.exists ? curUserDoc.data()?.tentativas || 0 : 0) + 1;
-      const userPayload = { tentativas: curUserTentativas, ultimoErro: agora };
+      // Incremento Colaborador (limite de 5 tentativas por janela)
+      const curUserData = curUserDoc.exists ? curUserDoc.data() : {};
+      const userJanelaExpirada = !curUserData.janelaIniciadaEm || (agora - curUserData.janelaIniciadaEm > JANELA_INDIVIDUAL_MS);
+      const curUserTentativas = (userJanelaExpirada ? 0 : (curUserData.tentativas || 0)) + 1;
+      const userPayload = {
+        tentativas: curUserTentativas,
+        ultimoErro: agora,
+        janelaIniciadaEm: userJanelaExpirada ? agora : curUserData.janelaIniciadaEm,
+      };
       if (curUserTentativas >= 5) {
         userPayload.bloqueadoAte = agora + 15 * 60 * 1000;
       }
       t.set(userRateLimitRef, userPayload, { merge: true });
 
-      // Incremento Global do Tenant (limite de 20 falhas distribuídas no estabelecimento)
-      const curGlobalTentativas = (curGlobalDoc.exists ? curGlobalDoc.data()?.tentativas || 0 : 0) + 1;
-      const globalPayload = { tentativas: curGlobalTentativas, ultimoErro: agora };
+      // Incremento Global do Tenant com JANELA DESLIZANTE DE RECUPERAÇÃO EXPLÍCITA
+      // Se a última falha ou início da janela ocorreu há mais de 15 min, o contador reseta automaticamente!
+      const curGlobalData = curGlobalDoc.exists ? curGlobalDoc.data() : {};
+      const globalJanelaExpirada = !curGlobalData.janelaIniciadaEm || (agora - curGlobalData.janelaIniciadaEm > JANELA_GLOBAL_MS);
+      const curGlobalTentativas = (globalJanelaExpirada ? 0 : (curGlobalData.tentativas || 0)) + 1;
+      
+      const globalPayload = {
+        tentativas: curGlobalTentativas,
+        ultimoErro: agora,
+        janelaIniciadaEm: globalJanelaExpirada ? agora : curGlobalData.janelaIniciadaEm,
+      };
+
       if (curGlobalTentativas >= 20) {
         globalPayload.bloqueadoAte = agora + 15 * 60 * 1000;
+        // Marca que após o bloqueio de 15 min a contagem zera
+        globalPayload.tentativas = 20;
       }
       t.set(globalRestRateLimitRef, globalPayload, { merge: true });
     });
@@ -457,7 +483,7 @@ exports.loginComPin = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError('permission-denied', 'PIN incorreto para este colaborador.');
   }
 
-  // 5. Se o login foi bem-sucedido: limpa atômica do rate limiting individual e de IP
+  // 5. Se o login foi bem-sucedido: limpa atômica do rate limiting individual e decrementa/limpa IP
   const deleteBatch = firestoreDb.batch();
   deleteBatch.delete(ipRateLimitRef);
   deleteBatch.delete(userRateLimitRef);

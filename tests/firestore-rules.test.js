@@ -184,6 +184,51 @@ async function runTests() {
   });
 
   // 2. COMANDAS E CHECKOUT
+  await test("Cliente Titular PODE criar comanda aberta com restauranteId correto", async () => {
+    const clientDb = testEnv.authenticatedContext("cliente_novo").firestore();
+    await assertSucceeds(
+      clientDb.doc("restaurantes/rest_a/mesas/1/comandas_abertas/cliente_novo").set({
+        id: "cliente_novo",
+        clienteId: "cliente_novo",
+        restauranteId: "rest_a",
+        status: "pedindo",
+      })
+    );
+  });
+
+  await test("Cliente NÃO pode criar comanda forjando restauranteId de outro restaurante (Anti-spoofing Multi-tenant)", async () => {
+    const clientDb = testEnv.authenticatedContext("cliente_hacker").firestore();
+    await assertFails(
+      clientDb.doc("restaurantes/rest_a/mesas/1/comandas_abertas/cliente_hacker").set({
+        id: "cliente_hacker",
+        clienteId: "cliente_hacker",
+        restauranteId: "rest_b", // Tentativa de forjar restaurante B no caminho do restaurante A
+        status: "pedindo",
+      })
+    );
+  });
+
+  await test("Cliente NÃO pode alterar restauranteId de comanda já existente (Imutabilidade de Tenant)", async () => {
+    const clientDb = testEnv.authenticatedContext("cliente_1").firestore();
+    await assertFails(
+      clientDb.doc("restaurantes/rest_a/mesas/1/comandas_abertas/cliente_1").update({
+        restauranteId: "rest_b",
+      })
+    );
+  });
+
+  await test("Equipe NÃO pode alterar restauranteId de pedido existente (Imutabilidade em Pedidos)", async () => {
+    const garcomADb = testEnv.authenticatedContext("garcom_a", {
+      role: "garcom",
+      restauranteId: "rest_a",
+    }).firestore();
+    await assertFails(
+      garcomADb.doc("restaurantes/rest_a/mesas/1/comandas_abertas/cliente_1/pedidos/ped_1").update({
+        restauranteId: "rest_b",
+      })
+    );
+  });
+
   await test("Cliente Titular PODE ler sua própria comanda aberta", async () => {
     const clientDb = testEnv.authenticatedContext("cliente_1").firestore();
     await assertSucceeds(clientDb.doc("restaurantes/rest_a/mesas/1/comandas_abertas/cliente_1").get());

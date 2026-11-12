@@ -191,29 +191,35 @@ service cloud.firestore {
             || isSuperAdmin()
             || (isSignedIn() && request.auth.uid == clienteId);
 
-          // Criação: somente se NÃO estiver criando já como pago
+          // Criação: exige titularidade e amarração estrita ao restauranteId do path
           allow create: if (isSignedIn() && request.auth.uid == clienteId)
-            && request.resource.data.status in ['pedindo', 'aguardando_pratos'];
+            && request.resource.data.status in ['pedindo', 'aguardando_pratos']
+            && request.resource.data.restauranteId == restauranteId;
 
           // Trava mestra: Se está pago, o cliente não toca mais!
-          // Cliente só pode transitar estados operacionais permitidos (nunca para 'pago')
-          allow update: if (isSignedIn() && (
-            (request.auth.uid == clienteId 
+          // O campo restauranteId é estritamente IMUTÁVEL em qualquer atualização
+          allow update: if (
+            request.resource.data.restauranteId == resource.data.restauranteId
+            || !request.resource.data.diff(resource.data).affectedKeys().hasAny(['restauranteId'])
+          ) && (
+            (isSignedIn() && (
+              (request.auth.uid == clienteId 
+                && resource.data.status != 'pago'
+                && request.resource.data.status != 'pago'
+                && (
+                  request.resource.data.status == resource.data.status
+                  || isAllowedClientStatus(resource.data.status, request.resource.data.status)
+                ))
+              || isOwner(restauranteId)
+              || isGarcom(restauranteId)
+            )) || (
+              // Permite atualização de chamado do garçom pelo cliente daquela sessão
+              isSignedIn()
+              && request.auth.uid == clienteId
+              && request.resource.data.id == resource.data.id
               && resource.data.status != 'pago'
               && request.resource.data.status != 'pago'
-              && (
-                request.resource.data.status == resource.data.status
-                || isAllowedClientStatus(resource.data.status, request.resource.data.status)
-              ))
-            || isOwner(restauranteId)
-            || isGarcom(restauranteId)
-          )) || (
-            // Permite atualização de chamado do garçom pelo cliente daquela sessão
-            isSignedIn()
-            && request.auth.uid == clienteId
-            && request.resource.data.id == resource.data.id
-            && resource.data.status != 'pago'
-            && request.resource.data.status != 'pago'
+            )
           );
 
           // Apenas o Garçom/Dono do restaurante pode libertar e encerrar a mesa
@@ -242,7 +248,14 @@ service cloud.firestore {
               );
 
             // Apenas a equipe do restaurante pode alterar status ou cancelar pedidos
-            allow update, delete: if isGarcom(restauranteId) || isCozinha(restauranteId) || isSuperAdmin();
+            // restauranteId é estritamente imutável nas atualizações de pedidos
+            allow update: if (isGarcom(restauranteId) || isCozinha(restauranteId) || isSuperAdmin())
+              && (
+                request.resource.data.restauranteId == resource.data.restauranteId
+                || !request.resource.data.diff(resource.data).affectedKeys().hasAny(['restauranteId'])
+              );
+
+            allow delete: if isGarcom(restauranteId) || isCozinha(restauranteId) || isSuperAdmin();
           }
         }
       }

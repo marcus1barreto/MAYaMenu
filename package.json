@@ -7,8 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "npx tsx --test tests/unit/*.test.ts",
-    "test:unit": "npx tsx --test tests/unit/*.test.ts",
+    "test": "node tests/rate-limiting.test.js && firebase emulators:exec --only firestore \"node tests/firestore-rules.test.js\"",
+    "test:unit": "node tests/rate-limiting.test.js",
     "test:rules": "firebase emulators:exec --only firestore \"node tests/firestore-rules.test.js\"",
     "test:e2e": "../agentes_teste_python/venv/bin/python tests/e2e/test_novidades_superadmin_caixa.py"
   },
