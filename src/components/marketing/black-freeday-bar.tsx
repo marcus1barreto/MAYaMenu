@@ -38,13 +38,13 @@ export function BlackFreedayBar() {
             Comece <strong>100% Grátis</strong> no Free ou turbine seu salão com o PRO por <strong>R$ 41,50/mês</strong>!
           </span>
 
-          <a
-            href="#precos"
+          <Link
+            href="/precos"
             className="inline-flex items-center gap-1 text-[11px] font-black text-amber-400 hover:text-amber-300 underline underline-offset-4 decoration-amber-400/50 hover:decoration-amber-300 transition-all ml-1 group"
           >
             <span>Aproveitar Oferta</span>
             <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
-          </a>
+          </Link>
         </div>
 
         {/* BOTÃO FECHAR */}

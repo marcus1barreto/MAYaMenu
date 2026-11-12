@@ -53,6 +53,21 @@ const nextConfig: NextConfig = {
         destination: "/politica-de-privacidade",
         permanent: true,
       },
+      {
+        source: "/planos",
+        destination: "/precos",
+        permanent: true,
+      },
+      {
+        source: "/precos-e-planos",
+        destination: "/precos",
+        permanent: true,
+      },
+      {
+        source: "/planos-e-precos",
+        destination: "/precos",
+        permanent: true,
+      },
     ];
   },
   turbopack: {

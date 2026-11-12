@@ -82,9 +82,9 @@ export default function LandingPage() {
                 NOVO
               </span>
             </a>
-            <a href="#precos" className="hover:text-rose-600 transition-colors">
-              Tarifa Flexível
-            </a>
+            <Link href="/precos" className="hover:text-rose-600 transition-colors">
+              Planos & Preços
+            </Link>
             <a href="#perguntas" className="hover:text-rose-600 transition-colors">
               Dúvidas
             </a>
@@ -567,6 +567,9 @@ export default function LandingPage() {
             </a>
             <Link href="/manual" className="hover:text-rose-600 transition-colors">
               Manual & FAQ
+            </Link>
+            <Link href="/precos" className="hover:text-rose-600 transition-colors">
+              Planos & Preços
             </Link>
             <Link href="/termos-de-uso" className="hover:text-rose-600 transition-colors">
               Termos de Uso
