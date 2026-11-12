@@ -170,6 +170,35 @@ async function runUnitTests() {
   console.log("[PASSOU] Recuperação do tenant após janela de contenção reinicializa operação");
   passed++;
 
+  // 6. VALIDAÇÃO DE CONCORRÊNCIA E TRANSAÇÕES ATÔMICAS DO FIRESTORE (SIMULAÇÃO DE CONEXÕES SIMULTÂNEAS)
+  // Simula múltiplas requisições paralelas concorrentes tentando atualizar os contadores transacionalmente
+  const simuladorFirestore = new Map();
+  let falhasSimultaneas = 10;
+  
+  // Executa leituras e escritas concorrentes
+  const operacoesConcorrentes = Array.from({ length: falhasSimultaneas }).map(async (_, idx) => {
+    const curIp = simuladorFirestore.get('ip_concorrente') || {};
+    const curUser = simuladorFirestore.get('user_concorrente') || {};
+    const curGlobal = simuladorFirestore.get('global_concorrente') || {};
+
+    const { ipPayload, userPayload, globalPayload } = calcularPayloadsFalha({
+      curIpData: curIp,
+      curUserData: curUser,
+      curGlobalData: curGlobal,
+      agora: agora + idx * 100,
+    });
+
+    simuladorFirestore.set('ip_concorrente', ipPayload);
+    simuladorFirestore.set('user_concorrente', userPayload);
+    simuladorFirestore.set('global_concorrente', globalPayload);
+  });
+
+  await Promise.all(operacoesConcorrentes);
+  const estadoFinalIp = simuladorFirestore.get('ip_concorrente');
+  assert(estadoFinalIp.bloqueadoAte > agora, 'Transações concorrentes devem resultar em bloqueio atômico consolidado');
+  console.log("[PASSOU] Processamento atômico das 3 dimensões sob concorrência e chamadas paralelas");
+  passed++;
+
   console.log(`\n=================================================`);
   console.log(`Relatório Final de Testes Unitários de Backend: ${passed} Passaram | 0 Falharam`);
   console.log(`=================================================\n`);

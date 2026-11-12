@@ -337,6 +337,45 @@ async function runTests() {
     await assertFails(unauthedDb.doc("restaurantes/rest_a/kds_tickets/ticket_1").get());
   });
 
+  await test("Usuário autenticado aleatório NÃO pode criar kds_ticket em restaurante onde não possui comanda aberta", async () => {
+    const intrusoDb = testEnv.authenticatedContext("usuario_qualquer").firestore();
+    await assertFails(
+      intrusoDb.doc("restaurantes/rest_a/kds_tickets/ticket_invasor").set({
+        id: "ticket_invasor",
+        mesa: 1,
+        clienteId: "usuario_qualquer",
+        status: "a_fazer",
+        itens: [{ menuItemId: "item1", nome: "Item Invasor", quantidade: 1 }],
+      })
+    );
+  });
+
+  await test("Cliente Titular PODE criar kds_ticket se possuir comanda aberta válida naquela mesa", async () => {
+    const cliente1Db = testEnv.authenticatedContext("cliente_1").firestore();
+    await assertSucceeds(
+      cliente1Db.doc("restaurantes/rest_a/kds_tickets/ticket_cliente_1").set({
+        id: "ticket_cliente_1",
+        mesa: 1,
+        clienteId: "cliente_1",
+        status: "a_fazer",
+        itens: [{ menuItemId: "item1", nome: "Hambúrguer", quantidade: 1 }],
+      })
+    );
+  });
+
+  await test("Cliente com comanda PAGA NÃO pode criar kds_ticket (Trava de comanda encerrada)", async () => {
+    const cliente2Db = testEnv.authenticatedContext("cliente_2").firestore();
+    await assertFails(
+      cliente2Db.doc("restaurantes/rest_a/kds_tickets/ticket_cliente_2").set({
+        id: "ticket_cliente_2",
+        mesa: 1,
+        clienteId: "cliente_2",
+        status: "a_fazer",
+        itens: [{ menuItemId: "item1", nome: "Sobremesa", quantidade: 1 }],
+      })
+    );
+  });
+
   await test("Cozinha do Restaurante A PODE ler kds_tickets do Restaurante A", async () => {
     const cozinhaADb = testEnv.authenticatedContext("cozinha_a", {
       role: "cozinha",

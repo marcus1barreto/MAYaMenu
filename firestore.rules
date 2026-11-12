@@ -172,9 +172,23 @@ service cloud.firestore {
       match /kds_tickets/{ticketId} {
         // Leitura restrita à equipe operacional do restaurante ou superadmin
         allow read: if isOwner(restauranteId) || isGarcom(restauranteId) || isCozinha(restauranteId) || isSuperAdmin();
-        // Criação de tickets por cliente autenticado (da sua sessão) ou equipe
-        allow create: if (isSignedIn() && request.resource.data.status == 'a_fazer')
-          || isGarcom(restauranteId) || isCozinha(restauranteId);
+
+        // Criação de tickets:
+        // Exige estritamente que quem cria seja o cliente titular de comanda aberta naquela mesa (com status != 'pago')
+        // OU garçom/cozinha com papel autorizado no restaurante.
+        // Impede que qualquer usuário arbitrário injete tickets em restaurantes alheios.
+        allow create: if (
+          (
+            isSignedIn()
+            && request.resource.data.status == 'a_fazer'
+            && request.resource.data.clienteId == request.auth.uid
+            && exists(/databases/$(database)/documents/restaurantes/$(restauranteId)/mesas/$(request.resource.data.mesa)/comandas_abertas/$(request.auth.uid))
+            && get(/databases/$(database)/documents/restaurantes/$(restauranteId)/mesas/$(request.resource.data.mesa)/comandas_abertas/$(request.auth.uid)).data.status != 'pago'
+          )
+          || isGarcom(restauranteId)
+          || isCozinha(restauranteId)
+        );
+
         // Apenas a equipe (dono/tablet operacional) marcha, cancela ou remove tickets
         allow update, delete: if isOwner(restauranteId) || isGarcom(restauranteId) || isCozinha(restauranteId) || isSuperAdmin();
       }

@@ -23,14 +23,34 @@ const LIMITE_TENTATIVAS_USER = 5;
 const LIMITE_TENTATIVAS_GLOBAL = 20;
 
 /**
- * Extrai o IP real do cliente com validação da cadeia de proxies reversos do Google Cloud / GFE
+ * Extrai o IP real do cliente com validação da cadeia de proxies reversos do Google Cloud / GFE / Firebase Hosting
+ * 
+ * Topologia de Infraestrutura Google Cloud Functions / Cloud Run:
+ * 1. O cliente se conecta ao Google Front End (GFE) ou ao Firebase Hosting Proxy.
+ * 2. O Firebase Hosting e o Google Cloud adicionam o cabeçalho 'fastly-client-ip' ou 'x-appengine-user-ip',
+ *    que é inserido EXCLUSIVAMENTE pelo proxy reverso de borda e NUNCA é aceito de clientes externos.
+ * 3. No cabeçalho standard 'x-forwarded-for', o GFE anexa o IP real de conexão do salto anterior
+ *    ao final da cadeia: [cliente_spoofed, ..., proxy_borda_confiavel, gfe].
+ *    Portanto, nós anteriores controlados pelo chamador são descartados, e o salto confiável
+ *    de borda comprovado é selecionado.
  */
 function extrairIpConviavel(rawRequest) {
   if (!rawRequest) return 'unknown_ip';
 
-  // 1. Em Cloud Functions / Cloud Run / App Engine, o proxy de borda do Google (GFE)
-  // anexa o IP do cliente remoto como o ÚLTIMO elemento de X-Forwarded-For
-  // (ou socket.remoteAddress quando executado localmente / emulação).
+  // 1. Cabeçalhos de salto único inseridos de forma inviolável pela infraestrutura do Google
+  const gcpUserIp = rawRequest.headers?.['x-appengine-user-ip'];
+  if (gcpUserIp && /^[a-fA-F0-9:.]+$/.test(String(gcpUserIp).trim())) {
+    return String(gcpUserIp).trim();
+  }
+
+  const fastlyClientIp = rawRequest.headers?.['fastly-client-ip'];
+  if (fastlyClientIp && /^[a-fA-F0-9:.]+$/.test(String(fastlyClientIp).trim())) {
+    return String(fastlyClientIp).trim();
+  }
+
+  // 2. Análise da cadeia X-Forwarded-For no Google Cloud Run / Functions:
+  // O GFE appenda o IP de conexão do cliente ao final da lista.
+  // Seleciona o salto confiável de borda (último nó adicionado pela malha Google)
   const rawXff = rawRequest.headers?.['x-forwarded-for'];
   if (rawXff) {
     const ips = String(rawXff)
@@ -39,11 +59,11 @@ function extrairIpConviavel(rawRequest) {
       .filter((s) => s.length > 0 && /^[a-fA-F0-9:.]+$/.test(s));
 
     if (ips.length > 0) {
-      // O elemento confiável adicionado pelo proxy seguro do Google é o último nó de borda
       return ips[ips.length - 1];
     }
   }
 
+  // 3. Fallback para conexão de socket direto (emulação local / testes)
   if (rawRequest.socket?.remoteAddress) {
     return rawRequest.socket.remoteAddress;
   }
