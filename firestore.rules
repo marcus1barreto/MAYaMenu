@@ -14,14 +14,7 @@ service cloud.firestore {
 
     // Verifica se o usuário autenticado é SuperAdmin do MAYaMenu
     function isSuperAdmin() {
-      return isSignedIn() && (
-        request.auth.token.email in [
-          'admin@mayamenu.com',
-          'teste@teste.com',
-          'marcus1fialho@gmail.com'
-        ]
-        || request.auth.token.superadmin == true
-      );
+      return isSignedIn() && request.auth.token.superadmin == true;
     }
 
     // -----------------------------------------------------------------
@@ -176,8 +169,9 @@ service cloud.firestore {
 
       // Fila Operacional da Cozinha (KDS Tickets Isolados)
       match /kds_tickets/{ticketId} {
-        allow read: if true;
-        // Cliente anônimo ou garçom cria com status 'a_fazer'
+        // Leitura restrita à equipe operacional do restaurante ou superadmin
+        allow read: if isOwner(restauranteId) || isGarcom(restauranteId) || isCozinha(restauranteId) || isSuperAdmin();
+        // Criação de tickets por cliente autenticado (da sua sessão) ou equipe
         allow create: if (isSignedIn() && request.resource.data.status == 'a_fazer')
           || isGarcom(restauranteId) || isCozinha(restauranteId);
         // Apenas a equipe (dono/tablet operacional) marcha, cancela ou remove tickets
@@ -234,13 +228,15 @@ service cloud.firestore {
               || isSuperAdmin()
               || (isSignedIn() && request.auth.uid == clienteId);
 
-            allow create: if (isSignedIn() && (
-              (request.auth.uid == clienteId 
+            allow create: if isSignedIn() && (
+              (
+                request.auth.uid == clienteId 
                 && request.resource.data.status == 'a_fazer'
                 && get(/databases/$(database)/documents/restaurantes/$(restauranteId)/mesas/$(numeroMesa)/comandas_abertas/$(clienteId)).data.status != 'pago'
               )
-              || isGarcom(restauranteId) || isCozinha(restauranteId)
-            )) || (isSignedIn() && request.resource.data.status == 'a_fazer');
+              || isGarcom(restauranteId)
+              || isCozinha(restauranteId)
+            );
 
             // Apenas a equipe do restaurante pode alterar status ou cancelar pedidos
             allow update, delete: if isGarcom(restauranteId) || isCozinha(restauranteId) || isSuperAdmin();

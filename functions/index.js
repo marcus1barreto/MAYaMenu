@@ -1,8 +1,32 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 const { getFirestore } = require('firebase-admin/firestore');
+const crypto = require('crypto');
 
 admin.initializeApp();
+
+// Utilitários de Hash seguro para PIN com salt e scrypt (evita persistência em texto claro)
+function hashPin(pin, saltHex) {
+  const salt = saltHex || crypto.randomBytes(16).toString('hex');
+  const derivedKey = crypto.scryptSync(String(pin).trim(), salt, 64);
+  return {
+    hash: derivedKey.toString('hex'),
+    salt,
+  };
+}
+
+function verifyPin(pin, storedHash, storedSalt) {
+  if (!storedHash || !storedSalt || !pin) return false;
+  try {
+    const derivedKey = crypto.scryptSync(String(pin).trim(), storedSalt, 64);
+    const keyBuffer = Buffer.from(derivedKey.toString('hex'), 'hex');
+    const hashBuffer = Buffer.from(storedHash, 'hex');
+    if (keyBuffer.length !== hashBuffer.length) return false;
+    return crypto.timingSafeEqual(keyBuffer, hashBuffer);
+  } catch (err) {
+    return false;
+  }
+}
 
 // Garante conexão ao banco com ID "mayamenu-bd" ou fallback ao default
 function getDb() {
@@ -93,7 +117,9 @@ exports.setStaffRole = functions.https.onCall(async (data, context) => {
   const realRestauranteId = restDoc.id;
   const restData = restDoc.data();
   const isSuperadmin = context.auth.token?.superadmin === true;
-  const isOwner = restData?.ownerId === callerUid || context.auth.token?.role === 'owner';
+  // Blindagem contra vazamento horizontal: claims role=='owner' só valem para o restauranteId vinculado
+  const isOwner = restData?.ownerId === callerUid || 
+    (context.auth.token?.role === 'owner' && context.auth.token?.restauranteId === realRestauranteId);
 
   if (!isOwner && !isSuperadmin) {
     throw new functions.https.HttpsError(
@@ -136,7 +162,6 @@ exports.setStaffRole = functions.https.onCall(async (data, context) => {
   }
 
   // 4. Gera token seguro para Crachá QR Code (para login rápido com câmera)
-  const crypto = require('crypto');
   const crachaToken = crypto.randomBytes(16).toString('hex');
 
   // 5. Define os custom claims do colaborador
@@ -157,9 +182,11 @@ exports.setStaffRole = functions.https.onCall(async (data, context) => {
     crachaToken,
     atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
   };
-  // Salva o PIN informado ou gera um PIN padrão numérico de 4 dígitos
+  // Hasheia o PIN com salt (nunca armazena o PIN em texto puro)
   const pinDefinido = pin && String(pin).trim() ? String(pin).trim() : (senha && /^\d{4,6}$/.test(String(senha).trim()) ? String(senha).trim() : '1234');
-  docMembro.pin = pinDefinido;
+  const { hash: pinHash, salt: pinSalt } = hashPin(pinDefinido);
+  docMembro.pinHash = pinHash;
+  docMembro.pinSalt = pinSalt;
 
   await restDoc.ref
     .collection('equipe')
@@ -282,6 +309,7 @@ exports.loginComCracha = functions.https.onCall(async (data, context) => {
 
 /**
  * Cloud Function HTTPS Callable para autenticação rápida via PIN (4 a 6 dígitos)
+ * Com proteção contra força bruta (rate limiting) e hash scrypt com salt.
  */
 exports.loginComPin = functions.https.onCall(async (data, context) => {
   const { restauranteId, pin, role, colaboradorId } = data || {};
@@ -303,18 +331,53 @@ exports.loginComPin = functions.https.onCall(async (data, context) => {
   const restData = restDoc.data() || {};
   const pinLimpo = String(pin).trim();
 
+  // 1. Rate Limiting por IP ou identificador de tentativa (5 falhas = bloqueio por 15 min)
+  const clientIp = context.rawRequest?.headers?.['x-forwarded-for'] || 'client';
+  const ipKey = String(clientIp).split(',')[0].trim().replace(/[^a-zA-Z0-9_-]/g, '_');
+  const rateLimitRef = restDoc.ref.collection('_pin_rate_limits').doc(colaboradorId ? `user_${colaboradorId}` : `ip_${ipKey}`);
+  
+  const rlDoc = await rateLimitRef.get();
+  const rlData = rlDoc.exists ? rlDoc.data() : { tentativas: 0, bloqueadoAte: 0 };
+  const agora = Date.now();
+
+  if (rlData.bloqueadoAte && agora < rlData.bloqueadoAte) {
+    const minutosRestantes = Math.ceil((rlData.bloqueadoAte - agora) / 60000);
+    throw new functions.https.HttpsError(
+      'resource-exhausted',
+      `Muitas tentativas incorretas. Bloqueado temporariamente por ${minutosRestantes} minuto(s).`
+    );
+  }
+
   let targetUid = null;
   let targetRole = role || 'garcom';
   let targetNome = 'Colaborador';
   let targetFoto = null;
 
-  // 1. Se informou colaboradorId específico (selecionado na tela)
+  // 2. Se informou colaboradorId específico (selecionado na tela)
   if (colaboradorId) {
     const memDoc = await restDoc.ref.collection('equipe').doc(colaboradorId).get();
     if (memDoc.exists) {
       const mData = memDoc.data() || {};
-      const pinEsperado = mData.pin ? String(mData.pin).trim() : null;
-      if (pinEsperado && pinEsperado === pinLimpo) {
+      let pinValido = false;
+
+      // Verificação 1: Hash com salt scrypt
+      if (mData.pinHash && mData.pinSalt) {
+        pinValido = verifyPin(pinLimpo, mData.pinHash, mData.pinSalt);
+      } else if (mData.pin) {
+        // Fallback transitório para migração transparente: se ainda estava em texto puro
+        pinValido = (String(mData.pin).trim() === pinLimpo);
+        if (pinValido) {
+          // Auto-upgrade imediato: salva hash e apaga o campo legado
+          const { hash, salt } = hashPin(pinLimpo);
+          await memDoc.ref.update({
+            pinHash: hash,
+            pinSalt: salt,
+            pin: admin.firestore.FieldValue.delete(),
+          }).catch((err) => console.warn('Erro no upgrade de pin legado:', err));
+        }
+      }
+
+      if (pinValido) {
         targetUid = mData.uid || memDoc.id;
         targetRole = mData.role || targetRole;
         targetNome = mData.nome || targetNome;
@@ -323,44 +386,56 @@ exports.loginComPin = functions.https.onCall(async (data, context) => {
     }
   }
 
-  // 2. Se ainda não identificou, busca membro da equipe com este PIN
+  // 3. Se ainda não identificou, pesquisa na equipe pelo hash ou migração
   if (!targetUid) {
-    let q = restDoc.ref.collection('equipe').where('pin', '==', pinLimpo);
+    let q = restDoc.ref.collection('equipe');
     if (role) {
       q = q.where('role', '==', role);
     }
-    const snap = await q.limit(1).get();
+    const snap = await q.get();
 
-    if (!snap.empty) {
-      const mData = snap.docs[0].data();
-      targetUid = mData.uid;
-      targetRole = mData.role || targetRole;
-      targetNome = mData.nome || targetNome;
-      targetFoto = mData.fotoUrl || null;
+    for (const d of snap.docs) {
+      const mData = d.data() || {};
+      let pinValido = false;
+      if (mData.pinHash && mData.pinSalt) {
+        pinValido = verifyPin(pinLimpo, mData.pinHash, mData.pinSalt);
+      } else if (mData.pin) {
+        pinValido = (String(mData.pin).trim() === pinLimpo);
+        if (pinValido) {
+          const { hash, salt } = hashPin(pinLimpo);
+          await d.ref.update({
+            pinHash: hash,
+            pinSalt: salt,
+            pin: admin.firestore.FieldValue.delete(),
+          }).catch((err) => console.warn('Erro no upgrade de pin legado:', err));
+        }
+      }
+
+      if (pinValido) {
+        targetUid = mData.uid || d.id;
+        targetRole = mData.role || targetRole;
+        targetNome = mData.nome || targetNome;
+        targetFoto = mData.fotoUrl || null;
+        break;
+      }
     }
   }
 
-  // 3. Fallback de PIN mestre do salão (ex: 4321 garçom, 1234 cozinha ou configurado)
+  // Se nenhum membro foi validado com o PIN informado
   if (!targetUid) {
-    const pinPadraoEsperado = role === 'cozinha' ? '1234' : '4321';
-    const pinConfig = role === 'cozinha'
-      ? (restData.configuracoes?.pinCozinha || pinPadraoEsperado)
-      : (restData.configuracoes?.pinGarcom || pinPadraoEsperado);
-
-    if (pinLimpo === pinConfig || pinLimpo === '0000') {
-      targetUid = `staff_${targetRole}_${realRestauranteId}`;
-      try {
-        await admin.auth().getUser(targetUid);
-      } catch (e) {
-        await admin.auth().createUser({
-          uid: targetUid,
-          displayName: `${targetRole === 'cozinha' ? 'KDS Cozinha' : 'Garçom de Salão'} (${restData.nome || 'MAYa'})`,
-        });
-      }
-      targetNome = targetRole === 'cozinha' ? 'Equipe Cozinha' : 'Equipe Garçom';
-    } else {
-      throw new functions.https.HttpsError('permission-denied', 'PIN incorreto para este restaurante.');
+    const novasTentativas = (rlData.tentativas || 0) + 1;
+    const updatePayload = { tentativas: novasTentativas, ultimoErro: agora };
+    if (novasTentativas >= 5) {
+      updatePayload.bloqueadoAte = agora + 15 * 60 * 1000; // 15 minutos de suspensão
     }
+    await rateLimitRef.set(updatePayload, { merge: true });
+
+    throw new functions.https.HttpsError('permission-denied', 'PIN incorreto para este restaurante.');
+  }
+
+  // Se o PIN for válido, reseta o rate limiting para este usuário/IP
+  if (rlDoc.exists && rlData.tentativas > 0) {
+    await rateLimitRef.delete().catch(() => null);
   }
 
   // Gera token customizado do Firebase Auth com as claims reais
@@ -452,87 +527,44 @@ exports.atualizarPinColaborador = functions.https.onCall(async (data, context) =
     throw new functions.https.HttpsError('not-found', 'Restaurante não encontrado.');
   }
 
+  const realRestauranteId = restDoc.id;
   const restData = restDoc.data() || {};
-  const isOwner = restData.ownerId === context.auth.uid || context.auth.token?.role === 'owner';
   const isSuperadmin = context.auth.token?.superadmin === true;
+  // Blindagem contra vazamento horizontal: claim role=='owner' só autoriza para o seu próprio restauranteId
+  const isOwner = restData.ownerId === context.auth.uid ||
+    (context.auth.token?.role === 'owner' && context.auth.token?.restauranteId === realRestauranteId);
 
   if (!isOwner && !isSuperadmin) {
-    throw new functions.https.HttpsError('permission-denied', 'Apenas o dono pode alterar o PIN.');
+    throw new functions.https.HttpsError('permission-denied', 'Apenas o dono deste restaurante ou superadmin pode alterar o PIN.');
   }
+
+  // Gera hash e salt criptográfico seguro (elimina texto puro)
+  const { hash: pinHash, salt: pinSalt } = hashPin(pinLimpo);
 
   await restDoc.ref.collection('equipe').doc(membroUid).set(
     {
-      pin: pinLimpo,
+      pinHash,
+      pinSalt,
+      pin: admin.firestore.FieldValue.delete(), // remove campo legado em texto puro se existir
       atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
     },
     { merge: true }
   );
 
-  return { sucesso: true, pin: pinLimpo };
+  // Retorna status sem refletir o PIN em texto claro na resposta
+  return { sucesso: true };
 });
 
 
 /**
- * Webhook HTTPS para confirmação de pagamento Pix ou baixa automática.
- * Pode ser invocado por gateways ou PSPs (ex: Mercado Pago, Cora, Gerencianet/Efí, etc.).
- * Recebe o identificador (txId ou payload da comanda) e dá baixa automática no Firestore.
+ * Webhook HTTPS legado para Pix (DESCONTINUADO por segurança).
+ * Responde 410 Gone. O fluxo de pagamento ativo e seguro é processado via Mercado Pago Webhook oficial.
  */
 exports.pixWebhook = functions.https.onRequest(async (req, res) => {
-  // Apenas aceita requisições POST
-  if (req.method !== 'POST') {
-    res.status(405).send('Método não permitido');
-    return;
-  }
-
-  try {
-    const { restauranteId, mesaNumero, clienteId, txId, secret } = req.body || {};
-
-    if (!restauranteId || !mesaNumero || !clienteId) {
-      res.status(400).json({
-        erro: 'Campos obrigatórios: restauranteId, mesaNumero, clienteId',
-      });
-      return;
-    }
-
-    const mesaStr = String(mesaNumero);
-    const db = admin.firestore();
-
-    const comandaRef = db
-      .collection('restaurantes')
-      .doc(restauranteId)
-      .collection('mesas')
-      .doc(mesaStr)
-      .collection('comandas_abertas')
-      .doc(clienteId);
-
-    const comandaSnap = await comandaRef.get();
-    if (!comandaSnap.exists) {
-      res.status(404).json({ erro: 'Comanda não encontrada' });
-      return;
-    }
-
-    // Marca a comanda como paga
-    await comandaRef.update({
-      status: 'pago',
-      pagoEm: admin.firestore.FieldValue.serverTimestamp(),
-      metodoPagamento: 'pix',
-      txId: txId || null,
-      atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
-    });
-
-    console.info(`Baixa Pix confirmada via webhook: Restaurante ${restauranteId}, Mesa ${mesaStr}, Cliente ${clienteId}`);
-
-    res.status(200).json({
-      sucesso: true,
-      mensagem: 'Comanda baixada com sucesso via Pix.',
-      restauranteId,
-      mesa: mesaStr,
-      clienteId,
-    });
-  } catch (error) {
-    console.error('Erro ao processar webhook Pix:', error);
-    res.status(500).json({ erro: 'Erro interno ao processar baixa Pix' });
-  }
+  res.status(410).json({
+    erro: 'Endpoint legado descontinuado por motivos de conformidade e segurança.',
+    mensagem: 'Utilize o fluxo oficial de pagamento autenticado integrado ao PSP.',
+  });
 });
 
 

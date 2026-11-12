@@ -259,25 +259,15 @@ export function GestaoEquipe({ restauranteId, nomeRestaurante = "MAYaMenu" }: Ge
 
     setSalvandoPin(true);
     try {
-      // 1. Atualiza diretamente no Firestore
-      const membroRef = doc(db, "restaurantes", restauranteId, "equipe", membroEditandoPin.id);
-      await updateDoc(membroRef, {
-        pin: pinLimpo,
+      // Chama a Cloud Function para hash com salt seguro e sincronização
+      const atualizarPinFn = httpsCallable(functions, "atualizarPinColaborador");
+      await atualizarPinFn({
+        restauranteId,
+        membroUid: membroEditandoPin.uid,
+        novoPin: pinLimpo,
       });
 
-      // 2. Chama a Cloud Function para sincronização se disponível
-      try {
-        const atualizarPinFn = httpsCallable(functions, "atualizarPinColaborador");
-        await atualizarPinFn({
-          restauranteId,
-          membroUid: membroEditandoPin.uid,
-          novoPin: pinLimpo,
-        });
-      } catch (fnErr) {
-        console.warn("Aviso na Cloud Function atualizarPinColaborador:", fnErr);
-      }
-
-      setMensagemSucesso(`PIN de ${membroEditandoPin.nome} atualizado para ${pinLimpo} com sucesso!`);
+      setMensagemSucesso(`PIN de ${membroEditandoPin.nome} atualizado com sucesso!`);
       setMembroEditandoPin(null);
       setNovoPinValor("");
     } catch (err: any) {

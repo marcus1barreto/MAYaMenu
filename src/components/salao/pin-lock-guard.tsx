@@ -172,26 +172,10 @@ export function PinLockGuard({ role, restauranteId, slug, children }: PinLockGua
         return;
       }
     } catch (err: any) {
-      console.warn("Autenticação de PIN via nuvem falhou ou offline:", err);
-      // Fallback para PIN padrão de contingência
-      if (pinFinal === PINS_CONFIG[role] || pinFinal === "0000" || pinFinal === "123456") {
-        sessionStorage.setItem(`mayamenu_pin_unlocked_${role}`, "true");
-        if (colaboradorSelecionado) {
-          sessionStorage.setItem(
-            `mayamenu_colaborador_${role}`,
-            JSON.stringify({
-              uid: colaboradorSelecionado.uid,
-              nome: colaboradorSelecionado.nome,
-              role,
-              fotoUrl: colaboradorSelecionado.fotoUrl,
-            })
-          );
-        }
-        setDesbloqueado(true);
-        return;
-      }
-
-      const msg = err?.message?.includes("PIN incorreto")
+      console.warn("Autenticação de PIN via nuvem falhou:", err);
+      const msg = err?.message?.includes("bloqueado temporariamente")
+        ? err.message
+        : err?.message?.includes("PIN incorreto")
         ? `PIN incorreto para ${colaboradorSelecionado ? colaboradorSelecionado.nome : "este restaurante"}.`
         : "PIN inválido. Verifique os números e tente novamente.";
       setErro(msg);
