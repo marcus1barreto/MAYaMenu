@@ -217,11 +217,12 @@ exports.removeStaffMember = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError('permission-denied', 'Permissão negada.');
   }
 
-  // Remove claims
+  // Remove claims e revoga tokens imediatamente para deslogar sessões ativas
   try {
     await admin.auth().setCustomUserClaims(uid, { role: null, restauranteId: null });
+    await admin.auth().revokeRefreshTokens(uid);
   } catch (err) {
-    console.warn(`Aviso ao remover claims do UID ${uid}:`, err);
+    console.warn(`Aviso ao revogar tokens e claims do UID ${uid}:`, err);
   }
 
   // Remove do Firestore
