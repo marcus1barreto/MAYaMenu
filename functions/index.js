@@ -321,8 +321,11 @@ exports.loginComCracha = functions.https.onCall(async (data, context) => {
  */
 exports.loginComPin = functions.https.onCall(async (data, context) => {
   const { restauranteId, pin, role, colaboradorId } = data || {};
-  if (!restauranteId || !pin) {
-    throw new functions.https.HttpsError('invalid-argument', 'Campos restauranteId e pin são obrigatórios.');
+  if (!restauranteId || !pin || !colaboradorId) {
+    throw new functions.https.HttpsError(
+      'invalid-argument',
+      'Campos restauranteId, colaboradorId e pin são obrigatórios para autenticação individual.'
+    );
   }
 
   const firestoreDb = getDb();
@@ -339,27 +342,47 @@ exports.loginComPin = functions.https.onCall(async (data, context) => {
   const pinLimpo = String(pin).trim();
   const agora = Date.now();
 
-  // 1. Identificação forçada de IP e Colaborador (o cliente não escolhe contornar bloqueios)
-  const clientIp = context.rawRequest?.headers?.['x-forwarded-for'] || context.rawRequest?.ip || 'unknown_ip';
-  const ipKey = String(clientIp).split(',')[0].trim().replace(/[^a-zA-Z0-9_-]/g, '_');
-  
-  const ipRateLimitRef = restDoc.ref.collection('_pin_rate_limits').doc(`ip_${ipKey}`);
-  const userRateLimitRef = colaboradorId ? restDoc.ref.collection('_pin_rate_limits').doc(`user_${colaboradorId}`) : null;
+  // 1. Extração segura do IP do cliente inspecionando a cadeia de proxies reversos do Cloud Functions / Cloud Run
+  // No Google Cloud Functions, a cadeia confiável coloca o IP real mais confiável
+  const rawXff = context.rawRequest?.headers?.['x-forwarded-for'];
+  let clientIp = 'unknown_ip';
+  if (rawXff) {
+    // Separa os nós da cadeia de proxies e valida o formato
+    const ips = String(rawXff).split(',').map((s) => s.trim()).filter(Boolean);
+    // Em Cloud Functions/Cloud Run, o penúltimo ou último nó antes do proxy interno do GCP é o IP de borda
+    clientIp = ips[0] || 'unknown_ip';
+  } else if (context.rawRequest?.socket?.remoteAddress) {
+    clientIp = context.rawRequest.socket.remoteAddress;
+  } else if (context.rawRequest?.ip) {
+    clientIp = context.rawRequest.ip;
+  }
 
-  // 2. Verificação prévia atômica de bloqueio ativo em qualquer uma das dimensões
-  const [ipSnap, userSnap] = await Promise.all([
+  const ipKey = String(clientIp).replace(/[^a-zA-Z0-9_-]/g, '_');
+  
+  // Rate limits rastreados em 3 chaves:
+  // 1. IP isolado
+  // 2. Colaborador isolado
+  // 3. Chave global do restaurante (previne ataques de força bruta distribuídos de múltiplas origens contra a equipe)
+  const ipRateLimitRef = restDoc.ref.collection('_pin_rate_limits').doc(`ip_${ipKey}`);
+  const userRateLimitRef = restDoc.ref.collection('_pin_rate_limits').doc(`user_${colaboradorId}`);
+  const globalRestRateLimitRef = restDoc.ref.collection('_pin_rate_limits').doc('tenant_global');
+
+  // 2. Verificação prévia atômica de bloqueio ativo em qualquer uma das três dimensões
+  const [ipSnap, userSnap, globalSnap] = await Promise.all([
     ipRateLimitRef.get(),
-    userRateLimitRef ? userRateLimitRef.get() : Promise.resolve(null),
+    userRateLimitRef.get(),
+    globalRestRateLimitRef.get(),
   ]);
 
   const ipData = ipSnap.exists ? ipSnap.data() : null;
-  const userData = userSnap && userSnap.exists ? userSnap.data() : null;
+  const userData = userSnap.exists ? userSnap.data() : null;
+  const globalData = globalSnap.exists ? globalSnap.data() : null;
 
   if (ipData?.bloqueadoAte && agora < ipData.bloqueadoAte) {
     const minutosRestantes = Math.ceil((ipData.bloqueadoAte - agora) / 60000);
     throw new functions.https.HttpsError(
       'resource-exhausted',
-      `Muitas tentativas a partir deste endereço IP. Bloqueado temporariamente por ${minutosRestantes} minuto(s).`
+      `Muitas tentativas a partir deste endereço de rede. Bloqueado temporariamente por ${minutosRestantes} minuto(s).`
     );
   }
 
@@ -371,88 +394,73 @@ exports.loginComPin = functions.https.onCall(async (data, context) => {
     );
   }
 
+  if (globalData?.bloqueadoAte && agora < globalData.bloqueadoAte) {
+    const minutosRestantes = Math.ceil((globalData.bloqueadoAte - agora) / 60000);
+    throw new functions.https.HttpsError(
+      'resource-exhausted',
+      `Muitas tentativas globais no estabelecimento. Bloqueio de contenção por ${minutosRestantes} minuto(s).`
+    );
+  }
+
   let targetUid = null;
   let targetRole = role || 'garcom';
   let targetNome = 'Colaborador';
   let targetFoto = null;
 
-  // 3. Validação estrita por hash scrypt + salt (PIN em texto puro é sumariamente rejeitado)
-  if (colaboradorId) {
-    const memDoc = await restDoc.ref.collection('equipe').doc(colaboradorId).get();
-    if (memDoc.exists) {
-      const mData = memDoc.data() || {};
-      if (mData.pinHash && mData.pinSalt) {
-        if (verifyPin(pinLimpo, mData.pinHash, mData.pinSalt)) {
-          targetUid = mData.uid || memDoc.id;
-          targetRole = mData.role || targetRole;
-          targetNome = mData.nome || targetNome;
-          targetFoto = mData.fotoUrl || null;
-        }
+  // 3. Validação estrita por hash scrypt + salt diretamente do colaborador selecionado
+  const memDoc = await restDoc.ref.collection('equipe').doc(colaboradorId).get();
+  if (memDoc.exists) {
+    const mData = memDoc.data() || {};
+    if (mData.pinHash && mData.pinSalt) {
+      if (verifyPin(pinLimpo, mData.pinHash, mData.pinSalt)) {
+        targetUid = mData.uid || memDoc.id;
+        targetRole = mData.role || targetRole;
+        targetNome = mData.nome || targetNome;
+        targetFoto = mData.fotoUrl || null;
       }
     }
   }
 
-  // Se não foi identificado pelo ID, busca na equipe exclusivamente por hash scrypt
-  if (!targetUid) {
-    let q = restDoc.ref.collection('equipe');
-    if (role) {
-      q = q.where('role', '==', role);
-    }
-    const snap = await q.get();
-
-    for (const d of snap.docs) {
-      const mData = d.data() || {};
-      if (mData.pinHash && mData.pinSalt) {
-        if (verifyPin(pinLimpo, mData.pinHash, mData.pinSalt)) {
-          targetUid = mData.uid || d.id;
-          targetRole = mData.role || targetRole;
-          targetNome = mData.nome || targetNome;
-          targetFoto = mData.fotoUrl || null;
-          break;
-        }
-      }
-    }
-  }
-
-  // 4. Se falhou na validação do PIN: atualização atômica de tentativas em ambas as dimensões
+  // 4. Se falhou na validação do PIN: atualização atômica de tentativas em todas as 3 dimensões
   if (!targetUid) {
     await firestoreDb.runTransaction(async (t) => {
-      // Leitura da transação
+      // Leituras transacionais
       const curIpDoc = await t.get(ipRateLimitRef);
-      const curUserDoc = userRateLimitRef ? await t.get(userRateLimitRef) : null;
+      const curUserDoc = await t.get(userRateLimitRef);
+      const curGlobalDoc = await t.get(globalRestRateLimitRef);
 
+      // Incremento IP (limite de 5 tentativas)
       const curIpTentativas = (curIpDoc.exists ? curIpDoc.data()?.tentativas || 0 : 0) + 1;
-      const ipPayload = {
-        tentativas: curIpTentativas,
-        ultimoErro: agora,
-      };
+      const ipPayload = { tentativas: curIpTentativas, ultimoErro: agora };
       if (curIpTentativas >= 5) {
         ipPayload.bloqueadoAte = agora + 15 * 60 * 1000;
       }
       t.set(ipRateLimitRef, ipPayload, { merge: true });
 
-      if (userRateLimitRef) {
-        const curUserTentativas = (curUserDoc && curUserDoc.exists ? curUserDoc.data()?.tentativas || 0 : 0) + 1;
-        const userPayload = {
-          tentativas: curUserTentativas,
-          ultimoErro: agora,
-        };
-        if (curUserTentativas >= 5) {
-          userPayload.bloqueadoAte = agora + 15 * 60 * 1000;
-        }
-        t.set(userRateLimitRef, userPayload, { merge: true });
+      // Incremento Colaborador (limite de 5 tentativas)
+      const curUserTentativas = (curUserDoc.exists ? curUserDoc.data()?.tentativas || 0 : 0) + 1;
+      const userPayload = { tentativas: curUserTentativas, ultimoErro: agora };
+      if (curUserTentativas >= 5) {
+        userPayload.bloqueadoAte = agora + 15 * 60 * 1000;
       }
+      t.set(userRateLimitRef, userPayload, { merge: true });
+
+      // Incremento Global do Tenant (limite de 20 falhas distribuídas no estabelecimento)
+      const curGlobalTentativas = (curGlobalDoc.exists ? curGlobalDoc.data()?.tentativas || 0 : 0) + 1;
+      const globalPayload = { tentativas: curGlobalTentativas, ultimoErro: agora };
+      if (curGlobalTentativas >= 20) {
+        globalPayload.bloqueadoAte = agora + 15 * 60 * 1000;
+      }
+      t.set(globalRestRateLimitRef, globalPayload, { merge: true });
     });
 
-    throw new functions.https.HttpsError('permission-denied', 'PIN incorreto para este restaurante.');
+    throw new functions.https.HttpsError('permission-denied', 'PIN incorreto para este colaborador.');
   }
 
-  // 5. Se o login foi bem-sucedido: limpa atômica do rate limiting
+  // 5. Se o login foi bem-sucedido: limpa atômica do rate limiting individual e de IP
   const deleteBatch = firestoreDb.batch();
   deleteBatch.delete(ipRateLimitRef);
-  if (userRateLimitRef) {
-    deleteBatch.delete(userRateLimitRef);
-  }
+  deleteBatch.delete(userRateLimitRef);
   await deleteBatch.commit().catch(() => null);
 
   // Gera token customizado do Firebase Auth com as claims reais

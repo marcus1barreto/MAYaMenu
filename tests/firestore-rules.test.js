@@ -82,6 +82,33 @@ async function runTests() {
       total: 0,
     });
 
+    // Pedido 1 do cliente_1 na comanda do Restaurante A
+    await db.doc("restaurantes/rest_a/mesas/1/comandas_abertas/cliente_1/pedidos/ped_1").set({
+      id: "ped_1",
+      clienteId: "cliente_1",
+      restauranteId: "rest_a",
+      status: "a_fazer",
+      pratoNome: "Hambúrguer A",
+    });
+
+    // Comanda aberta no Restaurante B para cliente_b
+    await db.doc("restaurantes/rest_b/mesas/1/comandas_abertas/cliente_b").set({
+      id: "cliente_b",
+      clienteId: "cliente_b",
+      restauranteId: "rest_b",
+      status: "pedindo",
+      total: 0,
+    });
+
+    // Pedido 1 do cliente_b no Restaurante B
+    await db.doc("restaurantes/rest_b/mesas/1/comandas_abertas/cliente_b/pedidos/ped_b1").set({
+      id: "ped_b1",
+      clienteId: "cliente_b",
+      restauranteId: "rest_b",
+      status: "a_fazer",
+      pratoNome: "Pizza B",
+    });
+
     // Comanda PAGA no Restaurante A para cliente_2
     await db.doc("restaurantes/rest_a/mesas/1/comandas_abertas/cliente_2").set({
       id: "cliente_2",
@@ -178,6 +205,7 @@ async function runTests() {
     const clientDb = testEnv.authenticatedContext("cliente_2").firestore();
     await assertFails(
       clientDb.doc("restaurantes/rest_a/mesas/1/comandas_abertas/cliente_2/pedidos/ped_novo").set({
+        restauranteId: "rest_a",
         pratoNome: "Sobremesa",
         status: "a_fazer",
         quantidade: 1,
@@ -185,15 +213,77 @@ async function runTests() {
     );
   });
 
-  await test("Cliente Titular PODE criar pedido em comanda aberta", async () => {
+  await test("Cliente NÃO pode criar pedido forjando restauranteId diferente do path (Tentativa de Falsificação Multi-tenant)", async () => {
+    const clientDb = testEnv.authenticatedContext("cliente_1").firestore();
+    await assertFails(
+      clientDb.doc("restaurantes/rest_a/mesas/1/comandas_abertas/cliente_1/pedidos/ped_fake").set({
+        restauranteId: "rest_b", // Falsificação deliberada!
+        pratoNome: "Item Invasor",
+        status: "a_fazer",
+        quantidade: 1,
+      })
+    );
+  });
+
+  await test("Cliente Titular PODE criar pedido em comanda aberta informando o restauranteId correto", async () => {
     const clientDb = testEnv.authenticatedContext("cliente_1").firestore();
     await assertSucceeds(
-      clientDb.doc("restaurantes/rest_a/mesas/1/comandas_abertas/cliente_1/pedidos/ped_1").set({
+      clientDb.doc("restaurantes/rest_a/mesas/1/comandas_abertas/cliente_1/pedidos/ped_novo_valido").set({
+        restauranteId: "rest_a",
         pratoNome: "Suco Natural",
         status: "a_fazer",
         quantidade: 1,
       })
     );
+  });
+
+  // 3. CONSULTAS COLLECTIONGROUP E ISOLAMENTO MULTI-TENANT
+  await test("Garçom do Restaurante A PODE consultar collectionGroup de comandas do Restaurante A", async () => {
+    const garcomADb = testEnv.authenticatedContext("garcom_a", {
+      role: "garcom",
+      restauranteId: "rest_a",
+    }).firestore();
+    const q = garcomADb.collectionGroup("comandas_abertas").where("restauranteId", "==", "rest_a");
+    await assertSucceeds(q.get());
+  });
+
+  await test("Garçom do Restaurante A NÃO pode consultar collectionGroup de comandas do Restaurante B", async () => {
+    const garcomADb = testEnv.authenticatedContext("garcom_a", {
+      role: "garcom",
+      restauranteId: "rest_a",
+    }).firestore();
+    const q = garcomADb.collectionGroup("comandas_abertas").where("restauranteId", "==", "rest_b");
+    await assertFails(q.get());
+  });
+
+  await test("Cozinha do Restaurante A PODE consultar collectionGroup de pedidos do Restaurante A", async () => {
+    const cozinhaADb = testEnv.authenticatedContext("cozinha_a", {
+      role: "cozinha",
+      restauranteId: "rest_a",
+    }).firestore();
+    const q = cozinhaADb.collectionGroup("pedidos").where("restauranteId", "==", "rest_a");
+    await assertSucceeds(q.get());
+  });
+
+  await test("Cozinha do Restaurante A NÃO pode consultar collectionGroup de pedidos do Restaurante B (Acesso Cruzado)", async () => {
+    const cozinhaADb = testEnv.authenticatedContext("cozinha_a", {
+      role: "cozinha",
+      restauranteId: "rest_a",
+    }).firestore();
+    const q = cozinhaADb.collectionGroup("pedidos").where("restauranteId", "==", "rest_b");
+    await assertFails(q.get());
+  });
+
+  await test("Cliente Titular PODE ler seu pedido individual via collectionGroup", async () => {
+    const clientDb = testEnv.authenticatedContext("cliente_1").firestore();
+    const q = clientDb.collectionGroup("pedidos").where("clienteId", "==", "cliente_1");
+    await assertSucceeds(q.get());
+  });
+
+  await test("Cliente Intruso NÃO pode ler pedidos de outro cliente via collectionGroup", async () => {
+    const intrusoDb = testEnv.authenticatedContext("cliente_intruso").firestore();
+    const q = intrusoDb.collectionGroup("pedidos").where("clienteId", "==", "cliente_1");
+    await assertFails(q.get());
   });
 
   // 3. FILA DA COZINHA (KDS TICKETS)
