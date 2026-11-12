@@ -1013,6 +1013,32 @@ export function AdminDashboard() {
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col transition-colors duration-200">
+      {/* TARJA PRETA BLACK FREEDAY PARA USUÁRIOS NO PLANO FREE */}
+      {restaurante?.plano !== "pro" && !restaurante?.patrocinio?.ativo && (
+        <div className="bg-neutral-950 text-white border-b border-neutral-800 px-4 py-2 text-xs flex flex-wrap items-center justify-between gap-2 shadow-xs z-30">
+          <div className="flex items-center gap-2 mx-auto sm:mx-0 flex-wrap justify-center">
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-gradient-to-r from-amber-500/20 to-rose-500/20 border border-amber-500/40 text-[10px] font-black uppercase tracking-wider text-amber-300">
+              🖤 BLACK FREEDAY
+            </span>
+            <span className="text-neutral-200 font-medium">
+              Comece <strong>100% Grátis</strong> no Free ou turbine seu salão com o PRO por <strong>R$ 41,50/mês</strong>!
+            </span>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              setPlanoCheckoutSelecionado("pro_semestral");
+              setModalProAberto(true);
+            }}
+            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-gradient-to-r from-amber-500 to-rose-600 hover:from-amber-400 hover:to-rose-500 text-white font-black text-[11px] shadow-xs cursor-pointer transition-all active:scale-95 mx-auto sm:mx-0 shrink-0"
+          >
+            <span>Garantir PRO com 17% OFF</span>
+            <ArrowUpRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
       {/* BARRA SUPERIOR DO PAINEL (COMPACTA PARA ELEVAR OS CARDS) */}
       <header className="px-4 sm:px-6 py-3 sm:py-3.5 bg-card border-b border-border flex flex-wrap items-center justify-between gap-3 shadow-xs">
         <div className="flex items-center gap-3">
@@ -2057,8 +2083,8 @@ export function AdminDashboard() {
                   : "border-border bg-card hover:border-slate-300 dark:hover:border-slate-700"
               }`}
             >
-              <div className="absolute -top-2.5 right-3 bg-gradient-to-r from-amber-500 to-rose-600 text-white text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full shadow-xs">
-                Economize 17%
+              <div className="absolute -top-2.5 right-3 bg-neutral-950 border border-amber-500/50 text-amber-300 text-[9px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full shadow-md flex items-center gap-1">
+                <span>🖤 BLACK FREEDAY • 17% OFF</span>
               </div>
               <div>
                 <div className="flex items-center justify-between mb-1">

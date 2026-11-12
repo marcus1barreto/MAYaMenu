@@ -20,6 +20,7 @@ import {
   FileSpreadsheet,
   Lock,
 } from "lucide-react";
+import { BlackFreedayBar } from "@/components/marketing/black-freeday-bar";
 
 export const metadata: Metadata = {
   title: "MAYaMenu | Menus Inteligentes para Restaurantes, Bares e Lanchonetes",
@@ -44,6 +45,9 @@ export const metadata: Metadata = {
 export default function LandingPage() {
   return (
     <div className="min-h-screen bg-white text-neutral-900 flex flex-col selection:bg-rose-600 selection:text-white antialiased font-sans overflow-x-hidden">
+      {/* TARJA PRETA BLACK FREEDAY */}
+      <BlackFreedayBar />
+
       {/* 1. NAVBAR CLARA & PROFISSIONAL (IFOOD STYLE) */}
       <header className="sticky top-0 z-50 w-full border-b border-neutral-200/80 bg-white/95 backdrop-blur-md">
         <div className="max-w-7xl mx-auto px-3.5 sm:px-6 h-16 flex items-center justify-between gap-2">
