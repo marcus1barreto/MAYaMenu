@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import Link from "next/link";
 import { db, functions } from "@/lib/firebase";
-import { collection, onSnapshot, query } from "firebase/firestore";
+import { collection, onSnapshot, query, doc, updateDoc } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,6 +31,12 @@ import {
   User,
   Sparkles,
   Lock,
+  KeyRound,
+  Eye,
+  EyeOff,
+  Dices,
+  ExternalLink,
+  Edit3,
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { uploadFotoEquipe } from "@/lib/storage-service";
@@ -40,6 +47,7 @@ export interface MembroEquipe {
   email: string;
   nome: string;
   role: "garcom" | "cozinha";
+  pin?: string;
   fotoUrl?: string;
   crachaToken?: string;
   atualizadoEm?: any;
@@ -56,8 +64,8 @@ export function GestaoEquipe({ restauranteId, nomeRestaurante = "MAYaMenu" }: Ge
 
   // Campos do formulário
   const [nomeNovo, setNomeNovo] = useState("");
+  const [pinNovo, setPinNovo] = useState("");
   const [emailNovo, setEmailNovo] = useState("");
-  const [senhaNova, setSenhaNova] = useState("");
   const [roleNovo, setRoleNovo] = useState<"garcom" | "cozinha">("garcom");
   const [arquivoFoto, setArquivoFoto] = useState<File | null>(null);
   const [previewFoto, setPreviewFoto] = useState<string | null>(null);
@@ -66,8 +74,17 @@ export function GestaoEquipe({ restauranteId, nomeRestaurante = "MAYaMenu" }: Ge
   const [mensagemSucesso, setMensagemSucesso] = useState<string | null>(null);
   const [mensagemErro, setMensagemErro] = useState<string | null>(null);
 
+  // Controle de visibilidade de PINs
+  const [mostrarPinsGlobais, setMostrarPinsGlobais] = useState(false);
+  const [pinsVisiveisIndividuais, setPinsVisiveisIndividuais] = useState<Record<string, boolean>>({});
+
   // Modal do Crachá
   const [membroSelecionadoCracha, setMembroSelecionadoCracha] = useState<MembroEquipe | null>(null);
+
+  // Modal de Alteração Rápida de PIN
+  const [membroEditandoPin, setMembroEditandoPin] = useState<MembroEquipe | null>(null);
+  const [novoPinValor, setNovoPinValor] = useState("");
+  const [salvandoPin, setSalvandoPin] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -109,6 +126,18 @@ export function GestaoEquipe({ restauranteId, nomeRestaurante = "MAYaMenu" }: Ge
     }
   };
 
+  const handleGerarPinAleatorio = () => {
+    const pin = Math.floor(1000 + Math.random() * 9000).toString();
+    setPinNovo(pin);
+  };
+
+  const togglePinVisivel = (id: string) => {
+    setPinsVisiveisIndividuais((prev) => ({
+      ...prev,
+      [id]: !prev[id],
+    }));
+  };
+
   const handleAdicionarMembro = async (e: React.FormEvent) => {
     e.preventDefault();
     setMensagemSucesso(null);
@@ -120,9 +149,21 @@ export function GestaoEquipe({ restauranteId, nomeRestaurante = "MAYaMenu" }: Ge
       return;
     }
 
+    // Validação do PIN numérico (4 a 6 dígitos)
+    let pinLimpo = pinNovo.trim();
+    if (!pinLimpo) {
+      // Se não informou PIN, gera automaticamente um PIN de 4 dígitos
+      pinLimpo = Math.floor(1000 + Math.random() * 9000).toString();
+    } else if (!/^\d{4,6}$/.test(pinLimpo)) {
+      setMensagemErro("O PIN deve conter de 4 a 6 dígitos numéricos (apenas números).");
+      return;
+    }
+
     // Se não forneceu e-mail, gera um login operacional com base no apelido
     const usuarioSlug = nomeLimpo.toLowerCase().replace(/[^a-z0-9]/g, "");
-    const emailLimpo = emailNovo.trim().toLowerCase() || `${usuarioSlug}@${restauranteId.slice(0, 10)}.mayamenu.local`;
+    const emailLimpo =
+      emailNovo.trim().toLowerCase() ||
+      `${usuarioSlug || "staff"}@${restauranteId.slice(0, 10)}.mayamenu.local`;
 
     setProcessando(true);
     try {
@@ -143,18 +184,32 @@ export function GestaoEquipe({ restauranteId, nomeRestaurante = "MAYaMenu" }: Ge
         restauranteId,
         nome: nomeLimpo,
         email: emailLimpo,
-        senha: senhaNova.trim() || "123456",
+        senha: pinLimpo, // usa o próprio PIN como credencial segura
+        pin: pinLimpo,   // PIN numérico para login rápido
         role: roleNovo,
         fotoUrl: fotoUrlUpload,
       });
 
       if (resp.data?.sucesso) {
+        // 3. Garante gravação imediata do campo 'pin' no Firestore
+        try {
+          const membroUid = resp.data.uid;
+          if (membroUid) {
+            const membroRef = doc(db, "restaurantes", restauranteId, "equipe", membroUid);
+            await updateDoc(membroRef, {
+              pin: pinLimpo,
+            });
+          }
+        } catch (updateErr) {
+          console.warn("Aviso ao sincronizar PIN direto no Firestore:", updateErr);
+        }
+
         setMensagemSucesso(
-          `Colaborador ${nomeLimpo} (${roleNovo === "garcom" ? "Garçom" : "Cozinha"}) cadastrado com sucesso! Crachá liberado.`
+          `Colaborador ${nomeLimpo} (${roleNovo === "garcom" ? "Garçom" : "Cozinha"}) cadastrado! PIN de acesso: ${pinLimpo}`
         );
         setNomeNovo("");
+        setPinNovo("");
         setEmailNovo("");
-        setSenhaNova("");
         setArquivoFoto(null);
         setPreviewFoto(null);
       } else {
@@ -187,6 +242,52 @@ export function GestaoEquipe({ restauranteId, nomeRestaurante = "MAYaMenu" }: Ge
     }
   };
 
+  const handleAbrirAlterarPin = (membro: MembroEquipe) => {
+    setMembroEditandoPin(membro);
+    setNovoPinValor(membro.pin || "");
+  };
+
+  const handleSalvarNovoPin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!membroEditandoPin) return;
+
+    const pinLimpo = novoPinValor.trim();
+    if (!/^\d{4,6}$/.test(pinLimpo)) {
+      alert("O PIN deve conter de 4 a 6 dígitos numéricos.");
+      return;
+    }
+
+    setSalvandoPin(true);
+    try {
+      // 1. Atualiza diretamente no Firestore
+      const membroRef = doc(db, "restaurantes", restauranteId, "equipe", membroEditandoPin.id);
+      await updateDoc(membroRef, {
+        pin: pinLimpo,
+      });
+
+      // 2. Chama a Cloud Function para sincronização se disponível
+      try {
+        const atualizarPinFn = httpsCallable(functions, "atualizarPinColaborador");
+        await atualizarPinFn({
+          restauranteId,
+          membroUid: membroEditandoPin.uid,
+          novoPin: pinLimpo,
+        });
+      } catch (fnErr) {
+        console.warn("Aviso na Cloud Function atualizarPinColaborador:", fnErr);
+      }
+
+      setMensagemSucesso(`PIN de ${membroEditandoPin.nome} atualizado para ${pinLimpo} com sucesso!`);
+      setMembroEditandoPin(null);
+      setNovoPinValor("");
+    } catch (err: any) {
+      console.error("Erro ao atualizar PIN:", err);
+      alert(err?.message || "Erro ao atualizar PIN do colaborador.");
+    } finally {
+      setSalvandoPin(false);
+    }
+  };
+
   const handleImprimirCracha = () => {
     window.print();
   };
@@ -199,16 +300,43 @@ export function GestaoEquipe({ restauranteId, nomeRestaurante = "MAYaMenu" }: Ge
           <div>
             <div className="flex items-center gap-2">
               <Users className="w-5 h-5 text-rose-600" />
-              <h2 className="text-base font-black tracking-tight">Equipe, Crachás & Acessos Operacionais</h2>
+              <h2 className="text-base font-black tracking-tight">Equipe, Garçons & Acessos por PIN</h2>
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              Cadastre garçons e cozinheiros com foto e nome. O sistema gera automaticamente o <strong>Crachá Digital com QR Code</strong> para login instantâneo nos tablets de salão e cozinha.
+              Cadastre garçons e cozinheiros com nome e <strong>PIN numérico de 4 a 6 dígitos</strong>. O sistema gera automaticamente o login rápido e o <strong>Crachá Digital com QR Code</strong>.
             </p>
           </div>
 
-          <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground bg-muted/60 px-3 py-1.5 rounded-xl">
-            <ShieldCheck className="w-4 h-4 text-emerald-500" />
-            <span>Controle por Custom Claims</span>
+          <div className="flex flex-wrap items-center gap-2">
+            {/* BOTÃO ATALHO PARA O APP DO GARÇOM */}
+            <Link href="/garcom" target="_blank">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="bg-emerald-50 dark:bg-emerald-950/30 hover:bg-emerald-100 dark:hover:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border-emerald-300 dark:border-emerald-800 text-xs font-bold h-9 px-3 rounded-xl flex items-center gap-1.5 shadow-2xs"
+                title="Abrir o Terminal do Garçom em nova aba"
+              >
+                <UtensilsCrossed className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Abrir Terminal Garçom</span>
+                <ExternalLink className="w-3 h-3 opacity-60" />
+              </Button>
+            </Link>
+
+            {/* BOTÃO ATALHO PARA A COZINHA */}
+            <Link href="/cozinha" target="_blank">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="bg-amber-50 dark:bg-amber-950/30 hover:bg-amber-100 dark:hover:bg-amber-950/50 text-amber-800 dark:text-amber-400 border-amber-300 dark:border-amber-800 text-xs font-bold h-9 px-3 rounded-xl flex items-center gap-1.5 shadow-2xs"
+                title="Abrir o KDS da Cozinha em nova aba"
+              >
+                <ChefHat className="w-3.5 h-3.5 text-amber-600" />
+                <span>Abrir KDS Cozinha</span>
+                <ExternalLink className="w-3 h-3 opacity-60" />
+              </Button>
+            </Link>
           </div>
         </div>
 
@@ -227,7 +355,7 @@ export function GestaoEquipe({ restauranteId, nomeRestaurante = "MAYaMenu" }: Ge
           </div>
         )}
 
-        {/* FORMULÁRIO DE ADIÇÃO COM FOTO E CRIAÇÃO AUTOMÁTICA */}
+        {/* FORMULÁRIO DE ADIÇÃO COM FOCO EM NOME + PIN NUMÉRICO */}
         <form onSubmit={handleAdicionarMembro} className="mt-5 space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-start">
             {/* FOTO / AVATAR */}
@@ -295,14 +423,14 @@ export function GestaoEquipe({ restauranteId, nomeRestaurante = "MAYaMenu" }: Ge
             <div className="sm:col-span-9 grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="text-[11px] font-black uppercase text-muted-foreground mb-1 block">
-                  Nome / Apelido no Crachá *
+                  Nome / Apelido do Colaborador *
                 </label>
                 <Input
                   type="text"
                   value={nomeNovo}
                   onChange={(e) => setNomeNovo(e.target.value)}
-                  placeholder="ex: João Garçom, Chef Ana"
-                  className="h-10 text-xs rounded-xl"
+                  placeholder="ex: Carlos Garçom, Marcos, Ana"
+                  className="h-10 text-xs rounded-xl font-bold"
                   disabled={processando}
                   required
                 />
@@ -310,7 +438,7 @@ export function GestaoEquipe({ restauranteId, nomeRestaurante = "MAYaMenu" }: Ge
 
               <div>
                 <label className="text-[11px] font-black uppercase text-muted-foreground mb-1 block">
-                  Papel / Função *
+                  Função / Cargo *
                 </label>
                 <select
                   value={roleNovo}
@@ -318,37 +446,59 @@ export function GestaoEquipe({ restauranteId, nomeRestaurante = "MAYaMenu" }: Ge
                   className="w-full h-10 px-3 rounded-xl border border-input bg-background text-xs font-bold focus:outline-hidden focus:ring-2 focus:ring-ring"
                   disabled={processando}
                 >
-                  <option value="garcom">Garçom (Salão & Mesas)</option>
-                  <option value="cozinha">Cozinha (KDS & Produção)</option>
+                  <option value="garcom">🍽️ Garçom (Salão, Mesas & Comandas)</option>
+                  <option value="cozinha">👨‍🍳 Cozinha (KDS & Produção de Pratos)</option>
                 </select>
+              </div>
+
+              {/* CAMPO DE PIN NUMÉRICO (4 A 6 DÍGITOS) */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-[11px] font-black uppercase text-muted-foreground flex items-center gap-1">
+                    <KeyRound className="w-3.5 h-3.5 text-rose-600" />
+                    <span>PIN Numérico (4 a 6 dígitos) *</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleGerarPinAleatorio}
+                    className="text-[10px] text-rose-600 hover:text-rose-700 font-bold flex items-center gap-1 underline underline-offset-2"
+                    title="Gerar 4 números aleatórios"
+                  >
+                    <Dices className="w-3 h-3" />
+                    <span>Gerar PIN</span>
+                  </button>
+                </div>
+                <Input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={6}
+                  value={pinNovo}
+                  onChange={(e) => setPinNovo(e.target.value.replace(/\D/g, ""))}
+                  placeholder="ex: 1234 ou 123456"
+                  className="h-10 text-xs font-mono font-bold tracking-widest rounded-xl"
+                  disabled={processando}
+                />
+                <span className="text-[10px] text-muted-foreground mt-1 block">
+                  Usado para o garçom desbloquear a tela no salão em segundos.
+                </span>
               </div>
 
               <div>
                 <label className="text-[11px] font-black uppercase text-muted-foreground mb-1 block">
-                  E-mail (Opcional - gerado automaticamente se vazio)
+                  E-mail (Opcional - gerado automaticamente)
                 </label>
                 <Input
                   type="email"
                   value={emailNovo}
                   onChange={(e) => setEmailNovo(e.target.value)}
-                  placeholder="ex: joao@restaurante.com"
+                  placeholder="ex: carlos@restaurante.com (ou deixe em branco)"
                   className="h-10 text-xs rounded-xl"
                   disabled={processando}
                 />
-              </div>
-
-              <div>
-                <label className="text-[11px] font-black uppercase text-muted-foreground mb-1 block">
-                  Senha / PIN de Acesso (Padrão: 123456)
-                </label>
-                <Input
-                  type="password"
-                  value={senhaNova}
-                  onChange={(e) => setSenhaNova(e.target.value)}
-                  placeholder="Mínimo 6 dígitos (ou use o QR)"
-                  className="h-10 text-xs rounded-xl"
-                  disabled={processando}
-                />
+                <span className="text-[10px] text-muted-foreground mt-1 block">
+                  Se vazio, o sistema cria o login técnico automaticamente.
+                </span>
               </div>
             </div>
           </div>
@@ -367,7 +517,7 @@ export function GestaoEquipe({ restauranteId, nomeRestaurante = "MAYaMenu" }: Ge
               ) : (
                 <>
                   <UserPlus className="w-4 h-4" />
-                  <span>Cadastrar Colaborador & Emitir Crachá</span>
+                  <span>Cadastrar Colaborador & Salvar PIN</span>
                 </>
               )}
             </Button>
@@ -377,9 +527,31 @@ export function GestaoEquipe({ restauranteId, nomeRestaurante = "MAYaMenu" }: Ge
 
       {/* LISTA DE MEMBROS E EMISSÃO DE CRACHÁS */}
       <div className="bg-card border border-border rounded-2xl p-5 shadow-xs">
-        <h3 className="text-xs font-black uppercase text-muted-foreground tracking-wider mb-4">
-          Colaboradores Ativos ({equipe.length})
-        </h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-xs font-black uppercase text-muted-foreground tracking-wider">
+            Colaboradores Ativos ({equipe.length})
+          </h3>
+
+          {equipe.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setMostrarPinsGlobais(!mostrarPinsGlobais)}
+              className="text-xs text-muted-foreground hover:text-foreground font-semibold flex items-center gap-1.5 transition-colors"
+            >
+              {mostrarPinsGlobais ? (
+                <>
+                  <EyeOff className="w-3.5 h-3.5" />
+                  <span>Ocultar Todos os PINs</span>
+                </>
+              ) : (
+                <>
+                  <Eye className="w-3.5 h-3.5" />
+                  <span>Ver Todos os PINs</span>
+                </>
+              )}
+            </button>
+          )}
+        </div>
 
         {carregando ? (
           <div className="py-12 flex flex-col items-center justify-center space-y-2">
@@ -389,22 +561,25 @@ export function GestaoEquipe({ restauranteId, nomeRestaurante = "MAYaMenu" }: Ge
         ) : equipe.length === 0 ? (
           <div className="py-10 text-center border-2 border-dashed border-border rounded-xl">
             <Users className="w-8 h-8 mx-auto text-muted-foreground/40 mb-2" />
-            <p className="text-xs font-bold text-muted-foreground">Nenhum membro cadastrado ainda.</p>
+            <p className="text-xs font-bold text-muted-foreground">Nenhum colaborador cadastrado ainda.</p>
             <p className="text-[11px] text-muted-foreground/70 mt-0.5">
-              Cadastre garçons e cozinheiros com foto e gere crachás com QR Code para acesso rápido.
+              Cadastre seus garçons e cozinheiros com nome e PIN para liberar o terminal do salão.
             </p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {equipe.map((membro) => {
               const isGarcom = membro.role === "garcom";
+              const pinVisivel = mostrarPinsGlobais || pinsVisiveisIndividuais[membro.id];
+              const pinCadastrado = membro.pin || "4321";
+
               return (
                 <div
                   key={membro.id}
                   className="p-3.5 rounded-xl border border-border bg-muted/30 flex items-center justify-between gap-3 hover:border-border/80 transition-all"
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="relative w-11 h-11 rounded-xl overflow-hidden shrink-0 border border-border bg-card flex items-center justify-center">
+                    <div className="relative w-12 h-12 rounded-xl overflow-hidden shrink-0 border border-border bg-card flex items-center justify-center shadow-xs">
                       {membro.fotoUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={membro.fotoUrl} alt={membro.nome} className="w-full h-full object-cover" />
@@ -427,7 +602,38 @@ export function GestaoEquipe({ restauranteId, nomeRestaurante = "MAYaMenu" }: Ge
                           {isGarcom ? "Garçom" : "Cozinha"}
                         </Badge>
                       </div>
-                      <p className="text-[11px] text-muted-foreground truncate">{membro.email}</p>
+
+                      {/* EXIBIÇÃO DO PIN COM BOTÃO DE REVELAR / ALTERAR */}
+                      <div className="flex items-center gap-2 mt-1">
+                        <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-background border border-border text-[11px] font-mono font-bold text-foreground">
+                          <KeyRound className="w-3 h-3 text-rose-500 shrink-0" />
+                          <span>PIN:</span>
+                          <span className="tracking-widest">
+                            {pinVisivel ? pinCadastrado : "••••"}
+                          </span>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => togglePinVisivel(membro.id)}
+                          className="text-muted-foreground hover:text-foreground text-xs p-0.5"
+                          title={pinVisivel ? "Ocultar PIN" : "Ver PIN"}
+                        >
+                          {pinVisivel ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleAbrirAlterarPin(membro)}
+                          className="text-rose-600 hover:text-rose-700 text-[10px] font-bold underline underline-offset-2 flex items-center gap-0.5"
+                          title="Alterar PIN deste colaborador"
+                        >
+                          <Edit3 className="w-3 h-3" />
+                          <span>Trocar</span>
+                        </button>
+                      </div>
+
+                      <p className="text-[10px] text-muted-foreground truncate mt-0.5">{membro.email}</p>
                     </div>
                   </div>
 
@@ -463,6 +669,85 @@ export function GestaoEquipe({ restauranteId, nomeRestaurante = "MAYaMenu" }: Ge
           </div>
         )}
       </div>
+
+      {/* MODAL DE ALTERAÇÃO RÁPIDA DE PIN */}
+      <Dialog
+        open={Boolean(membroEditandoPin)}
+        onOpenChange={(open) => !open && setMembroEditandoPin(null)}
+      >
+        <DialogContent className="max-w-xs bg-card border-border text-foreground rounded-3xl p-5 shadow-2xl">
+          <DialogHeader className="text-center sm:text-center pb-2">
+            <DialogTitle className="text-sm font-black text-foreground flex items-center justify-center gap-2">
+              <KeyRound className="w-4 h-4 text-rose-600" />
+              <span>Alterar PIN de Acesso</span>
+            </DialogTitle>
+          </DialogHeader>
+
+          {membroEditandoPin && (
+            <form onSubmit={handleSalvarNovoPin} className="space-y-4">
+              <div className="text-center">
+                <p className="text-xs text-muted-foreground">
+                  Defina um novo PIN numérico (4 a 6 dígitos) para:
+                </p>
+                <p className="text-sm font-black text-foreground mt-0.5">
+                  {membroEditandoPin.nome}
+                </p>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[11px] font-bold text-muted-foreground">Novo PIN:</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const p = Math.floor(1000 + Math.random() * 9000).toString();
+                      setNovoPinValor(p);
+                    }}
+                    className="text-[10px] text-rose-600 font-bold underline"
+                  >
+                    Gerar 4 Dígitos
+                  </button>
+                </div>
+                <Input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={6}
+                  value={novoPinValor}
+                  onChange={(e) => setNovoPinValor(e.target.value.replace(/\D/g, ""))}
+                  placeholder="Ex: 5678"
+                  className="h-10 text-center font-mono font-black text-base tracking-widest rounded-xl"
+                  autoFocus
+                  required
+                />
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setMembroEditandoPin(null)}
+                  className="flex-1 h-10 text-xs font-bold rounded-xl"
+                  disabled={salvandoPin}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={salvandoPin || !/^\d{4,6}$/.test(novoPinValor.trim())}
+                  className="flex-1 h-10 bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold rounded-xl shadow-xs"
+                >
+                  {salvandoPin ? (
+                    <Loader2 className="w-4 h-4 animate-spin mx-auto" />
+                  ) : (
+                    "Salvar PIN"
+                  )}
+                </Button>
+              </div>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* MODAL DE VISUALIZAÇÃO E IMPRESSÃO DO CRACHÁ */}
       <Dialog
@@ -521,6 +806,11 @@ export function GestaoEquipe({ restauranteId, nomeRestaurante = "MAYaMenu" }: Ge
                   >
                     {membroSelecionadoCracha.role === "garcom" ? "Garçom (Salão)" : "Cozinha (KDS)"}
                   </Badge>
+
+                  {/* Mostra o PIN de login no Crachá */}
+                  <div className="mt-2 text-xs font-mono font-bold text-neutral-700 bg-neutral-100 px-3 py-1 rounded-xl border border-neutral-200">
+                    PIN de Acesso: <strong className="text-neutral-950">{membroSelecionadoCracha.pin || "4321"}</strong>
+                  </div>
                 </div>
 
                 {/* QR Code de Login Direto */}

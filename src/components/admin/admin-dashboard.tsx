@@ -1099,6 +1099,18 @@ export function AdminDashboard() {
             <span className="hidden sm:inline">Escanear Comanda</span>
           </Button>
 
+          <Link href="/garcom" target="_blank">
+            <Button
+              variant="outline"
+              className="bg-card border-border hover:bg-muted text-emerald-600 dark:text-emerald-400 font-bold text-xs h-9 px-3 rounded-xl flex items-center gap-1.5 shadow-2xs hover:border-emerald-300 transition-all"
+              title="Abrir o Terminal de Pedidos e Atendimento do Garçom em nova aba"
+            >
+              <UtensilsCrossed className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+              <span>App Garçom</span>
+              <ExternalLink className="w-3 h-3 opacity-60" />
+            </Button>
+          </Link>
+
           <Link href="/cozinha" target="_blank">
             <Button
               variant="outline"

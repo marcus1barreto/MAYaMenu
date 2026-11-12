@@ -157,9 +157,9 @@ exports.setStaffRole = functions.https.onCall(async (data, context) => {
     crachaToken,
     atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
   };
-  if (pin && String(pin).trim()) {
-    docMembro.pin = String(pin).trim();
-  }
+  // Salva o PIN informado ou gera um PIN padrão numérico de 4 dígitos
+  const pinDefinido = pin && String(pin).trim() ? String(pin).trim() : (senha && /^\d{4,6}$/.test(String(senha).trim()) ? String(senha).trim() : '1234');
+  docMembro.pin = pinDefinido;
 
   await restDoc.ref
     .collection('equipe')
@@ -280,10 +280,10 @@ exports.loginComCracha = functions.https.onCall(async (data, context) => {
 });
 
 /**
- * Cloud Function HTTPS Callable para autenticação rápida via PIN de 4 dígitos
+ * Cloud Function HTTPS Callable para autenticação rápida via PIN (4 a 6 dígitos)
  */
 exports.loginComPin = functions.https.onCall(async (data, context) => {
-  const { restauranteId, pin, role } = data || {};
+  const { restauranteId, pin, role, colaboradorId } = data || {};
   if (!restauranteId || !pin) {
     throw new functions.https.HttpsError('invalid-argument', 'Campos restauranteId e pin são obrigatórios.');
   }
@@ -302,26 +302,45 @@ exports.loginComPin = functions.https.onCall(async (data, context) => {
   const restData = restDoc.data() || {};
   const pinLimpo = String(pin).trim();
 
-  // 1. Busca membro da equipe com este PIN
-  let q = restDoc.ref.collection('equipe').where('pin', '==', pinLimpo);
-  if (role) {
-    q = q.where('role', '==', role);
-  }
-  const snap = await q.limit(1).get();
-
   let targetUid = null;
   let targetRole = role || 'garcom';
   let targetNome = 'Colaborador';
   let targetFoto = null;
 
-  if (!snap.empty) {
-    const mData = snap.docs[0].data();
-    targetUid = mData.uid;
-    targetRole = mData.role || targetRole;
-    targetNome = mData.nome || targetNome;
-    targetFoto = mData.fotoUrl || null;
-  } else {
-    // 2. Fallback de PIN mestre do salão (ex: 4321 garçom, 1234 cozinha ou cadastrado nas configs)
+  // 1. Se informou colaboradorId específico (selecionado na tela)
+  if (colaboradorId) {
+    const memDoc = await restDoc.ref.collection('equipe').doc(colaboradorId).get();
+    if (memDoc.exists) {
+      const mData = memDoc.data() || {};
+      const pinEsperado = mData.pin ? String(mData.pin).trim() : null;
+      if (pinEsperado && pinEsperado === pinLimpo) {
+        targetUid = mData.uid || memDoc.id;
+        targetRole = mData.role || targetRole;
+        targetNome = mData.nome || targetNome;
+        targetFoto = mData.fotoUrl || null;
+      }
+    }
+  }
+
+  // 2. Se ainda não identificou, busca membro da equipe com este PIN
+  if (!targetUid) {
+    let q = restDoc.ref.collection('equipe').where('pin', '==', pinLimpo);
+    if (role) {
+      q = q.where('role', '==', role);
+    }
+    const snap = await q.limit(1).get();
+
+    if (!snap.empty) {
+      const mData = snap.docs[0].data();
+      targetUid = mData.uid;
+      targetRole = mData.role || targetRole;
+      targetNome = mData.nome || targetNome;
+      targetFoto = mData.fotoUrl || null;
+    }
+  }
+
+  // 3. Fallback de PIN mestre do salão (ex: 4321 garçom, 1234 cozinha ou configurado)
+  if (!targetUid) {
     const pinPadraoEsperado = role === 'cozinha' ? '1234' : '4321';
     const pinConfig = role === 'cozinha'
       ? (restData.configuracoes?.pinCozinha || pinPadraoEsperado)
@@ -359,6 +378,96 @@ exports.loginComPin = functions.https.onCall(async (data, context) => {
       fotoUrl: targetFoto,
     },
   };
+});
+
+/**
+ * Cloud Function HTTPS Callable para listar equipe operacional pública
+ * (Retorna apenas nome, foto, cargo e ID - sem expor PIN ou e-mail)
+ */
+exports.listarEquipePublica = functions.https.onCall(async (data, context) => {
+  const { restauranteId, role } = data || {};
+  if (!restauranteId) {
+    throw new functions.https.HttpsError('invalid-argument', 'Campo restauranteId é obrigatório.');
+  }
+
+  const firestoreDb = getDb();
+  let restDoc = await firestoreDb.collection('restaurantes').doc(restauranteId).get();
+  if (!restDoc.exists) {
+    const q = await firestoreDb.collection('restaurantes').where('slug', '==', restauranteId).limit(1).get();
+    if (!q.empty) restDoc = q.docs[0];
+  }
+  if (!restDoc.exists) {
+    return { membros: [] };
+  }
+
+  let q = restDoc.ref.collection('equipe');
+  if (role) {
+    q = q.where('role', '==', role);
+  }
+
+  const snap = await q.get();
+  const membros = [];
+
+  snap.forEach((d) => {
+    const m = d.data() || {};
+    membros.push({
+      id: d.id,
+      uid: m.uid || d.id,
+      nome: m.nome || 'Colaborador',
+      role: m.role || 'garcom',
+      fotoUrl: m.fotoUrl || null,
+    });
+  });
+
+  membros.sort((a, b) => a.nome.localeCompare(b.nome));
+  return { membros };
+});
+
+/**
+ * Cloud Function HTTPS Callable para o Dono alterar o PIN de um membro
+ */
+exports.atualizarPinColaborador = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Autenticação necessária.');
+  }
+
+  const { restauranteId, membroUid, novoPin } = data || {};
+  if (!restauranteId || !membroUid || !novoPin) {
+    throw new functions.https.HttpsError('invalid-argument', 'Campos restauranteId, membroUid e novoPin são obrigatórios.');
+  }
+
+  const pinLimpo = String(novoPin).trim();
+  if (!/^\d{4,6}$/.test(pinLimpo)) {
+    throw new functions.https.HttpsError('invalid-argument', 'O PIN deve conter de 4 a 6 números.');
+  }
+
+  const firestoreDb = getDb();
+  let restDoc = await firestoreDb.collection('restaurantes').doc(restauranteId).get();
+  if (!restDoc.exists) {
+    const q = await firestoreDb.collection('restaurantes').where('slug', '==', restauranteId).limit(1).get();
+    if (!q.empty) restDoc = q.docs[0];
+  }
+  if (!restDoc.exists) {
+    throw new functions.https.HttpsError('not-found', 'Restaurante não encontrado.');
+  }
+
+  const restData = restDoc.data() || {};
+  const isOwner = restData.ownerId === context.auth.uid || context.auth.token?.role === 'owner';
+  const isSuperadmin = context.auth.token?.superadmin === true;
+
+  if (!isOwner && !isSuperadmin) {
+    throw new functions.https.HttpsError('permission-denied', 'Apenas o dono pode alterar o PIN.');
+  }
+
+  await restDoc.ref.collection('equipe').doc(membroUid).set(
+    {
+      pin: pinLimpo,
+      atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
+    },
+    { merge: true }
+  );
+
+  return { sucesso: true, pin: pinLimpo };
 });
 
 
