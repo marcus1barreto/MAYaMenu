@@ -84,6 +84,14 @@ exports.setStaffRole = functions.https.onCall(async (data, context) => {
     );
   }
 
+  const pinDefinido = pin ? String(pin).trim() : (senha && /^\d{4,6}$/.test(String(senha).trim()) ? String(senha).trim() : null);
+  if (!pinDefinido || !/^\d{4,6}$/.test(pinDefinido)) {
+    throw new functions.https.HttpsError(
+      'invalid-argument',
+      'É obrigatório definir um PIN individual explícito de 4 a 6 dígitos para o colaborador.'
+    );
+  }
+
   if (role !== 'garcom' && role !== 'cozinha') {
     throw new functions.https.HttpsError(
       'invalid-argument',
@@ -182,8 +190,7 @@ exports.setStaffRole = functions.https.onCall(async (data, context) => {
     crachaToken,
     atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
   };
-  // Hasheia o PIN com salt (nunca armazena o PIN em texto puro)
-  const pinDefinido = pin && String(pin).trim() ? String(pin).trim() : (senha && /^\d{4,6}$/.test(String(senha).trim()) ? String(senha).trim() : '1234');
+  // Hasheia o PIN individual explícito com salt scrypt (nunca armazena em texto puro)
   const { hash: pinHash, salt: pinSalt } = hashPin(pinDefinido);
   docMembro.pinHash = pinHash;
   docMembro.pinSalt = pinSalt;
@@ -309,7 +316,8 @@ exports.loginComCracha = functions.https.onCall(async (data, context) => {
 
 /**
  * Cloud Function HTTPS Callable para autenticação rápida via PIN (4 a 6 dígitos)
- * Com proteção contra força bruta (rate limiting) e hash scrypt com salt.
+ * Protegida com rate limiting atômico simultâneo (IP e Colaborador)
+ * e validação estrita exclusiva de hash scrypt + salt (rejeita texto puro).
  */
 exports.loginComPin = functions.https.onCall(async (data, context) => {
   const { restauranteId, pin, role, colaboradorId } = data || {};
@@ -328,23 +336,38 @@ exports.loginComPin = functions.https.onCall(async (data, context) => {
   }
 
   const realRestauranteId = restDoc.id;
-  const restData = restDoc.data() || {};
   const pinLimpo = String(pin).trim();
-
-  // 1. Rate Limiting por IP ou identificador de tentativa (5 falhas = bloqueio por 15 min)
-  const clientIp = context.rawRequest?.headers?.['x-forwarded-for'] || 'client';
-  const ipKey = String(clientIp).split(',')[0].trim().replace(/[^a-zA-Z0-9_-]/g, '_');
-  const rateLimitRef = restDoc.ref.collection('_pin_rate_limits').doc(colaboradorId ? `user_${colaboradorId}` : `ip_${ipKey}`);
-  
-  const rlDoc = await rateLimitRef.get();
-  const rlData = rlDoc.exists ? rlDoc.data() : { tentativas: 0, bloqueadoAte: 0 };
   const agora = Date.now();
 
-  if (rlData.bloqueadoAte && agora < rlData.bloqueadoAte) {
-    const minutosRestantes = Math.ceil((rlData.bloqueadoAte - agora) / 60000);
+  // 1. Identificação forçada de IP e Colaborador (o cliente não escolhe contornar bloqueios)
+  const clientIp = context.rawRequest?.headers?.['x-forwarded-for'] || context.rawRequest?.ip || 'unknown_ip';
+  const ipKey = String(clientIp).split(',')[0].trim().replace(/[^a-zA-Z0-9_-]/g, '_');
+  
+  const ipRateLimitRef = restDoc.ref.collection('_pin_rate_limits').doc(`ip_${ipKey}`);
+  const userRateLimitRef = colaboradorId ? restDoc.ref.collection('_pin_rate_limits').doc(`user_${colaboradorId}`) : null;
+
+  // 2. Verificação prévia atômica de bloqueio ativo em qualquer uma das dimensões
+  const [ipSnap, userSnap] = await Promise.all([
+    ipRateLimitRef.get(),
+    userRateLimitRef ? userRateLimitRef.get() : Promise.resolve(null),
+  ]);
+
+  const ipData = ipSnap.exists ? ipSnap.data() : null;
+  const userData = userSnap && userSnap.exists ? userSnap.data() : null;
+
+  if (ipData?.bloqueadoAte && agora < ipData.bloqueadoAte) {
+    const minutosRestantes = Math.ceil((ipData.bloqueadoAte - agora) / 60000);
     throw new functions.https.HttpsError(
       'resource-exhausted',
-      `Muitas tentativas incorretas. Bloqueado temporariamente por ${minutosRestantes} minuto(s).`
+      `Muitas tentativas a partir deste endereço IP. Bloqueado temporariamente por ${minutosRestantes} minuto(s).`
+    );
+  }
+
+  if (userData?.bloqueadoAte && agora < userData.bloqueadoAte) {
+    const minutosRestantes = Math.ceil((userData.bloqueadoAte - agora) / 60000);
+    throw new functions.https.HttpsError(
+      'resource-exhausted',
+      `Muitas tentativas para este colaborador. Bloqueado temporariamente por ${minutosRestantes} minuto(s).`
     );
   }
 
@@ -353,40 +376,23 @@ exports.loginComPin = functions.https.onCall(async (data, context) => {
   let targetNome = 'Colaborador';
   let targetFoto = null;
 
-  // 2. Se informou colaboradorId específico (selecionado na tela)
+  // 3. Validação estrita por hash scrypt + salt (PIN em texto puro é sumariamente rejeitado)
   if (colaboradorId) {
     const memDoc = await restDoc.ref.collection('equipe').doc(colaboradorId).get();
     if (memDoc.exists) {
       const mData = memDoc.data() || {};
-      let pinValido = false;
-
-      // Verificação 1: Hash com salt scrypt
       if (mData.pinHash && mData.pinSalt) {
-        pinValido = verifyPin(pinLimpo, mData.pinHash, mData.pinSalt);
-      } else if (mData.pin) {
-        // Fallback transitório para migração transparente: se ainda estava em texto puro
-        pinValido = (String(mData.pin).trim() === pinLimpo);
-        if (pinValido) {
-          // Auto-upgrade imediato: salva hash e apaga o campo legado
-          const { hash, salt } = hashPin(pinLimpo);
-          await memDoc.ref.update({
-            pinHash: hash,
-            pinSalt: salt,
-            pin: admin.firestore.FieldValue.delete(),
-          }).catch((err) => console.warn('Erro no upgrade de pin legado:', err));
+        if (verifyPin(pinLimpo, mData.pinHash, mData.pinSalt)) {
+          targetUid = mData.uid || memDoc.id;
+          targetRole = mData.role || targetRole;
+          targetNome = mData.nome || targetNome;
+          targetFoto = mData.fotoUrl || null;
         }
-      }
-
-      if (pinValido) {
-        targetUid = mData.uid || memDoc.id;
-        targetRole = mData.role || targetRole;
-        targetNome = mData.nome || targetNome;
-        targetFoto = mData.fotoUrl || null;
       }
     }
   }
 
-  // 3. Se ainda não identificou, pesquisa na equipe pelo hash ou migração
+  // Se não foi identificado pelo ID, busca na equipe exclusivamente por hash scrypt
   if (!targetUid) {
     let q = restDoc.ref.collection('equipe');
     if (role) {
@@ -396,47 +402,58 @@ exports.loginComPin = functions.https.onCall(async (data, context) => {
 
     for (const d of snap.docs) {
       const mData = d.data() || {};
-      let pinValido = false;
       if (mData.pinHash && mData.pinSalt) {
-        pinValido = verifyPin(pinLimpo, mData.pinHash, mData.pinSalt);
-      } else if (mData.pin) {
-        pinValido = (String(mData.pin).trim() === pinLimpo);
-        if (pinValido) {
-          const { hash, salt } = hashPin(pinLimpo);
-          await d.ref.update({
-            pinHash: hash,
-            pinSalt: salt,
-            pin: admin.firestore.FieldValue.delete(),
-          }).catch((err) => console.warn('Erro no upgrade de pin legado:', err));
+        if (verifyPin(pinLimpo, mData.pinHash, mData.pinSalt)) {
+          targetUid = mData.uid || d.id;
+          targetRole = mData.role || targetRole;
+          targetNome = mData.nome || targetNome;
+          targetFoto = mData.fotoUrl || null;
+          break;
         }
-      }
-
-      if (pinValido) {
-        targetUid = mData.uid || d.id;
-        targetRole = mData.role || targetRole;
-        targetNome = mData.nome || targetNome;
-        targetFoto = mData.fotoUrl || null;
-        break;
       }
     }
   }
 
-  // Se nenhum membro foi validado com o PIN informado
+  // 4. Se falhou na validação do PIN: atualização atômica de tentativas em ambas as dimensões
   if (!targetUid) {
-    const novasTentativas = (rlData.tentativas || 0) + 1;
-    const updatePayload = { tentativas: novasTentativas, ultimoErro: agora };
-    if (novasTentativas >= 5) {
-      updatePayload.bloqueadoAte = agora + 15 * 60 * 1000; // 15 minutos de suspensão
-    }
-    await rateLimitRef.set(updatePayload, { merge: true });
+    await firestoreDb.runTransaction(async (t) => {
+      // Leitura da transação
+      const curIpDoc = await t.get(ipRateLimitRef);
+      const curUserDoc = userRateLimitRef ? await t.get(userRateLimitRef) : null;
+
+      const curIpTentativas = (curIpDoc.exists ? curIpDoc.data()?.tentativas || 0 : 0) + 1;
+      const ipPayload = {
+        tentativas: curIpTentativas,
+        ultimoErro: agora,
+      };
+      if (curIpTentativas >= 5) {
+        ipPayload.bloqueadoAte = agora + 15 * 60 * 1000;
+      }
+      t.set(ipRateLimitRef, ipPayload, { merge: true });
+
+      if (userRateLimitRef) {
+        const curUserTentativas = (curUserDoc && curUserDoc.exists ? curUserDoc.data()?.tentativas || 0 : 0) + 1;
+        const userPayload = {
+          tentativas: curUserTentativas,
+          ultimoErro: agora,
+        };
+        if (curUserTentativas >= 5) {
+          userPayload.bloqueadoAte = agora + 15 * 60 * 1000;
+        }
+        t.set(userRateLimitRef, userPayload, { merge: true });
+      }
+    });
 
     throw new functions.https.HttpsError('permission-denied', 'PIN incorreto para este restaurante.');
   }
 
-  // Se o PIN for válido, reseta o rate limiting para este usuário/IP
-  if (rlDoc.exists && rlData.tentativas > 0) {
-    await rateLimitRef.delete().catch(() => null);
+  // 5. Se o login foi bem-sucedido: limpa atômica do rate limiting
+  const deleteBatch = firestoreDb.batch();
+  deleteBatch.delete(ipRateLimitRef);
+  if (userRateLimitRef) {
+    deleteBatch.delete(userRateLimitRef);
   }
+  await deleteBatch.commit().catch(() => null);
 
   // Gera token customizado do Firebase Auth com as claims reais
   const customToken = await admin.auth().createCustomToken(targetUid, {

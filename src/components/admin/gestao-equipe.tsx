@@ -191,21 +191,8 @@ export function GestaoEquipe({ restauranteId, nomeRestaurante = "MAYaMenu" }: Ge
       });
 
       if (resp.data?.sucesso) {
-        // 3. Garante gravação imediata do campo 'pin' no Firestore
-        try {
-          const membroUid = resp.data.uid;
-          if (membroUid) {
-            const membroRef = doc(db, "restaurantes", restauranteId, "equipe", membroUid);
-            await updateDoc(membroRef, {
-              pin: pinLimpo,
-            });
-          }
-        } catch (updateErr) {
-          console.warn("Aviso ao sincronizar PIN direto no Firestore:", updateErr);
-        }
-
         setMensagemSucesso(
-          `Colaborador ${nomeLimpo} (${roleNovo === "garcom" ? "Garçom" : "Cozinha"}) cadastrado! PIN de acesso: ${pinLimpo}`
+          `Colaborador ${nomeLimpo} (${roleNovo === "garcom" ? "Garçom" : "Cozinha"}) cadastrado com sucesso! PIN de acesso configurado.`
         );
         setNomeNovo("");
         setPinNovo("");

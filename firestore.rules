@@ -14,7 +14,7 @@ service cloud.firestore {
 
     // Verifica se o usuário autenticado é SuperAdmin do MAYaMenu
     function isSuperAdmin() {
-      return isSignedIn() && request.auth.token.superadmin == true;
+      return isSignedIn() && ('superadmin' in request.auth.token) && request.auth.token.superadmin == true;
     }
 
     // -----------------------------------------------------------------
@@ -22,9 +22,10 @@ service cloud.firestore {
     // -----------------------------------------------------------------
     function hasRole(restauranteId, role) {
       return isSignedIn() &&
+        ('role' in request.auth.token) &&
         request.auth.token.role == role &&
         (
-          request.auth.token.restauranteId == restauranteId ||
+          (('restauranteId' in request.auth.token) && request.auth.token.restauranteId == restauranteId) ||
           get(/databases/$(database)/documents/restaurantes/$(restauranteId)).data.ownerId == request.auth.uid
         );
     }
@@ -178,10 +179,9 @@ service cloud.firestore {
         allow update, delete: if isOwner(restauranteId) || isGarcom(restauranteId) || isCozinha(restauranteId) || isSuperAdmin();
       }
 
-      // Mesas e Salão
+      // Mesas e Salão: Leitura restrita à equipe operacional ou SuperAdmin (elimina leitura pública desnecessária)
       match /mesas/{numeroMesa} {
-        allow read: if true;
-        allow write: if isOwner(restauranteId) || isGarcom(restauranteId) || isSuperAdmin();
+        allow read, write: if isOwner(restauranteId) || isGarcom(restauranteId) || isSuperAdmin();
 
         // NÓ PAI: Comanda da Sessão do Cliente (agrega o subtotal)
         match /comandas_abertas/{clienteId} {
@@ -260,20 +260,30 @@ service cloud.firestore {
     }
 
     // ──────────────────────────── CollectionGroup Queries (Leitura KDS/Garçom) ────────────────────────────
-    // Leitura operacional restrita à equipe autenticada ou ao titular do pedido
+    // Leitura operacional vinculada rigorosamente ao restaurante correspondente ou ao titular do pedido
     match /{path=**}/comandas_abertas/{clienteId} {
       allow read: if isSignedIn() && (
-        request.auth.token.role in ['owner', 'garcom', 'cozinha']
+        isSuperAdmin()
         || request.auth.uid == clienteId
-        || isSuperAdmin()
+        || (
+          ('role' in request.auth.token)
+          && request.auth.token.role in ['owner', 'garcom', 'cozinha']
+          && ('restauranteId' in request.auth.token)
+          && request.auth.token.restauranteId == resource.data.restauranteId
+        )
       );
     }
 
     match /{path=**}/pedidos/{pedidoId} {
       allow read: if isSignedIn() && (
-        request.auth.token.role in ['owner', 'garcom', 'cozinha']
+        isSuperAdmin()
         || request.auth.uid == clienteId
-        || isSuperAdmin()
+        || (
+          ('role' in request.auth.token)
+          && request.auth.token.role in ['owner', 'garcom', 'cozinha']
+          && ('restauranteId' in request.auth.token)
+          && request.auth.token.restauranteId == resource.data.restauranteId
+        )
       );
     }
 
