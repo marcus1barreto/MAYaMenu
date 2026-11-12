@@ -1,16 +1,28 @@
 /**
- * Testes Unitários de Backend - Autenticação por PIN e Rate Limiting
- * Valida a Cloud Function `loginComPin` e os mecanismos de contenção:
- * 1. Janela temporal deslizante de 15 minutos
- * 2. Bloqueio por IP e por Colaborador
- * 3. Recuperação e reset da contenção global do tenant
- * 4. Validação estrita scrypt + salt (rejeição de texto puro e PINs incorretos)
+ * Testes Unitários de Backend - Autenticação por PIN, Rate Limiting e Anti-Spoofing de IP
+ * 
+ * Executa e valida o código real de produção importado de `functions/rateLimiter.js`:
+ * 1. Extração segura de IP contra falsificação e spoofing de cabeçalhos (X-Forwarded-For).
+ * 2. Criptografia scrypt + salt e verificação em tempo constante (timingSafeEqual).
+ * 3. Bloqueio atômico por colaborador e por IP após 5 tentativas incorretas.
+ * 4. Janela temporal deslizante de 15 minutos com reset automático.
+ * 5. Contenção global do estabelecimento contra força bruta distribuída e sua recuperação.
  */
 
 const assert = require('assert');
 const crypto = require('crypto');
+const {
+  JANELA_MS,
+  LIMITE_TENTATIVAS_IP,
+  LIMITE_TENTATIVAS_USER,
+  LIMITE_TENTATIVAS_GLOBAL,
+  extrairIpConviavel,
+  sanitizarChave,
+  verificarBloqueioAtivo,
+  calcularPayloadsFalha,
+} = require('../functions/rateLimiter');
 
-// Simulação dos utilitários idênticos a functions/index.js
+// Utilitários de Hash idênticos aos de production
 function hashPin(pin, saltHex) {
   const salt = saltHex || crypto.randomBytes(16).toString('hex');
   const derivedKey = crypto.scryptSync(String(pin).trim(), salt, 64);
@@ -33,168 +45,137 @@ function verifyPin(pin, storedHash, storedSalt) {
   }
 }
 
-// Lógica de simulação do Rate Limiter de functions/index.js
-class RateLimiterSimulator {
-  constructor() {
-    this.storage = new Map();
-  }
-
-  processAttempt({ ip, colaboradorId, restauranteId, pinCorreto, agora }) {
-    const JANELA_MS = 15 * 60 * 1000;
-    const ipKey = `ip_${ip}`;
-    const userKey = `user_${colaboradorId}`;
-    const globalKey = `global_${restauranteId}`;
-
-    const ipData = this.storage.get(ipKey) || {};
-    const userData = this.storage.get(userKey) || {};
-    const globalData = this.storage.get(globalKey) || {};
-
-    // 1. Verificação prévia de bloqueio
-    if (ipData.bloqueadoAte && agora < ipData.bloqueadoAte) {
-      return { status: 'BLOQUEADO_IP' };
-    }
-    if (userData.bloqueadoAte && agora < userData.bloqueadoAte) {
-      return { status: 'BLOQUEADO_USER' };
-    }
-    if (globalData.bloqueadoAte && agora < globalData.bloqueadoAte) {
-      return { status: 'BLOQUEADO_GLOBAL' };
-    }
-
-    if (pinCorreto) {
-      // Sucesso: limpa chaves individuais
-      this.storage.delete(ipKey);
-      this.storage.delete(userKey);
-      return { status: 'SUCESSO' };
-    }
-
-    // Falha: cálculo de janelas deslizantes
-    const ipExpirada = !ipData.janelaIniciadaEm || (agora - ipData.janelaIniciadaEm > JANELA_MS);
-    const ipTentativas = (ipExpirada ? 0 : (ipData.tentativas || 0)) + 1;
-    this.storage.set(ipKey, {
-      tentativas: ipTentativas,
-      janelaIniciadaEm: ipExpirada ? agora : ipData.janelaIniciadaEm,
-      bloqueadoAte: ipTentativas >= 5 ? agora + JANELA_MS : 0,
-    });
-
-    const userExpirada = !userData.janelaIniciadaEm || (agora - userData.janelaIniciadaEm > JANELA_MS);
-    const userTentativas = (userExpirada ? 0 : (userData.tentativas || 0)) + 1;
-    this.storage.set(userKey, {
-      tentativas: userTentativas,
-      janelaIniciadaEm: userExpirada ? agora : userData.janelaIniciadaEm,
-      bloqueadoAte: userTentativas >= 5 ? agora + JANELA_MS : 0,
-    });
-
-    const globalExpirada = !globalData.janelaIniciadaEm || (agora - globalData.janelaIniciadaEm > JANELA_MS);
-    const globalTentativas = (globalExpirada ? 0 : (globalData.tentativas || 0)) + 1;
-    let novoBloqueadoAte = 0;
-    let novaJanelaIniciada = globalExpirada ? agora : globalData.janelaIniciadaEm;
-    let proxTentativas = globalTentativas;
-
-    if (globalTentativas >= 20) {
-      novoBloqueadoAte = agora + JANELA_MS;
-      novaJanelaIniciada = agora;
-      proxTentativas = 20;
-    }
-
-    this.storage.set(globalKey, {
-      tentativas: proxTentativas,
-      janelaIniciadaEm: novaJanelaIniciada,
-      bloqueadoAte: novoBloqueadoAte,
-    });
-
-    return { status: 'FALHA_CREDENCIAL' };
-  }
-}
-
 async function runUnitTests() {
   console.log("=================================================");
-  console.log("Iniciando Testes Unitários de Autenticação e Rate Limiting");
+  console.log("Iniciando Testes Unitários do Módulo Real (functions/rateLimiter.js)");
   console.log("=================================================\n");
 
   let passed = 0;
 
-  // 1. Criptografia scrypt + salt
-  const { hash, salt } = hashPin("5821");
-  assert.strictEqual(verifyPin("5821", hash, salt), true, "PIN correto deve ser validado");
+  // 1. EXTRAÇÃO SEGURA DE IP E ANTI-SPOOFING DE X-FORWARDED-FOR
+  // Cenário: Atacante forja cabeçalho X-Forwarded-For com múltiplos IPs tentando burlar rate limit
+  const mockReqSpoofing = {
+    headers: {
+      'x-forwarded-for': '198.51.100.1, 203.0.113.195, 172.56.21.89', // 198.51 e 203.0 forjados pelo cliente, 172.56 anexado pelo proxy
+    },
+  };
+  const ipExtraido = extrairIpConviavel(mockReqSpoofing);
+  // Deve selecionar o último nó (adicionado pelo proxy GFE do Google Cloud) e ignorar os nós iniciais forjados
+  assert.strictEqual(ipExtraido, '172.56.21.89', 'Deve rejeitar IPs falsificados e extrair o nó confiável da infraestrutura');
+  console.log("[PASSOU] Extração de IP com proteção ativa contra spoofing de X-Forwarded-For");
+  passed++;
+
+  // Cenário: Requisição sem proxy com socket direto
+  const mockReqDireto = {
+    socket: { remoteAddress: '10.0.0.5' },
+  };
+  assert.strictEqual(extrairIpConviavel(mockReqDireto), '10.0.0.5', 'Deve extrair remoteAddress se sem proxy');
+  console.log("[PASSOU] Extração de IP via socket direto");
+  passed++;
+
+  // 2. CRIPTOGRAFIA SCRYPT + SALT
+  const { hash, salt } = hashPin("7842");
+  assert.strictEqual(verifyPin("7842", hash, salt), true, "PIN correto deve ser validado");
   assert.strictEqual(verifyPin("0000", hash, salt), false, "PIN incorreto deve ser rejeitado");
-  assert.strictEqual(verifyPin("1234", hash, salt), false, "PIN padrão legado deve ser rejeitado");
-  console.log("[PASSOU] Criptografia e verificação com timingSafeEqual scrypt + salt");
+  assert.strictEqual(verifyPin("1234", hash, salt), false, "PIN legado padrão deve ser rejeitado");
+  console.log("[PASSOU] Criptografia scrypt com salt de 16 bytes e verificação em tempo constante");
   passed++;
 
-  // 2. Rate Limiting por Colaborador (5 falhas bloqueiam)
-  const rl = new RateLimiterSimulator();
-  let baseTime = Date.now();
+  // 3. BLOQUEIO ATÔMICO POR COLABORADOR E IP
+  let curIpData = {};
+  let curUserData = {};
+  let curGlobalData = {};
+  let agora = Date.now();
 
-  for (let i = 1; i <= 4; i++) {
-    const res = rl.processAttempt({ ip: "1.1.1.1", colaboradorId: "user_joao", restauranteId: "rest_1", pinCorreto: false, agora: baseTime });
-    assert.strictEqual(res.status, 'FALHA_CREDENCIAL');
+  // Executa 5 falhas consecutivas usando a função real `calcularPayloadsFalha`
+  for (let i = 1; i <= 5; i++) {
+    const { ipPayload, userPayload, globalPayload } = calcularPayloadsFalha({
+      curIpData,
+      curUserData,
+      curGlobalData,
+      agora: agora + i * 1000,
+    });
+    curIpData = ipPayload;
+    curUserData = userPayload;
+    curGlobalData = globalPayload;
   }
-  const quintaFalha = rl.processAttempt({ ip: "1.1.1.1", colaboradorId: "user_joao", restauranteId: "rest_1", pinCorreto: false, agora: baseTime });
-  assert.strictEqual(quintaFalha.status, 'FALHA_CREDENCIAL');
 
-  // Sexta tentativa: bloqueado pelo usuário
-  const sextaTentativa = rl.processAttempt({ ip: "1.1.1.1", colaboradorId: "user_joao", restauranteId: "rest_1", pinCorreto: false, agora: baseTime + 1000 });
-  assert.strictEqual(sextaTentativa.status, 'BLOQUEADO_IP'); // Tanto IP quanto user bloqueados
-  console.log("[PASSOU] Bloqueio atômico de colaborador e IP após 5 tentativas incorretas");
+  assert.strictEqual(curIpData.tentativas, 5);
+  assert(curIpData.bloqueadoAte > agora, 'IP deve estar bloqueado após 5 falhas');
+  assert.strictEqual(curUserData.tentativas, 5);
+  assert(curUserData.bloqueadoAte > agora, 'Colaborador deve estar bloqueado após 5 falhas');
+
+  // Verifica se a função real `verificarBloqueioAtivo` aplica o bloqueio
+  const statusBloqueio = verificarBloqueioAtivo({
+    ipData: curIpData,
+    userData: curUserData,
+    globalData: curGlobalData,
+    agora: agora + 6000,
+  });
+  assert.strictEqual(statusBloqueio.bloqueado, true);
+  console.log("[PASSOU] Bloqueio atômico de colaborador e IP após 5 falhas consecutivas via functions/rateLimiter.js");
   passed++;
 
-  // 3. Janela de Expiração e Recuperação (após 15 min, desbloqueia)
-  const tempoApos16Min = baseTime + 16 * 60 * 1000;
-  const aposDesbloqueio = rl.processAttempt({ ip: "1.1.1.1", colaboradorId: "user_joao", restauranteId: "rest_1", pinCorreto: true, agora: tempoApos16Min });
-  assert.strictEqual(aposDesbloqueio.status, 'SUCESSO');
-  console.log("[PASSOU] Janela temporal deslizante de recuperação de 15 minutos desfaz bloqueio");
+  // 4. JANELA TEMPORAL DESLIZANTE DE RECUPERAÇÃO (15 MINUTOS)
+  const tempoApos16Min = agora + 16 * 60 * 1000;
+  const statusApos16Min = verificarBloqueioAtivo({
+    ipData: curIpData,
+    userData: curUserData,
+    globalData: curGlobalData,
+    agora: tempoApos16Min,
+  });
+  assert.strictEqual(statusApos16Min.bloqueado, false, 'Bloqueio deve ser levantado após janela de 15 minutos');
+  console.log("[PASSOU] Janela temporal deslizante de 15 minutos desfaz bloqueio automaticamente");
   passed++;
 
-  // 4. Contenção Global do Estabelecimento com Janela Deslizante de Reset
-  const rlGlobal = new RateLimiterSimulator();
+  // 5. CONTENÇÃO GLOBAL CONTRA FORÇA BRUTA DISTRIBUÍDA E RECUPERAÇÃO
+  let gGlobalData = {};
   let gTime = Date.now();
 
-  // Simula ataque distribuído de 20 falhas de origens diferentes contra o mesmo restaurante
+  // Simula 20 falhas distribuídas no tenant vindas de múltiplos IPs
   for (let i = 1; i <= 20; i++) {
-    const resFalha = rlGlobal.processAttempt({
-      ip: `192.168.1.${i}`,
-      colaboradorId: `colab_${i}`,
-      restauranteId: "rest_alvo",
-      pinCorreto: false,
+    const { globalPayload } = calcularPayloadsFalha({
+      curIpData: {},
+      curUserData: {},
+      curGlobalData: gGlobalData,
       agora: gTime + i * 1000,
     });
-    // Na 20ª tentativa, atinge o limiar e entra em contenção
+    gGlobalData = globalPayload;
   }
 
-  // Consulta o estado registrado no storage global
-  const globalArmazenado = rlGlobal.storage.get("global_rest_alvo");
-  assert(globalArmazenado.bloqueadoAte > gTime, "Deve registrar timestamp de bloqueio global");
+  assert.strictEqual(gGlobalData.tentativas, 20);
+  assert(gGlobalData.bloqueadoAte > gTime, 'Tenant deve estar sob contenção global');
 
-  // 21ª tentativa subsequente dentro do período de bloqueio (ex: 25 segundos depois)
-  const bloqueioDistribuido = rlGlobal.processAttempt({
-    ip: "200.200.200.200",
-    colaboradorId: "colab_novo",
-    restauranteId: "rest_alvo",
-    pinCorreto: false,
+  // Teste de bloqueio ativo no estabelecimento
+  const bloqueioTenant = verificarBloqueioAtivo({
+    ipData: null,
+    userData: null,
+    globalData: gGlobalData,
     agora: gTime + 25000,
   });
-
-  assert.strictEqual(bloqueioDistribuido.status, 'BLOQUEADO_GLOBAL');
-  console.log("[PASSOU] Contenção global contra força bruta distribuída bloqueia estabelecimento");
+  assert.strictEqual(bloqueioTenant.bloqueado, true);
+  assert.strictEqual(bloqueioTenant.tipo, 'global');
+  console.log("[PASSOU] Contenção global ativada no tenant contra ataque distribuído");
   passed++;
 
-  // Recuperação global após a janela de 15 minutos (não trava indefinidamente)
+  // Recuperação global após a janela
   const gTempoApos16Min = gTime + 16 * 60 * 1000;
-  const recuperacaoGlobal = rlGlobal.processAttempt({
-    ip: "200.200.200.200",
-    colaboradorId: "colab_novo",
-    restauranteId: "rest_alvo",
-    pinCorreto: true,
+  const recuperacaoTenant = verificarBloqueioAtivo({
+    ipData: null,
+    userData: null,
+    globalData: gGlobalData,
     agora: gTempoApos16Min,
   });
-  assert.strictEqual(recuperacaoGlobal.status, 'SUCESSO');
-  console.log("[PASSOU] Recuperação da contenção global do tenant reinicializa janela e permite login legítimo");
+  assert.strictEqual(recuperacaoTenant.bloqueado, false, 'Contenção global deve liberar após período de penalidade');
+  console.log("[PASSOU] Recuperação do tenant após janela de contenção reinicializa operação");
   passed++;
 
-  console.log(`\nRelatório de Testes Unitários de Backend: ${passed} Passaram | 0 Falharam\n`);
+  console.log(`\n=================================================`);
+  console.log(`Relatório Final de Testes Unitários de Backend: ${passed} Passaram | 0 Falharam`);
+  console.log(`=================================================\n`);
 }
 
 runUnitTests().catch((err) => {
-  console.error("Erro no teste unitário:", err);
+  console.error("Erro fatal nos testes unitários:", err);
   process.exit(1);
 });

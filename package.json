@@ -7,9 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node tests/rate-limiting.test.js && firebase emulators:exec --only firestore \"node tests/firestore-rules.test.js\"",
+    "test": "node tests/rate-limiting.test.js && npx firebase emulators:exec --only firestore \"node tests/firestore-rules.test.js\"",
     "test:unit": "node tests/rate-limiting.test.js",
-    "test:rules": "firebase emulators:exec --only firestore \"node tests/firestore-rules.test.js\"",
+    "test:rules": "npx firebase emulators:exec --only firestore \"node tests/firestore-rules.test.js\"",
     "test:e2e": "../agentes_teste_python/venv/bin/python tests/e2e/test_novidades_superadmin_caixa.py"
   },
   "dependencies": {
@@ -38,6 +38,7 @@
     "esbuild": "^0.28.2",
     "eslint": "^9",
     "eslint-config-next": "^16.4.3",
+    "firebase-tools": "^15.36.0",
     "serwist": "^9.5.13",
     "tailwindcss": "^4",
     "typescript": "^5"

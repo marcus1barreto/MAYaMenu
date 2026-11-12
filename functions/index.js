@@ -2,6 +2,12 @@ const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 const { getFirestore } = require('firebase-admin/firestore');
 const crypto = require('crypto');
+const {
+  extrairIpConviavel,
+  sanitizarChave,
+  verificarBloqueioAtivo,
+  calcularPayloadsFalha,
+} = require('./rateLimiter');
 
 admin.initializeApp();
 
@@ -342,29 +348,13 @@ exports.loginComPin = functions.https.onCall(async (data, context) => {
   const pinLimpo = String(pin).trim();
   const agora = Date.now();
 
-  // 1. Extração segura do IP do cliente inspecionando a cadeia de proxies reversos do Cloud Functions / Cloud Run
-  // No Google Cloud Functions, a cadeia confiável coloca o IP real mais confiável
-  const rawXff = context.rawRequest?.headers?.['x-forwarded-for'];
-  let clientIp = 'unknown_ip';
-  if (rawXff) {
-    // Separa os nós da cadeia de proxies e valida o formato
-    const ips = String(rawXff).split(',').map((s) => s.trim()).filter(Boolean);
-    // Em Cloud Functions/Cloud Run, o penúltimo ou último nó antes do proxy interno do GCP é o IP de borda
-    clientIp = ips[0] || 'unknown_ip';
-  } else if (context.rawRequest?.socket?.remoteAddress) {
-    clientIp = context.rawRequest.socket.remoteAddress;
-  } else if (context.rawRequest?.ip) {
-    clientIp = context.rawRequest.ip;
-  }
-
-  const ipKey = String(clientIp).replace(/[^a-zA-Z0-9_-]/g, '_');
+  // 1. Extração segura de IP contra falsificação e spoofing de cabeçalhos
+  const clientIp = extrairIpConviavel(context.rawRequest);
+  const ipKey = sanitizarChave(clientIp);
   
-  // Rate limits rastreados em 3 chaves:
-  // 1. IP isolado
-  // 2. Colaborador isolado
-  // 3. Chave global do restaurante (previne ataques de força bruta distribuídos de múltiplas origens contra a equipe)
+  // Rate limits rastreados em 3 chaves no Firestore:
   const ipRateLimitRef = restDoc.ref.collection('_pin_rate_limits').doc(`ip_${ipKey}`);
-  const userRateLimitRef = restDoc.ref.collection('_pin_rate_limits').doc(`user_${colaboradorId}`);
+  const userRateLimitRef = restDoc.ref.collection('_pin_rate_limits').doc(`user_${sanitizarChave(colaboradorId)}`);
   const globalRestRateLimitRef = restDoc.ref.collection('_pin_rate_limits').doc('tenant_global');
 
   // 2. Verificação prévia atômica de bloqueio ativo em qualquer uma das três dimensões
@@ -378,28 +368,9 @@ exports.loginComPin = functions.https.onCall(async (data, context) => {
   const userData = userSnap.exists ? userSnap.data() : null;
   const globalData = globalSnap.exists ? globalSnap.data() : null;
 
-  if (ipData?.bloqueadoAte && agora < ipData.bloqueadoAte) {
-    const minutosRestantes = Math.ceil((ipData.bloqueadoAte - agora) / 60000);
-    throw new functions.https.HttpsError(
-      'resource-exhausted',
-      `Muitas tentativas a partir deste endereço de rede. Bloqueado temporariamente por ${minutosRestantes} minuto(s).`
-    );
-  }
-
-  if (userData?.bloqueadoAte && agora < userData.bloqueadoAte) {
-    const minutosRestantes = Math.ceil((userData.bloqueadoAte - agora) / 60000);
-    throw new functions.https.HttpsError(
-      'resource-exhausted',
-      `Muitas tentativas para este colaborador. Bloqueado temporariamente por ${minutosRestantes} minuto(s).`
-    );
-  }
-
-  if (globalData?.bloqueadoAte && agora < globalData.bloqueadoAte) {
-    const minutosRestantes = Math.ceil((globalData.bloqueadoAte - agora) / 60000);
-    throw new functions.https.HttpsError(
-      'resource-exhausted',
-      `Muitas tentativas globais no estabelecimento. Bloqueio de contenção por ${minutosRestantes} minuto(s).`
-    );
+  const bloqueio = verificarBloqueioAtivo({ ipData, userData, globalData, agora });
+  if (bloqueio.bloqueado) {
+    throw new functions.https.HttpsError('resource-exhausted', bloqueio.mensagem);
   }
 
   let targetUid = null;
@@ -421,62 +392,27 @@ exports.loginComPin = functions.https.onCall(async (data, context) => {
     }
   }
 
-  // 4. Se falhou na validação do PIN: atualização atômica de tentativas com janelas deslizantes explícitas
+  // 4. Se falhou na validação do PIN: atualização atômica de tentativas via módulo centralizado
   if (!targetUid) {
-    const JANELA_GLOBAL_MS = 15 * 60 * 1000; // Janela deslizante de 15 minutos para falhas globais do tenant
-    const JANELA_INDIVIDUAL_MS = 15 * 60 * 1000;
-
     await firestoreDb.runTransaction(async (t) => {
       // Leituras transacionais
       const curIpDoc = await t.get(ipRateLimitRef);
       const curUserDoc = await t.get(userRateLimitRef);
       const curGlobalDoc = await t.get(globalRestRateLimitRef);
 
-      // Incremento IP (limite de 5 tentativas por janela)
       const curIpData = curIpDoc.exists ? curIpDoc.data() : {};
-      const ipJanelaExpirada = !curIpData.janelaIniciadaEm || (agora - curIpData.janelaIniciadaEm > JANELA_INDIVIDUAL_MS);
-      const curIpTentativas = (ipJanelaExpirada ? 0 : (curIpData.tentativas || 0)) + 1;
-      const ipPayload = {
-        tentativas: curIpTentativas,
-        ultimoErro: agora,
-        janelaIniciadaEm: ipJanelaExpirada ? agora : curIpData.janelaIniciadaEm,
-      };
-      if (curIpTentativas >= 5) {
-        ipPayload.bloqueadoAte = agora + 15 * 60 * 1000;
-      }
-      t.set(ipRateLimitRef, ipPayload, { merge: true });
-
-      // Incremento Colaborador (limite de 5 tentativas por janela)
       const curUserData = curUserDoc.exists ? curUserDoc.data() : {};
-      const userJanelaExpirada = !curUserData.janelaIniciadaEm || (agora - curUserData.janelaIniciadaEm > JANELA_INDIVIDUAL_MS);
-      const curUserTentativas = (userJanelaExpirada ? 0 : (curUserData.tentativas || 0)) + 1;
-      const userPayload = {
-        tentativas: curUserTentativas,
-        ultimoErro: agora,
-        janelaIniciadaEm: userJanelaExpirada ? agora : curUserData.janelaIniciadaEm,
-      };
-      if (curUserTentativas >= 5) {
-        userPayload.bloqueadoAte = agora + 15 * 60 * 1000;
-      }
-      t.set(userRateLimitRef, userPayload, { merge: true });
-
-      // Incremento Global do Tenant com JANELA DESLIZANTE DE RECUPERAÇÃO EXPLÍCITA
-      // Se a última falha ou início da janela ocorreu há mais de 15 min, o contador reseta automaticamente!
       const curGlobalData = curGlobalDoc.exists ? curGlobalDoc.data() : {};
-      const globalJanelaExpirada = !curGlobalData.janelaIniciadaEm || (agora - curGlobalData.janelaIniciadaEm > JANELA_GLOBAL_MS);
-      const curGlobalTentativas = (globalJanelaExpirada ? 0 : (curGlobalData.tentativas || 0)) + 1;
-      
-      const globalPayload = {
-        tentativas: curGlobalTentativas,
-        ultimoErro: agora,
-        janelaIniciadaEm: globalJanelaExpirada ? agora : curGlobalData.janelaIniciadaEm,
-      };
 
-      if (curGlobalTentativas >= 20) {
-        globalPayload.bloqueadoAte = agora + 15 * 60 * 1000;
-        // Marca que após o bloqueio de 15 min a contagem zera
-        globalPayload.tentativas = 20;
-      }
+      const { ipPayload, userPayload, globalPayload } = calcularPayloadsFalha({
+        curIpData,
+        curUserData,
+        curGlobalData,
+        agora,
+      });
+
+      t.set(ipRateLimitRef, ipPayload, { merge: true });
+      t.set(userRateLimitRef, userPayload, { merge: true });
       t.set(globalRestRateLimitRef, globalPayload, { merge: true });
     });
 
