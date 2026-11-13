@@ -14,7 +14,7 @@ import {
   Store,
   Layers,
 } from "lucide-react";
-import { buscarPatrocinadorPorChave, salvarPatrocinador, salvarItemCatalogoMaster, criarLoteLicencas } from "@/lib/b2b-service";
+import { buscarPatrocinadorPorChave } from "@/lib/b2b-service";
 import type { PatrocinadorB2B } from "@/types/b2b";
 
 interface B2BLoginProps {
