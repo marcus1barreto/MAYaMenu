@@ -1573,6 +1573,9 @@ async function executarLancamentoPedidoGarcom(firestoreDb, authUid, authToken, p
   );
 
   const restData = restDoc.data() || {};
+  if (restData.suspenso === true || restData.configuracoes?.suspenso === true) {
+    throw new functions.https.HttpsError('failed-precondition', 'Estabelecimento suspenso; novos pedidos estão bloqueados.');
+  }
   const realRestauranteId = restDoc.id;
   const realSlug = String(restData.slug || realRestauranteId);
   if (slug && String(slug).trim() !== realSlug && String(slug).trim() !== realRestauranteId) {
@@ -1667,8 +1670,9 @@ async function executarLancamentoPedidoGarcom(firestoreDb, authUid, authToken, p
       throw new functions.https.HttpsError('not-found', 'Mesa não cadastrada neste restaurante.');
     }
     const mesaData = mesaSnap.data() || {};
-    if (mesaData.ativa === false || mesaData.statusEstrutural === 'inativa' || mesaData.statusEstrutural === 'bloqueada') {
-      throw new functions.https.HttpsError('failed-precondition', 'Mesa inexistente, inativa ou bloqueada para atendimento.');
+    if (mesaData.ativa === false ||
+        ['inativa', 'bloqueada', 'reservada'].includes(mesaData.statusEstrutural)) {
+      throw new functions.https.HttpsError('failed-precondition', 'Mesa inexistente, inativa, reservada ou bloqueada para atendimento.');
     }
 
     if (comandaSnap.exists) {
