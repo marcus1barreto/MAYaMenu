@@ -524,15 +524,32 @@ export async function renovarValidadeLicenca(
   horasAdicionais = 48
 ): Promise<Date> {
   const codigoFormatado = codigo.trim().toUpperCase();
+  if (!Number.isFinite(horasAdicionais) || horasAdicionais <= 0 || horasAdicionais > 24 * 30) {
+    throw new Error("Prazo de renovação inválido.");
+  }
+  const licencaRef = doc(db, "concessoes", codigoFormatado);
+  const arquivoRef = doc(db, "arquivo_morto_licencas", codigoFormatado);
   const novaExpiracao = new Date(Date.now() + horasAdicionais * 60 * 60 * 1000);
 
-  // O servidor confirma a renovação antes de atualizar qualquer cache local.
-  await updateDoc(doc(db, "concessoes", codigoFormatado), {
-    expiracaoEm: novaExpiracao,
-    status: "disponivel",
+  // A renovação é transacional e nunca ressuscita uma concessão consumida/arquivada.
+  await runTransaction(db, async (tx) => {
+    const [licencaSnap, arquivoSnap] = await Promise.all([
+      tx.get(licencaRef),
+      tx.get(arquivoRef),
+    ]);
+    if (!licencaSnap.exists()) throw new Error("Concessão não encontrada.");
+    if (arquivoSnap.exists()) throw new Error("Concessão arquivada não pode ser reativada.");
+    const statusAtual = String(licencaSnap.data().status || "disponivel");
+    if (["ativa", "utilizada", "revogada"].includes(statusAtual)) {
+      throw new Error("Concessão já utilizada ou revogada não pode ser renovada.");
+    }
+    tx.update(licencaRef, {
+      expiracaoEm: novaExpiracao,
+      status: "disponivel",
+      atualizadoEm: serverTimestamp(),
+    });
   });
 
-  // Atualiza localmente
   const locais = obterLicencasLocais();
   const atualizadas = locais.map((l) =>
     l.id === codigoFormatado
