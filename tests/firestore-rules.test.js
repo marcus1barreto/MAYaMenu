@@ -82,6 +82,7 @@ async function runTests() {
       nome: "Restaurante A",
       ownerId: "owner_a",
       plano: "free",
+      maxMesas: 20,
     });
 
     // Restaurante B (Dono: owner_b)
@@ -89,6 +90,7 @@ async function runTests() {
       nome: "Restaurante B",
       ownerId: "owner_b",
       plano: "free",
+      maxMesas: 20,
     });
     await db.doc("restaurantes_publicos/rest_a").set({
       restauranteId: "rest_a", slug: "rest-a", nome: "Restaurante A", suspenso: false,
@@ -274,6 +276,24 @@ async function runTests() {
     await assertFails(ownerDb.doc(mesaRef).update({ ativa: true, statusEstrutural: "livre" }));
     await assertFails(garcomDb.doc(mesaRef).update({ ativa: true, statusEstrutural: "livre" }));
     await assertSucceeds(superadminDb.doc(mesaRef).update({ ativa: true, statusEstrutural: "livre" }));
+  });
+
+  await test("Mesas: criação respeita número físico e capacidade licenciada", async () => {
+    const ownerDb = testEnv.authenticatedContext("owner_a", {
+      role: "owner", restauranteId: "rest_a",
+    }).firestore();
+    await assertSucceeds(ownerDb.doc("restaurantes/rest_a/mesas/20").set({
+      numero: 20, ativa: true, statusEstrutural: "livre",
+    }));
+    await assertFails(ownerDb.doc("restaurantes/rest_a/mesas/21").set({
+      numero: 21, ativa: true, statusEstrutural: "livre",
+    }));
+    await assertFails(ownerDb.doc("restaurantes/rest_a/mesas/22").set({
+      numero: 20, ativa: true, statusEstrutural: "livre",
+    }));
+    await assertFails(ownerDb.doc("restaurantes/rest_a/mesas/23").set({
+      ativa: true, statusEstrutural: "livre",
+    }));
   });
 
   await test("Cardápio: lojista não pode forjar, editar ou excluir itens patrocinados", async () => {
