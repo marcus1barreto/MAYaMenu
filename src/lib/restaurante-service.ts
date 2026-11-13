@@ -573,47 +573,14 @@ export async function marcarComandaPagaFirestore(
   mesaNumero: number | string,
   clienteId: string
 ): Promise<void> {
+  // O backend fecha a comanda e cria, na mesma transação, o evento de sell-out
+  // derivado dos itens efetivamente gravados e validados pelo servidor.
   const fecharComandaFn = httpsCallable(functions, "fecharComandaBackend");
   await fecharComandaFn({
     restauranteId,
     mesa: mesaNumero,
     clienteId,
   });
-
-  const comandaRef = doc(
-    db,
-    "restaurantes",
-    restauranteId,
-    "mesas",
-    String(mesaNumero),
-    "comandas_abertas",
-    clienteId
-  );
-
-  // Telemetria automática de Sell-Out para itens de patrocinadores
-  try {
-    const pedidosCol = collection(comandaRef, "pedidos");
-    const pedidosSnap = await getDocs(pedidosCol);
-    for (const pedDoc of pedidosSnap.docs) {
-      const pedData = pedDoc.data() as PedidoRodada;
-      for (const it of pedData.itens || []) {
-        const patId = (it as any).origemPatrocinadorId;
-        if (patId) {
-          const { registrarVendaItemPatrocinado } = await import("@/lib/b2b-service");
-          await registrarVendaItemPatrocinado({
-            patrocinadorId: patId,
-            itemId: it.menuItemId,
-            itemNome: it.nome,
-            quantidade: it.quantidade || 1,
-            valorTotal: (it.precoFinal || 0) * (it.quantidade || 1),
-            restauranteId,
-          });
-        }
-      }
-    }
-  } catch (err) {
-    console.warn("Telemetria de sellout não pôde ser enviada:", err);
-  }
 }
 
 /**
