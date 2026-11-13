@@ -2883,10 +2883,16 @@ async function executarAtivarPatrocinio(firestoreDb, authUid, token, payload, ra
   const restauranteId = String(payload?.restauranteId || '').trim();
   const codigo = normalizarCodigoAtivacao(payload?.codigoVoucher);
   if (!restauranteId || !/^[A-Z0-9_-]{4,100}$/.test(codigo)) throw new functions.https.HttpsError('invalid-argument', 'Restaurante e voucher são obrigatórios.');
-  // A ativação direta do voucher também passa pelo mesmo limitador da validação pública.
-  await executarValidarCodigoAtivacaoComRateLimit(firestoreDb, { codigo }, rawRequest);
   const superadmin = token?.superadmin === true;
   const restRef = firestoreDb.collection('restaurantes').doc(restauranteId);
+  // Confere o vínculo antes de consumir tentativas do voucher em nome de outro tenant.
+  const restAuthSnap = await restRef.get();
+  if (!restAuthSnap.exists) throw new functions.https.HttpsError('not-found', 'Restaurante não encontrado.');
+  if (!superadmin && restAuthSnap.data()?.ownerId !== authUid) {
+    throw new functions.https.HttpsError('permission-denied', 'Somente o titular ou SuperAdmin pode vincular patrocínio.');
+  }
+  // A ativação direta do voucher também passa pelo mesmo limitador da validação pública.
+  await executarValidarCodigoAtivacaoComRateLimit(firestoreDb, { codigo }, rawRequest);
   let resultado = null;
 
   await firestoreDb.runTransaction(async (tx) => {
