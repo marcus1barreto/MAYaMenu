@@ -12,7 +12,8 @@ const { _internal } = require("../functions/index.js");
 const {
   executarFecharComanda, executarLiberarMesa, executarDefinirTaxaServicoMesa,
   executarDesativarMesa, executarChamarGarcom, executarValidarCodigoAtivacao,
-  executarAtivarInstancia, executarAtivarPatrocinio,
+  executarAtivarInstancia, executarAtivarPatrocinio, executarProcessarSelloutOutbox,
+  executarLancamentoPedidoGarcom,
 } = _internal;
 const crypto = require("crypto");
 
@@ -47,6 +48,60 @@ async function seed(db, mesa, clienteId) {
 async function main() {
   const db = admin.firestore();
   const base = { restauranteId: "rest_e" };
+
+  await runTest("Emulador: pedido de garçom preserva origem patrocinada e rejeita produto inativo", async () => {
+    const rest = db.doc("restaurantes/rest_e");
+    await rest.set({ nome: "Rest Emulador", slug: "rest-e", ownerId: "owner_e" }, { merge: true });
+    await rest.collection("equipe").doc("garcom_e").set({ role: "garcom", ativo: true });
+    await rest.collection("mesas").doc("12").set({ ativa: true, statusEstrutural: "livre" });
+    await rest.collection("cardapio").doc("spn-item").set({
+      nome: "Produto Patrocinado", precoBase: 8, ativo: true,
+      origemPatrocinadorId: "spn_sellout_test",
+    });
+    await rest.collection("cardapio").doc("item-inativo").set({
+      nome: "Produto Inativo", precoBase: 5, ativo: false,
+    });
+    const resultado = await executarLancamentoPedidoGarcom(db, "garcom_e", {}, {
+      restauranteId: "rest_e", pedidoId: "pedido_spn_12", mesa: 12,
+      clienteId: "cli_spn_12", nomeCliente: "Cliente",
+      itens: [{ menuItemId: "spn-item", quantidade: 2 }],
+    });
+    assert.strictEqual(resultado.sucesso, true);
+    const pedido = await rest.collection("mesas").doc("12")
+      .collection("comandas_abertas").doc("cli_spn_12")
+      .collection("pedidos").doc("pedido_spn_12").get();
+    assert.strictEqual(pedido.data().itens[0].origemPatrocinadorId, "spn_sellout_test");
+    await assert.rejects(() => executarLancamentoPedidoGarcom(db, "garcom_e", {}, {
+      restauranteId: "rest_e", pedidoId: "pedido_inativo_12", mesa: 12,
+      clienteId: "cli_spn_12", nomeCliente: "Cliente",
+      itens: [{ menuItemId: "item-inativo", quantidade: 1 }],
+    }), /indisponível/i);
+  });
+
+  await runTest("Emulador: fechamento gera outbox sell-out idempotente e métricas confiáveis", async () => {
+    const { rest, comanda } = await seed(db, 13, "cli_sellout");
+    await comanda.collection("pedidos").doc("p1").update({
+      itens: [{
+        menuItemId: "spn-bierhaus-item", nome: "Produto BierHaus",
+        quantidade: 2, precoFinal: 10, origemPatrocinadorId: "spn_bierhaus",
+      }],
+    });
+    const eventId = crypto.createHash("sha256").update("rest_e|13|cli_sellout").digest("hex");
+    await executarFecharComanda(db, "garcom_e", {}, {
+      ...base, mesa: 13, clienteId: "cli_sellout",
+    });
+    const outbox = await rest.collection("_sellout_outbox").doc(eventId).get();
+    assert.strictEqual(outbox.exists, true);
+    assert.strictEqual(outbox.data().itens[0].quantidade, 2);
+    await executarProcessarSelloutOutbox(db, "rest_e", eventId);
+    const metric = await db.doc("patrocinadores/spn_bierhaus/metricas_sellout/bierhaus-item").get();
+    assert.strictEqual(metric.data().totalUnidadesVendidas, 2);
+    assert.strictEqual(metric.data().faturamentoTotalEstimado, 20);
+    await executarProcessarSelloutOutbox(db, "rest_e", eventId);
+    const metricRetry = await db.doc("patrocinadores/spn_bierhaus/metricas_sellout/bierhaus-item").get();
+    assert.strictEqual(metricRetry.data().totalUnidadesVendidas, 2);
+    assert.strictEqual((await outbox.ref.get()).data().processado, true);
+  });
 
   await runTest("Emulador: validação de licença não exige leitura pública e retorna apenas dados mínimos", async () => {
     await db.doc("concessoes/MAYA-TESTE-01").set({
