@@ -2904,7 +2904,11 @@ async function executarProcessarEstornoPagamentoPro(firestoreDb, attemptId, paym
         ultimoEstornoPagamentoId: paymentId,
       };
 
-      if (String(assinaturaAtual.paymentId || '') === paymentId && ledger.previousState) {
+      const paymentIdAnterior = String(ledger.previousState?.assinatura?.paymentId || '');
+      const paymentIdAtual = String(assinaturaAtual.paymentId || '');
+      const aindaNoEstadoAnterior = paymentIdAtual === paymentIdAnterior;
+      if (ledger.previousState &&
+          (paymentIdAtual === paymentId || aindaNoEstadoAnterior)) {
         const anterior = ledger.previousState;
         patch.plano = anterior.plano || 'free';
         patch.maxMesas = anterior.maxMesas ?? (patch.plano === 'pro' ? 30 : 10);
