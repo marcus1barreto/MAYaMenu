@@ -89,7 +89,7 @@ exports.setStaffRole = functions.https.onCall(async (data, context) => {
   }
 
   const callerUid = context.auth.uid;
-  const { restauranteId, email, role, nome, senha, fotoUrl, pin } = data || {};
+  const { restauranteId, email, role, nome, fotoUrl, pin } = data || {};
 
   if (!restauranteId || !email || !role) {
     throw new functions.https.HttpsError(
@@ -98,7 +98,7 @@ exports.setStaffRole = functions.https.onCall(async (data, context) => {
     );
   }
 
-  const pinDefinido = pin ? String(pin).trim() : (senha && /^\d{4,6}$/.test(String(senha).trim()) ? String(senha).trim() : null);
+  const pinDefinido = pin ? String(pin).trim() : null;
   if (!pinDefinido || !/^\d{4,6}$/.test(pinDefinido)) {
     throw new functions.https.HttpsError(
       'invalid-argument',
@@ -151,7 +151,9 @@ exports.setStaffRole = functions.https.onCall(async (data, context) => {
   }
 
   const nomeFormatado = (nome || '').trim() || email.split('@')[0];
-  const senhaPadrao = senha && String(senha).length >= 6 ? String(senha) : '123456';
+  // A senha Firebase nunca é o PIN operacional. Conta nova recebe segredo aleatório
+  // não compartilhado; o acesso de salão ocorre exclusivamente pelo fluxo PIN/crachá.
+  const senhaInicialAleatoria = crypto.randomBytes(48).toString('base64url');
 
   // 3. Busca ou CRIA AUTOMATICAMENTE o usuário no Firebase Auth
   let targetUser;
@@ -169,7 +171,7 @@ exports.setStaffRole = functions.https.onCall(async (data, context) => {
     try {
       targetUser = await admin.auth().createUser({
         email,
-        password: senhaPadrao,
+        password: senhaInicialAleatoria,
         displayName: nomeFormatado,
         photoURL: fotoUrl || null,
       });
