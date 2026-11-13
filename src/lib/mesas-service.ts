@@ -66,6 +66,33 @@ export async function reativarMesaFirestore(
 }
 
 /**
+ * Emite ou rotaciona a credencial QR de uma mesa. O segredo só é devolvido no momento da emissão.
+ */
+export async function emitirCredencialMesaFirestore(
+  restauranteId: string,
+  numeroMesa: number,
+  rotacionar = false
+): Promise<{
+  sucesso: boolean;
+  jaConfigurada?: boolean;
+  slug?: string;
+  mesa: number;
+  qrVersao?: number;
+  qrCredencial?: string;
+}> {
+  const emitirFn = httpsCallable(functions, "garantirCredencialMesa");
+  const resultado = await emitirFn({ restauranteId, mesa: numeroMesa, rotacionar });
+  return resultado.data as {
+    sucesso: boolean;
+    jaConfigurada?: boolean;
+    slug?: string;
+    mesa: number;
+    qrVersao?: number;
+    qrCredencial?: string;
+  };
+}
+
+/**
  * Ativa ou desativa todas as mesas ou uma faixa de mesas em lote
  */
 export async function alternarStatusLoteMesas(
@@ -112,6 +139,8 @@ export function escutarConfigsMesas(
             modoAtendimento: data.modoAtendimento || "livre",
             garcomFixoId: data.garcomFixoId,
             garcomFixoNome: data.garcomFixoNome,
+            qrConfigurado: typeof data.qrCredencialHash === "string" && data.qrCredencialHash.length === 64,
+            qrVersao: Number(data.qrVersao) || 0,
             atualizadoEm: data.atualizadoEm,
           };
         }
