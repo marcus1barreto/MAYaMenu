@@ -1,7 +1,7 @@
 // lib/b2b-service.ts
 // Serviços do Módulo B2B & Patrocínios em Lote (Sponsor Tiers) do MAYaMenu
 
-import { db } from "@/lib/firebase";
+import { db, functions } from "@/lib/firebase";
 import {
   collection,
   doc,
@@ -24,6 +24,7 @@ import type {
   MetricasSelloutItem,
 } from "@/types/b2b";
 import type { MenuItem } from "@/types";
+import { httpsCallable } from "firebase/functions";
 
 export const PATROCINADOR_DEMO: PatrocinadorB2B = {
   id: "spn-bierhaus-demo",
@@ -348,88 +349,25 @@ export async function validarVoucherPatrocinio(
   lote?: LoteLicencasB2B;
 }> {
   const codigo = codigoVoucher.trim().toUpperCase();
-  if (!codigo) {
-    return { valido: false, mensagem: "Informe o código do voucher de patrocínio." };
-  }
-
+  if (!codigo) return { valido: false, mensagem: "Informe o código do voucher de patrocínio." };
   try {
-    let loteData: LoteLicencasB2B | null = null;
-    let patrocinadorData: PatrocinadorB2B | null = null;
-
-    // Tentativa 1: Query simples via collectionGroup (apenas 1 where para NÃO precisar de índice composto)
-    try {
-      const { collectionGroup } = await import("firebase/firestore");
-      const q = query(
-        collectionGroup(db, "lotes_licencas"),
-        where("codigoCampanha", "==", codigo)
-      );
-      const snap = await getDocs(q);
-      for (const docSnap of snap.docs) {
-        const l = { id: docSnap.id, ...(docSnap.data() as any) } as LoteLicencasB2B;
-        if (l.ativo !== false) {
-          loteData = l;
-          break;
-        }
-      }
-    } catch (cgErr) {
-      console.warn("CollectionGroup lotes_licencas falhou (tentando fallback direto por patrocinadores):", cgErr);
+    const validarFn = httpsCallable(functions, "validarCodigoAtivacaoBackend");
+    const resposta = await validarFn({ codigo });
+    const dados = resposta.data as {
+      tipo?: string;
+      voucher?: { patrocinador?: PatrocinadorB2B; lote?: LoteLicencasB2B };
+    };
+    if (dados?.tipo !== "patrocinio" || !dados.voucher?.patrocinador || !dados.voucher?.lote) {
+      return { valido: false, mensagem: "Voucher de patrocínio não encontrado ou indisponível." };
     }
-
-    // Tentativa 2 (Fallback Resiliente): Itera sobre todos os patrocinadores cadastrados
-    if (!loteData) {
-      try {
-        const patsSnap = await getDocs(collection(db, "patrocinadores"));
-        for (const patDoc of patsSnap.docs) {
-          const pat = { id: patDoc.id, ...(patDoc.data() as any) } as PatrocinadorB2B;
-          if (pat.ativo === false) continue;
-
-          const lotesCol = collection(db, "patrocinadores", pat.id, "lotes_licencas");
-          const qLote = query(lotesCol, where("codigoCampanha", "==", codigo));
-          const snapLote = await getDocs(qLote);
-
-          if (!snapLote.empty) {
-            const lDoc = snapLote.docs[0];
-            const l = { id: lDoc.id, ...(lDoc.data() as any) } as LoteLicencasB2B;
-            if (l.ativo !== false) {
-              loteData = l;
-              patrocinadorData = pat;
-              break;
-            }
-          }
-        }
-      } catch (fbErr) {
-        console.warn("Fallback de busca por patrocinador falhou:", fbErr);
-      }
-    }
-
-    if (!loteData) {
-      return { valido: false, mensagem: "Voucher de patrocínio não encontrado ou expirado." };
-    }
-
-    if (loteData.licencasAtivadas >= loteData.totalLicencas) {
-      return { valido: false, mensagem: "Este lote de licenças patrocinadas já esgotou suas cotas." };
-    }
-
-    if (loteData.dataExpiracao && new Date(loteData.dataExpiracao) < new Date()) {
-      return { valido: false, mensagem: "A validade desta campanha de patrocínio expirou." };
-    }
-
-    // Busca dados do patrocinador caso ainda não obtidos
-    if (!patrocinadorData && loteData.patrocinadorId) {
-      const patDoc = await getDoc(doc(db, "patrocinadores", loteData.patrocinadorId));
-      if (patDoc.exists()) {
-        patrocinadorData = { id: patDoc.id, ...(patDoc.data() as any) } as PatrocinadorB2B;
-      }
-    }
-
     return {
       valido: true,
-      lote: loteData,
-      patrocinador: patrocinadorData || undefined,
+      patrocinador: dados.voucher.patrocinador,
+      lote: dados.voucher.lote,
     };
-  } catch (err: any) {
-    console.error("Erro ao validar voucher:", err);
-    return { valido: false, mensagem: "Falha na validação do voucher." };
+  } catch (err: unknown) {
+    const mensagem = err instanceof Error ? err.message : "Falha na validação do voucher.";
+    return { valido: false, mensagem: mensagem.replace(/^functions\\/[a-z-]+:\\s*/i, "") };
   }
 }
 
@@ -449,234 +387,21 @@ export async function ativarPatrocinioNoRestaurante(params: {
   slugRestaurante: string;
   codigoVoucher: string;
 }): Promise<{ sucesso: boolean; mensagem?: string; novaDataExpiracao?: string; mesesAdicionados?: number }> {
-  const validacao = await validarVoucherPatrocinio(params.codigoVoucher);
-  if (!validacao.valido || !validacao.lote || !validacao.patrocinador) {
-    return { sucesso: false, mensagem: validacao.mensagem || "Voucher inválido." };
-  }
-
-  const { lote, patrocinador } = validacao;
-
   try {
-    const restRef = doc(db, "restaurantes", params.restauranteId);
-    const restSnap = await getDoc(restRef);
-    const restData = restSnap.exists() ? (restSnap.data() as any) : null;
-
-    // 1. Busca os itens do Catálogo Master do Patrocinador
-    const colMaster = collection(db, "patrocinadores", patrocinador.id, "catalogo_master");
-    const snapMaster = await getDocs(colMaster);
-    const itensInjetadosIds: string[] = [];
-
-    // Extrai as categorias representadas pelos itens desta marca
-    const categoriasNovas = new Set<string>();
-    snapMaster.forEach((docSnap) => {
-      const it = docSnap.data() as ItemCatalogoPatrocinador;
-      if (it.categoriaSugerida) {
-        categoriasNovas.add(it.categoriaSugerida.trim().toLowerCase());
-      }
-    });
-
-    // Se o catálogo estiver vazio no banco (ex: demo), usa as categorias do demo
-    if (categoriasNovas.size === 0 && patrocinador.id === "spn-bierhaus-demo") {
-      CATALOGO_MASTER_DEMO.forEach((it) => {
-        if (it.categoriaSugerida) categoriasNovas.add(it.categoriaSugerida.trim().toLowerCase());
-      });
-    }
-
-    // 2. Trava de Categoria (Category Lock) & Verificação de Marcas Concorrentes
-    const patrocinioExistente = restData?.patrocinio;
-    const slotsExistentes = Array.isArray(patrocinioExistente?.slots)
-      ? patrocinioExistente.slots
-      : patrocinioExistente?.ativo
-        ? [
-            {
-              patrocinadorId: patrocinioExistente.patrocinadorId,
-              patrocinadorNome: patrocinioExistente.patrocinadorNome,
-              categoriaSugerida: "Chopps & Cervejas",
-              loteId: patrocinioExistente.loteId || "",
-              codigoVoucher: "",
-              itensInjetados: patrocinioExistente.itensInjetados || [],
-              mesesAdicionados: 6,
-              vinculadoEm: new Date().toISOString(),
-            },
-          ]
-        : [];
-
-    // Verifica se a mesma marca já está vinculada
-    if (slotsExistentes.some((s: any) => s.patrocinadorId === patrocinador.id)) {
-      return {
-        sucesso: false,
-        mensagem: `O estabelecimento já possui o patrocínio oficial da marca ${patrocinador.nomeFantasia}.`,
-      };
-    }
-
-    // Trava de exclusividade: não permite outra marca na mesma categoria
-    for (const slot of slotsExistentes) {
-      const catExistente = (slot.categoriaSugerida || "").trim().toLowerCase();
-      if (catExistente && categoriasNovas.has(catExistente)) {
-        return {
-          sucesso: false,
-          mensagem: `Conflito de Categoria: Este estabelecimento já possui a marca oficial "${slot.patrocinadorNome}" na categoria "${slot.categoriaSugerida}". Patrocinadores adicionais devem ser de segmentos complementares (ex: Carnes, Cafés, Destilados).`,
-        };
-      }
-    }
-
-    // 3. Injeta os itens no cardápio do restaurante
-    const colCardapioRest = collection(db, "restaurantes", params.restauranteId, "cardapio");
-
-    const itensParaInjetar = snapMaster.empty && patrocinador.id === "spn-bierhaus-demo"
-      ? CATALOGO_MASTER_DEMO
-      : snapMaster.docs.map((d) => d.data() as ItemCatalogoPatrocinador);
-
-    for (const itemMaster of itensParaInjetar) {
-      const idNoRestaurante = `spn-${itemMaster.id}`;
-
-      const menuItem: Partial<MenuItem> & {
-        origemPatrocinadorId: string;
-        bloqueadoParaExclusao: boolean;
-        seloPatrocinador: string;
-        posicaoFixaTopo: boolean;
-      } = {
-        id: idNoRestaurante,
-        nome: itemMaster.nome,
-        categoria: itemMaster.categoriaSugerida || "Especiais da Casa",
-        descricao: itemMaster.descricaoOficial || "",
-        precoBase: itemMaster.precoSugerido || 0,
-        fotoUrl: itemMaster.fotoOficialUrl || "",
-        ativo: true,
-        ordem: -100, // Topo absoluto garantido
-        posicaoFixaTopo: true,
-        origemPatrocinadorId: patrocinador.id,
-        bloqueadoParaExclusao: itemMaster.obrigatorioNoCardapio ?? true,
-        seloPatrocinador: itemMaster.seloPatrocinador || "Parceiro Oficial",
-      };
-
-      await setDoc(doc(colCardapioRest, idNoRestaurante), menuItem, { merge: true });
-      itensInjetadosIds.push(idNoRestaurante);
-    }
-
-    // 4. Extensão Cumulativa de Tempo (+6 meses por padrão)
-    const mesesAdicionar = lote.validadeMeses || 6;
-    const agora = new Date();
-    let dataBase = agora;
-
-    if (patrocinioExistente?.dataExpiracao) {
-      const expExistente = new Date(patrocinioExistente.dataExpiracao);
-      if (!isNaN(expExistente.getTime()) && expExistente > agora) {
-        dataBase = expExistente;
-      }
-    }
-
-    const novaDataExpiracao = new Date(dataBase);
-    novaDataExpiracao.setMonth(novaDataExpiracao.getMonth() + mesesAdicionar);
-
-    const categoriaPrincipal =
-      Array.from(categoriasNovas)[0] || "Especiais da Marca";
-
-    const novoSlot = {
-      patrocinadorId: patrocinador.id,
-      patrocinadorNome: patrocinador.nomeFantasia,
-      categoriaSugerida: categoriaPrincipal,
-      loteId: lote.id,
-      codigoVoucher: params.codigoVoucher.toUpperCase(),
-      itensInjetados: itensInjetadosIds,
-      mesesAdicionados: mesesAdicionar,
-      vinculadoEm: new Date().toISOString(),
-    };
-
-    const slotsAtualizados = [...slotsExistentes, novoSlot];
-    const todosItensInjetados = Array.from(
-      new Set([...(patrocinioExistente?.itensInjetados || []), ...itensInjetadosIds])
-    );
-
-    // 5. Registra a ativação no Lote do Patrocinador (Garante presença na Rede de Restaurantes B2B)
-    const loteRef = doc(db, "patrocinadores", patrocinador.id, "lotes_licencas", lote.id);
-    const novoVinculo = {
+    const ativarFn = httpsCallable(functions, "ativarPatrocinioBackend");
+    const resposta = await ativarFn({
       restauranteId: params.restauranteId,
-      nomeRestaurante: params.nomeRestaurante,
-      slugRestaurante: params.slugRestaurante,
-      codigoVoucherUtilizado: params.codigoVoucher.toUpperCase(),
-      ativadoEm: new Date().toISOString(),
-      status: "ativo" as const,
-    };
-
-    const vinculadosExistentes = Array.isArray(lote.restaurantesVinculados) ? [...lote.restaurantesVinculados] : [];
-    const indexExistente = vinculadosExistentes.findIndex((r) => r.restauranteId === params.restauranteId);
-
-    if (indexExistente >= 0) {
-      vinculadosExistentes[indexExistente] = { ...vinculadosExistentes[indexExistente], ...novoVinculo };
-    } else {
-      vinculadosExistentes.push(novoVinculo);
-    }
-
-    const novasAtivadas = indexExistente >= 0 ? (lote.licencasAtivadas || 1) : (lote.licencasAtivadas || 0) + 1;
-
-    try {
-      await updateDoc(loteRef, {
-        licencasAtivadas: novasAtivadas,
-        restaurantesVinculados: vinculadosExistentes,
-      });
-    } catch (loteErr) {
-      console.warn("Aviso ao atualizar lote no Firestore (tentando setDoc merge):", loteErr);
-      await setDoc(loteRef, {
-        licencasAtivadas: novasAtivadas,
-        restaurantesVinculados: vinculadosExistentes,
-      }, { merge: true });
-    }
-
-    // 6. Atualiza o restaurante com Linha PRO e dados do patrocínio cumulativo
-    const payloadRestaurante: any = {
-      plano: "pro", // Concede os benefícios da linha PRO
-      maxMesas: 30,
-      maxPratos: 60,
-      maxItensMenu: 60,
-      assinatura: {
-        planoId: "plan_b2b_patrocinado_v1",
-        apelido: `Patrocinado por ${patrocinador.nomeFantasia}`,
-        versao: "1.0.0",
-        contratadoEm: new Date().toISOString(),
-        dataExpiracao: novaDataExpiracao.toISOString(),
-        valorContratado: 0,
-        periodicidade: "patrocinado",
-        limites: {
-          maxMesas: 30,
-          maxItensMenu: 60,
-          modulosPermitidos: ["cardapio", "mesas", "kds", "garcom", "analytics", "patrocinio_topo"],
-        },
-        garantiaAcordo: "inalteravel",
-        status: "ativa",
-      },
-      patrocinio: {
-        ativo: true,
-        patrocinadorId: patrocinador.id,
-        patrocinadorNome: patrocinador.nomeFantasia,
-        loteId: lote.id,
-        dataExpiracao: novaDataExpiracao.toISOString(),
-        itensInjetados: todosItensInjetados,
-        slots: slotsAtualizados,
-      },
-    };
-
-    try {
-      await updateDoc(restRef, payloadRestaurante);
-    } catch (restErr) {
-      console.warn("Update direto com plano pro sofreu restrição de regra, tentando merge de patrocinio:", restErr);
-      try {
-        await updateDoc(restRef, {
-          patrocinio: payloadRestaurante.patrocinio,
-        });
-      } catch (mergeErr) {
-        console.warn("Falha no merge de restaurante:", mergeErr);
-      }
-    }
-
+      codigoVoucher: params.codigoVoucher.trim().toUpperCase(),
+    });
+    const dados = resposta.data as { sucesso?: boolean; novaDataExpiracao?: string; mesesAdicionados?: number };
     return {
-      sucesso: true,
-      mesesAdicionados: mesesAdicionar,
-      novaDataExpiracao: novaDataExpiracao.toISOString(),
+      sucesso: dados.sucesso === true,
+      novaDataExpiracao: dados.novaDataExpiracao,
+      mesesAdicionados: dados.mesesAdicionados,
     };
-  } catch (err: any) {
-    console.error("Falha ao ativar patrocínio:", err);
-    return { sucesso: false, mensagem: err?.message || "Erro durante a ativação do patrocínio." };
+  } catch (err: unknown) {
+    const mensagem = err instanceof Error ? err.message : "Erro durante a ativação do patrocínio.";
+    return { sucesso: false, mensagem: mensagem.replace(/^functions\\/[a-z-]+:\\s*/i, "") };
   }
 }
 
