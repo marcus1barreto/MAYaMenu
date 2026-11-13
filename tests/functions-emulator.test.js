@@ -996,6 +996,23 @@ async function main() {
     );
   });
 
+  await runTest("Emulador: chamado do garçom rejeita mesa reservada", async () => {
+    const { rest } = await seed(db, 10, "cliente_mesa_reservada");
+    const qr = "qr-credencial-mesa-reservada-123456";
+    await rest.collection("mesas").doc("10").set({
+      ativa: true,
+      statusEstrutural: "reservada",
+      qrCredencialHash: crypto.createHash("sha256").update(qr).digest("hex"),
+      qrVersao: 1,
+    }, { merge: true });
+    await assert.rejects(
+      () => executarChamarGarcom(db, "cliente_mesa_reservada", {
+        ...base, mesa: 10, qrCredencial: qr,
+      }),
+      /mesa indisponível/i
+    );
+  });
+
   await runTest("Emulador: chamado de garçom exige QR válido e aplica cooldown no servidor", async () => {
     const { rest } = await seed(db, 8, "cliente_qr");
     const qr = "qr-credencial-fisica-de-teste-123456";
