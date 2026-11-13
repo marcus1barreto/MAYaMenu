@@ -2210,10 +2210,10 @@ export function AdminDashboard() {
               </div>
             </div>
 
-            {/* AVISO TRANSPARENTE SOBRE PAYPAL */}
+            {/* AVISO SOBRE CONDIÇÕES INSTITUCIONAIS */}
             <div className="mt-2 pt-2 border-t border-border flex items-start gap-2 text-[10px] text-muted-foreground">
-              <div className="w-4 h-4 rounded bg-[#003087] text-white flex items-center justify-center font-black text-[8px] shrink-0 mt-0.5">
-                P
+              <div className="w-4 h-4 rounded bg-muted text-muted-foreground flex items-center justify-center font-black text-[8px] shrink-0 mt-0.5">
+                i
               </div>
               <p className="leading-snug">
                 <strong className="text-foreground">Precisa de condições institucionais?</strong> Entre em contato com nossa equipe comercial para avaliar opções de contratação.
