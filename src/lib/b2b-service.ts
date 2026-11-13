@@ -204,6 +204,7 @@ export async function salvarPatrocinador(
     slug,
     chaveAcessoB2B: chaveAcesso,
     ativo: dados.ativo ?? true,
+    authVersion: increment(1),
     atualizadoEm: serverTimestamp(),
   };
 
