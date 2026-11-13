@@ -60,10 +60,10 @@ export async function buscarPatrocinadorPorChave(
 }
 
 export async function validarSessaoPatrocinador(): Promise<PatrocinadorB2B | null> {
-  await b2bAuth.authStateReady();
-  await setPersistence(b2bAuth, browserSessionPersistence);
-  if (!b2bAuth.currentUser) return null;
   try {
+    await b2bAuth.authStateReady();
+    await setPersistence(b2bAuth, browserSessionPersistence);
+    if (!b2bAuth.currentUser) return null;
     const validarFn = httpsCallable(b2bFunctions, "validarSessaoPatrocinadorBackend");
     const resposta = await validarFn({});
     const dados = resposta.data as { patrocinador?: PatrocinadorB2B };
