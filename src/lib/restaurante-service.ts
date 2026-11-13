@@ -584,6 +584,17 @@ export async function marcarComandaPagaFirestore(
 }
 
 /**
+ * Desativa permanentemente uma mesa pelo backend, revogando o QR e preservando auditoria.
+ */
+export async function desativarMesaFirestore(
+  restauranteId: string,
+  mesaNumero: number | string
+): Promise<void> {
+  const desativarFn = httpsCallable(functions, "desativarMesaBackend");
+  await desativarFn({ restauranteId, mesa: mesaNumero });
+}
+
+/**
  * Cliente solicita a presença do Garçom na mesa com anti-flooding integrado.
  */
 export async function chamarGarcomFirestore(params: {
