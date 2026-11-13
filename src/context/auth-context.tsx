@@ -308,15 +308,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const atualizarRestaurante = async (dados: Partial<Restaurante>) => {
-    if (!restaurante) return;
+    if (!restaurante) throw new Error("Restaurante não carregado; alteração não enviada.");
+    const restRef = doc(db, "restaurantes", restaurante.id);
+    const patch: Record<string, unknown> = { ...dados };
+    const configuracoes = dados.configuracoes;
+    delete patch.configuracoes;
+    if (configuracoes) {
+      // Atualiza somente as chaves informadas. Evita substituir todo o mapa e apagar
+      // configurações que não fazem parte do formulário atual.
+      for (const [chave, valor] of Object.entries(configuracoes)) {
+        patch[`configuracoes.${chave}`] = valor;
+      }
+    }
     try {
-      const restRef = doc(db, "restaurantes", restaurante.id);
-      await updateDoc(restRef, dados);
+      await updateDoc(restRef, patch);
     } catch (err) {
       console.error("Falha ao atualizar dados do restaurante no servidor:", err);
       throw err;
     }
-    setRestaurante((prev) => (prev ? { ...prev, ...dados } : null));
+    setRestaurante((prev) => (prev ? {
+      ...prev,
+      ...dados,
+      configuracoes: configuracoes
+        ? { ...(prev.configuracoes || {}), ...configuracoes }
+        : prev.configuracoes,
+    } : null));
   };
 
   return (
