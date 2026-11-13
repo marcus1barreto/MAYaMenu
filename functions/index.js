@@ -4113,6 +4113,111 @@ exports.desativarMesaBackend = functions.https.onCall(async (data, context) => {
   return executarDesativarMesa(getDb(), context.auth?.uid, context.auth?.token, data);
 });
 
+/**
+ * Reativa uma mesa desativada somente após nova validação operacional e rotação do QR.
+ * A credencial em texto claro é retornada uma única vez ao titular/admin que solicitou a reativação.
+ */
+async function executarReativarMesa(firestoreDb, authUid, authToken, payload) {
+  const { restauranteId, mesa } = payload || {};
+  if (!authUid) throw new functions.https.HttpsError('unauthenticated', 'Autenticação necessária.');
+  if (!restauranteId || mesa === undefined || mesa === null) {
+    throw new functions.https.HttpsError('invalid-argument', 'Restaurante e mesa são obrigatórios.');
+  }
+  const restDoc = await resolverRestDoc(firestoreDb, restauranteId);
+  await verificarPermissaoOperacionalRestaurante(
+    firestoreDb, restDoc, authUid, authToken, ['owner', 'admin']
+  );
+  const restData = restDoc.data() || {};
+  if (restData.suspenso === true || restData.configuracoes?.suspenso === true) {
+    throw new functions.https.HttpsError('failed-precondition', 'Restaurante suspenso não pode reativar mesas.');
+  }
+
+  const mesaNormalizada = normalizarMesaIdentificador(mesa);
+  const mesaStr = mesaNormalizada.mesaId;
+  const mesaRef = restDoc.ref.collection('mesas').doc(mesaStr);
+  const qrCredencial = crypto.randomBytes(24).toString('hex');
+  const qrCredencialHash = hashQrCredencial(qrCredencial);
+  const agoraServer = admin.firestore.FieldValue.serverTimestamp();
+  let resultado = null;
+
+  await firestoreDb.runTransaction(async (t) => {
+    const mesaSnap = await t.get(mesaRef);
+    if (!mesaSnap.exists) throw new functions.https.HttpsError('not-found', 'Mesa não encontrada.');
+    const mData = mesaSnap.data() || {};
+    if (mData.ativa === true && mData.statusEstrutural !== 'inativa' &&
+        typeof mData.qrCredencialHash === 'string' && mData.qrCredencialHash.length === 64) {
+      resultado = { sucesso: true, idempotente: true, restauranteId: restDoc.id, mesa: mesaNormalizada.numero };
+      return;
+    }
+    if (mData.statusEstrutural !== 'inativa' && mData.ativa !== false) {
+      throw new functions.https.HttpsError('failed-precondition', 'Somente mesas desativadas permanentemente podem usar este fluxo de reativação.');
+    }
+
+    const comandasSnap = await t.get(mesaRef.collection('comandas_abertas').limit(51));
+    if (comandasSnap.size > 50) {
+      throw new functions.https.HttpsError('failed-precondition', 'Mesa excede o limite seguro de 50 comandas para reativação.');
+    }
+    const temComandaAtiva = comandasSnap.docs.some((d) => {
+      const c = d.data() || {};
+      return c.status !== 'pago' || c.arquivada !== true || !c.pagoEm;
+    });
+    if (temComandaAtiva) {
+      throw new functions.https.HttpsError('failed-precondition', 'Não é possível reativar mesa com comanda pendente ou sem baixa financeira.');
+    }
+
+    const valoresMesa = Array.from(new Set([
+      mesaNormalizada.numero, mesaStr, String(mesa).trim(),
+    ]));
+    const consultasKds = [];
+    for (const campo of ['mesa', 'numeroMesa']) {
+      for (const valor of valoresMesa) {
+        consultasKds.push(t.get(
+          restDoc.ref.collection('kds_tickets').where(campo, '==', valor).limit(51)
+        ));
+      }
+    }
+    const resultadosKds = await Promise.all(consultasKds);
+    if (resultadosKds.some((snap) => snap.size > 50)) {
+      throw new functions.https.HttpsError('failed-precondition', 'Mesa excede o limite seguro de tickets KDS para reativação.');
+    }
+    const ticketsUnicos = new Map();
+    resultadosKds.forEach((snap) => snap.docs.forEach((d) => ticketsUnicos.set(d.id, d)));
+    const temTicketAtivo = Array.from(ticketsUnicos.values()).some((d) => {
+      const status = String((d.data() || {}).status || '').toLowerCase();
+      return !['entregue', 'cancelado', 'estornado'].includes(status);
+    });
+    if (temTicketAtivo) {
+      throw new functions.https.HttpsError('failed-precondition', 'Não é possível reativar mesa com tickets ativos no KDS.');
+    }
+
+    const versaoAtual = Number(mData.qrVersao) || 1;
+    t.update(mesaRef, {
+      ativa: true,
+      statusEstrutural: 'livre',
+      qrCredencialHash,
+      qrCredencial: admin.firestore.FieldValue.delete(),
+      qrVersao: versaoAtual + 1,
+      reativadaEm: agoraServer,
+      reativadaPorUid: authUid,
+      atualizadoEm: agoraServer,
+    });
+    resultado = {
+      sucesso: true,
+      idempotente: false,
+      restauranteId: restDoc.id,
+      slug: String(restData.slug || restDoc.id),
+      mesa: mesaNormalizada.numero,
+      qrVersao: versaoAtual + 1,
+      qrCredencial,
+    };
+  });
+  return resultado;
+}
+
+exports.reativarMesaBackend = functions.https.onCall(async (data, context) => {
+  return executarReativarMesa(getDb(), context.auth?.uid, context.auth?.token, data);
+});
+
 
 // Mantém um espelho público minimizado do restaurante. O documento raiz permanece privado.
 // Somente campos explicitamente permitidos são copiados; nunca replica ownerId, plano,
@@ -4202,6 +4307,7 @@ exports._internal = {
   executarFecharComanda,
   executarLiberarMesa,
   executarDesativarMesa,
+  executarReativarMesa,
   executarChamarGarcom,
   executarValidarCodigoAtivacao,
   executarValidarCodigoAtivacaoComRateLimit,
