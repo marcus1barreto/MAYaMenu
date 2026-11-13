@@ -358,6 +358,7 @@ exports.loginComCracha = functions.https.onCall(async (data, context) => {
   return {
     sucesso: true,
     token: customToken,
+    restauranteId: restDoc.id,
     membro: {
       uid: membroData.uid,
       nome: membroData.nome,
@@ -486,6 +487,7 @@ exports.loginComPin = functions.https.onCall(async (data, context) => {
   return {
     sucesso: true,
     token: customToken,
+    restauranteId: realRestauranteId,
     membro: {
       uid: targetUid,
       nome: targetNome,
