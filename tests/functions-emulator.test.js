@@ -12,7 +12,7 @@ const { getFirestore } = require("../functions/node_modules/firebase-admin/fires
 const { _internal } = require("../functions/index.js");
 const {
   executarFecharComanda, executarLiberarMesa, executarDefinirTaxaServicoMesa,
-  executarDesativarMesa, executarChamarGarcom, executarGarantirCredencialMesa,
+  executarDesativarMesa, executarReativarMesa, executarChamarGarcom, executarGarantirCredencialMesa,
   executarEmissaoSessaoMesa, executarValidarCodigoAtivacao,
   executarAtivarInstancia, executarAtivarPatrocinio, executarProcessarSelloutOutbox,
   executarSincronizarPerfilPublicoRestaurante, executarLancamentoPedidoGarcom,
@@ -1260,6 +1260,28 @@ async function main() {
     // Chamada repetida é idempotente
     const d2 = await executarDesativarMesa(db, "owner_e", {}, { ...base, mesa: 6 });
     assert.strictEqual(d2.idempotente, true);
+
+    await assert.rejects(
+      () => executarReativarMesa(db, "garcom_e", {}, { ...base, mesa: 6 }),
+      /permissão/i
+    );
+    const reativada = await executarReativarMesa(db, "owner_e", {}, { ...base, mesa: 6 });
+    assert.strictEqual(reativada.sucesso, true);
+    assert.strictEqual(reativada.idempotente, false);
+    assert.strictEqual(typeof reativada.qrCredencial, "string");
+    assert.strictEqual(reativada.qrCredencial.length, 48);
+    const mesaReativada = await rest.collection("mesas").doc("6").get();
+    assert.strictEqual(mesaReativada.data().ativa, true);
+    assert.strictEqual(mesaReativada.data().statusEstrutural, "livre");
+    assert.strictEqual(mesaReativada.data().qrVersao, 4);
+    assert.strictEqual(mesaReativada.data().qrCredencial, undefined);
+    assert.strictEqual(
+      mesaReativada.data().qrCredencialHash,
+      crypto.createHash("sha256").update(reativada.qrCredencial).digest("hex")
+    );
+    const retryReativacao = await executarReativarMesa(db, "owner_e", {}, { ...base, mesa: 6 });
+    assert.strictEqual(retryReativacao.idempotente, true);
+    assert.strictEqual(retryReativacao.qrCredencial, undefined);
   });
 
   console.log("\n=================================================");
