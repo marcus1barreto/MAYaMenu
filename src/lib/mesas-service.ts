@@ -1,5 +1,6 @@
-import { db } from "@/lib/firebase";
-import { doc, setDoc, updateDoc, onSnapshot, collection, getDocs, getDoc } from "firebase/firestore";
+import { db, functions } from "@/lib/firebase";
+import { doc, setDoc, updateDoc, onSnapshot, collection, getDoc } from "firebase/firestore";
+import { httpsCallable } from "firebase/functions";
 
 export interface ConfigMesa {
   numero: number;
@@ -35,6 +36,33 @@ export async function salvarConfigMesa(
     },
     { merge: true }
   );
+}
+
+/**
+ * Reativa uma mesa permanentemente desativada por callable privilegiada e rotaciona o QR.
+ * A credencial em texto claro é retornada uma única vez e nunca persiste no Firestore.
+ */
+export async function reativarMesaFirestore(
+  restauranteId: string,
+  numeroMesa: number
+): Promise<{
+  sucesso: boolean;
+  idempotente?: boolean;
+  slug?: string;
+  mesa: number;
+  qrVersao?: number;
+  qrCredencial?: string;
+}> {
+  const reativarFn = httpsCallable(functions, "reativarMesaBackend");
+  const resultado = await reativarFn({ restauranteId, mesa: numeroMesa });
+  return resultado.data as {
+    sucesso: boolean;
+    idempotente?: boolean;
+    slug?: string;
+    mesa: number;
+    qrVersao?: number;
+    qrCredencial?: string;
+  };
 }
 
 /**
