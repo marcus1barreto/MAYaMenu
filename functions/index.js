@@ -3130,7 +3130,8 @@ async function executarDesativarMesa(firestoreDb, authUid, authToken, payload) {
     }
     const temComandaAtiva = comandasSnap.docs.some((d) => {
       const c = d.data() || {};
-      return c.status !== 'pago' && c.arquivada !== true;
+      // Só é considerada encerrada quando os três marcadores financeiros coexistem.
+      return c.status !== 'pago' || c.arquivada !== true || !c.pagoEm;
     });
     if (temComandaAtiva) {
       throw new functions.https.HttpsError(
