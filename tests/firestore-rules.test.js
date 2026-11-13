@@ -19,7 +19,7 @@ const {
 const fs = require("fs");
 const path = require("path");
 const {
-  getFirestore,
+  initializeFirestore,
   connectFirestoreEmulator,
 } = require("firebase/firestore");
 
