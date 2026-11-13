@@ -316,7 +316,7 @@ export default function PrecosPage() {
                 <div className="flex items-center justify-between mb-4">
                   <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full bg-gradient-to-r from-rose-500 to-amber-500 text-white shadow-md shadow-rose-500/30">
                     <Sparkles className="w-3 h-3" />
-                    Oferta especial · 17% OFF
+                    R$ 100 abaixo do preço de tabela
                   </span>
                   <span className="text-[10px] font-bold text-amber-300">
                     MAIS VENDIDO
@@ -535,7 +535,7 @@ export default function PrecosPage() {
                 </div>
 
                 <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-neutral-100 border border-neutral-200 text-neutral-700 font-semibold">
-                  <span>Opção PayPal</span>
+                  <span>Condições institucionais sob consulta</span>
                 </div>
               </div>
             </div>
@@ -788,7 +788,7 @@ export default function PrecosPage() {
               {
                 pergunta: "Quais são as formas de pagamento disponíveis no PRO?",
                 resposta:
-                  "Processamos todos os pagamentos com a segurança do Mercado Pago. Você pode pagar via PIX com aprovação e liberação imediata da licença em segundos, ou no cartão de crédito com parcelamento em até 12 vezes. Para casos institucionais especiais, também temos suporte a PayPal.",
+                  "Processamos os pagamentos online pelo Mercado Pago. Você pode pagar via Pix ou cartão de crédito com parcelamento em até 12 vezes. Para condições institucionais especiais, entre em contato com nossa equipe comercial.",
               },
               {
                 pergunta: "Existe fidelidade ou multa por cancelamento?",
