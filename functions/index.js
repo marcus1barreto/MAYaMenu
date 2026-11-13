@@ -308,8 +308,9 @@ exports.removeStaffMember = functions.https.onCall(async (data, context) => {
  */
 exports.loginComCracha = functions.https.onCall(async (data, context) => {
   const { restauranteId, crachaToken } = data || {};
-  if (!restauranteId || !crachaToken) {
-    throw new functions.https.HttpsError('invalid-argument', 'Campos restauranteId e crachaToken são obrigatórios.');
+  if (typeof restauranteId !== 'string' || !restauranteId.trim() || restauranteId.length > 128 ||
+      typeof crachaToken !== 'string' || !/^[a-f0-9]{32}$/i.test(crachaToken)) {
+    throw new functions.https.HttpsError('invalid-argument', 'Restaurante ou credencial de crachá inválidos.');
   }
 
   const firestoreDb = getDb();
@@ -361,10 +362,12 @@ exports.loginComCracha = functions.https.onCall(async (data, context) => {
  */
 exports.loginComPin = functions.https.onCall(async (data, context) => {
   const { restauranteId, pin, colaboradorId } = data || {};
-  if (!restauranteId || !pin || !colaboradorId) {
+  if (typeof restauranteId !== 'string' || !restauranteId.trim() || restauranteId.length > 128 ||
+      typeof colaboradorId !== 'string' || !colaboradorId.trim() || colaboradorId.length > 128 ||
+      colaboradorId.includes('/') || typeof pin !== 'string' || !/^\d{4,6}$/.test(pin.trim())) {
     throw new functions.https.HttpsError(
       'invalid-argument',
-      'Campos restauranteId, colaboradorId e pin são obrigatórios para autenticação individual.'
+      'Restaurante, colaborador ou PIN inválido para autenticação individual.'
     );
   }
 
