@@ -150,6 +150,7 @@ exports.setStaffRole = functions.https.onCall(async (data, context) => {
   // 3. Busca o usuário. Só cria uma conta quando o erro é realmente user-not-found;
   // falhas transitórias de Auth nunca devem disparar uma tentativa de criação alternativa.
   let targetUser;
+  let usuarioCriado = false;
   try {
     targetUser = await admin.auth().getUserByEmail(email.trim().toLowerCase());
   } catch (err) {
@@ -163,6 +164,7 @@ exports.setStaffRole = functions.https.onCall(async (data, context) => {
         displayName: nomeFormatado,
         ...(fotoUrl ? { photoURL: fotoUrl } : {}),
       });
+      usuarioCriado = true;
       console.info(`Novo colaborador criado automaticamente: ${email} (UID: ${targetUser.uid})`);
     } catch (createErr) {
       console.error('Falha ao criar colaborador no Firebase Auth:', createErr);
@@ -190,14 +192,12 @@ exports.setStaffRole = functions.https.onCall(async (data, context) => {
       restauranteAtual && restauranteAtual !== realRestauranteId) {
     throw new functions.https.HttpsError('failed-precondition', 'Este usuário já está vinculado a outro restaurante. Remova o vínculo anterior antes de transferi-lo.');
   }
-  // Só depois da autorização atualiza o perfil e a senha. Contas de equipe legadas
-  // podem ter sido criadas com o PIN como senha; ao atualizar o vínculo, rotaciona a senha.
+  // Só depois da autorização atualiza o perfil e a senha. Toda conta vinculada à equipe
+  // recebe senha Firebase aleatória; a autenticação operacional é exclusivamente PIN/crachá.
   const updates = {};
   if (nomeFormatado && targetUser.displayName !== nomeFormatado) updates.displayName = nomeFormatado;
   if (fotoUrl) updates.photoURL = fotoUrl;
-  if (['garcom', 'cozinha'].includes(roleAtual) && restauranteAtual === realRestauranteId) {
-    updates.password = senhaInicialAleatoria;
-  }
+  if (!usuarioCriado) updates.password = senhaInicialAleatoria;
   if (Object.keys(updates).length > 0) {
     targetUser = await admin.auth().updateUser(targetUser.uid, updates);
   }
