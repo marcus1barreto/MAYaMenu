@@ -44,7 +44,7 @@ export async function verificarSlugDisponivel(slug: string): Promise<boolean> {
 
     // 2. Consulta em restaurantes
     const q = query(
-      collection(db, "restaurantes"),
+      collection(db, "restaurantes_publicos"),
       where("slug", "==", slugLimpo),
       limit(1)
     );
@@ -67,7 +67,7 @@ export async function obterRestaurantePorSlugValido(slug: string): Promise<Resta
   try {
     // 1. Consulta por campo 'slug'
     const q = query(
-      collection(db, "restaurantes"),
+      collection(db, "restaurantes_publicos"),
       where("slug", "==", slugLimpo),
       limit(1)
     );
@@ -101,7 +101,7 @@ export async function obterRestaurantePorSlugValido(slug: string): Promise<Resta
     }
 
     // 2. Consulta pelo UID direto do documento
-    const directDoc = await getDoc(doc(db, "restaurantes", slugLimpo));
+    const directDoc = await getDoc(doc(db, "restaurantes_publicos", slugLimpo));
     if (directDoc.exists()) {
       const data = directDoc.data();
       return {
@@ -151,7 +151,7 @@ export function escutarRestaurante(
   onAtualizacao: (restaurante: Restaurante) => void
 ): Unsubscribe {
   const isDemo = restauranteId === "rest-demo-alpha" || restauranteId === "demo";
-  const restRef = doc(db, "restaurantes", restauranteId);
+  const restRef = doc(db, "restaurantes_publicos", restauranteId);
 
   return onSnapshot(
     restRef,
@@ -626,53 +626,16 @@ export async function chamarGarcomFirestore(params: {
   nomeCliente?: string;
   motivo?: string;
   slug?: string;
+  qrCredencial: string;
 }): Promise<void> {
-  const idFinal = (params.restauranteId || params.slug || "demo").trim();
-
-  const comandaRef = doc(
-    db,
-    "restaurantes",
-    idFinal,
-    "mesas",
-    String(params.mesaNumero),
-    "comandas_abertas",
-    params.clienteId
-  );
-
-  const comandaSnap = await getDoc(comandaRef);
-
-  if (!comandaSnap.exists()) {
-    // 1ª vez: cria a comanda com status inicial 'pedindo' e restauranteId garantido
-    await setDoc(comandaRef, {
-      id: params.clienteId,
-      restauranteId: idFinal,
-      slug: params.slug || idFinal,
-      nomeCliente: params.nomeCliente || "Cliente",
-      mesa: params.mesaNumero,
-      numeroMesa: Number(params.mesaNumero) || params.mesaNumero,
-      subtotal: 0,
-      status: "pedindo",
-      criadoEm: serverTimestamp(),
-      atualizadoEm: serverTimestamp(),
-      chamadoGarcom: {
-        ativo: true,
-        solicitadoEm: serverTimestamp(),
-        motivo: params.motivo || "Atendimento",
-      },
-    });
-  } else {
-    // Comanda já existe: ativa o chamado preservando status e subtotal
-    await updateDoc(comandaRef, {
-      restauranteId: idFinal,
-      slug: params.slug || idFinal,
-      atualizadoEm: serverTimestamp(),
-      chamadoGarcom: {
-        ativo: true,
-        solicitadoEm: serverTimestamp(),
-        motivo: params.motivo || "Atendimento",
-      },
-    });
-  }
+  const chamarFn = httpsCallable(functions, "chamarGarcomBackend");
+  await chamarFn({
+    restauranteId: params.restauranteId || params.slug,
+    mesa: params.mesaNumero,
+    nomeCliente: params.nomeCliente || "Cliente",
+    motivo: params.motivo || "Atendimento",
+    qrCredencial: params.qrCredencial,
+  });
 }
 
 /**
