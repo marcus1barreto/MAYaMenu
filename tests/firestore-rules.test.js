@@ -799,55 +799,25 @@ async function runTests() {
     await assertSucceeds(adminDb.doc("concessoes/lic_1").update({ observacao: "ok" }));
   });
 
-  await test("Concessão: exclusão isolada é negada; queima atômica (delete + arquivo morto próprio) é permitida", async () => {
+  await test("Concessão: consumo e arquivamento pelo lojista são negados; somente SuperAdmin/backend", async () => {
     const authCtx = { firebase: { sign_in_provider: "password" } };
     const ownerDb = testEnv.authenticatedContext("owner_queima", authCtx).firestore();
+    const adminDb = testEnv.authenticatedContext("admin_uid", { superadmin: true }).firestore();
+    const arq = { id: "lic_2", codigo: "lic_2", ownerId: "owner_queima", dadosLicenca: { plano: "free" } };
 
-    const arq = (id, ownerId, plano = "free") => ({ id, codigo: id, ownerId, dadosLicenca: { plano } });
-
-    // Exclusão sem arquivamento
     await assertFails(ownerDb.doc("concessoes/lic_2").delete());
+    const batchLojista = ownerDb.batch();
+    batchLojista.set(ownerDb.doc("arquivo_morto_licencas/lic_2"), arq);
+    batchLojista.delete(ownerDb.doc("concessoes/lic_2"));
+    await assertFails(batchLojista.commit());
+    await assertFails(ownerDb.doc("arquivo_morto_licencas/lic_2").set(arq));
 
-    // Arquivo morto em nome de outro usuário não autoriza a exclusão
-    const batchOutro = ownerDb.batch();
-    batchOutro.set(ownerDb.doc("arquivo_morto_licencas/lic_2"), arq("lic_2", "outro_uid"));
-    batchOutro.delete(ownerDb.doc("concessoes/lic_2"));
-    await assertFails(batchOutro.commit());
-
-    // Arquivo morto criado sem excluir a concessão existente é negado (arquivo arbitrário/avulso)
-    await assertFails(ownerDb.doc("arquivo_morto_licencas/lic_2").set(arq("lic_2", "owner_queima")));
-
-    // Arquivo com plano divergente da concessão (ex.: promover free -> pro) é negado
-    const batchPlano = ownerDb.batch();
-    batchPlano.set(ownerDb.doc("arquivo_morto_licencas/lic_2"), arq("lic_2", "owner_queima", "pro"));
-    batchPlano.delete(ownerDb.doc("concessoes/lic_2"));
-    await assertFails(batchPlano.commit());
-
-    // Arquivo com id/codigo diferentes do documento é negado
-    await assertFails(
-      ownerDb.doc("arquivo_morto_licencas/lic_9").set({ id: "outro", codigo: "lic_9", ownerId: "owner_queima", dadosLicenca: { plano: "free" } })
-    );
-
-    // Arquivo morto para código INEXISTENTE é negado (fecha brecha para códigos inventados)
-    await assertFails(ownerDb.doc("arquivo_morto_licencas/cod_inventado").set(arq("cod_inventado", "owner_queima")));
-
-    // Arquivo de uma concessão que exclui OUTRA concessão não satisfaz a condição de exclusão
-    const batchCruzado = ownerDb.batch();
-    batchCruzado.set(ownerDb.doc("arquivo_morto_licencas/lic_9"), arq("lic_9", "owner_queima"));
-    batchCruzado.delete(ownerDb.doc("concessoes/lic_2"));
-    await assertFails(batchCruzado.commit());
-
-    // Licença suspensa não pode ser queimada
-    const batchSusp = ownerDb.batch();
-    batchSusp.set(ownerDb.doc("arquivo_morto_licencas/lic_4"), arq("lic_4", "owner_queima"));
-    batchSusp.delete(ownerDb.doc("concessoes/lic_4"));
-    await assertFails(batchSusp.commit());
-
-    // Fluxo legítimo
-    const batchOk = ownerDb.batch();
-    batchOk.set(ownerDb.doc("arquivo_morto_licencas/lic_2"), arq("lic_2", "owner_queima"));
-    batchOk.delete(ownerDb.doc("concessoes/lic_2"));
-    await assertSucceeds(batchOk.commit());
+    const batchAdmin = adminDb.batch();
+    batchAdmin.set(adminDb.doc("arquivo_morto_licencas/lic_2"), arq);
+    batchAdmin.delete(adminDb.doc("concessoes/lic_2"));
+    await assertSucceeds(batchAdmin.commit());
+    await assertFails(adminDb.doc("arquivo_morto_licencas/lic_2").update({ ownerId: "intruso" }));
+    await assertFails(adminDb.doc("arquivo_morto_licencas/lic_2").delete());
   });
 
   await test("Mesa: exclusão física direta negada para dono, garçom e SuperAdmin (usar desativarMesaBackend)", async () => {
