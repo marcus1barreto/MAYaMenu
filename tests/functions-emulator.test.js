@@ -1248,6 +1248,7 @@ async function main() {
     });
     assert.strictEqual(primeiro.sucesso, true);
     const restauranteAposB2B = (await restRef.get()).data();
+    assert.strictEqual(restauranteAposB2B.assinatura.ativa, true);
     assert.ok(
       Date.parse(restauranteAposB2B.assinatura.dataExpiracao) > Date.parse(validadePagaAnterior),
       "Ativação B2B deve estender a partir da maior validade PRO paga ainda vigente"
