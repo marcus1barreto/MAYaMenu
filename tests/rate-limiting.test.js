@@ -104,6 +104,7 @@ async function runUnitTests() {
   // Cabeçalhos com valores que parecem hexadecimais, mas não são IPs válidos, não podem alterar a seleção.
   const mockReqIpMalformado = {
     headers: { 'x-forwarded-for': '999.999.999.999, deadbeef' },
+    ip: '1.2.3.4', // valor que pode refletir trust-proxy e não deve prevalecer
     socket: { remoteAddress: '35.191.0.20' },
   };
   assert.strictEqual(
