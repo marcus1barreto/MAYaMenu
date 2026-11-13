@@ -185,8 +185,7 @@ export function GestaoEquipe({ restauranteId, nomeRestaurante = "MAYaMenu" }: Ge
         restauranteId,
         nome: nomeLimpo,
         email: emailLimpo,
-        senha: pinLimpo, // usa o próprio PIN como credencial segura
-        pin: pinLimpo,   // PIN numérico para login rápido
+        pin: pinLimpo, // PIN operacional; nunca é reutilizado como senha Firebase
         role: roleNovo,
         fotoUrl: fotoUrlUpload,
       });
