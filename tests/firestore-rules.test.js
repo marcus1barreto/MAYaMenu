@@ -294,6 +294,9 @@ async function runTests() {
     await assertFails(ownerDb.doc("restaurantes/rest_a/mesas/23").set({
       ativa: true, statusEstrutural: "livre",
     }));
+    await assertFails(ownerDb.doc("restaurantes/rest_a/mesas/24").set({
+      numero: 24, ativa: false, statusEstrutural: "bloqueada",
+    }));
   });
 
   await test("Cardápio: lojista não pode forjar, editar ou excluir itens patrocinados", async () => {
