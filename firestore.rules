@@ -122,9 +122,9 @@ service cloud.firestore {
     // Slugs (Trava de Unicidade)
     match /slugs/{slug} {
       allow read: if true; // Validação prévia
-      allow create: if isNonAnonymous() && request.resource.data.ownerId == request.auth.uid;
-      // Trava de slug é imutável pelo cliente após a criação.
-      allow update, delete: if isSuperAdmin();
+      // Slugs são reservados atomicamente pelo backend durante a ativação da licença.
+      // Escrita cliente permitiria squatting de qualquer endereço público.
+      allow create, update, delete: if isSuperAdmin();
     }
 
     // ─────────────────────────── Módulo B2B & Patrocinadores ───────────────────────────
