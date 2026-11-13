@@ -152,15 +152,18 @@ export async function criarLoteLicencas(params: {
     });
   }
 
-  // Cada código é criado com precondição de inexistência. Falhas são propagadas.
-  for (const lic of loteCriado) {
-    const licRef = doc(db, "concessoes", lic.id);
-    await runTransaction(db, async (tx) => {
-      const atual = await tx.get(licRef);
-      if (atual.exists()) throw new Error(`Colisão no código ${lic.id}; lote não concluído.`);
-      tx.set(licRef, { ...lic, criadaEm: serverTimestamp() });
+  // Todo o lote é criado numa única transação: sem sobrescrita e sem lote parcial.
+  await runTransaction(db, async (tx) => {
+    const refs = loteCriado.map((lic) => doc(db, "concessoes", lic.id));
+    const snapshots = await Promise.all(refs.map((ref) => tx.get(ref)));
+    const colisao = snapshots.findIndex((snap) => snap.exists());
+    if (colisao >= 0) {
+      throw new Error(`Colisão no código ${loteCriado[colisao].id}; nenhum item do lote foi criado.`);
+    }
+    refs.forEach((ref, index) => {
+      tx.set(ref, { ...loteCriado[index], criadaEm: serverTimestamp() });
     });
-  }
+  });
   salvarLoteLicencasLocal(loteCriado);
   return loteCriado;
 }
