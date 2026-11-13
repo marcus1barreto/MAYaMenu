@@ -51,6 +51,16 @@ async function main() {
   const db = admin.firestore();
   const base = { restauranteId: "rest_e" };
 
+  await runTest("Emulador: autenticação de equipe nunca aceita papel enviado pelo cliente", async () => {
+    const validar = _internal.validarMembroEquipeParaLogin;
+    assert.strictEqual(validar({ uid: "garcom_1", role: "garcom", ativo: true }, "garcom_1"), true);
+    assert.strictEqual(validar({ uid: "cozinha_1", role: "cozinha" }, "cozinha_1"), true);
+    assert.strictEqual(validar({ uid: "intruso", role: "owner" }, "intruso"), false);
+    assert.strictEqual(validar({ uid: "garcom_1", role: "garcom", ativo: false }, "garcom_1"), false);
+    assert.strictEqual(validar({ uid: "uid_diferente", role: "garcom" }, "doc_membro"), false);
+    assert.strictEqual(validar({ uid: "garcom_1", role: "admin" }, "garcom_1"), false);
+  });
+
   await runTest("Emulador: pedido de garçom preserva origem patrocinada e rejeita produto inativo", async () => {
     const rest = db.doc("restaurantes/rest_e");
     await rest.set({ nome: "Rest Emulador", slug: "rest-e", ownerId: "owner_e" }, { merge: true });
