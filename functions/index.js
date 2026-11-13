@@ -2086,7 +2086,7 @@ async function executarChamarGarcom(firestoreDb, authUid, payload) {
     throw new functions.https.HttpsError('failed-precondition', 'Estabelecimento suspenso.');
   }
   const mesaStr = String(mesa).trim();
-  if (!/^\\d+$/.test(mesaStr) || Number(mesaStr) < 1) {
+  if (!/^\d+$/.test(mesaStr) || Number(mesaStr) < 1) {
     throw new functions.https.HttpsError('invalid-argument', 'Número de mesa inválido.');
   }
   const mesaRef = restDoc.ref.collection('mesas').doc(mesaStr);
