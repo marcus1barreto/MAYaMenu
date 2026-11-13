@@ -3208,7 +3208,8 @@ async function executarMercadoPagoWebhook(firestoreDb, req, res) {
   try {
     const payment = await consultarPagamentoMercadoPagoServidor(dataId, token);
     if (!payment) {
-      res.status(200).json({ status: 'payment_not_found' });
+      // Um 404 transitório no recurso do PSP não deve descartar a notificação.
+      res.status(502).json({ status: 'payment_not_yet_available' });
       return;
     }
       const attemptId = String(payment.external_reference || '');
