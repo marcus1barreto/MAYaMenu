@@ -38,6 +38,9 @@ import { doc, updateDoc, serverTimestamp, onSnapshot } from "firebase/firestore"
 import { escutarCardapio, escutarRestaurante, chamarGarcomFirestore, escutarPedidosCliente } from "@/lib/restaurante-service";
 import { marcarVisitaAtualComoPaga, limparSessaoClienteLocal } from "@/lib/historico-cliente";
 import { MesaScannerModal } from "./mesa-scanner-modal";
+import cartStorage from "@/lib/cart-storage.cjs";
+
+const { obterQrCredencialInicial } = cartStorage;
 
 interface MenuViewProps {
   restaurante: Restaurante;
@@ -59,23 +62,14 @@ export function MenuView({
   useEffect(() => {
     if (typeof window === "undefined") return;
     const storageKey = `mayamenu_qr_${restauranteInicial.id}_mesa_${String(numeroMesa)}`;
-    // A credencial recebida na URL pertence exclusivamente à mesa inicial.
-    // Em trocas internas, a credencial recém-lida deve vir do storage da nova mesa;
-    // nunca reaplicar o QR inicial sobre a mesa selecionada pelo scanner.
-    const ehMesaInicial = String(numeroMesa) === String(numeroMesaProp);
-    let qrDetectada = ehMesaInicial ? qrCredencialInicial : undefined;
-    if (ehMesaInicial) {
-      try {
-        const hashStr = window.location.hash || "";
-        if (hashStr.includes("qr=")) {
-          const hashParams = new URLSearchParams(hashStr.replace(/^#/, ""));
-          const qrDoHash = hashParams.get("qr");
-          if (qrDoHash) qrDetectada = qrDoHash;
-        }
-      } catch {
-        // Ignora
-      }
-    }
+    // A credencial inicial da URL só pode ser aplicada à mesa inicial.
+    // Trocas internas usam a credencial persistida para a mesa recém-escaneada.
+    const qrDetectada = obterQrCredencialInicial(
+      numeroMesa,
+      numeroMesaProp,
+      qrCredencialInicial,
+      window.location.hash || ""
+    );
 
     if (qrDetectada) {
       setQrCredencialAtiva(qrDetectada);
