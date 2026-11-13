@@ -2347,6 +2347,19 @@ async function localizarLoteVoucher(firestoreDb, codigo, transaction) {
   return { loteDoc, lote, patrocinadorId };
 }
 
+function validarCnpjBasico(valor) {
+  const cnpj = String(valor || '').replace(/\\D/g, '');
+  if (!/^\\d{14}$/.test(cnpj) || /^([0-9])\\1{13}$/.test(cnpj)) return false;
+  const calcular = (base, pesos) => {
+    const soma = base.split('').reduce((total, digito, index) => total + Number(digito) * pesos[index], 0);
+    const resto = soma % 11;
+    return resto < 2 ? 0 : 11 - resto;
+  };
+  const primeiro = calcular(cnpj.slice(0, 12), [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]);
+  const segundo = calcular(cnpj.slice(0, 12) + primeiro, [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]);
+  return cnpj === cnpj.slice(0, 12) + String(primeiro) + String(segundo);
+}
+
 async function executarCadastrarPatrocinadorSuperadmin(firestoreDb, authUid, authToken, payload) {
   if (!authUid || authToken?.superadmin !== true) {
     throw new functions.https.HttpsError('permission-denied', 'Somente SuperAdmin pode cadastrar patrocinadores.');
@@ -2381,11 +2394,16 @@ async function executarCadastrarPatrocinadorSuperadmin(firestoreDb, authUid, aut
   const chaveAcessoB2B = `SPN-${gerarToken(26)}`;
   const codigoVoucherInicial = `MAYA-B2B-${crypto.randomBytes(12).toString('hex').toUpperCase()}`;
   const patrocinadorRef = firestoreDb.collection('patrocinadores').doc(id);
+  const cnpjQuery = firestoreDb.collection('patrocinadores').where('cnpj', '==', cnpj).limit(1);
   const loteId = `lote-${codigoVoucherInicial.toLowerCase()}`;
   const loteRef = patrocinadorRef.collection('lotes_licencas').doc(loteId);
   const expiracao = adicionarMesesSemOverflow(new Date(), validadeMeses).toISOString();
 
   await firestoreDb.runTransaction(async (tx) => {
+    const cnpjExistente = await tx.get(cnpjQuery);
+    if (!cnpjExistente.empty) {
+      throw new functions.https.HttpsError('already-exists', 'Já existe um patrocinador cadastrado com este CNPJ.');
+    }
     tx.create(patrocinadorRef, {
       id, cnpj, razaoSocial, nomeFantasia, slug, chaveAcessoB2B,
       logoUrl: '/images/demo/coquetel.webp',
@@ -4441,6 +4459,7 @@ exports._internal = {
   executarValidarCodigoAtivacaoComRateLimit,
   executarAutenticarPatrocinador,
   executarCadastrarPatrocinadorSuperadmin,
+  validarCnpjBasico,
   executarCriarLoteLicencasB2BSuperadmin,
   criarClaimsSessaoPatrocinador,
   executarAtivarInstancia,
