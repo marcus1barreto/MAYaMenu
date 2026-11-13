@@ -250,6 +250,10 @@ async function runTests() {
     }));
     await assertFails(ownerDb.doc("restaurantes/rest_a").update({ plano: "pro", patrocinio: { ativo: true } }));
     await assertFails(ownerDb.doc("restaurantes_publicos/rest_a").update({ nome: "perfil adulterado" }));
+    await assertFails(ownerDb.doc("pagamentos_pro/tentativa_privada").get());
+    await assertFails(ownerDb.doc("pagamentos_pro/tentativa_privada").set({ status: "approved" }));
+    await assertFails(ownerDb.doc("pagamentos_pro_processados/123456789").get());
+    await assertFails(ownerDb.doc("pagamentos_pro_rate_limits/owner_a").set({ tentativas: 0 }));
   });
 
   await test("Cardápio: lojista não pode forjar, editar ou excluir itens patrocinados", async () => {
