@@ -398,6 +398,61 @@ async function main() {
     assert.strictEqual(ledger.data().status, "refunded");
   });
 
+  await runTest("Emulador: estorno fora de ordem não remove assinatura PRO mais recente", async () => {
+    const restRef = db.doc("restaurantes/rest_mp_estorno_fora_ordem");
+    await restRef.set({
+      ownerId: "owner_mp_estorno_fora_ordem", plano: "free",
+      maxMesas: 10, maxPratos: 20, maxItensMenu: 20,
+    });
+    const attemptA = "123e4567-e89b-12d3-a456-426614174400";
+    const paymentAId = "987654400";
+    await db.doc(`pagamentos_pro/${attemptA}`).set({
+      attemptId: attemptA, ownerUid: "owner_mp_estorno_fora_ordem",
+      restauranteId: restRef.id, planoId: "pro_mensal", valorCentavos: 4990,
+      currency: "BRL", liveMode: false, collectorId: "12345", status: "pending",
+      expiraEm: new Date(Date.now() + 60 * 60 * 1000),
+    });
+    const paymentA = {
+      id: paymentAId, status: "approved", external_reference: attemptA,
+      currency_id: "BRL", transaction_amount: 49.90, live_mode: false,
+      collector_id: "12345", date_approved: new Date().toISOString(),
+    };
+    await executarProcessarPagamentoProAprovado(db, attemptA, paymentA);
+
+    const attemptB = "123e4567-e89b-12d3-a456-426614174401";
+    const paymentBId = "987654401";
+    await db.doc(`pagamentos_pro/${attemptB}`).set({
+      attemptId: attemptB, ownerUid: "owner_mp_estorno_fora_ordem",
+      restauranteId: restRef.id, planoId: "pro_semestral", valorCentavos: 24900,
+      currency: "BRL", liveMode: false, collectorId: "12345", status: "pending",
+      expiraEm: new Date(Date.now() + 60 * 60 * 1000),
+    });
+    const paymentB = {
+      id: paymentBId, status: "approved", external_reference: attemptB,
+      currency_id: "BRL", transaction_amount: 249.00, live_mode: false,
+      collector_id: "12345", date_approved: new Date().toISOString(),
+    };
+    await executarProcessarPagamentoProAprovado(db, attemptB, paymentB);
+    assert.strictEqual((await restRef.get()).data().assinatura.paymentId, paymentBId);
+
+    const estornoAntigo = await executarProcessarEstornoPagamentoPro(db, attemptA, {
+      ...paymentA, status: "refunded", transaction_amount_refunded: 49.90,
+    });
+    assert.strictEqual(estornoAntigo.status, "refunded");
+    const aposEstornoAntigo = (await restRef.get()).data();
+    assert.strictEqual(aposEstornoAntigo.plano, "pro");
+    assert.strictEqual(aposEstornoAntigo.assinatura.paymentId, paymentBId);
+    assert.strictEqual(aposEstornoAntigo.revisaoFinanceira.status, "revisao_financeira");
+
+    const estornoAtual = await executarProcessarEstornoPagamentoPro(db, attemptB, {
+      ...paymentB, status: "refunded", transaction_amount_refunded: 249.00,
+    });
+    assert.strictEqual(estornoAtual.status, "refunded");
+    const final = (await restRef.get()).data();
+    assert.strictEqual(final.plano, "free");
+    assert.strictEqual(final.assinatura, undefined);
+  });
+
   await runTest("Emulador: estorno parcial exige revisão e preserva assinatura até estorno integral", async () => {
     const attemptId = "123e4567-e89b-12d3-a456-426614174004";
     const paymentId = "987654325";
