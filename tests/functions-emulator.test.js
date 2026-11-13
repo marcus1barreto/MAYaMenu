@@ -286,6 +286,10 @@ async function main() {
       descricaoOficial: "Produto oficial", fotoOficialUrl: "/produto.webp",
       precoSugerido: 12.5, obrigatorioNoCardapio: true, seloPatrocinador: "Parceiro Oficial",
     });
+    await patRef.collection("catalogo_master").doc("item-inativo").set({
+      id: "item-inativo", nome: "Produto desativado", categoriaSugerida: "Bebidas",
+      precoSugerido: 99, ativo: false,
+    });
     await patRef.collection("lotes_licencas").doc("lote-test-b2b").set({
       id: "lote-test-b2b", patrocinadorId: "spn_test_b2b", nome: "Lote Teste",
       codigoCampanha: "CAMPANHA-TESTE-01", totalLicencas: 1, licencasAtivadas: 0,
@@ -306,6 +310,7 @@ async function main() {
     const item = await db.doc("restaurantes/owner_b2b_01/cardapio/spn-item-obrigatorio").get();
     assert.strictEqual(item.exists, true);
     assert.strictEqual(item.data().bloqueadoParaExclusao, true);
+    assert.strictEqual((await db.doc("restaurantes/owner_b2b_01/cardapio/spn-item-inativo").get()).exists, false);
     assert.strictEqual((await patRef.collection("lotes_licencas").doc("lote-test-b2b").get()).data().licencasAtivadas, 1);
     await assert.rejects(() => executarAtivarInstancia(db, "owner_b2b_02", {
       codigo: "CAMPANHA-TESTE-01", slug: "b2b-rest-02", restauranteNome: "Segundo B2B",
