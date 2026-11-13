@@ -25,6 +25,16 @@ import type {
 import { httpsCallable } from "firebase/functions";
 import { signInWithCustomToken, signOut } from "firebase/auth";
 
+function gerarTokenB2BSeguro(tamanho: number): string {
+  const alfabeto = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const bytes = new Uint8Array(tamanho);
+  if (!globalThis.crypto?.getRandomValues) {
+    throw new Error("Gerador criptográfico seguro indisponível; operação B2B cancelada.");
+  }
+  globalThis.crypto.getRandomValues(bytes);
+  return Array.from(bytes, (byte) => alfabeto[byte & 31]).join("");
+}
+
 export const PATROCINADOR_DEMO: PatrocinadorB2B = {
   id: "spn-bierhaus-demo",
   cnpj: "12.345.678/0001-90",
@@ -182,7 +192,7 @@ export async function salvarPatrocinador(
   const id = dados.id || `spn-${slug}`;
   const chaveAcesso =
     dados.chaveAcessoB2B ||
-    `SPN-${slug.toUpperCase().slice(0, 8)}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+    `SPN-${gerarTokenB2BSeguro(26)}`;
 
   const docRef = doc(db, "patrocinadores", id);
   const payload: Partial<PatrocinadorB2B> = {
@@ -306,7 +316,7 @@ export async function criarLoteLicencas(
     validadeMeses: number;
   }
 ): Promise<string> {
-  const loteId = `lote-${dados.codigoCampanha.toLowerCase()}-${Date.now().toString().slice(-4)}`;
+  const loteId = `lote-${dados.codigoCampanha.toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 32)}-${gerarTokenB2BSeguro(8).toLowerCase()}`;
   const docRef = doc(db, "patrocinadores", patrocinadorId, "lotes_licencas", loteId);
 
   const hoje = new Date();
@@ -511,9 +521,9 @@ export async function cadastrarPatrocinadorSuperadmin(dados: {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)+/g, "");
 
-  const id = `spn-${slug}-${Date.now().toString().slice(-4)}`;
-  const chaveAcessoB2B = `SPN-${slug.toUpperCase().slice(0, 8)}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
-  const codigoVoucherInicial = `${slug.toUpperCase().slice(0, 8)}${new Date().getFullYear()}`;
+  const id = `spn-${slug}-${gerarTokenB2BSeguro(8).toLowerCase()}`;
+  const chaveAcessoB2B = `SPN-${gerarTokenB2BSeguro(26)}`;
+  const codigoVoucherInicial = `MAYA-B2B-${gerarTokenB2BSeguro(20)}`;
 
   // 1. Cria o registro do Patrocinador
   const docRef = doc(db, "patrocinadores", id);
