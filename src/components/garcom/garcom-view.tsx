@@ -634,9 +634,10 @@ export function GarcomView({
 
   // Confirma o pagamento no backend antes de atualizar a interface.
   const handleMarcarComoPago = async (mesaNumero: number, clienteId: string): Promise<boolean> => {
-    if (!restauranteId) return false;
+    const idRestauranteFinal = restauranteId || restaurante?.id;
+    if (!idRestauranteFinal) return false;
     try {
-      await marcarComandaPagaFirestore(restauranteId, mesaNumero, clienteId);
+      await marcarComandaPagaFirestore(idRestauranteFinal, mesaNumero, clienteId);
     } catch (err) {
       console.error("Falha ao confirmar pagamento da comanda no backend:", err);
       alert(err instanceof Error ? err.message : "Não foi possível confirmar o pagamento.");
