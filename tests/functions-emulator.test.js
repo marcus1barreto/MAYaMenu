@@ -168,9 +168,10 @@ async function main() {
   await runTest("Emulador: validação de licença não exige leitura pública e retorna apenas dados mínimos", async () => {
     await db.doc("concessoes/MAYA-TESTE-01").set({
       status: "disponivel", plano: "pro",
-      limites: { maxMesas: 30, maxPratos: 60, maxItensMenu: 60 },
+      limites: { maxMesas: 30, maxPratos: 60, maxItensMenu: 60, segredoInterno: "não publicar" },
       responsavel: "Restaurante teste",
       notas: "Nota administrativa confidencial",
+      contratoPrivado: "não publicar",
     });
     const validacao = await executarValidarCodigoAtivacao(db, { codigo: "maya-teste-01" });
     assert.strictEqual(validacao.valida, true);
@@ -178,6 +179,8 @@ async function main() {
     assert.strictEqual(validacao.licenca.plano, "pro");
     assert.strictEqual(validacao.licenca.ownerUid, undefined);
     assert.strictEqual(validacao.licenca.notas, undefined);
+    assert.strictEqual(validacao.licenca.contratoPrivado, undefined);
+    assert.strictEqual(validacao.licenca.limites.segredoInterno, undefined);
   });
 
   await runTest("Emulador: sessão B2B valida status/versão e nunca retorna a chave de acesso", async () => {
