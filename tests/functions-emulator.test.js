@@ -132,6 +132,8 @@ async function main() {
       assert.strictEqual(preferencePayload.back_urls.success.startsWith("https://app.mayamenu.test/"), true);
       assert.strictEqual(preferencePayload.back_urls.success.includes("attacker.example"), false);
       assert.strictEqual(preferencePayload.notification_url.includes("cloudfunctions.net/mercadoPagoWebhook"), true);
+      assert.strictEqual(preferencePayload.expires, true);
+      assert.ok(Date.parse(preferencePayload.expiration_date_to) - Date.parse(preferencePayload.expiration_date_from) >= 71 * 60 * 60 * 1000);
       const attempt = await db.doc(`pagamentos_pro/${result.attemptId}`).get();
       assert.strictEqual(attempt.data().status, "pending");
       assert.strictEqual(attempt.data().valorCentavos, 4990);
