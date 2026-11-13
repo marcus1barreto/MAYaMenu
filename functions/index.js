@@ -1562,11 +1562,12 @@ async function executarLancamentoPedidoGarcom(firestoreDb, authUid, authToken, p
       );
     }
 
-    if (mesaSnap.exists) {
-      const mData = mesaSnap.data() || {};
-      if (mData.ativa === false || mData.statusEstrutural === 'bloqueada') {
-        throw new functions.https.HttpsError('failed-precondition', 'Mesa inativa ou bloqueada para atendimento.');
-      }
+    if (!mesaSnap.exists) {
+      throw new functions.https.HttpsError('not-found', 'Mesa não cadastrada neste restaurante.');
+    }
+    const mesaData = mesaSnap.data() || {};
+    if (mesaData.ativa === false || mesaData.statusEstrutural === 'inativa' || mesaData.statusEstrutural === 'bloqueada') {
+      throw new functions.https.HttpsError('failed-precondition', 'Mesa inexistente, inativa ou bloqueada para atendimento.');
     }
 
     if (comandaSnap.exists) {
@@ -1932,6 +1933,13 @@ async function executarLiberarMesa(firestoreDb, authUid, authToken, payload) {
         jaRegistradas++;
         return;
       }
+      // A liberação é apenas pós-pagamento: nunca converte uma comanda aberta em paga.
+      if (c.status !== 'pago' || c.arquivada !== true || !c.pagoEm) {
+        throw new functions.https.HttpsError(
+          'failed-precondition',
+          'A comanda precisa estar paga e encerrada pelo fluxo de fechamento antes da liberação.'
+        );
+      }
       pendentes.push({ ref: snap.ref, data: c });
     });
 
@@ -2105,13 +2113,21 @@ async function executarDesativarMesa(firestoreDb, authUid, authToken, payload) {
       );
     }
 
-    const kdsQuery = Number.isFinite(numMesa)
-      ? restDoc.ref.collection('kds_tickets').where('mesa', '==', numMesa)
-      : restDoc.ref.collection('kds_tickets').where('mesa', '==', mesaStr);
-    const kdsSnap = await t.get(kdsQuery);
-    const temTicketAtivo = kdsSnap.docs.some((d) => {
-      const s = (d.data() || {}).status;
-      return s === 'a_fazer' || s === 'em_preparo' || s === 'pronto';
+    // Consulta as duas representações legadas e ambos os campos usados pelos produtores KDS.
+    // A união por ID evita depender de um único tipo numérico/string.
+    const valoresMesa = Number.isFinite(numMesa) ? [numMesa, mesaStr] : [mesaStr];
+    const consultasKds = [];
+    for (const campo of ['mesa', 'numeroMesa']) {
+      for (const valor of valoresMesa) {
+        consultasKds.push(t.get(restDoc.ref.collection('kds_tickets').where(campo, '==', valor)));
+      }
+    }
+    const resultadosKds = await Promise.all(consultasKds);
+    const ticketsUnicos = new Map();
+    resultadosKds.forEach((snap) => snap.docs.forEach((d) => ticketsUnicos.set(d.id, d)));
+    const temTicketAtivo = Array.from(ticketsUnicos.values()).some((d) => {
+      const statusTicket = (d.data() || {}).status;
+      return ['a_fazer', 'em_preparo', 'pronto'].includes(statusTicket);
     });
     if (temTicketAtivo) {
       throw new functions.https.HttpsError(
@@ -2149,6 +2165,35 @@ exports.liberarMesaBackend = functions.https.onCall(async (data, context) => {
 exports.desativarMesaBackend = functions.https.onCall(async (data, context) => {
   return executarDesativarMesa(getDb(), context.auth?.uid, context.auth?.token, data);
 });
+
+
+// Mantém um espelho público minimizado do restaurante. O documento raiz permanece privado.
+// Somente campos explicitamente permitidos são copiados; nunca replica ownerId, plano,
+// licença, limites, dados de equipe, PINs, QR ou configurações financeiras privadas.
+exports.sincronizarPerfilPublicoRestaurante = functions.firestore
+  .document('restaurantes/{restauranteId}')
+  .onWrite(async (change, context) => {
+    const publicRef = getDb().collection('restaurantes_publicos').doc(context.params.restauranteId);
+    if (!change.after.exists) {
+      await publicRef.delete().catch(() => {});
+      return null;
+    }
+    const data = change.after.data() || {};
+    const cfg = data.configuracoes || {};
+    const configuracoes = {};
+    for (const key of ['corPrimaria', 'tema', 'logoUrl', 'capaUrl', 'modoOperacao', 'modoFilaKds', 'taxaServico']) {
+      if (cfg[key] !== undefined) configuracoes[key] = cfg[key];
+    }
+    await publicRef.set({
+      restauranteId: context.params.restauranteId,
+      slug: String(data.slug || context.params.restauranteId),
+      nome: String(data.nome || 'Restaurante'),
+      suspenso: data.suspenso === true || cfg.suspenso === true,
+      configuracoes,
+      atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: false });
+    return null;
+  });
 
 exports._internal = {
   getMesaTokenSecret,
