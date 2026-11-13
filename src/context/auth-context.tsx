@@ -51,8 +51,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Sincroniza o JWT fresco do Firebase Auth com o cookie '__session' para o Middleware
     const unsubIdToken = onIdTokenChanged(auth, async (currentUser) => {
       if (currentUser) {
-        // Pega o JWT fresco (onde moram os Custom Claims)
-        const token = await currentUser.getIdToken();
+        // Pega o JWT fresco e sincroniza também as claims após triggers de provisionamento.
+        const tokenResult = await currentUser.getIdTokenResult();
+        const token = tokenResult.token;
+        const roleClaim = (tokenResult.claims.role as any) || (tokenResult.claims.superadmin ? "superadmin" : null);
+        setRole(roleClaim);
         const isHttps = typeof window !== "undefined" && window.location.protocol === "https:";
         // Salva no cookie '__session' (apenas usa 'secure' em HTTPS para não falhar no localhost)
         document.cookie = `__session=${token}; path=/; ${isHttps ? "secure;" : ""} samesite=lax; max-age=3600`;
