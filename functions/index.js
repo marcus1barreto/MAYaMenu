@@ -3512,10 +3512,6 @@ async function executarAtivarInstancia(firestoreDb, authUid, authToken, payload,
     if (concessaoSnap.exists) {
       const licData = concessaoSnap.data() || {};
       validarDisponibilidadeAtivacao(licData, codigo);
-      const arquivoSnap = await tx.get(arquivoRef);
-      if (arquivoSnap.exists) {
-        throw new functions.https.HttpsError('already-exists', 'Esta licença já foi utilizada e transferida para o Arquivo Morto.');
-      }
       const plano = String(licData.plano || 'free');
       const limites = licData.limites || (plano === 'pro'
         ? { maxPratos: 60, maxItensMenu: 60, maxMesas: 30 }
