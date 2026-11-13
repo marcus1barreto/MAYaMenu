@@ -1,7 +1,7 @@
 // lib/b2b-service.ts
 // Serviços do Módulo B2B & Patrocínios em Lote (Sponsor Tiers) do MAYaMenu
 
-import { db, functions, b2bAuth, b2bDb } from "@/lib/firebase";
+import { db, functions, b2bAuth, b2bDb, b2bFunctions } from "@/lib/firebase";
 import {
   collection,
   doc,
@@ -147,6 +147,20 @@ export async function buscarPatrocinadorPorChave(
     return dados.patrocinador;
   } catch (err) {
     console.warn("Falha ao autenticar patrocinador no backend:", err);
+    return null;
+  }
+}
+
+export async function validarSessaoPatrocinador(): Promise<PatrocinadorB2B | null> {
+  if (!b2bAuth.currentUser) return null;
+  try {
+    const validarFn = httpsCallable(b2bFunctions, "validarSessaoPatrocinadorBackend");
+    const resposta = await validarFn({});
+    const dados = resposta.data as { patrocinador?: PatrocinadorB2B };
+    return dados.patrocinador?.id ? dados.patrocinador : null;
+  } catch (err) {
+    console.warn("Sessão B2B inválida ou revogada:", err);
+    await signOut(b2bAuth).catch(() => undefined);
     return null;
   }
 }
