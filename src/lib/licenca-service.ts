@@ -593,24 +593,7 @@ export async function arquivarLicencaExpirada(licenca: Licenca): Promise<void> {
   const codigoFormatado = licenca.id.trim().toUpperCase();
   const arquivoMortoRef = doc(db, "arquivo_morto_licencas", codigoFormatado);
   const licencaRef = doc(db, "concessoes", codigoFormatado);
-
-  const dadosConsolidados: Licenca = {
-    ...licenca,
-    status: "revogada",
-  };
-
-  const arquivoMortoDoc = {
-    id: codigoFormatado,
-    codigo: codigoFormatado,
-    arquivadoEm: serverTimestamp(),
-    motivo: "expirada",
-    restauranteId: licenca.restauranteId || "nao_ativada",
-    restauranteNome: licenca.restauranteNome || licenca.responsavel || "Licença Expirada sem Uso",
-    slug: licenca.slug || "",
-    ownerId: licenca.ownerId || "",
-    snapshotJson: JSON.stringify(dadosConsolidados, null, 2),
-    dadosLicenca: dadosConsolidados,
-  };
+  let arquivoFinal: LicencaArquivada | null = null;
 
   await runTransaction(db, async (tx) => {
     const [licSnap, arquivoSnap] = await Promise.all([
@@ -624,26 +607,38 @@ export async function arquivarLicencaExpirada(licenca: Licenca): Promise<void> {
     if (arquivoSnap.exists()) {
       throw new Error("Já existe arquivo morto para esta concessão; operação interrompida.");
     }
+
+    // O snapshot de auditoria é derivado exclusivamente do documento atual do servidor.
+    // O objeto recebido pelo navegador fornece apenas o identificador da concessão.
     const atual = licSnap.data() as Licenca;
     if (!["disponivel", "utilizada"].includes(atual.status)) {
       throw new Error("Somente concessões elegíveis podem ser arquivadas.");
     }
-    if (atual.plano !== dadosConsolidados.plano) {
-      throw new Error("Plano divergente entre concessão e arquivo morto.");
-    }
-    tx.set(arquivoMortoRef, {
-      ...arquivoMortoDoc,
-      dadosLicenca: { ...atual, status: "revogada" },
-      snapshotJson: JSON.stringify({ ...atual, status: "revogada" }, null, 2),
-    });
+
+    const dadosConsolidados: Licenca = { ...atual, status: "revogada" };
+    arquivoFinal = {
+      id: codigoFormatado,
+      codigo: codigoFormatado,
+      arquivadoEm: serverTimestamp(),
+      motivo: "expirada",
+      restauranteId: atual.restauranteId || "nao_ativada",
+      restauranteNome: atual.restauranteNome || atual.responsavel || "Licença Expirada sem Uso",
+      slug: atual.slug || "",
+      ownerId: atual.ownerId || "",
+      snapshotJson: JSON.stringify(dadosConsolidados, null, 2),
+      dadosLicenca: dadosConsolidados,
+    };
+
+    tx.set(arquivoMortoRef, arquivoFinal);
     tx.delete(licencaRef);
   });
 
-  salvarArquivoMortoLocal({
-    ...arquivoMortoDoc,
-    arquivadoEm: new Date(),
-    motivo: "expirada",
-  });
+  if (arquivoFinal) {
+    salvarArquivoMortoLocal({
+      ...arquivoFinal,
+      arquivadoEm: new Date(),
+    });
+  }
   removerLicencaLocal(codigoFormatado);
 }
 
