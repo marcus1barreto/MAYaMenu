@@ -1949,6 +1949,73 @@ async function executarFecharComanda(firestoreDb, authUid, authToken, payload) {
 }
 
 /**
+ * Processa o outbox de sell-out criado atomicamente no fechamento da comanda.
+ * Cada par evento/produto possui marcador idempotente, evitando dupla contagem em retries.
+ */
+async function executarProcessarSelloutOutbox(firestoreDb, restauranteId, eventId) {
+  const outboxRef = firestoreDb.collection('restaurantes').doc(restauranteId)
+    .collection('_sellout_outbox').doc(eventId);
+  const outboxSnap = await outboxRef.get();
+  if (!outboxSnap.exists) return { sucesso: false, inexistente: true };
+  const outbox = outboxSnap.data() || {};
+  if (outbox.processado === true) return { sucesso: true, idempotente: true };
+  if (!Array.isArray(outbox.itens) || outbox.itens.length > 200) {
+    throw new Error('Outbox de sell-out inválido ou acima do limite operacional.');
+  }
+
+  for (const item of outbox.itens) {
+    const patrocinadorId = String(item.patrocinadorId || '');
+    const itemId = String(item.itemId || '');
+    const quantidade = Number(item.quantidade);
+    const valorTotalCentavos = Number(item.valorTotalCentavos);
+    if (!patrocinadorId || patrocinadorId.includes('/') || !itemId || itemId.includes('/') ||
+        !Number.isInteger(quantidade) || quantidade < 1 ||
+        !Number.isSafeInteger(valorTotalCentavos) || valorTotalCentavos < 0) {
+      throw new Error('Linha de sell-out inválida; evento preservado para auditoria.');
+    }
+    const patrocinadorRef = firestoreDb.collection('patrocinadores').doc(patrocinadorId);
+    const metricRef = patrocinadorRef.collection('metricas_sellout').doc(itemId);
+    const markerId = crypto.createHash('sha256').update(eventId + '|' + itemId).digest('hex');
+    const markerRef = patrocinadorRef.collection('metricas_sellout_eventos').doc(markerId);
+
+    await firestoreDb.runTransaction(async (tx) => {
+      const [markerSnap, metricSnap] = await Promise.all([tx.get(markerRef), tx.get(metricRef)]);
+      if (markerSnap.exists) return;
+      const atual = metricSnap.exists ? (metricSnap.data() || {}) : {};
+      const restaurantes = Array.isArray(atual.restaurantesContabilizados)
+        ? atual.restaurantesContabilizados.slice()
+        : [];
+      if (!restaurantes.includes(restauranteId)) restaurantes.push(restauranteId);
+      const payloadMetric = {
+        itemId,
+        itemNome: String(item.itemNome || itemId),
+        patrocinadorId,
+        totalUnidadesVendidas: Number(atual.totalUnidadesVendidas || 0) + quantidade,
+        faturamentoTotalEstimado: Number(atual.faturamentoTotalEstimado || 0) + valorTotalCentavos / 100,
+        restaurantesContabilizados: restaurantes,
+        ultimaVendaEm: new Date().toISOString(),
+      };
+      if (metricSnap.exists) tx.set(metricRef, payloadMetric, { merge: true });
+      else tx.create(metricRef, payloadMetric);
+      tx.create(markerRef, {
+        eventId,
+        restauranteId,
+        itemId,
+        quantidade,
+        valorTotalCentavos,
+        processadoEm: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    });
+  }
+
+  await outboxRef.update({
+    processado: true,
+    processadoEm: admin.firestore.FieldValue.serverTimestamp(),
+  });
+  return { sucesso: true, itensProcessados: outbox.itens.length };
+}
+
+/**
  * Libera a mesa: tudo em uma única transação (leituras antes das escritas).
  * O subtotal do histórico é recalculado a partir dos pedidos reais. Idempotente: comandas já
  * registradas (campo historicoSessaoId) não geram novo histórico nem nova métrica.
@@ -2803,6 +2870,12 @@ exports.autenticarPatrocinadorBackend = functions.https.onCall(async (data) => {
   return executarAutenticarPatrocinador(getDb(), data);
 });
 
+exports.processarSelloutOutbox = functions.firestore
+  .document('restaurantes/{restauranteId}/_sellout_outbox/{eventId}')
+  .onCreate(async (snap, context) => {
+    return executarProcessarSelloutOutbox(getDb(), context.params.restauranteId, context.params.eventId);
+  });
+
 exports.validarCodigoAtivacaoBackend = functions.https.onCall(async (data) => {
   return executarValidarCodigoAtivacao(getDb(), data);
 });
@@ -2884,6 +2957,7 @@ exports._internal = {
   executarAutenticarPatrocinador,
   executarAtivarInstancia,
   executarAtivarPatrocinio,
+  executarProcessarSelloutOutbox,
 };
 
 /**
