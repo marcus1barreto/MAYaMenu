@@ -205,17 +205,9 @@ exports.setStaffRole = functions.https.onCall(async (data, context) => {
   // 4. Gera token seguro para Crachá QR Code (para login rápido com câmera)
   const crachaToken = crypto.randomBytes(16).toString('hex');
 
-  // 5. Define os custom claims preservando apenas claims não conflitantes.
-  const newClaims = {
-    ...(targetUser.customClaims || {}),
-    role,
-    restauranteId: realRestauranteId,
-  };
-  delete newClaims.superadmin;
-
-  await admin.auth().setCustomUserClaims(targetUser.uid, newClaims);
-
-  // 6. Registra o membro na subcoleção do Firestore para listagem rápida e geração de crachá
+  // 5. Registra primeiro o estado efetivo no Firestore.
+  // As Rules e o backend passam a negar imediatamente o cargo antigo, mesmo que
+  // o ID token anterior ainda esteja válido enquanto o Auth atualiza as claims.
   const docMembro = {
     uid: targetUser.uid,
     email: targetUser.email,
@@ -235,6 +227,16 @@ exports.setStaffRole = functions.https.onCall(async (data, context) => {
     .collection('equipe')
     .doc(targetUser.uid)
     .set(docMembro, { merge: true });
+
+  // 6. Atualiza as claims depois do vínculo persistido. Se o Auth falhar,
+  // o documento atual continua sendo a fonte de autorização e falha fechado.
+  const newClaims = {
+    ...(targetUser.customClaims || {}),
+    role,
+    restauranteId: realRestauranteId,
+  };
+  delete newClaims.superadmin;
+  await admin.auth().setCustomUserClaims(targetUser.uid, newClaims);
 
   console.info(`Papel '${role}' atribuído a ${email} (UID: ${targetUser.uid}) no restaurante ${realRestauranteId}`);
 
@@ -299,6 +301,10 @@ exports.removeStaffMember = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError('permission-denied', 'A conta é titular de um estabelecimento e não pode ser removida como colaborador.');
   }
 
+  // Remove primeiro o vínculo persistido para que Rules e backend neguem acesso
+  // imediatamente, mesmo se a atualização posterior do Firebase Auth falhar.
+  await membroRef.delete();
+
   // Só revoga claims quando elas pertencem ao tenant deste vínculo.
   if (targetUser.customClaims?.restauranteId === restDoc.id) {
     const claimsRestantes = { ...(targetUser.customClaims || {}) };
@@ -307,8 +313,6 @@ exports.removeStaffMember = functions.https.onCall(async (data, context) => {
     await admin.auth().setCustomUserClaims(String(uid), claimsRestantes);
     await admin.auth().revokeRefreshTokens(String(uid));
   }
-
-  await membroRef.delete();
 
   return { sucesso: true };
 });
