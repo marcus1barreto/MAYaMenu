@@ -139,10 +139,15 @@ service cloud.firestore {
         allow write: if isSuperAdmin();
       }
 
-      // Subcoleção Métricas de Sell-Out (Gravação consolidada pelo Backend / Admin SDK)
+      // Métricas de Sell-Out (leitura pelo patrocinador; gravação somente pelo backend).
       match /metricas_sellout/{itemId} {
         allow read: if isSuperAdmin() || isSponsor(patrocinadorId);
         allow write: if isSuperAdmin();
+      }
+
+      // Marcadores de idempotência do processamento de eventos de venda.
+      match /metricas_sellout_eventos/{eventId} {
+        allow read, write: if isSuperAdmin();
       }
     }
 
@@ -337,6 +342,11 @@ service cloud.firestore {
             allow delete: if false;
           }
         }
+      }
+
+      // Outbox financeiro/telemetria: escrita e leitura exclusivas do backend.
+      match /_sellout_outbox/{eventId} {
+        allow read, write: if false;
       }
 
       // Histórico de Sessões de Mesas: criado exclusivamente por liberarMesaBackend (Admin SDK)
