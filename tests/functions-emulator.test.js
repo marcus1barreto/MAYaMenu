@@ -19,6 +19,7 @@ const {
   executarValidarCodigoAtivacaoComRateLimit, executarValidarSessaoPatrocinador,
   validarAssinaturaMercadoPago, validarPagamentoPro, executarProcessarPagamentoProAprovado,
   executarProcessarEstornoPagamentoPro, limitarCriacaoPreferenciaPro,
+  executarCriarPreferenciaProBackend,
 } = _internal;
 const crypto = require("crypto");
 
@@ -82,6 +83,68 @@ async function main() {
       () => limitarCriacaoPreferenciaPro(db, "owner_rate_checkout"),
       /muitas tentativas de checkout/i
     );
+  });
+
+  await runTest("Mercado Pago: preferência usa preço e URL definidos exclusivamente no servidor", async () => {
+    const oldFetch = global.fetch;
+    const oldToken = process.env.MERCADO_PAGO_ACCESS_TOKEN;
+    const oldAppUrl = process.env.MAYAMENU_APP_URL;
+    const oldLiveMode = process.env.MERCADO_PAGO_LIVE_MODE;
+    let preferencePayload = null;
+    try {
+      process.env.MERCADO_PAGO_ACCESS_TOKEN = "TEST-token-de-integracao";
+      process.env.MAYAMENU_APP_URL = "https://app.mayamenu.test";
+      process.env.MERCADO_PAGO_LIVE_MODE = "false";
+      global.fetch = async (url, options) => {
+        assert.strictEqual(url, "https://api.mercadopago.com/checkout/preferences");
+        assert.strictEqual(options.headers.Authorization, "Bearer TEST-token-de-integracao");
+        preferencePayload = JSON.parse(options.body);
+        return new Response(JSON.stringify({
+          id: "pref-teste-01",
+          init_point: "https://checkout.live.test",
+          sandbox_init_point: "https://checkout.sandbox.test",
+          collector_id: 12345,
+        }), { status: 201, headers: { "content-type": "application/json" } });
+      };
+
+      await db.doc("restaurantes/rest_mp_checkout").set({
+        ownerId: "owner_mp_checkout",
+        nome: "Restaurante Checkout",
+        plano: "free",
+      });
+      const result = await executarCriarPreferenciaProBackend(db, {
+        uid: "owner_mp_checkout",
+        token: {
+          email: "owner@example.test",
+          firebase: { sign_in_provider: "password" },
+        },
+      }, {
+        restauranteId: "rest_mp_checkout",
+        planoId: "pro_mensal",
+        preco: 0.01,
+        baseUrl: "https://attacker.example",
+      });
+
+      assert.strictEqual(result.sucesso, true);
+      assert.strictEqual(result.initPoint, "https://checkout.sandbox.test");
+      assert.strictEqual(preferencePayload.items[0].unit_price, 49.90);
+      assert.strictEqual(preferencePayload.external_reference, result.attemptId);
+      assert.strictEqual(preferencePayload.back_urls.success.startsWith("https://app.mayamenu.test/"), true);
+      assert.strictEqual(preferencePayload.back_urls.success.includes("attacker.example"), false);
+      assert.strictEqual(preferencePayload.notification_url.includes("cloudfunctions.net/mercadoPagoWebhook"), true);
+      const attempt = await db.doc(`pagamentos_pro/${result.attemptId}`).get();
+      assert.strictEqual(attempt.data().status, "pending");
+      assert.strictEqual(attempt.data().valorCentavos, 4990);
+      assert.strictEqual(attempt.data().collectorId, "12345");
+    } finally {
+      global.fetch = oldFetch;
+      if (oldToken === undefined) delete process.env.MERCADO_PAGO_ACCESS_TOKEN;
+      else process.env.MERCADO_PAGO_ACCESS_TOKEN = oldToken;
+      if (oldAppUrl === undefined) delete process.env.MAYAMENU_APP_URL;
+      else process.env.MAYAMENU_APP_URL = oldAppUrl;
+      if (oldLiveMode === undefined) delete process.env.MERCADO_PAGO_LIVE_MODE;
+      else process.env.MERCADO_PAGO_LIVE_MODE = oldLiveMode;
+    }
   });
 
   await runTest("Mercado Pago: valida assinatura HMAC do webhook e rejeita adulteração", async () => {
