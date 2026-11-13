@@ -594,22 +594,25 @@ export function AdminDashboard() {
   };
 
   const handleAtenderGarcom = async (mesaNumero: number, clienteId: string) => {
+    if (!restaurante?.id) return;
+    try {
+      await atenderGarcomFirestore(restaurante.id, mesaNumero, clienteId);
+    } catch (err) {
+      console.error("Falha ao desarmar chamado no Firestore:", err);
+      alert(err instanceof Error ? err.message : "Não foi possível encerrar o chamado.");
+      return;
+    }
+
     setMesas((prev) =>
       prev.map((m) => {
-        if (m.numero === mesaNumero) {
-          const novasComandas = m.comandas.map((c) =>
-            c.id === clienteId && c.chamadoGarcom
-              ? { ...c, chamadoGarcom: { ...c.chamadoGarcom, ativo: false } }
-              : c
-          );
-          const aindaTemChamado = novasComandas.some((c) => c.chamadoGarcom?.ativo);
-          return {
-            ...m,
-            chamandoGarcom: aindaTemChamado,
-            comandas: novasComandas,
-          };
-        }
-        return m;
+        if (m.numero !== mesaNumero) return m;
+        const novasComandas = m.comandas.map((c) =>
+          c.id === clienteId && c.chamadoGarcom
+            ? { ...c, chamadoGarcom: { ...c.chamadoGarcom, ativo: false } }
+            : c
+        );
+        const aindaTemChamado = novasComandas.some((c) => c.chamadoGarcom?.ativo);
+        return { ...m, chamandoGarcom: aindaTemChamado, comandas: novasComandas };
       })
     );
 
@@ -621,20 +624,8 @@ export function AdminDashboard() {
           : c
       );
       const aindaTemChamado = novasComandas.some((c) => c.chamadoGarcom?.ativo);
-      return {
-        ...prev,
-        chamandoGarcom: aindaTemChamado,
-        comandas: novasComandas,
-      };
+      return { ...prev, chamandoGarcom: aindaTemChamado, comandas: novasComandas };
     });
-
-    if (restaurante?.id) {
-      try {
-        await atenderGarcomFirestore(restaurante.id, mesaNumero, clienteId);
-      } catch (err) {
-        console.warn("Falha ao desarmar chamado no Firestore pelo Admin:", err);
-      }
-    }
   };
 
   const handleLancarItemManual = (
