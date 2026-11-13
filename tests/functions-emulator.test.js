@@ -256,6 +256,28 @@ async function main() {
     }));
   });
 
+  await runTest("Emulador: ativação rejeita slug já usado por restaurante legado", async () => {
+    await db.doc("restaurantes/legacy_rest").set({
+      ownerId: "owner_legacy", slug: "slug-em-uso", nome: "Legado",
+    });
+    await db.doc("restaurantes_publicos/legacy_rest").set({
+      restauranteId: "legacy_rest", slug: "slug-em-uso", nome: "Legado", configuracoes: {},
+    });
+    await db.doc("concessoes/lic_slug").set({
+      id: "lic_slug", codigo: "lic_slug", status: "disponivel", plano: "free",
+      limites: { maxMesas: 10, maxPratos: 20 },
+      expiracaoEm: new Date(Date.now() + 86400000).toISOString(),
+    });
+    await assert.rejects(
+      () => executarAtivarInstancia(db, "owner_novo", {
+        codigo: "lic_slug", slug: "slug-em-uso", restauranteNome: "Novo",
+      }),
+      /endereço público já está em uso/i
+    );
+    assert.strictEqual((await db.doc("restaurantes/owner_novo").get()).exists, false);
+    assert.strictEqual((await db.doc("concessoes/lic_slug").get()).exists, true);
+  });
+
   await runTest("Emulador: voucher B2B ativa PRO, injeta catálogo e consome uma única cota", async () => {
     const patRef = db.doc("patrocinadores/spn_test_b2b");
     await patRef.set({ nomeFantasia: "Marca Teste", ativo: true, slug: "marca-teste" });
