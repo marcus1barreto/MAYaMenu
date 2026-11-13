@@ -269,6 +269,11 @@ async function main() {
       obterQrCredencialInicial(3, 3, "qr-mesa-3", ""),
       "qr-mesa-3"
     );
+    // Mesmo voltando à mesa original, a credencial da URL não pode ser reaplicada.
+    assert.strictEqual(
+      obterQrCredencialInicial(3, 3, "qr-mesa-3-antigo", "", false),
+      undefined
+    );
   });
 
   await runTest("QR: cache de sessão não reutiliza token após rotação da credencial", async () => {
