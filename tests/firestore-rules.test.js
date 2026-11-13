@@ -820,6 +820,18 @@ async function runTests() {
     await assertFails(adminDb.doc("arquivo_morto_licencas/lic_2").delete());
   });
 
+  await test("Mesa: estado estrutural inativa só pode ser gravado pelo backend", async () => {
+    const ownerDb = testEnv.authenticatedContext("owner_a", {
+      role: "owner", restauranteId: "rest_a",
+    }).firestore();
+    await assertFails(ownerDb.doc("restaurantes/rest_a/mesas/1").update({
+      statusEstrutural: "inativa",
+    }));
+    await assertSucceeds(ownerDb.doc("restaurantes/rest_a/mesas/1").update({
+      ativa: false,
+    }));
+  });
+
   await test("Mesa: exclusão física direta negada para dono, garçom e SuperAdmin (usar desativarMesaBackend)", async () => {
     const ctxs = [
       testEnv.authenticatedContext("owner_a", { role: "owner", restauranteId: "rest_a" }).firestore(),
