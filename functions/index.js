@@ -3143,7 +3143,14 @@ async function executarProcessarEstornoPagamentoPro(firestoreDb, attemptId, paym
             : new Date(expiracaoAssinaturaRaw))
           : null;
         const assinaturaAnteriorAtiva = pagamentoAnteriorConfirmado &&
-          assinaturaAnterior?.ativa === true &&
+          (
+            assinaturaAnterior?.ativa === true ||
+            (
+              assinaturaAnterior?.planoId === 'plan_b2b_patrocinado_v1' &&
+              assinaturaAnterior?.periodicidade === 'patrocinado' &&
+              assinaturaAnterior?.status === 'ativa'
+            )
+          ) &&
           expiracaoAssinatura && Number.isFinite(expiracaoAssinatura.getTime()) &&
           expiracaoAssinatura > new Date();
         const patrocinioAnteriorRaw = anterior.patrocinioDataExpiracao;
