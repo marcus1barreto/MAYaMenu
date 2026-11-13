@@ -170,6 +170,11 @@ async function main() {
     assert.strictEqual((await db.doc("concessoes/MAYA-ATOMIC-01").get()).exists, false);
     assert.strictEqual((await db.doc("arquivo_morto_licencas/MAYA-ATOMIC-01").get()).exists, true);
     assert.strictEqual((await db.doc("slugs/atomic-rest-01").get()).data().ownerId, "owner_atomic_01");
+    const perfilPublico = await db.doc("restaurantes_publicos/owner_atomic_01").get();
+    assert.strictEqual(perfilPublico.exists, true);
+    assert.strictEqual(perfilPublico.data().nome, "Atomic Restaurante");
+    assert.strictEqual(perfilPublico.data().ownerId, undefined);
+    assert.strictEqual(perfilPublico.data().licenca, undefined);
     await assert.rejects(() => executarAtivarInstancia(db, "owner_atomic_02", {
       codigo: "MAYA-ATOMIC-01", slug: "atomic-rest-02", restauranteNome: "Outro Restaurante",
     }));
@@ -196,6 +201,10 @@ async function main() {
     });
     assert.strictEqual(restaurante.plano, "pro");
     assert.strictEqual(restaurante.patrocinio.patrocinadorId, "spn_test_b2b");
+    const perfilPublico = await db.doc("restaurantes_publicos/owner_b2b_01").get();
+    assert.strictEqual(perfilPublico.exists, true);
+    assert.strictEqual(perfilPublico.data().nome, "Restaurante B2B");
+    assert.strictEqual(perfilPublico.data().plano, undefined);
     const item = await db.doc("restaurantes/owner_b2b_01/cardapio/spn-item-obrigatorio").get();
     assert.strictEqual(item.exists, true);
     assert.strictEqual(item.data().bloqueadoParaExclusao, true);
