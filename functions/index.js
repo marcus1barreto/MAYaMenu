@@ -1003,7 +1003,9 @@ async function executarGarantirCredencialMesa(firestoreDb, authUid, authToken, p
         sucesso: true,
         jaConfigurada: true,
         restauranteId: restDoc.id,
+        slug: String(restData.slug || restDoc.id),
         mesa: numMesaParsed,
+        qrVersao: Number(mData.qrVersao) || 1,
       };
       return;
     }
@@ -1036,7 +1038,9 @@ async function executarGarantirCredencialMesa(firestoreDb, authUid, authToken, p
       sucesso: true,
       jaConfigurada: false,
       restauranteId: restDoc.id,
+      slug: String(restData.slug || restDoc.id),
       mesa: numMesaParsed,
+      qrVersao: novaVersao,
       qrCredencial: novaCredencial,
     };
   });
