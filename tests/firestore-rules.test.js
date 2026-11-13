@@ -834,7 +834,7 @@ async function runTests() {
     await assertFails(membro.update({ role: "owner" }));
     await assertFails(membro.update({ pinHash: "hash_falso", pinSalt: "salt_falso" }));
     await assertFails(membro.delete());
-    await assertSucceeds(membro.update({
+    await assertFails(membro.update({
       statusTurno: "pausa", turnoPausadoEm: Date.now(), atualizadoEm: Date.now(),
     }));
     await assertSucceeds(staffDb.doc("restaurantes/rest_a/equipe/garcom_a").update({
