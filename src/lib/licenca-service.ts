@@ -1,7 +1,7 @@
 // src/lib/licenca-service.ts
 // Gerenciamento e validação de Licenças / Concessões do MAYaMenu (SuperAdmin)
 
-import { db } from "@/lib/firebase";
+import { db, functions } from "@/lib/firebase";
 import {
   collection,
   doc,
@@ -20,6 +20,7 @@ import {
 } from "firebase/firestore";
 import type { Licenca, PlanoTipo, LimitesPlano, Restaurante } from "@/types";
 import { parseDateToMillis, millisOu } from "@/lib/datas";
+import { httpsCallable } from "firebase/functions";
 
 export const LIMITES_POR_PLANO: Record<PlanoTipo, LimitesPlano> = {
   free: {
@@ -295,78 +296,19 @@ export async function validarLicencaParaAtivacao(codigo: string): Promise<{
   motivo?: string;
 }> {
   const codigoFormatado = codigo.trim().toUpperCase();
-
-  const checarLicenca = (lic: Licenca): { valida: boolean; licenca?: Licenca; motivo?: string } => {
-    if (lic.status === "ativa" || lic.status === "utilizada") {
-      return { valida: false, motivo: "Este link de ativação já foi utilizado e extinto." };
-    }
-    if (lic.status === "suspensa" || lic.status === "revogada") {
-      return { valida: false, motivo: "Esta licença foi bloqueada ou revogada pela gerência." };
-    }
-
-    // Validação de expiração se houver
-    if (lic.expiracaoEm) {
-      const expMillis = parseDateToMillis(lic.expiracaoEm);
-      if (expMillis !== null && Date.now() > expMillis) {
-        return { valida: false, motivo: "Este convite de ativação expirou. Solicite um novo link." };
-      }
-    }
-
-    return { valida: true, licenca: lic };
-  };
-
-  // 1. Checa no Firestore (prioridade para ver status mais atualizado de queima)
+  if (!codigoFormatado) return { valida: false, motivo: "Informe o código de ativação." };
   try {
-    const docSnap = await getDoc(doc(db, "concessoes", codigoFormatado));
-    if (docSnap.exists()) {
-      const licencaFirestore = { ...(docSnap.data() as Licenca), id: docSnap.id };
-      return checarLicenca(licencaFirestore);
+    const validarFn = httpsCallable(functions, "validarCodigoAtivacaoBackend");
+    const resposta = await validarFn({ codigo: codigoFormatado });
+    const dados = resposta.data as { valida?: boolean; licenca?: Licenca };
+    if (!dados?.valida || !dados.licenca) {
+      return { valida: false, motivo: "Link de ativação inválido ou inexistente." };
     }
-
-    // Checa se já está no Arquivo Morto (licença já utilizada e arquivada)
-    const arquivoSnap = await getDoc(doc(db, "arquivo_morto_licencas", codigoFormatado));
-    if (arquivoSnap.exists()) {
-      return { valida: false, motivo: "Esta licença já foi utilizada, ativada e transferida para o Arquivo Morto." };
-    }
-  } catch (err) {
-    console.warn("Consulta Firestore da licença falhou, checando local:", err);
+    return { valida: true, licenca: dados.licenca };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Não foi possível validar o código no servidor.";
+    return { valida: false, motivo: message.replace(/^functions\\/[a-z-]+:\\s*/i, "") };
   }
-
-  // 2. Se não encontrar no Firestore ou offline, checa armazenamento local
-  const mortosLocais = obterArquivoMortoLocais();
-  if (mortosLocais.some((m) => m.id === codigoFormatado || m.codigo === codigoFormatado)) {
-    return { valida: false, motivo: "Esta licença já foi utilizada, ativada e transferida para o Arquivo Morto." };
-  }
-
-  const locais = obterLicencasLocais();
-  const localEncontrada = locais.find((l) => l.id === codigoFormatado);
-  if (localEncontrada) {
-    return checarLicenca(localEncontrada);
-  }
-
-  // 3. Checa se é um voucher corporativo de patrocínio B2B
-  try {
-    const { validarVoucherPatrocinio } = await import("@/lib/b2b-service");
-    const resVoucher = await validarVoucherPatrocinio(codigoFormatado);
-    if (resVoucher.valido && resVoucher.lote && resVoucher.patrocinador) {
-      const licencaPatrocinada: Licenca = {
-        id: codigoFormatado,
-        status: "disponivel",
-        plano: "pro",
-        limites: { maxPratos: 60, maxMesas: 30 },
-        criadaEm: new Date(),
-        responsavel: `Patrocinado por ${resVoucher.patrocinador.nomeFantasia}`,
-        notas: `Campanha B2B: ${resVoucher.lote.nome} (Voucher ${codigoFormatado})`,
-      };
-      return { valida: true, licenca: licencaPatrocinada };
-    } else if (resVoucher.mensagem && !resVoucher.mensagem.includes("não encontrado")) {
-      return { valida: false, motivo: resVoucher.mensagem };
-    }
-  } catch (errVoucher) {
-    console.warn("Checagem de voucher de patrocínio falhou:", errVoucher);
-  }
-
-  return { valida: false, motivo: "Link de ativação inválido ou inexistente." };
 }
 
 /**
@@ -384,186 +326,20 @@ export async function ativarLicencaEInstanciaAtomica(params: {
   termsVersion?: string;
 }): Promise<Restaurante> {
   const codigoFormatado = params.codigo.trim().toUpperCase();
-  const licencaRef = doc(db, "concessoes", codigoFormatado);
-  const arquivoMortoRef = doc(db, "arquivo_morto_licencas", codigoFormatado);
-  const restRef = doc(db, "restaurantes", params.ownerUid);
-
-  const slugLimpo = params.slug.trim().toLowerCase();
-  const nomeLimpo = params.restauranteNome.trim();
-
-  const novoRest: Restaurante = {
-    id: params.ownerUid,
-    ownerId: params.ownerUid,
-    slug: slugLimpo,
-    nome: nomeLimpo,
-    termsAcceptedAt: params.termsAcceptedAt || new Date().toISOString(),
-    termsVersion: params.termsVersion || "1.0.0",
-    configuracoes: {
-      corPrimaria: "#E11D48",
-      tema: "light",
-      capaUrl: "/images/capa-padrao.webp",
-      modoOperacao: params.modoOperacao || "hibrido",
-    },
-  };
-
-  const { runTransaction } = await import("firebase/firestore");
-
-  const slugTravaRef = doc(db, "slugs", slugLimpo);
-
-  try {
-    await runTransaction(db, async (transaction) => {
-      // 1. Checa trava de unicidade do slug
-      const slugSnap = await transaction.get(slugTravaRef);
-      if (slugSnap.exists()) {
-        const slugData = slugSnap.data();
-        if (slugData.ownerId && slugData.ownerId !== params.ownerUid) {
-          throw new Error(`O slug '/r/${slugLimpo}' já está em uso por outro restaurante. Escolha outro slug.`);
-        }
-      }
-
-      // 2. Verifica se já existe restaurante cadastrado para este proprietário
-      const restSnap = await transaction.get(restRef);
-      if (restSnap.exists()) {
-        throw new Error("Este usuário já possui um restaurante cadastrado e ativo.");
-      }
-
-      // 3. Checa se já existe no Arquivo Morto
-      const arquivoSnap = await transaction.get(arquivoMortoRef);
-      if (arquivoSnap.exists()) {
-        throw new Error("Esta licença já foi utilizada, ativada e transferida para o Arquivo Morto.");
-      }
-
-      const licSnap = await transaction.get(licencaRef);
-      if (!licSnap.exists()) {
-        throw new Error("Código de ativação inválido ou concessão não encontrada.");
-      }
-
-      const licData = licSnap.data() as Licenca;
-
-      // 4. Confirma dentro da transação que a licença continua disponível
-      if (licData.status === "utilizada" || licData.status === "ativa") {
-        throw new Error("Esta licença já foi utilizada e extinta.");
-      }
-      if (licData.status === "suspensa" || licData.status === "revogada") {
-        throw new Error("Esta licença foi revogada ou suspensa.");
-      }
-
-      if (licData.expiracaoEm) {
-        const expMillis = parseDateToMillis(licData.expiracaoEm);
-        if (expMillis !== null && Date.now() > expMillis) {
-          throw new Error("Este link de ativação expirou.");
-        }
-      }
-
-      // 5. Grava o documento do restaurante vinculado ao ownerId
-      const planoAtivo = licData.plano || "free";
-      const limitesAtivos = licData.limites || LIMITES_POR_PLANO[planoAtivo];
-      novoRest.plano = planoAtivo;
-      novoRest.maxMesas = limitesAtivos.maxMesas;
-      novoRest.maxPratos = limitesAtivos.maxPratos;
-      novoRest.licenca = {
-        id: codigoFormatado,
-        plano: planoAtivo,
-        limites: limitesAtivos,
-      };
-      transaction.set(restRef, novoRest);
-
-      // 6. Grava a trava de unicidade do slug
-      transaction.set(slugTravaRef, {
-        slug: slugLimpo,
-        ownerId: params.ownerUid,
-        restauranteNome: nomeLimpo,
-        criadoEm: serverTimestamp(),
-      });
-
-      // 7. Prepara os dados consolidados para o Arquivo Morto (WORM)
-      const agora = new Date();
-      const dadosConsolidados: Licenca = {
-        ...licData,
-        status: "utilizada",
-        consumidaEm: agora,
-        ativadaEm: agora,
-        restauranteId: params.ownerUid,
-        restauranteNome: nomeLimpo,
-        slug: slugLimpo,
-        ownerId: params.ownerUid,
-      };
-
-      const arquivoMortoDoc = {
-        id: codigoFormatado,
-        codigo: codigoFormatado,
-        arquivadoEm: serverTimestamp(),
-        motivo: "ativacao_concluida",
-        restauranteId: params.ownerUid,
-        restauranteNome: nomeLimpo,
-        slug: slugLimpo,
-        ownerId: params.ownerUid,
-        snapshotJson: JSON.stringify(dadosConsolidados, null, 2),
-        dadosLicenca: dadosConsolidados,
-      };
-
-      // 8. Grava no Arquivo Morto e remove da coleção concessoes atomicamente
-      transaction.set(arquivoMortoRef, arquivoMortoDoc);
-      transaction.delete(licencaRef);
-    });
-  } catch (err: unknown) {
-    console.error("Ativação transacional da licença falhou:", err);
-    if (err instanceof Error) {
-      throw err;
-    }
-    throw new Error("Não foi possível concluir a ativação no servidor. Verifique sua conexão e tente novamente.");
-  }
-
-  // 9. Atualiza cache local: remove de concessões ativas e move para arquivo morto local
-  removerLicencaLocal(codigoFormatado);
-  salvarArquivoMortoLocal({
-    id: codigoFormatado,
+  if (!codigoFormatado) throw new Error("Código de ativação obrigatório.");
+  const ativarFn = httpsCallable(functions, "ativarInstanciaBackend");
+  const resposta = await ativarFn({
     codigo: codigoFormatado,
-    arquivadoEm: new Date().toISOString(),
-    motivo: "ativacao_concluida",
-    restauranteId: params.ownerUid,
-    restauranteNome: nomeLimpo,
-    slug: slugLimpo,
-    ownerId: params.ownerUid,
-    snapshotJson: JSON.stringify({
-      id: codigoFormatado,
-      restauranteId: params.ownerUid,
-      restauranteNome: nomeLimpo,
-      slug: slugLimpo,
-      arquivadoEm: new Date(),
-    }, null, 2),
-    dadosLicenca: {
-      id: codigoFormatado,
-      status: "utilizada",
-      plano: "free",
-      limites: { maxPratos: 15, maxMesas: 5 },
-      criadaEm: new Date(),
-      restauranteId: params.ownerUid,
-      restauranteNome: nomeLimpo,
-      slug: slugLimpo,
-    },
+    slug: params.slug.trim().toLowerCase(),
+    restauranteNome: params.restauranteNome.trim(),
+    modoOperacao: params.modoOperacao || "hibrido",
+    termsAcceptedAt: params.termsAcceptedAt,
+    termsVersion: params.termsVersion,
   });
-
-  // 10. Se for um voucher de patrocínio corporativo B2B, vincula ao lote e injeta itens
-  try {
-    const { validarVoucherPatrocinio, ativarPatrocinioNoRestaurante } = await import("@/lib/b2b-service");
-    const checagemVoucher = await validarVoucherPatrocinio(codigoFormatado);
-    if (checagemVoucher.valido && checagemVoucher.lote && checagemVoucher.patrocinador) {
-      await ativarPatrocinioNoRestaurante({
-        restauranteId: params.ownerUid,
-        nomeRestaurante: nomeLimpo,
-        slugRestaurante: slugLimpo,
-        codigoVoucher: codigoFormatado,
-      });
-      novoRest.plano = "pro";
-      novoRest.maxMesas = 30;
-      novoRest.maxPratos = 60;
-    }
-  } catch (errPat) {
-    console.warn("Ativação complementar de patrocínio falhou:", errPat);
-  }
-
-  return novoRest;
+  const dados = resposta.data as Record<string, unknown>;
+  const { _tipoAtivacao: _tipoAtivacao, ...restaurante } = dados;
+  removerLicencaLocal(codigoFormatado);
+  return restaurante as unknown as Restaurante;
 }
 
 /**
