@@ -3124,8 +3124,10 @@ async function executarProcessarEstornoPagamentoPro(firestoreDb, attemptId, paym
       };
 
       const paymentIdAtual = String(assinaturaAtual.paymentId || '');
+      // IDs vazios não identificam uma assinatura: sem pagamento anterior registrado,
+      // um benefício B2B recém-ativado nunca pode ser confundido com o estado pré-pagamento.
       const estadoCorrespondeAoPagamento = paymentIdAtual === paymentId ||
-        paymentIdAtual === paymentIdAnterior;
+        (Boolean(paymentIdAnterior) && paymentIdAtual === paymentIdAnterior);
 
       if (ledger.previousState && estadoCorrespondeAoPagamento) {
         const anterior = ledger.previousState;
