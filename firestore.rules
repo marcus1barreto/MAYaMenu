@@ -277,6 +277,11 @@ service cloud.firestore {
           && !('qrCredencialHash' in request.resource.data)
           && !('qrVersao' in request.resource.data)
           && !('qrCredencial' in request.resource.data)
+          && request.resource.data.numero is int
+          && request.resource.data.numero == int(numeroMesa)
+          && get(/databases/$(database)/documents/restaurantes/$(restauranteId)).data.maxMesas is int
+          && request.resource.data.numero >= 1
+          && request.resource.data.numero <= get(/databases/$(database)/documents/restaurantes/$(restauranteId)).data.maxMesas
           && (!('statusEstrutural' in request.resource.data)
             || request.resource.data.statusEstrutural in ['livre', 'reservada', 'bloqueada'])
           && (!('ativa' in request.resource.data) || request.resource.data.ativa is bool);
