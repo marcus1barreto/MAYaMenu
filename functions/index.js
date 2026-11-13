@@ -2453,6 +2453,64 @@ function montarItemPatrocinado(itemMaster, patrocinadorId) {
   };
 }
 
+function criarRefsRateLimitValidacaoCodigo(firestoreDb, codigo, rawRequest) {
+  const ipKey = sanitizarChave(extrairIpConviavel(rawRequest));
+  const codigoHash = crypto.createHash('sha256').update(codigo).digest('hex');
+  const rateCollection = firestoreDb.collection('_activation_validation_rate_limits');
+  return {
+    ipRef: rateCollection.doc('ip_' + ipKey),
+    codigoRef: rateCollection.doc('codigo_' + codigoHash),
+  };
+}
+
+async function verificarRateLimitValidacaoCodigo(firestoreDb, refs) {
+  await firestoreDb.runTransaction(async (tx) => {
+    const [ipSnap, codigoSnap] = await Promise.all([tx.get(refs.ipRef), tx.get(refs.codigoRef)]);
+    const bloqueio = verificarBloqueioAtivo({
+      ipData: ipSnap.exists ? ipSnap.data() : null,
+      userData: codigoSnap.exists ? codigoSnap.data() : null,
+      globalData: null,
+      agora: Date.now(),
+    });
+    if (bloqueio.bloqueado) {
+      throw new functions.https.HttpsError('resource-exhausted', bloqueio.mensagem);
+    }
+  });
+}
+
+async function registrarResultadoRateLimitValidacaoCodigo(firestoreDb, refs, sucesso) {
+  await firestoreDb.runTransaction(async (tx) => {
+    const [ipSnap, codigoSnap] = await Promise.all([tx.get(refs.ipRef), tx.get(refs.codigoRef)]);
+    if (sucesso) {
+      tx.delete(refs.ipRef);
+      tx.delete(refs.codigoRef);
+      return;
+    }
+    const payloads = calcularPayloadsFalha({
+      curIpData: ipSnap.exists ? ipSnap.data() : {},
+      curUserData: codigoSnap.exists ? codigoSnap.data() : {},
+      curGlobalData: {},
+      agora: Date.now(),
+    });
+    tx.set(refs.ipRef, payloads.ipPayload, { merge: true });
+    tx.set(refs.codigoRef, payloads.userPayload, { merge: true });
+  });
+}
+
+async function executarValidarCodigoAtivacaoComRateLimit(firestoreDb, payload, rawRequest) {
+  const codigo = normalizarCodigoAtivacao(payload?.codigo);
+  const refs = criarRefsRateLimitValidacaoCodigo(firestoreDb, codigo, rawRequest);
+  await verificarRateLimitValidacaoCodigo(firestoreDb, refs);
+  try {
+    const resultado = await executarValidarCodigoAtivacao(firestoreDb, payload);
+    await registrarResultadoRateLimitValidacaoCodigo(firestoreDb, refs, true);
+    return resultado;
+  } catch (error) {
+    await registrarResultadoRateLimitValidacaoCodigo(firestoreDb, refs, false);
+    throw error;
+  }
+}
+
 async function executarAtivarInstancia(firestoreDb, authUid, payload) {
   if (!authUid) throw new functions.https.HttpsError('unauthenticated', 'Autenticação necessária.');
   const codigo = normalizarCodigoAtivacao(payload?.codigo);
@@ -2959,8 +3017,8 @@ exports.processarSelloutOutbox = onDocumentCreated({
   return executarProcessarSelloutOutbox(getDb(), event.params.restauranteId, event.params.eventId);
 });
 
-exports.validarCodigoAtivacaoBackend = functions.https.onCall(async (data) => {
-  return executarValidarCodigoAtivacao(getDb(), data);
+exports.validarCodigoAtivacaoBackend = functions.https.onCall(async (data, context) => {
+  return executarValidarCodigoAtivacaoComRateLimit(getDb(), data, context.rawRequest);
 });
 
 exports.ativarInstanciaBackend = functions.https.onCall(async (data, context) => {
@@ -3052,6 +3110,7 @@ exports._internal = {
   executarDesativarMesa,
   executarChamarGarcom,
   executarValidarCodigoAtivacao,
+  executarValidarCodigoAtivacaoComRateLimit,
   executarAutenticarPatrocinador,
   executarAtivarInstancia,
   executarAtivarPatrocinio,
