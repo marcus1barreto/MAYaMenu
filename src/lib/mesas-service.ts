@@ -46,16 +46,16 @@ export async function alternarStatusLoteMesas(
   ativa: boolean
 ): Promise<void> {
   if (!restauranteId || numerosMesas.length === 0) return;
-  const promises = numerosMesas.map(async (num) => {
+  const snapshots = await Promise.all(numerosMesas.map(async (num) => {
     const mesaRef = doc(db, "restaurantes", restauranteId, "mesas", String(num));
-    const snap = await getDoc(mesaRef);
-    const statusAtual = snap.exists() ? snap.data().statusEstrutural : undefined;
-    await salvarConfigMesa(restauranteId, num, {
-      ativa,
-      ...(ativa && statusAtual === "inativa" ? { statusEstrutural: "livre" as const } : {}),
-    });
-  });
-  await Promise.all(promises);
+    return { num, snap: await getDoc(mesaRef) };
+  }));
+  if (ativa && snapshots.some(({ snap }) => snap.exists() && snap.data().statusEstrutural === "inativa")) {
+    throw new Error("Uma ou mais mesas foram desativadas permanentemente. Reative-as somente pelo fluxo seguro de reemissão do QR Code.");
+  }
+  await Promise.all(snapshots.map(({ num }) =>
+    salvarConfigMesa(restauranteId, num, { ativa })
+  ));
 }
 
 /**
