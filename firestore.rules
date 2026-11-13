@@ -166,8 +166,7 @@ service cloud.firestore {
         && existsAfter(/databases/$(database)/documents/arquivo_morto_licencas/$(request.resource.data.licenca.id))
         && !existsAfter(/databases/$(database)/documents/concessoes/$(request.resource.data.licenca.id))
         && getAfter(/databases/$(database)/documents/arquivo_morto_licencas/$(request.resource.data.licenca.id)).data.ownerId == request.auth.uid
-        && getAfter(/databases/$(database)/documents/arquivo_morto_licencas/$(request.resource.data.licenca.id)).data.dadosLicenca.plano == request.resource.data.plano
-        ;
+        && getAfter(/databases/$(database)/documents/arquivo_morto_licencas/$(request.resource.data.licenca.id)).data.dadosLicenca.plano == request.resource.data.plano;
 
       // Lojista só altera campos cadastrais não privilegiados. Plano, licença, titularidade,
       // suspensão e limites são governados exclusivamente pelo SuperAdmin/backend.
