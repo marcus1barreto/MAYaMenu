@@ -21,6 +21,7 @@ import {
 import { CartaoConcessaoModal } from "./cartao-concessao-modal";
 import { validarVoucherPatrocinio, ativarPatrocinioNoRestaurante } from "@/lib/b2b-service";
 import { auth } from "@/lib/firebase";
+import { sendPasswordResetEmail } from "firebase/auth";
 import type { ModoOperacao } from "@/types";
 import Link from "next/link";
 
@@ -108,9 +109,13 @@ export function AdminLoginForm({ onLogado }: { onLogado?: () => void }) {
     whatsapp: string;
   } | null>(null);
 
+  const [enviandoReset, setEnviandoReset] = useState(false);
+  const [resetFeedback, setResetFeedback] = useState<string | null>(null);
+
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErro(null);
+    setResetFeedback(null);
     setSubmetendo(true);
 
     try {
@@ -121,6 +126,25 @@ export function AdminLoginForm({ onLogado }: { onLogado?: () => void }) {
       setErro(msg);
     } finally {
       setSubmetendo(false);
+    }
+  };
+
+  const handleEsqueciSenha = async () => {
+    setErro(null);
+    setResetFeedback(null);
+    const emailLimpo = loginEmail.trim();
+    if (!emailLimpo || !emailLimpo.includes("@")) {
+      setErro("Informe o e-mail cadastrado no campo acima para receber o link de redefinição.");
+      return;
+    }
+    setEnviandoReset(true);
+    try {
+      await sendPasswordResetEmail(auth, emailLimpo);
+      setResetFeedback("Se o e-mail estiver cadastrado, enviaremos um link para redefinir sua senha. Confira também a caixa de spam.");
+    } catch {
+      setResetFeedback("Se o e-mail estiver cadastrado, enviaremos um link para redefinir sua senha. Confira também a caixa de spam.");
+    } finally {
+      setEnviandoReset(false);
     }
   };
 
@@ -298,10 +322,20 @@ export function AdminLoginForm({ onLogado }: { onLogado?: () => void }) {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-bold uppercase tracking-wider text-neutral-700 flex items-center gap-1.5">
-                <Lock className="w-3.5 h-3.5 text-neutral-400" />
-                Senha
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold uppercase tracking-wider text-neutral-700 flex items-center gap-1.5">
+                  <Lock className="w-3.5 h-3.5 text-neutral-400" />
+                  Senha
+                </label>
+                <button
+                  type="button"
+                  onClick={handleEsqueciSenha}
+                  disabled={enviandoReset || submetendo}
+                  className="text-xs font-semibold text-rose-600 hover:text-rose-700 hover:underline disabled:opacity-50"
+                >
+                  {enviandoReset ? "Enviando..." : "Esqueci minha senha"}
+                </button>
+              </div>
               <Input
                 type="password"
                 value={loginSenha}
@@ -311,6 +345,12 @@ export function AdminLoginForm({ onLogado }: { onLogado?: () => void }) {
                 className="bg-neutral-50 border-neutral-200 text-neutral-900 placeholder:text-neutral-400 rounded-xl h-11 focus:bg-white focus:border-rose-500 focus:ring-1 focus:ring-rose-500"
               />
             </div>
+
+            {resetFeedback && (
+              <div className="rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-2 text-xs text-emerald-800">
+                {resetFeedback}
+              </div>
+            )}
 
             <Button
               type="submit"
