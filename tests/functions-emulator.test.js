@@ -546,6 +546,23 @@ async function main() {
     );
   });
 
+  await runTest("Emulador: liberação não contabiliza subtotal legado quando todos os pedidos foram cancelados", async () => {
+    const { rest, comanda } = await seed(db, 16, "cli_todos_cancelados");
+    const pedidos = await comanda.collection("pedidos").get();
+    for (const pedido of pedidos.docs) {
+      await pedido.ref.update({ status: "cancelado" });
+    }
+    const fechado = await executarFecharComanda(db, "garcom_e", {}, {
+      ...base, mesa: 16, clienteId: "cli_todos_cancelados",
+    });
+    assert.strictEqual(fechado.sucesso, true);
+    const liberado = await executarLiberarMesa(db, "garcom_e", {}, {
+      ...base, mesa: 16, comandasIds: ["cli_todos_cancelados"],
+    });
+    const historico = await rest.collection("historico_sessoes_mesas").doc(liberado.historicoId).get();
+    assert.strictEqual(historico.data().subtotalTotal, 0);
+  });
+
   await runTest("Emulador: desativarMesaBackend bloqueia com comanda/ticket ativo e desativa mesa livre", async () => {
     const { rest } = await seed(db, 6, "cli_m6");
     await rest.collection("mesas").doc("6").set({
