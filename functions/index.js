@@ -2326,6 +2326,18 @@ async function localizarLoteVoucher(firestoreDb, codigo, transaction) {
   return { loteDoc, lote, patrocinadorId };
 }
 
+function criarClaimsSessaoPatrocinador(patrocinadorId, patrocinadorData) {
+  const versao = Number(patrocinadorData?.authVersion || 0);
+  if (!Number.isSafeInteger(versao) || versao < 0) {
+    throw new functions.https.HttpsError('failed-precondition', 'Versão de autenticação B2B inválida.');
+  }
+  return {
+    role: 'sponsor',
+    patrocinadorId,
+    authVersion: versao,
+  };
+}
+
 async function executarAutenticarPatrocinador(firestoreDb, payload, rawRequest) {
   const chave = String(payload?.chave || '').trim().toUpperCase();
   // Aceita somente chaves novas com 130 bits de entropia; credenciais legadas
@@ -2387,10 +2399,12 @@ async function executarAutenticarPatrocinador(firestoreDb, payload, rawRequest) 
     throw new functions.https.HttpsError('unauthenticated', 'Chave B2B inválida ou não autorizada.');
   }
 
-  const customToken = await admin.auth().createCustomToken(patrocinadorRef.id, {
-    role: 'sponsor',
-    patrocinadorId: patrocinadorRef.id,
-  });
+  // A versão acompanha o custom claim para que Rules e validação da sessão
+  // rejeitem imediatamente tokens anteriores após suspensão/rotação da credencial.
+  const customToken = await admin.auth().createCustomToken(
+    patrocinadorRef.id,
+    criarClaimsSessaoPatrocinador(patrocinadorRef.id, patrocinadorData)
+  );
   return {
     customToken,
     patrocinador: {
@@ -3312,6 +3326,7 @@ exports._internal = {
   executarValidarCodigoAtivacao,
   executarValidarCodigoAtivacaoComRateLimit,
   executarAutenticarPatrocinador,
+  criarClaimsSessaoPatrocinador,
   executarAtivarInstancia,
   executarAtivarPatrocinio,
   executarProcessarSelloutOutbox,
