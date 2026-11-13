@@ -30,7 +30,7 @@ service cloud.firestore {
     function isSponsor(patrocinadorId) {
       return hasSponsorSession(patrocinadorId)
         && get(/databases/$(database)/documents/patrocinadores/$(patrocinadorId)).data.ativo == true
-        && request.auth.token.authVersion == get(/databases/$(database)/documents/patrocinadores/$(patrocinadorId)).data.get('authVersion', 1);
+        && request.auth.token.authVersion == get(/databases/$(database)/documents/patrocinadores/$(patrocinadorId)).data.get('authVersion', 0);
     }
 
     // -----------------------------------------------------------------
@@ -134,7 +134,7 @@ service cloud.firestore {
       allow read: if isSuperAdmin() || (
         hasSponsorSession(patrocinadorId)
         && resource.data.ativo == true
-        && request.auth.token.authVersion == resource.data.get('authVersion', 1)
+        && request.auth.token.authVersion == resource.data.get('authVersion', 0)
       );
       allow write: if isSuperAdmin();
 
