@@ -13,6 +13,8 @@ export default function ParceirosPage() {
   // Restaura apenas a sessão Firebase secundária; a chave bruta nunca é persistida.
   useEffect(() => {
     let ativo = true;
+    sessionStorage.removeItem("mayamenu_b2b_token");
+    sessionStorage.removeItem("mayamenu_b2b_patrocinador");
     validarSessaoPatrocinador()
       .then((pat) => {
         if (ativo) setPatrocinador(pat);
