@@ -105,11 +105,13 @@ export function SetupMesas({ restauranteId, maxMesas }: SetupMesasProps) {
         // Desativação permanente: backend verifica comandas/KDS e revoga a credencial QR.
         await desativarMesaFirestore(restauranteId, num);
       } else {
-        // Reativação após desativação permanente exige nova emissão de QR ao abrir a mesa.
-        await salvarConfigMesa(restauranteId, num, {
-          ativa: true,
-          ...(statusEstrutural === "inativa" ? { statusEstrutural: "livre" } : {}),
-        });
+        // Uma mesa desativada permanentemente só pode voltar por fluxo backend que emita
+        // uma nova credencial QR. Não reativar alterando campos diretamente no cliente.
+        if (statusEstrutural === "inativa") {
+          alert("Esta mesa foi desativada permanentemente. A reativação exige reemissão segura do QR Code pela administração.");
+          return;
+        }
+        await salvarConfigMesa(restauranteId, num, { ativa: true });
       }
     } catch (err) {
       console.error("Falha ao alterar estado da mesa:", err);
