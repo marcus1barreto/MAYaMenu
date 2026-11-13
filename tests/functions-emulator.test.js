@@ -775,6 +775,43 @@ async function main() {
     );
   });
 
+  await runTest("Emulador: concessão, lote e patrocinador sem estado ativo explícito falham fechados", async () => {
+    await db.doc("concessoes/LICENCA-SEM-STATUS-001").set({
+      plano: "pro", limites: { maxMesas: 30, maxPratos: 60 },
+      expiracaoEm: new Date(Date.now() + 86400000).toISOString(),
+    });
+    await assert.rejects(
+      () => executarValidarCodigoAtivacao(db, { codigo: "LICENCA-SEM-STATUS-001" }),
+      /não está disponível/i
+    );
+
+    const patAtivo = db.doc("patrocinadores/spn_lote_sem_ativo");
+    await patAtivo.set({ nomeFantasia: "Marca", ativo: true });
+    await patAtivo.collection("lotes_licencas").doc("lote-sem-ativo").set({
+      id: "lote-sem-ativo", patrocinadorId: patAtivo.id,
+      codigoCampanha: "VOUCHER-SEM-ATIVO-001",
+      totalLicencas: 2, licencasAtivadas: 0, validadeMeses: 6,
+      restaurantesVinculados: [],
+    });
+    await assert.rejects(
+      () => executarValidarCodigoAtivacao(db, { codigo: "VOUCHER-SEM-ATIVO-001" }),
+      /lote de patrocínio está inativo/i
+    );
+
+    const patSemAtivo = db.doc("patrocinadores/spn_sem_ativo");
+    await patSemAtivo.set({ nomeFantasia: "Marca sem status" });
+    await patSemAtivo.collection("lotes_licencas").doc("lote-pat-sem-ativo").set({
+      id: "lote-pat-sem-ativo", patrocinadorId: patSemAtivo.id,
+      codigoCampanha: "VOUCHER-SPONSOR-SEM-ATIVO",
+      totalLicencas: 2, licencasAtivadas: 0, validadeMeses: 6, ativo: true,
+      restaurantesVinculados: [],
+    });
+    await assert.rejects(
+      () => executarValidarCodigoAtivacao(db, { codigo: "VOUCHER-SPONSOR-SEM-ATIVO" }),
+      /patrocinador inativo ou inexistente/i
+    );
+  });
+
   await runTest("Emulador: voucher de lote B2B inativo não pode ser validado nem consumido", async () => {
     const pat = db.doc("patrocinadores/spn_lote_inativo");
     await pat.set({ nomeFantasia: "Marca Inativa", ativo: true });
