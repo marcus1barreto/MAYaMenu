@@ -861,12 +861,15 @@ async function runTests() {
     }
   });
 
-  await test("Slug: lojista NÃO pode sobrescrever slug pertencente a outro restaurante", async () => {
+  await test("Slug: reserva e alteração são exclusivas do backend/SuperAdmin", async () => {
     const ownerA = testEnv.authenticatedContext("owner_a", { firebase: { sign_in_provider: "password" } }).firestore();
     const ownerB = testEnv.authenticatedContext("owner_b", { firebase: { sign_in_provider: "password" } }).firestore();
-    await assertSucceeds(ownerA.doc("slugs/bistro-a").set({ slug: "bistro-a", ownerId: "owner_a" }));
+    const adminDb = testEnv.authenticatedContext("admin_uid", { superadmin: true }).firestore();
+    await assertFails(ownerA.doc("slugs/bistro-a").set({ slug: "bistro-a", ownerId: "owner_a" }));
     await assertFails(ownerB.doc("slugs/bistro-a").set({ slug: "bistro-a", ownerId: "owner_b" }));
+    await assertSucceeds(adminDb.doc("slugs/bistro-a").set({ slug: "bistro-a", ownerId: "owner_a" }));
     await assertFails(ownerB.doc("slugs/bistro-a").delete());
+    await assertFails(ownerB.doc("slugs/bistro-a").update({ ownerId: "owner_b" }));
   });
 
   await test("Comanda aberta: exclusão direta negada para dono, garçom e cliente titular", async () => {
