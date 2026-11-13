@@ -123,7 +123,7 @@ export async function salvarPatrocinador(
     `SPN-${gerarTokenB2BSeguro(26)}`;
 
   const docRef = doc(db, "patrocinadores", id);
-  const payload: Partial<PatrocinadorB2B> = {
+  const payload = {
     ...dados,
     id,
     slug,
