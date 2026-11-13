@@ -245,28 +245,17 @@ export async function criarLoteLicencas(
     validadeMeses: number;
   }
 ): Promise<string> {
-  const loteId = `lote-${dados.codigoCampanha.toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 32)}-${gerarTokenB2BSeguro(8).toLowerCase()}`;
-  const docRef = doc(db, "patrocinadores", patrocinadorId, "lotes_licencas", loteId);
-
-  const hoje = new Date();
-  const dataExpiracao = new Date(hoje.setMonth(hoje.getMonth() + dados.validadeMeses)).toISOString();
-
-  const payload: LoteLicencasB2B = {
-    id: loteId,
+  const criarFn = httpsCallable(functions, "criarLoteLicencasB2BSuperadminBackend");
+  const resposta = await criarFn({
     patrocinadorId,
     nome: dados.nome,
-    codigoCampanha: dados.codigoCampanha.toUpperCase(),
+    codigoCampanha: dados.codigoCampanha.trim().toUpperCase(),
     totalLicencas: dados.totalLicencas,
-    licencasAtivadas: 0,
     validadeMeses: dados.validadeMeses,
-    dataExpiracao,
-    ativo: true,
-    restaurantesVinculados: [],
-    criadoEm: serverTimestamp(),
-  };
-
-  await setDoc(docRef, payload);
-  return loteId;
+  });
+  const resultado = resposta.data as { loteId?: string };
+  if (!resultado.loteId) throw new Error("O servidor não confirmou a criação do lote B2B.");
+  return resultado.loteId;
 }
 
 /**
