@@ -942,6 +942,26 @@ function normalizarMesaIdentificador(mesa) {
   return { mesaId: String(numero), numero, original };
 }
 
+function validarLimiteMesaLicenciado(restData, numeroMesa) {
+  const limiteInformado = restData?.maxMesas
+    ?? restData?.licenca?.limites?.maxMesas
+    ?? restData?.licenca?.maxMesas;
+  const limite = Number(limiteInformado);
+  if (!Number.isSafeInteger(limite) || limite < 1) {
+    throw new functions.https.HttpsError(
+      'failed-precondition',
+      'Limite de mesas da licença ausente ou inválido. Regularize a licença antes de operar mesas.'
+    );
+  }
+  if (!Number.isSafeInteger(numeroMesa) || numeroMesa < 1 || numeroMesa > limite) {
+    throw new functions.https.HttpsError(
+      'failed-precondition',
+      'Mesa fora da capacidade licenciada do estabelecimento.'
+    );
+  }
+  return limite;
+}
+
 /**
  * Gera ou rotaciona a credencial secreta de QR Code de uma mesa física.
  * Armazena apenas o hash SHA-256 no Firestore (qrCredencialHash) e entrega a credencial
@@ -979,10 +999,7 @@ async function executarGarantirCredencialMesa(firestoreDb, authUid, authToken, p
   if (!Number.isInteger(numMesaParsed) || numMesaParsed < 1) {
     throw new functions.https.HttpsError('invalid-argument', 'Número de mesa inválido.');
   }
-  const maxMesasRest = Number(restData.maxMesas || restData.licenca?.maxMesas || 0);
-  if (maxMesasRest > 0 && numMesaParsed > maxMesasRest) {
-    throw new functions.https.HttpsError('invalid-argument', 'Mesa fora da capacidade licenciada.');
-  }
+  validarLimiteMesaLicenciado(restData, numMesaParsed);
 
   const mesaRef = restDoc.ref.collection('mesas').doc(mesaStr);
   let respostaCredencial = null;
@@ -1086,10 +1103,7 @@ async function executarEmissaoSessaoMesa(firestoreDb, authUid, payload) {
   if (!Number.isInteger(numMesaParsed) || numMesaParsed < 1) {
     throw new functions.https.HttpsError('invalid-argument', 'Número de mesa inválido.');
   }
-  const maxMesasRest = Number(restData.maxMesas || restData.licenca?.maxMesas || 0);
-  if (maxMesasRest > 0 && numMesaParsed > maxMesasRest) {
-    throw new functions.https.HttpsError('invalid-argument', 'Mesa fora da capacidade licenciada.');
-  }
+  validarLimiteMesaLicenciado(restData, numMesaParsed);
 
   const mesaSnap = await restDoc.ref.collection('mesas').doc(mesaStr).get();
   if (!mesaSnap.exists) {
@@ -1197,10 +1211,7 @@ async function executarCriacaoPedidoCliente(firestoreDb, authUid, payload) {
   if (!Number.isInteger(numMesaParsed) || numMesaParsed < 1) {
     throw new functions.https.HttpsError('invalid-argument', 'Número de mesa inválido.');
   }
-  const maxMesasRest = Number(restData.maxMesas || restData.licenca?.maxMesas || 0);
-  if (maxMesasRest > 0 && numMesaParsed > maxMesasRest) {
-    throw new functions.https.HttpsError('invalid-argument', 'Mesa fora da capacidade licenciada do estabelecimento.');
-  }
+  validarLimiteMesaLicenciado(restData, numMesaParsed);
   const mesaNumero = numMesaParsed;
 
   // Valida prova criptográfica de sessão vinculada ao restaurante, mesa e authUid
@@ -1591,10 +1602,7 @@ async function executarLancamentoPedidoGarcom(firestoreDb, authUid, authToken, p
   if (!Number.isInteger(numMesaParsed) || numMesaParsed < 1) {
     throw new functions.https.HttpsError('invalid-argument', 'Número de mesa inválido.');
   }
-  const maxMesasRest = Number(restData.maxMesas || restData.licenca?.maxMesas || 0);
-  if (maxMesasRest > 0 && numMesaParsed > maxMesasRest) {
-    throw new functions.https.HttpsError('invalid-argument', 'Mesa fora da capacidade licenciada.');
-  }
+  validarLimiteMesaLicenciado(restData, numMesaParsed);
   const mesaNumero = numMesaParsed;
 
   const mesaRef = restDoc.ref.collection('mesas').doc(mesaStr);
@@ -3908,6 +3916,7 @@ async function executarChamarGarcom(firestoreDb, authUid, payload) {
   if (!/^\d+$/.test(mesaInformada) || !Number.isSafeInteger(numeroMesa) || numeroMesa < 1 || numeroMesa > 99999) {
     throw new functions.https.HttpsError('invalid-argument', 'Número de mesa inválido.');
   }
+  validarLimiteMesaLicenciado(restData, numeroMesa);
   // IDs numéricos de mesa são canônicos: "01" e "1" não podem divergir.
   const mesaStr = String(numeroMesa);
   const mesaRef = restDoc.ref.collection('mesas').doc(mesaStr);
@@ -4137,6 +4146,7 @@ async function executarReativarMesa(firestoreDb, authUid, authToken, payload) {
   }
 
   const mesaNormalizada = normalizarMesaIdentificador(mesa);
+  validarLimiteMesaLicenciado(restData, mesaNormalizada.numero);
   const mesaStr = mesaNormalizada.mesaId;
   const mesaRef = restDoc.ref.collection('mesas').doc(mesaStr);
   const qrCredencial = crypto.randomBytes(24).toString('hex');
