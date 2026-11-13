@@ -13,15 +13,6 @@ export default function ParceirosPage() {
   // Recupera sessão ativa no sessionStorage
   useEffect(() => {
     const tokenSalvo = sessionStorage.getItem("mayamenu_b2b_token");
-    const dadosSalvos = sessionStorage.getItem("mayamenu_b2b_patrocinador");
-
-    if (dadosSalvos) {
-      try {
-        setPatrocinador(JSON.parse(dadosSalvos));
-      } catch {
-        // Ignora erro de parse
-      }
-    }
 
     if (tokenSalvo) {
       buscarPatrocinadorPorChave(tokenSalvo)
@@ -29,10 +20,15 @@ export default function ParceirosPage() {
           if (pat) {
             setPatrocinador(pat);
             sessionStorage.setItem("mayamenu_b2b_patrocinador", JSON.stringify(pat));
+          } else {
+            sessionStorage.removeItem("mayamenu_b2b_token");
+            sessionStorage.removeItem("mayamenu_b2b_patrocinador");
+            setPatrocinador(null);
           }
         })
         .finally(() => setCarregando(false));
     } else {
+      sessionStorage.removeItem("mayamenu_b2b_patrocinador");
       setCarregando(false);
     }
   }, []);
