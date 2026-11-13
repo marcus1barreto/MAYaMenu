@@ -2205,40 +2205,85 @@ async function localizarLoteVoucher(firestoreDb, codigo, transaction) {
   return { loteDoc, lote, patrocinadorId };
 }
 
-async function executarAutenticarPatrocinador(firestoreDb, payload) {
+async function executarAutenticarPatrocinador(firestoreDb, payload, rawRequest) {
   const chave = String(payload?.chave || '').trim().toUpperCase();
   if (!chave || chave.length > 120) {
     throw new functions.https.HttpsError('invalid-argument', 'Chave B2B inválida.');
   }
-  const snap = await firestoreDb.collection('patrocinadores')
+
+  const encontrados = await firestoreDb.collection('patrocinadores')
     .where('chaveAcessoB2B', '==', chave)
     .limit(2)
     .get();
-  if (snap.size !== 1) {
+  const patrocinadorRef = encontrados.size === 1 ? encontrados.docs[0].ref : null;
+
+  const agora = Date.now();
+  const ipKey = sanitizarChave(extrairIpConviavel(rawRequest));
+  const chaveHash = crypto.createHash('sha256').update(chave).digest('hex');
+  const rateCollection = firestoreDb.collection('_b2b_auth_rate_limits');
+  const ipRateRef = rateCollection.doc('ip_' + ipKey);
+  const keyRateRef = rateCollection.doc('key_' + chaveHash);
+  const globalRateRef = rateCollection.doc('global');
+  let patrocinadorData = null;
+
+  await firestoreDb.runTransaction(async (tx) => {
+    const [ipSnap, keySnap, globalSnap, sponsorSnap] = await Promise.all([
+      tx.get(ipRateRef),
+      tx.get(keyRateRef),
+      tx.get(globalRateRef),
+      patrocinadorRef ? tx.get(patrocinadorRef) : Promise.resolve(null),
+    ]);
+    const bloqueio = verificarBloqueioAtivo({
+      ipData: ipSnap.exists ? ipSnap.data() : null,
+      userData: keySnap.exists ? keySnap.data() : null,
+      globalData: globalSnap.exists ? globalSnap.data() : null,
+      agora,
+    });
+    if (bloqueio.bloqueado) {
+      throw new functions.https.HttpsError('resource-exhausted', bloqueio.mensagem);
+    }
+
+    const atual = sponsorSnap?.exists ? (sponsorSnap.data() || {}) : null;
+    const chaveValida = Boolean(atual && atual.ativo !== false && atual.chaveAcessoB2B === chave);
+    if (!chaveValida) {
+      const payloads = calcularPayloadsFalha({
+        curIpData: ipSnap.exists ? ipSnap.data() : {},
+        curUserData: keySnap.exists ? keySnap.data() : {},
+        curGlobalData: globalSnap.exists ? globalSnap.data() : {},
+        agora,
+      });
+      tx.set(ipRateRef, payloads.ipPayload, { merge: true });
+      tx.set(keyRateRef, payloads.userPayload, { merge: true });
+      tx.set(globalRateRef, payloads.globalPayload, { merge: true });
+      return;
+    }
+
+    tx.delete(ipRateRef);
+    tx.delete(keyRateRef);
+    patrocinadorData = atual;
+  });
+
+  if (!patrocinadorRef || !patrocinadorData) {
     throw new functions.https.HttpsError('unauthenticated', 'Chave B2B inválida ou não autorizada.');
   }
-  const docPatrocinador = snap.docs[0];
-  const dados = docPatrocinador.data() || {};
-  if (dados.ativo === false) {
-    throw new functions.https.HttpsError('permission-denied', 'Acesso B2B suspenso. Contate a administração.');
-  }
-  const customToken = await admin.auth().createCustomToken(docPatrocinador.id, {
+
+  const customToken = await admin.auth().createCustomToken(patrocinadorRef.id, {
     role: 'sponsor',
-    patrocinadorId: docPatrocinador.id,
+    patrocinadorId: patrocinadorRef.id,
   });
   return {
     customToken,
     patrocinador: {
-      id: docPatrocinador.id,
-      cnpj: String(dados.cnpj || ''),
-      razaoSocial: String(dados.razaoSocial || ''),
-      nomeFantasia: String(dados.nomeFantasia || ''),
-      slug: String(dados.slug || ''),
+      id: patrocinadorRef.id,
+      cnpj: String(patrocinadorData.cnpj || ''),
+      razaoSocial: String(patrocinadorData.razaoSocial || ''),
+      nomeFantasia: String(patrocinadorData.nomeFantasia || ''),
+      slug: String(patrocinadorData.slug || ''),
       chaveAcessoB2B: chave,
-      logoUrl: String(dados.logoUrl || ''),
-      bannerUrl: String(dados.bannerUrl || ''),
-      corMarca: String(dados.corMarca || ''),
-      contatoResponsavel: dados.contatoResponsavel || {},
+      logoUrl: String(patrocinadorData.logoUrl || ''),
+      bannerUrl: String(patrocinadorData.bannerUrl || ''),
+      corMarca: String(patrocinadorData.corMarca || ''),
+      contatoResponsavel: patrocinadorData.contatoResponsavel || {},
       ativo: true,
     },
   };
@@ -2866,8 +2911,8 @@ async function executarDesativarMesa(firestoreDb, authUid, authToken, payload) {
   return resultado;
 }
 
-exports.autenticarPatrocinadorBackend = functions.https.onCall(async (data) => {
-  return executarAutenticarPatrocinador(getDb(), data);
+exports.autenticarPatrocinadorBackend = functions.https.onCall(async (data, context) => {
+  return executarAutenticarPatrocinador(getDb(), data, context.rawRequest);
 });
 
 exports.processarSelloutOutbox = functions.firestore
