@@ -59,16 +59,22 @@ export function MenuView({
   useEffect(() => {
     if (typeof window === "undefined") return;
     const storageKey = `mayamenu_qr_${restauranteInicial.id}_mesa_${String(numeroMesa)}`;
-    let qrDetectada = qrCredencialInicial;
-    try {
-      const hashStr = window.location.hash || "";
-      if (hashStr.includes("qr=")) {
-        const hashParams = new URLSearchParams(hashStr.replace(/^#/, ""));
-        const qrDoHash = hashParams.get("qr");
-        if (qrDoHash) qrDetectada = qrDoHash;
+    // A credencial recebida na URL pertence exclusivamente à mesa inicial.
+    // Em trocas internas, a credencial recém-lida deve vir do storage da nova mesa;
+    // nunca reaplicar o QR inicial sobre a mesa selecionada pelo scanner.
+    const ehMesaInicial = String(numeroMesa) === String(numeroMesaProp);
+    let qrDetectada = ehMesaInicial ? qrCredencialInicial : undefined;
+    if (ehMesaInicial) {
+      try {
+        const hashStr = window.location.hash || "";
+        if (hashStr.includes("qr=")) {
+          const hashParams = new URLSearchParams(hashStr.replace(/^#/, ""));
+          const qrDoHash = hashParams.get("qr");
+          if (qrDoHash) qrDetectada = qrDoHash;
+        }
+      } catch {
+        // Ignora
       }
-    } catch {
-      // Ignora
     }
 
     if (qrDetectada) {
