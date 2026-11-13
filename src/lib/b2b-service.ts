@@ -140,6 +140,7 @@ export async function buscarPatrocinadorPorChave(
     const resposta = await autenticarFn({ chave: chaveLimpa });
     const dados = resposta.data as { customToken?: string; patrocinador?: PatrocinadorB2B };
     if (!dados.customToken || !dados.patrocinador?.id) return null;
+    await signOut(b2bAuth).catch(() => undefined);
     await setPersistence(b2bAuth, browserSessionPersistence);
     await signInWithCustomToken(b2bAuth, dados.customToken);
     return dados.patrocinador;
