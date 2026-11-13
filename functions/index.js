@@ -3554,7 +3554,8 @@ async function executarAtivarInstancia(firestoreDb, authUid, authToken, payload,
     }
     const { loteDoc, lote, patrocinadorId } = voucher;
     const patRef = firestoreDb.collection('patrocinadores').doc(patrocinadorId);
-    const catalogoQuery = patRef.collection('catalogo_master');
+    // Limita a leitura e o volume transacional; 451 permite detectar excesso sem varrer catálogo ilimitado.
+    const catalogoQuery = patRef.collection('catalogo_master').limit(451);
     const [patSnap, catalogoSnap] = await Promise.all([tx.get(patRef), tx.get(catalogoQuery)]);
     if (!patSnap.exists || patSnap.data()?.ativo === false) {
       throw new functions.https.HttpsError('failed-precondition', 'Patrocinador inativo ou inexistente.');
@@ -3568,6 +3569,9 @@ async function executarAtivarInstancia(firestoreDb, authUid, authToken, payload,
     }
     const cotas = validarCotaLoteVoucher(lote);
     const pat = patSnap.data() || {};
+    if (catalogoSnap.size > 450) {
+      throw new functions.https.HttpsError('failed-precondition', 'Catálogo Master excede o limite de 450 documentos.');
+    }
     const itensMaster = obterItensMasterPatrocinio(patrocinadorId, catalogoSnap);
     if (itensMaster.length === 0) {
       throw new functions.https.HttpsError('failed-precondition', 'Patrocinador sem produtos cadastrados no Catálogo Master.');
@@ -3685,7 +3689,8 @@ async function executarAtivarPatrocinio(firestoreDb, authUid, token, payload, ra
     if (!voucher) throw new functions.https.HttpsError('not-found', 'Voucher de patrocínio não encontrado.');
     const { loteDoc, lote, patrocinadorId } = voucher;
     const patRef = firestoreDb.collection('patrocinadores').doc(patrocinadorId);
-    const catalogoQuery = patRef.collection('catalogo_master');
+    // Limita a leitura e o volume transacional; 451 permite detectar excesso sem varrer catálogo ilimitado.
+    const catalogoQuery = patRef.collection('catalogo_master').limit(451);
     const [patSnap, catalogoSnap] = await Promise.all([tx.get(patRef), tx.get(catalogoQuery)]);
     if (!patSnap.exists || patSnap.data()?.ativo === false) throw new functions.https.HttpsError('failed-precondition', 'Patrocinador inativo.');
     const expiracaoLote = millisDataAtivacao(lote.dataExpiracao);
@@ -3702,6 +3707,9 @@ async function executarAtivarPatrocinio(firestoreDb, authUid, token, payload, ra
         itensInjetados: patrocinioExistente.itensInjetados || [],
       }] : []
     );
+    if (catalogoSnap.size > 450) {
+      throw new functions.https.HttpsError('failed-precondition', 'Catálogo Master excede o limite de 450 documentos.');
+    }
     const itensMaster = obterItensMasterPatrocinio(patrocinadorId, catalogoSnap);
     if (itensMaster.length === 0) {
       throw new functions.https.HttpsError('failed-precondition', 'Patrocinador sem produtos cadastrados no Catálogo Master.');
