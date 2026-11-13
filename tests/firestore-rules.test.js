@@ -183,6 +183,10 @@ async function runTests() {
       role: "owner", restauranteId: "rest_a",
     }).firestore();
     const otherDb = testEnv.authenticatedContext("intruso").firestore();
+    const superadminDb = testEnv.authenticatedContext("admin_uid", { superadmin: true }).firestore();
+    await assertFails(anonDb.doc("concessoes/lic_1").get());
+    await assertFails(ownerDb.doc("concessoes/lic_1").get());
+    await assertSucceeds(superadminDb.doc("concessoes/lic_1").get());
     await assertSucceeds(anonDb.doc("restaurantes_publicos/rest_a").get());
     await assertFails(anonDb.doc("restaurantes/rest_a").get());
     await assertSucceeds(ownerDb.doc("restaurantes/rest_a").get());
