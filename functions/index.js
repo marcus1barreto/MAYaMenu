@@ -3028,7 +3028,7 @@ async function executarCriarPreferenciaProBackend(firestoreDb, auth, payload) {
     liveMode,
     status: 'creating',
     criadoEm: admin.firestore.FieldValue.serverTimestamp(),
-    expiraEm: new Date(agora + 24 * 60 * 60 * 1000),
+    expiraEm: new Date(agora + 72 * 60 * 60 * 1000),
   });
 
   const notificationUrl = MERCADO_PAGO_WEBHOOK_URL;
@@ -3055,6 +3055,9 @@ async function executarCriarPreferenciaProBackend(firestoreDb, auth, payload) {
     auto_return: 'approved',
     statement_descriptor: 'MAYAMENU PRO',
     payment_methods: { installments: 12 },
+    expires: true,
+    expiration_date_from: new Date(agora).toISOString(),
+    expiration_date_to: new Date(agora + 72 * 60 * 60 * 1000).toISOString(),
     notification_url: notificationUrl,
   };
 
