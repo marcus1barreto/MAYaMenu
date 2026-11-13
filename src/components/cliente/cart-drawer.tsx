@@ -25,7 +25,7 @@ import { salvarVisitaLocal, gerarComprovanteHash } from "@/lib/historico-cliente
 import { enfileirarPedidoOffline } from "@/lib/offline-queue";
 import cartStorage from "@/lib/cart-storage.cjs";
 
-const { fingerprintQrCredencial } = cartStorage;
+const { fingerprintQrCredencial, isMesaTokenCacheValido } = cartStorage;
 
 function gerarIdempotencyKey(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -138,11 +138,7 @@ export function CartDrawer({
           const cached = sessionStorage.getItem(cacheKey);
           if (cached) {
             const parsed = JSON.parse(cached);
-            if (
-              parsed?.token
-              && parsed?.qrFingerprint === qrFingerprint
-              && Number(parsed?.expiraEm) > Date.now() + 60_000
-            ) {
+            if (isMesaTokenCacheValido(parsed, qrCredencial)) {
               return parsed.token;
             }
             // Token emitido com outro QR (por exemplo, antes de uma rotação) não pode ser reutilizado.
