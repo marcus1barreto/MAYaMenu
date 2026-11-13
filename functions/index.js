@@ -2348,8 +2348,8 @@ async function localizarLoteVoucher(firestoreDb, codigo, transaction) {
 }
 
 function validarCnpjBasico(valor) {
-  const cnpj = String(valor || '').replace(/\\D/g, '');
-  if (!/^\\d{14}$/.test(cnpj) || /^([0-9])\\1{13}$/.test(cnpj)) return false;
+  const cnpj = String(valor || '').replace(/\D/g, '');
+  if (!validarCnpjBasico(cnpj) || /^([0-9])\1{13}$/.test(cnpj)) return false;
   const calcular = (base, pesos) => {
     const soma = base.split('').reduce((total, digito, index) => total + Number(digito) * pesos[index], 0);
     const resto = soma % 11;
