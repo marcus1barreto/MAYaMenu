@@ -1259,6 +1259,7 @@ async function executarCriacaoPedidoCliente(firestoreDb, authUid, payload) {
         nome: String(menuData.nome || 'Item'),
         quantidade,
         precoFinal: unitarioCentavos / 100,
+        origemPatrocinadorId: typeof menuData.origemPatrocinadorId === 'string' ? menuData.origemPatrocinadorId : null,
         tempoPreparoEstimado: menuData.tempoPreparoEstimado ?? null,
         modificadores: modificadoresValidados,
         observacoes: it.observacoes,
@@ -1600,6 +1601,9 @@ async function executarLancamentoPedidoGarcom(firestoreDb, authUid, authToken, p
           `Produto "${mId}" não encontrado no cardápio deste restaurante.`
         );
       }
+      if (menuData.ativo === false) {
+        throw new functions.https.HttpsError('failed-precondition', `O produto "${menuData.nome || mId}" está indisponível no momento.`);
+      }
       const precoBaseCentavos = toCentavosSeguro(menuData.precoBase, 'Preço base');
       const { modificadoresValidados, somaAdicionaisCentavos } = validarModificadoresServidor(
         it.modificadores,
@@ -1617,6 +1621,7 @@ async function executarLancamentoPedidoGarcom(firestoreDb, authUid, authToken, p
         nome: String(menuData.nome || 'Item'),
         quantidade: it.quantidade,
         precoFinal: unitarioCentavos / 100,
+        origemPatrocinadorId: typeof menuData.origemPatrocinadorId === 'string' ? menuData.origemPatrocinadorId : null,
         tempoPreparoEstimado: menuData.tempoPreparoEstimado ?? null,
         modificadores: modificadoresValidados,
         observacoes: it.observacoes,
@@ -1835,6 +1840,8 @@ async function executarFecharComanda(firestoreDb, authUid, authToken, payload) {
   const mesaStr = String(mesa).trim();
   const cId = String(clienteId).trim();
   const comandaRef = restDoc.ref.collection('mesas').doc(mesaStr).collection('comandas_abertas').doc(cId);
+  const selloutEventId = crypto.createHash('sha256').update(`${restDoc.id}|${mesaStr}|${cId}`).digest('hex');
+  const selloutOutboxRef = restDoc.ref.collection('_sellout_outbox').doc(selloutEventId);
   const agoraServer = admin.firestore.FieldValue.serverTimestamp();
   const agoraIso = new Date().toISOString();
   let resultado = null;
@@ -1858,11 +1865,54 @@ async function executarFecharComanda(firestoreDb, authUid, authToken, payload) {
       const s = (d.data() || {}).status;
       return s !== 'cancelado' && s !== 'estornado';
     });
-    if (pedidosAtivos.length * 2 + 1 > MAX_ESCRITAS_POR_TRANSACAO) {
+    if (pedidosAtivos.length * 2 + 2 > MAX_ESCRITAS_POR_TRANSACAO) {
       throw new functions.https.HttpsError('failed-precondition', 'Comanda excede o limite operacional de pedidos.');
     }
     const kdsRefs = pedidosAtivos.map((d) => restDoc.ref.collection('kds_tickets').doc(d.id));
     const kdsSnaps = kdsRefs.length > 0 ? await t.getAll(...kdsRefs) : [];
+    const selloutOutboxSnap = await t.get(selloutOutboxRef);
+
+    // Compatibilidade com pedidos antigos: recupera origem patrocinada pelo menu server-side
+    // somente para itens cujo ID tem prefixo reservado spn- e ainda não carregam origem.
+    const legacySponsorIds = Array.from(new Set(pedidosAtivos.flatMap((pedDoc) =>
+      (Array.isArray(pedDoc.data()?.itens) ? pedDoc.data().itens : [])
+        .filter((it) => !it.origemPatrocinadorId && typeof it.menuItemId === 'string' && it.menuItemId.startsWith('spn-'))
+        .map((it) => it.menuItemId)
+    )));
+    const legacyMenuRefs = legacySponsorIds.map((id) => restDoc.ref.collection('cardapio').doc(id));
+    const legacyMenuSnaps = legacyMenuRefs.length ? await t.getAll(...legacyMenuRefs) : [];
+    const legacySponsorMap = new Map();
+    legacyMenuSnaps.forEach((snap) => {
+      if (snap.exists && typeof snap.data()?.origemPatrocinadorId === 'string') {
+        legacySponsorMap.set(snap.id, snap.data().origemPatrocinadorId);
+      }
+    });
+
+    const selloutAgg = new Map();
+    pedidosAtivos.forEach((pedDoc) => {
+      const pedido = pedDoc.data() || {};
+      (Array.isArray(pedido.itens) ? pedido.itens : []).forEach((item) => {
+        const patrocinadorId = item.origemPatrocinadorId || legacySponsorMap.get(item.menuItemId);
+        const itemId = String(item.menuItemId || '').replace(/^spn-/, '');
+        const quantidade = Number(item.quantidade);
+        const unitarioCentavos = Math.round(Number(item.precoFinal) * 100);
+        if (!patrocinadorId || !itemId || itemId.includes('/') ||
+            !Number.isInteger(quantidade) || quantidade < 1 ||
+            !Number.isSafeInteger(unitarioCentavos) || unitarioCentavos < 0) return;
+        const key = patrocinadorId + '|' + itemId;
+        const atual = selloutAgg.get(key) || {
+          patrocinadorId, itemId, itemNome: String(item.nome || itemId),
+          quantidade: 0, valorTotalCentavos: 0,
+        };
+        atual.quantidade += quantidade;
+        atual.valorTotalCentavos += unitarioCentavos * quantidade;
+        selloutAgg.set(key, atual);
+      });
+    });
+    const itensSellout = Array.from(selloutAgg.values());
+    if (itensSellout.length > 200) {
+      throw new functions.https.HttpsError('failed-precondition', 'Comanda excede o limite seguro de itens patrocinados para fechamento.');
+    }
 
     pedidosAtivos.forEach((pedDoc) => {
       t.update(pedDoc.ref, { status: 'pago', fechadoEm: agoraIso, atualizadoEm: agoraServer });
@@ -1881,6 +1931,17 @@ async function executarFecharComanda(firestoreDb, authUid, authToken, payload) {
       arquivada: true,
       atualizadoEm: agoraServer,
     });
+    if (itensSellout.length > 0 && !selloutOutboxSnap.exists) {
+      t.create(selloutOutboxRef, {
+        eventId: selloutEventId,
+        restauranteId: restDoc.id,
+        mesa: mesaStr,
+        comandaId: cId,
+        itens: itensSellout,
+        criadoEm: agoraServer,
+        processado: false,
+      });
+    }
     resultado = { sucesso: true, idempotente: false };
   });
 
