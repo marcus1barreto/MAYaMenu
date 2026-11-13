@@ -3204,6 +3204,7 @@ exports.sincronizarPerfilPublicoRestaurante = onDocumentWritten({
 });
 
 exports._internal = {
+  validarMembroEquipeParaLogin,
   getMesaTokenSecret,
   verificarMesaToken,
   validarModificadoresServidor,
