@@ -2233,8 +2233,10 @@ async function localizarLoteVoucher(firestoreDb, codigo, transaction) {
 
 async function executarAutenticarPatrocinador(firestoreDb, payload, rawRequest) {
   const chave = String(payload?.chave || '').trim().toUpperCase();
-  if (!chave || chave.length > 120) {
-    throw new functions.https.HttpsError('invalid-argument', 'Chave B2B inválida.');
+  // Aceita somente chaves novas com 130 bits de entropia; credenciais legadas
+  // curtas devem ser reemitidas pelo SuperAdmin antes da liberação do portal.
+  if (!/^SPN-[A-HJ-NP-Z2-9]{26}$/.test(chave)) {
+    throw new functions.https.HttpsError('invalid-argument', 'Chave B2B inválida ou desatualizada. Solicite uma nova credencial à administração.');
   }
 
   const encontrados = await firestoreDb.collection('patrocinadores')
