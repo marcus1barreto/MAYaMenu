@@ -3079,6 +3079,17 @@ async function executarProcessarEstornoPagamentoPro(firestoreDb, attemptId, paym
       return;
     }
 
+    // Antes de restaurar o snapshot, confirma se a assinatura anterior ainda
+    // corresponde a um pagamento aprovado. Um pagamento antigo pode ter sido estornado
+    // depois da contratação de uma assinatura mais nova.
+    const paymentIdAnterior = String(ledger.previousState?.assinatura?.paymentId || '');
+    let previousPaymentLedgerSnap = null;
+    if (paymentIdAnterior && paymentIdAnterior !== paymentId) {
+      previousPaymentLedgerSnap = await tx.get(
+        firestoreDb.collection('pagamentos_pro_processados').doc(paymentIdAnterior)
+      );
+    }
+
     let restRef = null;
     let restSnap = null;
     if (ledgerSnap.exists && ledger.restauranteId) {
@@ -3109,20 +3120,27 @@ async function executarProcessarEstornoPagamentoPro(firestoreDb, attemptId, paym
         ultimoEstornoPagamentoId: paymentId,
       };
 
-      const paymentIdAnterior = String(ledger.previousState?.assinatura?.paymentId || '');
       const paymentIdAtual = String(assinaturaAtual.paymentId || '');
-      const aindaNoEstadoAnterior = paymentIdAtual === paymentIdAnterior;
-      if (ledger.previousState &&
-          (paymentIdAtual === paymentId || aindaNoEstadoAnterior)) {
+      const estadoCorrespondeAoPagamento = paymentIdAtual === paymentId ||
+        paymentIdAtual === paymentIdAnterior;
+
+      if (ledger.previousState && estadoCorrespondeAoPagamento) {
         const anterior = ledger.previousState;
         const assinaturaAnterior = anterior.assinatura;
+        const statusPagamentoAnterior = previousPaymentLedgerSnap?.exists
+          ? String(previousPaymentLedgerSnap.data()?.status || '')
+          : '';
+        const pagamentoAnteriorConfirmado = !paymentIdAnterior ||
+          statusPagamentoAnterior === 'approved' ||
+          (statusPagamentoAnterior === 'partial_refund_review');
         const expiracaoAssinaturaRaw = assinaturaAnterior?.dataExpiracao;
         const expiracaoAssinatura = expiracaoAssinaturaRaw
           ? (typeof expiracaoAssinaturaRaw.toDate === 'function'
             ? expiracaoAssinaturaRaw.toDate()
             : new Date(expiracaoAssinaturaRaw))
           : null;
-        const assinaturaAnteriorAtiva = assinaturaAnterior?.ativa === true &&
+        const assinaturaAnteriorAtiva = pagamentoAnteriorConfirmado &&
+          assinaturaAnterior?.ativa === true &&
           expiracaoAssinatura && Number.isFinite(expiracaoAssinatura.getTime()) &&
           expiracaoAssinatura > new Date();
         const patrocinioAnteriorRaw = anterior.patrocinioDataExpiracao;
@@ -3155,25 +3173,14 @@ async function executarProcessarEstornoPagamentoPro(firestoreDb, attemptId, paym
           : admin.firestore.FieldValue.delete();
         patch.revisaoFinanceira = anterior.revisaoFinanceira || admin.firestore.FieldValue.delete();
       } else {
-        // Estorno de uma cobrança anterior à atual: falha fechada e revisão administrativa.
-        const temProPorLicenca = restData.licenca?.plano === 'pro';
-        const patrocinioExpiraRaw = restData.patrocinio?.dataExpiracao;
-        const patrocinioExpira = patrocinioExpiraRaw
-          ? (typeof patrocinioExpiraRaw.toDate === 'function' ? patrocinioExpiraRaw.toDate() : new Date(patrocinioExpiraRaw))
-          : null;
-        const temProPorPatrocinio = restData.patrocinio?.ativo === true &&
-          patrocinioExpira && Number.isFinite(patrocinioExpira.getTime()) && patrocinioExpira > new Date();
-        const planoFallback = temProPorLicenca || temProPorPatrocinio ? 'pro' : 'free';
-        patch.plano = planoFallback;
-        patch.maxMesas = planoFallback === 'pro' ? 30 : 10;
-        patch.maxPratos = planoFallback === 'pro' ? 60 : 20;
-        patch.maxItensMenu = planoFallback === 'pro' ? 60 : 20;
-        patch.assinatura = admin.firestore.FieldValue.delete();
+        // Estorno fora de ordem: preserva integralmente a assinatura mais recente.
+        // A equipe administrativa decide se há algum ajuste financeiro adicional.
         patch.revisaoFinanceira = {
           status: 'revisao_financeira',
           paymentId,
-          motivo: statusEstorno,
+          motivo: 'Estorno de pagamento anterior à assinatura atualmente ativa.',
           criadoEm: admin.firestore.FieldValue.serverTimestamp(),
+          assinaturaAtualPaymentId: paymentIdAtual || null,
         };
       }
       tx.update(restRef, patch);
