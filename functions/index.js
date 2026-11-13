@@ -902,6 +902,13 @@ async function executarGarantirCredencialMesa(firestoreDb, authUid, authToken, p
   await firestoreDb.runTransaction(async (t) => {
     const mesaSnap = await t.get(mesaRef);
     const mData = mesaSnap.exists ? mesaSnap.data() || {} : {};
+    if (mesaSnap.exists && (
+      mData.ativa === false
+      || mData.statusEstrutural === 'inativa'
+      || mData.statusEstrutural === 'bloqueada'
+    )) {
+      throw new functions.https.HttpsError('failed-precondition', 'Ative e libere a mesa antes de emitir ou rotacionar seu QR Code.');
+    }
 
     if (!rotacionar && typeof mData.qrCredencialHash === 'string' && mData.qrCredencialHash.length === 64) {
       respostaCredencial = {
@@ -1001,7 +1008,7 @@ async function executarEmissaoSessaoMesa(firestoreDb, authUid, payload) {
   }
 
   const mData = mesaSnap.data() || {};
-  if (mData.ativa === false || mData.statusEstrutural === 'bloqueada') {
+  if (mData.ativa === false || mData.statusEstrutural === 'inativa' || mData.statusEstrutural === 'bloqueada') {
     throw new functions.https.HttpsError('failed-precondition', 'Esta mesa não está disponível para atendimento.');
   }
 
@@ -1203,7 +1210,7 @@ async function executarCriacaoPedidoCliente(firestoreDb, authUid, payload) {
         'Sessão da mesa revogada ou expirada. Escaneie o QR Code atualizado da mesa.'
       );
     }
-    if (mData.ativa === false) {
+    if (mData.ativa === false || mData.statusEstrutural === 'inativa') {
       throw new functions.https.HttpsError('failed-precondition', 'Esta mesa está inativa no momento.');
     }
     if (mData.statusEstrutural === 'bloqueada') {
