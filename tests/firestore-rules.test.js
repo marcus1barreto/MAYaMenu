@@ -231,6 +231,9 @@ async function runTests() {
     await assertFails(sponsorADb.doc("patrocinadores/pat_a").update({ chaveAcessoB2B: "ROUBADA" }));
     await assertSucceeds(sponsorADb.doc("patrocinadores/pat_a/catalogo_master/item_b").set({ id: "item_b", nome: "Produto B" }));
     await assertFails(sponsorADb.doc("patrocinadores/pat_a/lotes_licencas/lote_b").set({ codigoCampanha: "FORJADO" }));
+    const adminDb = testEnv.authenticatedContext("admin_uid", { superadmin: true }).firestore();
+    await assertSucceeds(adminDb.doc("patrocinadores/pat_a").update({ ativo: false, authVersion: 2 }));
+    await assertFails(sponsorADb.doc("patrocinadores/pat_a/catalogo_master/item_a").get());
   });
 
   // 1. ISOLAMENTO DE MESAS
