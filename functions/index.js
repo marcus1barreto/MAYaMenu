@@ -34,13 +34,10 @@ function verifyPin(pin, storedHash, storedSalt) {
   }
 }
 
-// Garante conexão ao banco com ID "mayamenu-bd" ou fallback ao default
+// Usa exclusivamente o banco nomeado configurado pelo app. Nunca faz fallback silencioso
+// para (default), pois isso dividiria os dados entre bancos diferentes.
 function getDb() {
-  try {
-    return getFirestore('mayamenu-bd');
-  } catch (err) {
-    return admin.firestore();
-  }
+  return getFirestore('mayamenu-bd');
 }
 
 /**
