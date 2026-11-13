@@ -208,13 +208,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   ) => {
     setCarregando(true);
     try {
-      // 1. Validação estrita inicial da Licença / Concessão
+      // 1. Validação estrita inicial da Licença / Concessão (dispensada no auto-cadastro Free)
       const { validarLicencaParaAtivacao, ativarLicencaEInstanciaAtomica } = await import(
         "@/lib/licenca-service"
       );
-      const validacao = await validarLicencaParaAtivacao(codigoLicenca);
-      if (!validacao.valida) {
-        throw new Error(validacao.motivo || "Código de concessão inválido ou já utilizado.");
+      if (codigoLicenca.trim().toUpperCase() !== "FREE_AUTO") {
+        const validacao = await validarLicencaParaAtivacao(codigoLicenca);
+        if (!validacao.valida) {
+          throw new Error(validacao.motivo || "Código de concessão inválido ou já utilizado.");
+        }
       }
 
       // Validação de unicidade do slug antes de criar qualquer conta

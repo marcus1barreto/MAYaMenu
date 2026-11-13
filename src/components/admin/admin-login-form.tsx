@@ -163,23 +163,14 @@ export function AdminLoginForm({ onLogado }: { onLogado?: () => void }) {
         }
       }
 
-      // 2. Emissão automática de concessão (Plus se patrocinado, Free se comum)
-      const { criarNovaLicenca } = await import("@/lib/licenca-service");
-      const licenca = await criarNovaLicenca({
-        plano: validacaoVoucher ? "pro" : "free",
-        responsavel: cadastroEmail.trim(),
-        notas: validacaoVoucher
-          ? `Concessão Patrocinada por ${validacaoVoucher.patrocinador?.nomeFantasia} (Campanha ${validacaoVoucher.lote?.nome} / Voucher ${codVoucher}). WhatsApp: ${whatsapp.trim() || "Não informado"}`
-          : `Cadastro Direto Web. WhatsApp: ${whatsapp.trim() || "Não informado"}`,
-      });
-
-      // 3. Cadastra usuário e instância de salão com registro de consentimento LGPD
+      // 2. Cadastra usuário e instância no backend (Voucher B2B ou Free automático)
+      const codigoAtivacao = codVoucher || "FREE_AUTO";
       await cadastrar(
         cadastroEmail.trim(),
         cadastroSenha,
         nomeRestaurante.trim(),
         slugFinal,
-        licenca.id,
+        codigoAtivacao,
         "hibrido",
         {
           termsAcceptedAt: new Date().toISOString(),
@@ -187,20 +178,10 @@ export function AdminLoginForm({ onLogado }: { onLogado?: () => void }) {
         }
       );
 
-      // 4. Se for patrocinado, injeta automaticamente os itens do catálogo master e vincula a cota
-      if (validacaoVoucher && auth.currentUser?.uid) {
-        await ativarPatrocinioNoRestaurante({
-          restauranteId: auth.currentUser.uid,
-          nomeRestaurante: nomeRestaurante.trim(),
-          slugRestaurante: slugFinal,
-          codigoVoucher: codVoucher,
-        });
-      }
-
-      // 5. Aciona a transição do Cartão de Concessão Digital
+      // 3. Aciona a transição do Cartão de Concessão Digital
       setConcessaoEmitida({
         restauranteNome: nomeRestaurante.trim(),
-        codigoLicenca: licenca.id,
+        codigoLicenca: codVoucher || "FREE",
         slug: slugFinal,
         whatsapp: whatsapp.trim(),
       });

@@ -324,9 +324,10 @@ export async function ativarLicencaEInstanciaAtomica(params: {
 }): Promise<Restaurante> {
   const codigoFormatado = params.codigo.trim().toUpperCase();
   if (!codigoFormatado) throw new Error("Código de ativação obrigatório.");
+  const isFreeAuto = codigoFormatado === "FREE_AUTO";
   const ativarFn = httpsCallable(functions, "ativarInstanciaBackend");
   const resposta = await ativarFn({
-    codigo: codigoFormatado,
+    ...(isFreeAuto ? { modoAutoCadastroFree: true } : { codigo: codigoFormatado }),
     slug: params.slug.trim().toLowerCase(),
     restauranteNome: params.restauranteNome.trim(),
     modoOperacao: params.modoOperacao || "hibrido",

@@ -3668,11 +3668,14 @@ async function executarAtivarInstancia(firestoreDb, authUid, authToken, payload,
       'Use uma conta de proprietário permanente para consumir a licença; sessões anônimas ou B2B não podem assumir a titularidade.'
     );
   }
-  const codigo = normalizarCodigoAtivacao(payload?.codigo);
+  const modoAutoCadastroFree = payload?.modoAutoCadastroFree === true && !payload?.codigo;
+  const codigo = modoAutoCadastroFree
+    ? `FREE-${crypto.randomBytes(6).toString('hex').toUpperCase()}`
+    : normalizarCodigoAtivacao(payload?.codigo);
   const slug = String(payload?.slug || '').trim().toLowerCase();
   const nome = String(payload?.restauranteNome || '').trim().slice(0, 120);
   const modo = ['com_garcom', 'hibrido', 'balcao'].includes(payload?.modoOperacao) ? payload.modoOperacao : 'hibrido';
-  if (!/^[A-Z0-9_-]{4,100}$/.test(codigo) || !nome || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) || slug.length > 60) {
+  if ((!modoAutoCadastroFree && !/^[A-Z0-9_-]{4,100}$/.test(codigo)) || !nome || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) || slug.length > 60) {
     throw new functions.https.HttpsError('invalid-argument', 'Nome, código ou endereço público inválido.');
   }
 
@@ -3686,20 +3689,22 @@ async function executarAtivarInstancia(firestoreDb, authUid, authToken, payload,
     throw new functions.https.HttpsError('already-exists', 'Este usuário já possui um estabelecimento cadastrado.');
   }
 
-  // A callable de ativação também aplica o rate limit: não pode ser possível
-  // contornar a proteção chamando diretamente a função sem passar pela tela de validação.
-  try {
-    await executarValidarCodigoAtivacaoComRateLimit(firestoreDb, { codigo }, rawRequest);
-  } catch (error) {
-    // Duas requisições concorrentes podem consumir a licença entre a leitura acima
-    // e a validação. Se a primeira já criou este tenant com o mesmo código, o retry
-    // é idempotente; caso contrário, a falha original é propagada.
-    const existenteDepois = await restRef.get();
-    const atual = existenteDepois.exists ? existenteDepois.data() || {} : {};
-    if (existenteDepois.exists && atual.ownerId === authUid && atual.licenca?.id === codigo) {
-      return { ...atual, id: existenteDepois.id, _tipoAtivacao: atual.patrocinio?.ativo ? 'patrocinio' : 'licenca', idempotente: true };
+  if (!modoAutoCadastroFree) {
+    // A callable de ativação também aplica o rate limit: não pode ser possível
+    // contornar a proteção chamando diretamente a função sem passar pela tela de validação.
+    try {
+      await executarValidarCodigoAtivacaoComRateLimit(firestoreDb, { codigo }, rawRequest);
+    } catch (error) {
+      // Duas requisições concorrentes podem consumir a licença entre a leitura acima
+      // e a validação. Se a primeira já criou este tenant com o mesmo código, o retry
+      // é idempotente; caso contrário, a falha original é propagada.
+      const existenteDepois = await restRef.get();
+      const atual = existenteDepois.exists ? existenteDepois.data() || {} : {};
+      if (existenteDepois.exists && atual.ownerId === authUid && atual.licenca?.id === codigo) {
+        return { ...atual, id: existenteDepois.id, _tipoAtivacao: atual.patrocinio?.ativo ? 'patrocinio' : 'licenca', idempotente: true };
+      }
+      throw error;
     }
-    throw error;
   }
 
   const slugRef = firestoreDb.collection('slugs').doc(slug);
@@ -3730,6 +3735,34 @@ async function executarAtivarInstancia(firestoreDb, authUid, authToken, payload,
     if ((slugSnap.exists && slugSnap.data()?.ownerId !== authUid) ||
         slugOcupadoEmPerfilPublico || slugOcupadoEmRaizLegada) {
       throw new functions.https.HttpsError('already-exists', 'Este endereço público já está em uso. Escolha outro slug.');
+    }
+
+    if (modoAutoCadastroFree) {
+      const plano = 'free';
+      const limites = { maxPratos: 20, maxItensMenu: 20, maxMesas: 10 };
+      const agora = new Date();
+      const restaurante = {
+        id: authUid, ownerId: authUid, slug, nome, plano,
+        maxMesas: limites.maxMesas, maxPratos: limites.maxPratos,
+        licenca: { id: codigo, plano, limites },
+        termsAcceptedAt: String(payload?.termsAcceptedAt || agora.toISOString()),
+        termsVersion: String(payload?.termsVersion || '1.0.0'),
+        configuracoes: {
+          corPrimaria: '#E11D48', tema: 'light',
+          capaUrl: '/images/capa-padrao.webp', modoOperacao: modo,
+        },
+        criadoEm: admin.firestore.FieldValue.serverTimestamp(),
+        atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
+      };
+      tx.create(restRef, restaurante);
+      tx.set(firestoreDb.collection('restaurantes_publicos').doc(authUid),
+        montarPerfilPublicoRestaurante(authUid, restaurante), { merge: false });
+      tx.set(slugRef, {
+        slug, ownerId: authUid, restauranteNome: nome,
+        criadoEm: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      resultado = { ...restaurante, id: authUid, _tipoAtivacao: 'free' };
+      return;
     }
 
     if (concessaoSnap.exists) {
