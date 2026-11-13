@@ -18,6 +18,7 @@ const {
   executarFecharComanda, executarLiberarMesa, executarDefinirTaxaServicoMesa,
   executarDesativarMesa, executarReativarMesa, executarChamarGarcom, executarGarantirCredencialMesa,
   executarEmissaoSessaoMesa, executarValidarCodigoAtivacao,
+  executarCadastrarPatrocinadorSuperadmin,
   executarAtivarInstancia, executarAtivarPatrocinio, executarProcessarSelloutOutbox,
   executarSincronizarPerfilPublicoRestaurante, executarLancamentoPedidoGarcom,
   executarValidarCodigoAtivacaoComRateLimit, executarValidarSessaoPatrocinador,
@@ -614,6 +615,44 @@ async function main() {
     assert.strictEqual(validacao.licenca.notas, undefined);
     assert.strictEqual(validacao.licenca.contratoPrivado, undefined);
     assert.strictEqual(validacao.licenca.limites.segredoInterno, undefined);
+  });
+
+  await runTest("Emulador: cadastro B2B exige SuperAdmin e cria patrocinador/lote atomicamente", async () => {
+    const payload = {
+      nomeFantasia: "Marca Teste Segura",
+      razaoSocial: "Marca Teste Segura LTDA",
+      cnpj: "12.345.678/0001-95",
+      contatoNome: "Contato Teste",
+      contatoEmail: "contato@example.test",
+      contatoTelefone: "(85) 99999-0000",
+      totalCotasContratadas: 12,
+      validadeMeses: 6,
+    };
+    await assert.rejects(
+      () => executarCadastrarPatrocinadorSuperadmin(db, "intruso_b2b", {}, payload),
+      /somente superadmin/i
+    );
+    await assert.rejects(
+      () => executarCadastrarPatrocinadorSuperadmin(db, "admin_b2b", { superadmin: true }, {
+        ...payload, totalCotasContratadas: 0,
+      }),
+      /dados cadastrais/i
+    );
+    const criado = await executarCadastrarPatrocinadorSuperadmin(
+      db, "admin_b2b", { superadmin: true }, payload
+    );
+    assert.match(criado.id, /^spn-marca-teste-segura-/);
+    assert.match(criado.chaveAcessoB2B, /^SPN-[A-HJ-NP-Z2-9]{26}$/);
+    assert.match(criado.codigoVoucherInicial, /^MAYA-B2B-[A-F0-9]{24}$/);
+    const patrocinador = await db.doc(`patrocinadores/${criado.id}`).get();
+    assert.strictEqual(patrocinador.exists, true);
+    assert.strictEqual(patrocinador.data().chaveAcessoB2B, criado.chaveAcessoB2B);
+    const lotes = await db.collection("patrocinadores").doc(criado.id)
+      .collection("lotes_licencas").where("codigoCampanha", "==", criado.codigoVoucherInicial).get();
+    assert.strictEqual(lotes.size, 1);
+    assert.strictEqual(lotes.docs[0].data().totalLicencas, 12);
+    assert.strictEqual(lotes.docs[0].data().licencasAtivadas, 0);
+    assert.strictEqual(lotes.docs[0].data().ativo, true);
   });
 
   await runTest("Emulador: sessão B2B valida status/versão e nunca retorna a chave de acesso", async () => {
