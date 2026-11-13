@@ -632,68 +632,64 @@ export function GarcomView({
     }
   };
 
-  // Fechar/Marcar Comanda Individual como Paga (exclusivo do lojista/garçom)
-  const handleMarcarComoPago = async (mesaNumero: number, clienteId: string) => {
-    // Atualização otimista
+  // Confirma o pagamento no backend antes de atualizar a interface.
+  const handleMarcarComoPago = async (mesaNumero: number, clienteId: string): Promise<boolean> => {
+    if (!restauranteId) return false;
+    try {
+      await marcarComandaPagaFirestore(restauranteId, mesaNumero, clienteId);
+    } catch (err) {
+      console.error("Falha ao confirmar pagamento da comanda no backend:", err);
+      alert(err instanceof Error ? err.message : "Não foi possível confirmar o pagamento.");
+      return false;
+    }
+
     setMesas((prev) =>
       prev.map((m) => {
-        if (m.numero === mesaNumero) {
-          const novasComandas = m.comandas.map((c) =>
-            c.id === clienteId ? { ...c, status: "pago" as const } : c
-          );
-          const todasPagas = novasComandas.every((c) => c.status === "pago");
-          return {
-            ...m,
-            status: todasPagas ? ("paga_ocupada" as const) : m.status,
-            comandas: novasComandas,
-          };
-        }
-        return m;
+        if (m.numero !== mesaNumero) return m;
+        const comandas = m.comandas.map((c) =>
+          c.id === clienteId ? { ...c, status: "pago" as const } : c
+        );
+        const todasPagas = comandas.every((c) => c.status === "pago");
+        return { ...m, status: todasPagas ? ("paga_ocupada" as const) : m.status, comandas };
       })
     );
-
     setMesaSelecionada((prev) => {
       if (!prev || prev.numero !== mesaNumero) return prev;
-      const novas = prev.comandas.map((c) =>
+      const comandas = prev.comandas.map((c) =>
         c.id === clienteId ? { ...c, status: "pago" as const } : c
       );
-      const todasPagas = novas.every((c) => c.status === "pago");
-      return {
-        ...prev,
-        status: todasPagas ? ("paga_ocupada" as const) : prev.status,
-        comandas: novas,
-      };
+      const todasPagas = comandas.every((c) => c.status === "pago");
+      return { ...prev, status: todasPagas ? ("paga_ocupada" as const) : prev.status, comandas };
     });
-
-    // Persistência no Firestore
-    if (restauranteId) {
-      try {
-        await marcarComandaPagaFirestore(restauranteId, mesaNumero, clienteId);
-      } catch (err) {
-        console.warn("Falha ao marcar comanda como paga no Firestore:", err);
-      }
-    }
+    return true;
   };
 
-  // Liberar mesa no Firestore
-  const handleLiberarMesa = async (mesaNumero: number) => {
+  // Libera somente após confirmação do backend; nunca limpa estado otimista antes do commit.
+  const handleLiberarMesa = async (mesaNumero: number): Promise<boolean> => {
     const mesaAlvo = mesas.find((m) => m.numero === mesaNumero);
     const comandasIds = mesaAlvo ? mesaAlvo.comandas.map((c) => c.id) : [];
     const idRestauranteFinal = restauranteId || restaurante?.id;
+    if (!idRestauranteFinal || comandasIds.length === 0) {
+      alert("Não há comandas identificadas para liberar esta mesa.");
+      return false;
+    }
+    if (mesaAlvo?.comandas.some((c) => c.status !== "pago")) {
+      alert("Não é possível liberar a mesa: confirme o pagamento de todas as comandas primeiro.");
+      return false;
+    }
+    try {
+      await liberarMesaFirestore(idRestauranteFinal, mesaNumero, comandasIds);
+    } catch (err: any) {
+      console.warn("Falha ao liberar mesa no Firestore:", err);
+      alert("Erro ao liberar: " + (err?.message || "Falha na comunicação com o servidor"));
+      return false;
+    }
 
     setMesas((prev) =>
       prev.map((m) => (m.numero === mesaNumero ? { ...m, status: "livre", comandas: [] } : m))
     );
     setMesaSelecionada(null);
-
-    if (idRestauranteFinal && comandasIds.length > 0) {
-      try {
-        await liberarMesaFirestore(idRestauranteFinal, mesaNumero, comandasIds);
-      } catch (err: any) {
-        console.warn("Falha ao liberar mesa no Firestore:", err);
-        alert("Erro ao libertar: " + (err?.message || "Falha na comunicação com o servidor"));
-      }
-    }
+    return true;
   };
 
   // Garçom assume o atendimento das comandas ativas de uma mesa
