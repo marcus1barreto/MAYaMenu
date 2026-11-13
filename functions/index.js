@@ -1,4 +1,8 @@
 const functions = require('firebase-functions');
+const {
+  onDocumentCreated,
+  onDocumentWritten,
+} = require('firebase-functions/v2/firestore');
 const admin = require('firebase-admin');
 const { getFirestore } = require('firebase-admin/firestore');
 const crypto = require('crypto');
@@ -44,12 +48,16 @@ function getDb() {
  * Quando um documento em `restaurantes/{restId}` é criado, define o claim `owner`
  * no UID do usuário que criou o restaurante (campo `ownerId`).
  */
-exports.setRestaurantOwnerClaims = functions.firestore
-  .document('restaurantes/{restId}')
-  .onCreate(async (snap, context) => {
+exports.setRestaurantOwnerClaims = onDocumentCreated({
+  document: 'restaurantes/{restId}',
+  database: 'mayamenu-bd',
+  region: 'us-central1',
+}, async (event) => {
+    const snap = event.data;
+    if (!snap) return null;
     const data = snap.data();
     const ownerUid = data?.ownerId;
-    const restId = context.params.restId;
+    const restId = event.params.restId;
     if (!ownerUid) {
       console.warn('Documento de restaurante criado sem ownerId.');
       return null;
@@ -2935,11 +2943,14 @@ exports.autenticarPatrocinadorBackend = functions.https.onCall(async (data, cont
   return executarAutenticarPatrocinador(getDb(), data, context.rawRequest);
 });
 
-exports.processarSelloutOutbox = functions.firestore
-  .document('restaurantes/{restauranteId}/_sellout_outbox/{eventId}')
-  .onCreate(async (snap, context) => {
-    return executarProcessarSelloutOutbox(getDb(), context.params.restauranteId, context.params.eventId);
-  });
+exports.processarSelloutOutbox = onDocumentCreated({
+  document: 'restaurantes/{restauranteId}/_sellout_outbox/{eventId}',
+  database: 'mayamenu-bd',
+  region: 'us-central1',
+}, async (event) => {
+  if (!event.data) return null;
+  return executarProcessarSelloutOutbox(getDb(), event.params.restauranteId, event.params.eventId);
+});
 
 exports.validarCodigoAtivacaoBackend = functions.https.onCall(async (data) => {
   return executarValidarCodigoAtivacao(getDb(), data);
@@ -2969,15 +2980,19 @@ exports.desativarMesaBackend = functions.https.onCall(async (data, context) => {
 // Mantém um espelho público minimizado do restaurante. O documento raiz permanece privado.
 // Somente campos explicitamente permitidos são copiados; nunca replica ownerId, plano,
 // licença, limites, dados de equipe, PINs, QR ou configurações financeiras privadas.
-exports.sincronizarPerfilPublicoRestaurante = functions.firestore
-  .document('restaurantes/{restauranteId}')
-  .onWrite(async (change, context) => {
-    const publicRef = getDb().collection('restaurantes_publicos').doc(context.params.restauranteId);
-    if (!change.after.exists) {
+exports.sincronizarPerfilPublicoRestaurante = onDocumentWritten({
+  document: 'restaurantes/{restauranteId}',
+  database: 'mayamenu-bd',
+  region: 'us-central1',
+}, async (event) => {
+    const after = event.data?.after;
+    const restauranteId = event.params.restauranteId;
+    const publicRef = getDb().collection('restaurantes_publicos').doc(restauranteId);
+    if (!after?.exists) {
       await publicRef.delete().catch(() => {});
       return null;
     }
-    const data = change.after.data() || {};
+    const data = after.data() || {};
     const cfg = data.configuracoes || {};
     const configuracoes = {};
     for (const key of ['corPrimaria', 'tema', 'logoUrl', 'capaUrl', 'modoOperacao', 'modoFilaKds', 'taxaServico']) {
@@ -2995,8 +3010,8 @@ exports.sincronizarPerfilPublicoRestaurante = functions.firestore
       };
     }
     await publicRef.set({
-      restauranteId: context.params.restauranteId,
-      slug: String(data.slug || context.params.restauranteId),
+      restauranteId,
+      slug: String(data.slug || restauranteId),
       nome: String(data.nome || 'Restaurante'),
       suspenso: data.suspenso === true || cfg.suspenso === true,
       configuracoes,
