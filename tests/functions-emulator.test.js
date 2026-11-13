@@ -160,12 +160,14 @@ async function main() {
       status: "disponivel", plano: "pro",
       limites: { maxMesas: 30, maxPratos: 60, maxItensMenu: 60 },
       responsavel: "Restaurante teste",
+      notas: "Nota administrativa confidencial",
     });
     const validacao = await executarValidarCodigoAtivacao(db, { codigo: "maya-teste-01" });
     assert.strictEqual(validacao.valida, true);
     assert.strictEqual(validacao.licenca.id, "MAYA-TESTE-01");
     assert.strictEqual(validacao.licenca.plano, "pro");
     assert.strictEqual(validacao.licenca.ownerUid, undefined);
+    assert.strictEqual(validacao.licenca.notas, undefined);
   });
 
   await runTest("Emulador: sessão B2B valida status/versão e nunca retorna a chave de acesso", async () => {
