@@ -2672,7 +2672,7 @@ async function executarValidarCodigoAtivacaoComRateLimit(firestoreDb, payload, r
   }
 }
 
-async function executarAtivarInstancia(firestoreDb, authUid, authToken, payload) {
+async function executarAtivarInstancia(firestoreDb, authUid, authToken, payload, rawRequest) {
   if (!authUid) throw new functions.https.HttpsError('unauthenticated', 'Autenticação necessária.');
   const provedorAuth = authToken?.firebase?.sign_in_provider;
   if (!provedorAuth || provedorAuth === 'anonymous' ||
@@ -2689,6 +2689,10 @@ async function executarAtivarInstancia(firestoreDb, authUid, authToken, payload)
   if (!/^[A-Z0-9_-]{4,100}$/.test(codigo) || !nome || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) || slug.length > 60) {
     throw new functions.https.HttpsError('invalid-argument', 'Nome, código ou endereço público inválido.');
   }
+
+  // A callable de ativação também aplica o rate limit: não pode ser possível
+  // contornar a proteção chamando diretamente a função sem passar pela tela de validação.
+  await executarValidarCodigoAtivacaoComRateLimit(firestoreDb, { codigo }, rawRequest);
 
   const restRef = firestoreDb.collection('restaurantes').doc(authUid);
   const slugRef = firestoreDb.collection('slugs').doc(slug);
@@ -3244,7 +3248,7 @@ exports.validarCodigoAtivacaoBackend = functions.https.onCall(async (data, conte
 });
 
 exports.ativarInstanciaBackend = functions.https.onCall(async (data, context) => {
-  return executarAtivarInstancia(getDb(), context.auth?.uid, context.auth?.token, data);
+  return executarAtivarInstancia(getDb(), context.auth?.uid, context.auth?.token, data, context.rawRequest);
 });
 
 exports.ativarPatrocinioBackend = functions.https.onCall(async (data, context) => {
