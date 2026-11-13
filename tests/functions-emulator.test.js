@@ -13,7 +13,7 @@ const {
   executarFecharComanda, executarLiberarMesa, executarDefinirTaxaServicoMesa,
   executarDesativarMesa, executarChamarGarcom, executarValidarCodigoAtivacao,
   executarAtivarInstancia, executarAtivarPatrocinio, executarProcessarSelloutOutbox,
-  executarLancamentoPedidoGarcom,
+  executarSincronizarPerfilPublicoRestaurante, executarLancamentoPedidoGarcom,
 } = _internal;
 const crypto = require("crypto");
 
@@ -101,6 +101,42 @@ async function main() {
     const metricRetry = await db.doc("patrocinadores/spn_bierhaus/metricas_sellout/bierhaus-item").get();
     assert.strictEqual(metricRetry.data().totalUnidadesVendidas, 2);
     assert.strictEqual((await outbox.ref.get()).data().processado, true);
+  });
+
+  await runTest("Emulador: perfil público do restaurante expõe apenas campos permitidos e é removido ao excluir raiz", async () => {
+    await executarSincronizarPerfilPublicoRestaurante(db, "rest_publico_teste", {
+      ownerId: "uid-privado",
+      nome: "Restaurante Público",
+      slug: "restaurante-publico",
+      plano: "enterprise",
+      licenca: { id: "MAYA-SEGREDO", plano: "enterprise" },
+      assinatura: { contrato: "privado" },
+      equipe: { pinHash: "nao-publicar" },
+      qrCredencialHash: "nao-publicar",
+      configuracoes: {
+        corPrimaria: "#123456",
+        tema: "dark",
+        modoOperacao: "hibrido",
+        suspenso: false,
+        pixConfig: {
+          ativo: true, chave: "pix@restaurante.com", tipoChave: "email",
+          beneficiario: "Restaurante", cidade: "Fortaleza",
+          tokenPrivado: "nao-publicar",
+        },
+      },
+    });
+    const publicoRef = db.doc("restaurantes_publicos/rest_publico_teste");
+    const publico = (await publicoRef.get()).data();
+    assert.strictEqual(publico.nome, "Restaurante Público");
+    assert.strictEqual(publico.ownerId, undefined);
+    assert.strictEqual(publico.plano, undefined);
+    assert.strictEqual(publico.licenca, undefined);
+    assert.strictEqual(publico.assinatura, undefined);
+    assert.strictEqual(publico.qrCredencialHash, undefined);
+    assert.strictEqual(publico.configuracoes.pixConfig.chave, "pix@restaurante.com");
+    assert.strictEqual(publico.configuracoes.pixConfig.tokenPrivado, undefined);
+    await executarSincronizarPerfilPublicoRestaurante(db, "rest_publico_teste", null);
+    assert.strictEqual((await publicoRef.get()).exists, false);
   });
 
   await runTest("Emulador: validação de licença não exige leitura pública e retorna apenas dados mínimos", async () => {
