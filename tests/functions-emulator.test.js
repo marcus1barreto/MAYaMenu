@@ -17,6 +17,7 @@ const { _internal } = require("../functions/index.js");
 const {
   executarFecharComanda, executarLiberarMesa, executarDefinirTaxaServicoMesa,
   executarDesativarMesa, executarReativarMesa, executarChamarGarcom, executarGarantirCredencialMesa,
+  executarLoginComPin,
   executarEmissaoSessaoMesa, executarValidarCodigoAtivacao,
   executarCadastrarPatrocinadorSuperadmin, executarCriarLoteLicencasB2BSuperadmin,
   executarAtivarInstancia, executarAtivarPatrocinio, executarProcessarSelloutOutbox,
@@ -76,6 +77,61 @@ async function main() {
     assert.throws(() => validarLimite({ maxMesas: 30 }, 31), /capacidade licenciada/i);
     assert.throws(() => validarLimite({}, 1), /limite de mesas da licença ausente/i);
     assert.throws(() => validarLimite({ licenca: { limites: { maxMesas: 0 } } }, 1), /limite de mesas da licença ausente/i);
+  });
+
+  await runTest("Emulador: login PIN aplica rate limit atômico por IP, colaborador e tenant", async () => {
+    const restRef = db.doc("restaurantes/rest_pin_rate_atomic");
+    const salt = crypto.randomBytes(16).toString("hex");
+    const pinHash = crypto.scryptSync("1234", salt, 64).toString("hex");
+    await restRef.set({ ownerId: "owner_pin_rate_atomic", slug: "pin-rate-atomic" });
+    await restRef.collection("equipe").doc("garcom_pin_atomic").set({
+      uid: "garcom_pin_atomic", role: "garcom", ativo: true, pinHash, pinSalt: salt,
+    });
+
+    const rawRequest = {
+      headers: {
+        "fastly-client-ip": "1.2.3.4",
+        "x-forwarded-for": "198.51.100.22, 34.100.200.10",
+      },
+      socket: { remoteAddress: "35.191.0.20" },
+    };
+    const tentativas = await Promise.allSettled(
+      Array.from({ length: 6 }, () => executarLoginComPin(
+        db,
+        { restauranteId: restRef.id, colaboradorId: "garcom_pin_atomic", pin: "0000" },
+        rawRequest
+      ))
+    );
+    const incorretas = tentativas.filter((r) => r.status === "rejected" && /PIN incorreto/i.test(String(r.reason?.message)));
+    const bloqueadas = tentativas.filter((r) => r.status === "rejected" && /bloquead|tentativas/i.test(String(r.reason?.message)));
+    assert.strictEqual(incorretas.length, 5, "As cinco primeiras falhas devem ser contabilizadas");
+    assert.strictEqual(bloqueadas.length, 1, "A sexta tentativa concorrente deve ser bloqueada");
+
+    const ipDoc = await restRef.collection("_pin_rate_limits").doc("ip_34_100_200_10").get();
+    const userDoc = await restRef.collection("_pin_rate_limits").doc("user_garcom_pin_atomic").get();
+    const globalDoc = await restRef.collection("_pin_rate_limits").doc("tenant_global").get();
+    assert.strictEqual(ipDoc.data().tentativas, 5);
+    assert.ok(ipDoc.data().bloqueadoAte > Date.now());
+    assert.strictEqual(userDoc.data().tentativas, 5);
+    assert.strictEqual(globalDoc.data().tentativas, 5);
+  });
+
+  await runTest("Emulador: colaborador sem ativo=true não autentica mesmo com PIN correto", async () => {
+    const restRef = db.doc("restaurantes/rest_pin_inativo");
+    const salt = crypto.randomBytes(16).toString("hex");
+    const pinHash = crypto.scryptSync("1234", salt, 64).toString("hex");
+    await restRef.set({ ownerId: "owner_pin_inativo", slug: "pin-inativo" });
+    await restRef.collection("equipe").doc("garcom_sem_ativo").set({
+      uid: "garcom_sem_ativo", role: "garcom", pinHash, pinSalt: salt,
+    });
+    await assert.rejects(
+      () => executarLoginComPin(
+        db,
+        { restauranteId: restRef.id, colaboradorId: "garcom_sem_ativo", pin: "1234" },
+        { headers: { "x-forwarded-for": "198.51.100.23, 34.100.200.11" } }
+      ),
+      /PIN incorreto/i
+    );
   });
 
   await runTest("Emulador: autenticação de equipe nunca aceita papel enviado pelo cliente", async () => {
