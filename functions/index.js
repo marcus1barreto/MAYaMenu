@@ -2160,9 +2160,36 @@ function adicionarMesesSemOverflow(dataBase, meses) {
   return original;
 }
 
+function obterItensMasterPatrocinio(patrocinadorId, catalogoSnap) {
+  const itens = catalogoSnap.docs.map((d) => ({ id: d.id, ...(d.data() || {}) }));
+  if (itens.length || patrocinadorId !== 'spn-bierhaus-demo') return itens;
+  return [
+    {
+      id: 'chopp-artesanal-ipa-500',
+      nome: 'Chopp Artesanal BierHaus IPA 500ml',
+      categoriaSugerida: 'Chopps & Cervejas',
+      descricaoOficial: 'Cerveja artesanal fresca com lúpulos nobres cítricos.',
+      fotoOficialUrl: '/images/demo/coquetel.webp',
+      precoSugerido: 22,
+      obrigatorioNoCardapio: true,
+      seloPatrocinador: 'Chopp Oficial Parceiro',
+    },
+    {
+      id: 'cerveja-lager-longneck',
+      nome: 'BierHaus German Lager Long Neck',
+      categoriaSugerida: 'Cervejas Especiais',
+      descricaoOficial: 'Puro malte refrescante, coloração dourada.',
+      fotoOficialUrl: '/images/demo/coquetel.webp',
+      precoSugerido: 16,
+      obrigatorioNoCardapio: true,
+      seloPatrocinador: 'Parceiro Master',
+    },
+  ];
+}
+
 function montarItemPatrocinado(itemMaster, patrocinadorId) {
   const idMaster = String(itemMaster.id || '').trim();
-  if (!idMaster || idMaster.includes('/')) {
+  if (!idMaster || idMaster.includes('/') || idMaster.length > 100) {
     throw new functions.https.HttpsError('failed-precondition', 'Catálogo contém identificador de produto inválido.');
   }
   const preco = Number(itemMaster.precoSugerido || 0);
@@ -2284,7 +2311,10 @@ async function executarAtivarInstancia(firestoreDb, authUid, payload) {
       throw new functions.https.HttpsError('resource-exhausted', 'Este lote de licenças patrocinadas já esgotou suas cotas.');
     }
     const pat = patSnap.data() || {};
-    const itensMaster = catalogoSnap.docs.map((d) => ({ id: d.id, ...(d.data() || {}) }));
+    const itensMaster = obterItensMasterPatrocinio(patrocinadorId, catalogoSnap);
+    if (itensMaster.length === 0) {
+      throw new functions.https.HttpsError('failed-precondition', 'Patrocinador sem produtos cadastrados no Catálogo Master.');
+    }
     if (itensMaster.length > 450) {
       throw new functions.https.HttpsError('failed-precondition', 'O catálogo excede o limite seguro de itens por ativação.');
     }
@@ -2374,6 +2404,9 @@ async function executarAtivarPatrocinio(firestoreDb, authUid, token, payload) {
     const restSnap = await tx.get(restRef);
     if (!restSnap.exists) throw new functions.https.HttpsError('not-found', 'Restaurante não encontrado.');
     const rest = restSnap.data() || {};
+    if (rest.suspenso === true || rest.configuracoes?.suspenso === true) {
+      throw new functions.https.HttpsError('failed-precondition', 'Não é possível vincular patrocínio a um estabelecimento suspenso.');
+    }
     if (!superadmin && rest.ownerId !== authUid) {
       throw new functions.https.HttpsError('permission-denied', 'Somente o titular ou SuperAdmin pode vincular patrocínio.');
     }
@@ -2396,7 +2429,10 @@ async function executarAtivarPatrocinio(firestoreDb, authUid, token, payload) {
         itensInjetados: patrocinioExistente.itensInjetados || [],
       }] : []
     );
-    const itensMaster = catalogoSnap.docs.map((d) => ({ id: d.id, ...(d.data() || {}) }));
+    const itensMaster = obterItensMasterPatrocinio(patrocinadorId, catalogoSnap);
+    if (itensMaster.length === 0) {
+      throw new functions.https.HttpsError('failed-precondition', 'Patrocinador sem produtos cadastrados no Catálogo Master.');
+    }
     const categoriasNovas = new Set(itensMaster.map((i) => String(i.categoriaSugerida || '').trim().toLowerCase()).filter(Boolean));
     if (slots.some((slot) => slot.patrocinadorId === patrocinadorId)) {
       throw new functions.https.HttpsError('already-exists', 'Esta marca já está vinculada ao estabelecimento.');
