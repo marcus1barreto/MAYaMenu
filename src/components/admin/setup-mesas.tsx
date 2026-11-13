@@ -93,11 +93,16 @@ export function SetupMesas({ restauranteId, maxMesas }: SetupMesasProps) {
   }, [restauranteId]);
 
   // Alternar ativação de uma mesa individual
-  const handleToggleAtiva = async (num: number, estadoAtual: boolean) => {
+  const handleToggleAtiva = async (
+    num: number,
+    estadoAtual: boolean,
+    statusEstrutural?: ConfigMesa["statusEstrutural"]
+  ) => {
     setSalvandoNum(num);
     try {
       await salvarConfigMesa(restauranteId, num, {
         ativa: !estadoAtual,
+        ...(!estadoAtual && statusEstrutural === "inativa" ? { statusEstrutural: "livre" } : {}),
       });
     } catch (err) {
       console.error("Falha ao salvar status da mesa:", err);
@@ -318,7 +323,7 @@ export function SetupMesas({ restauranteId, maxMesas }: SetupMesasProps) {
                 {/* Switch Ativa / Inativa */}
                 <button
                   type="button"
-                  onClick={() => handleToggleAtiva(num, isAtiva)}
+                  onClick={() => handleToggleAtiva(num, isAtiva, cfg.statusEstrutural)}
                   title={isAtiva ? "Desativar mesa no salão" : "Ativar mesa no salão"}
                   className="text-muted-foreground hover:text-foreground transition-all"
                 >
