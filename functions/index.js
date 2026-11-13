@@ -2952,8 +2952,9 @@ async function executarProcessarEstornoPagamentoPro(firestoreDb, attemptId, paym
         const patrocinioAnteriorAtivo = anterior.patrocinioAtivo === true &&
           patrocinioAnteriorExpira && Number.isFinite(patrocinioAnteriorExpira.getTime()) &&
           patrocinioAnteriorExpira > new Date();
-        const planoAnteriorSemAssinatura = !assinaturaAnterior &&
-          (anterior.licencaPlano === 'pro' || patrocinioAnteriorAtivo || anterior.plano === 'pro');
+        const planoAnteriorSemAssinatura = !assinaturaAnteriorAtiva &&
+          (anterior.licencaPlano === 'pro' || patrocinioAnteriorAtivo ||
+            (!assinaturaAnterior && anterior.plano === 'pro'));
         const planoRestaurado = assinaturaAnteriorAtiva || planoAnteriorSemAssinatura ? 'pro' : 'free';
         patch.plano = assinaturaAnteriorAtiva
           ? (anterior.plano || 'pro')
