@@ -815,57 +815,53 @@ export function GarcomView({
     const subtotalCalculado =
       ticket.tot !== undefined ? ticket.tot : ticket.i.reduce((acc, it) => acc + it.q * 30, 0);
 
-    const novaComanda: ComandaGarcom = {
-      id: ticket.c.id,
-      nomeCliente: ticket.c.n,
-      subtotal: subtotalCalculado,
-      status: ticket.tot !== undefined ? "conta_pedida" : "aguardando_pratos",
-      itens: ticket.i.map((it) => ({
-        nome: `Item (${it.id})`,
-        quantidade: it.q,
-        precoFinal: ticket.tot !== undefined ? ticket.tot / (ticket.i.length || 1) : 30,
-        modificadores: it.m?.map(([g, o]) => ({ grupo: g, opcao: o })),
-      })),
-    };
-
-    setMesas((prev) =>
-      prev.map((m) => {
-        if (m.numero === mesaNum) {
-          return {
-            ...m,
-            status: "ocupada",
-            comandas: [...m.comandas, novaComanda],
-          };
-        }
-        return m;
-      })
-    );
-
-    // Persiste no Firestore para que a Cozinha veja instantaneamente no KDS!
-    if (restauranteId) {
-      try {
-        await injetarTicketContingencia(restauranteId, {
-          id: ticket.id,
-          mesa: mesaNum,
-          clienteId: ticket.c.id,
-          nomeCliente: ticket.c.n,
-          subtotal: subtotalCalculado,
-          itens: ticket.i.map((it) => ({
-            menuItemId: it.id,
-            nome: `Item (${it.id})`,
-            quantidade: it.q,
-            precoFinal: 30,
-            modificadores: it.m?.map(([g, o]) => ({ grupo: g, opcao: o })),
-            observacoes: it.o,
-          })),
-        });
-      } catch (err) {
-        console.warn("Falha ao injetar pedido de contingência no Firestore:", err);
-      }
+    if (!restauranteId) {
+      setFeedbackInjecao("Não foi possível identificar o restaurante para registrar o pedido.");
+      return;
     }
 
-    setFeedbackInjecao(`Pedido de ${ticket.c.n} injetado na Mesa ${mesaNum}!`);
-    setTimeout(() => setFeedbackInjecao(null), 4000);
+    try {
+      // O backend valida permissão, mesa, disponibilidade dos itens e recalcula os preços.
+      // Só refletimos sucesso na interface depois da confirmação da transação.
+      await injetarTicketContingencia(restauranteId, {
+        id: ticket.id,
+        mesa: mesaNum,
+        clienteId: ticket.c.id,
+        nomeCliente: ticket.c.n,
+        subtotal: subtotalCalculado,
+        itens: ticket.i.map((it) => ({
+          menuItemId: it.id,
+          quantidade: it.q,
+          precoFinal: 0, // Ignorado pelo backend; preços são recalculados do cardápio.
+          modificadores: it.m?.map(([g, o]) => ({ grupo: g, opcao: o })),
+          observacoes: it.o,
+        })),
+      });
+
+      const novaComanda: ComandaGarcom = {
+        id: ticket.c.id,
+        nomeCliente: ticket.c.n,
+        subtotal: subtotalCalculado,
+        status: ticket.tot !== undefined ? "conta_pedida" : "aguardando_pratos",
+        itens: ticket.i.map((it) => ({
+          nome: `Item (${it.id})`,
+          quantidade: it.q,
+          precoFinal: ticket.tot !== undefined ? ticket.tot / (ticket.i.length || 1) : 0,
+          modificadores: it.m?.map(([g, o]) => ({ grupo: g, opcao: o })),
+        })),
+      };
+      setMesas((prev) =>
+        prev.map((m) => m.numero === mesaNum
+          ? { ...m, status: "ocupada", comandas: [...m.comandas.filter((c) => c.id !== novaComanda.id), novaComanda] }
+          : m
+        )
+      );
+      setFeedbackInjecao(`Pedido de ${ticket.c.n} registrado e validado na Mesa ${mesaNum}!`);
+    } catch (err) {
+      console.error("Falha ao registrar pedido de contingência no backend:", err);
+      setFeedbackInjecao("Pedido não registrado. Verifique a mesa, os itens e a conexão antes de tentar novamente.");
+    }
+    setTimeout(() => setFeedbackInjecao(null), 5000);
   };
 
   const mesasComContaPedida = mesas.filter((m) => m.status === "conta_pedida").length;
