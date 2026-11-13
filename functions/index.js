@@ -2559,6 +2559,483 @@ function adicionarMesesSemOverflow(dataBase, meses) {
   return original;
 }
 
+const PLANOS_PRO_PAGAMENTO = Object.freeze({
+  pro_mensal: {
+    id: 'pro_mensal',
+    titulo: 'MAYaMenu PRO - Mensal',
+    preco: 49.90,
+    valorCentavos: 4990,
+    mesesValidade: 1,
+  },
+  pro_semestral: {
+    id: 'pro_semestral',
+    titulo: 'MAYaMenu PRO - Semestral (6 Meses)',
+    preco: 249.00,
+    valorCentavos: 24900,
+    mesesValidade: 6,
+  },
+});
+
+const MERCADO_PAGO_WEBHOOK_URL =
+  process.env.MERCADO_PAGO_WEBHOOK_URL ||
+  'https://us-central1-mayaranas-8ad9f.cloudfunctions.net/mercadoPagoWebhook';
+
+function validarAssinaturaMercadoPago({ xSignature, xRequestId, dataId, secret }) {
+  if (!xSignature || !xRequestId || !dataId || !secret) return false;
+  const partes = {};
+  for (const parte of String(xSignature).split(',')) {
+    const [chave, valor] = parte.split('=', 2);
+    if (chave && valor) partes[chave.trim()] = valor.trim();
+  }
+  if (!partes.ts || !partes.v1 || !/^[a-f0-9]{64}$/i.test(partes.v1)) return false;
+  const manifest = 'id:' + String(dataId).toLowerCase() +
+    ';request-id:' + String(xRequestId) + ';ts:' + partes.ts + ';';
+  const esperado = crypto.createHmac('sha256', secret).update(manifest).digest();
+  const recebido = Buffer.from(partes.v1, 'hex');
+  return recebido.length === esperado.length && crypto.timingSafeEqual(esperado, recebido);
+}
+
+function validarPagamentoPro(attempt, payment) {
+  if (!attempt || !payment) return 'Tentativa ou pagamento ausente.';
+  if (payment.status !== 'approved') return 'Pagamento ainda não aprovado.';
+  if (String(payment.external_reference || '') !== String(attempt.attemptId || '')) {
+    return 'Referência externa do pagamento não corresponde à tentativa.';
+  }
+  if (String(payment.currency_id || '').toUpperCase() !== 'BRL' ||
+      String(attempt.currency || '').toUpperCase() !== 'BRL') {
+    return 'Moeda do pagamento inválida.';
+  }
+  const valorCentavos = Math.round(Number(payment.transaction_amount) * 100);
+  if (!Number.isSafeInteger(valorCentavos) || valorCentavos !== Number(attempt.valorCentavos)) {
+    return 'Valor pago não corresponde ao preço contratado.';
+  }
+  if (typeof payment.live_mode !== 'boolean' || payment.live_mode !== (attempt.liveMode === true)) {
+    return 'Ambiente do pagamento não corresponde ao ambiente do checkout.';
+  }
+  if (attempt.collectorId &&
+      String(payment.collector_id || '') !== String(attempt.collectorId)) {
+    return 'Conta recebedora do pagamento não corresponde à preferência criada.';
+  }
+  if (!payment.date_approved || !Number.isFinite(Date.parse(payment.date_approved))) {
+    return 'Pagamento aprovado sem data de aprovação válida.';
+  }
+  return null;
+}
+
+async function consultarPagamentoMercadoPagoServidor(paymentId, token) {
+  if (!/^\d{1,30}$/.test(String(paymentId || ''))) return null;
+  const response = await fetch(
+    'https://api.mercadopago.com/v1/payments/' + encodeURIComponent(String(paymentId)),
+    { headers: { Authorization: 'Bearer ' + token } }
+  );
+  if (!response.ok) {
+    if (response.status === 404) return null;
+    throw new Error('Falha ao consultar pagamento no Mercado Pago: HTTP ' + response.status);
+  }
+  return response.json();
+}
+
+async function executarProcessarPagamentoProAprovado(firestoreDb, attemptId, payment) {
+  const paymentId = String(payment?.id || '');
+  if (!/^[0-9]{1,30}$/.test(paymentId)) {
+    throw new functions.https.HttpsError('invalid-argument', 'Identificador de pagamento inválido.');
+  }
+  if (!/^[a-f0-9-]{36}$/i.test(String(attemptId || ''))) {
+    throw new functions.https.HttpsError('invalid-argument', 'Identificador da tentativa inválido.');
+  }
+
+  const attemptRef = firestoreDb.collection('pagamentos_pro').doc(attemptId);
+  const ledgerRef = firestoreDb.collection('pagamentos_pro_processados').doc(paymentId);
+  let resultado = null;
+
+  await firestoreDb.runTransaction(async (tx) => {
+    const [attemptSnap, ledgerSnap] = await Promise.all([
+      tx.get(attemptRef),
+      tx.get(ledgerRef),
+    ]);
+    if (!attemptSnap.exists) {
+      throw new functions.https.HttpsError('not-found', 'Tentativa de pagamento não encontrada.');
+    }
+    const attempt = attemptSnap.data() || {};
+    const erroValidacao = validarPagamentoPro({ ...attempt, attemptId: attemptSnap.id }, payment);
+    if (erroValidacao) {
+      throw new functions.https.HttpsError('failed-precondition', erroValidacao);
+    }
+
+    if (ledgerSnap.exists) {
+      const ledger = ledgerSnap.data() || {};
+      if (ledger.attemptId === attemptId) {
+        resultado = {
+          sucesso: true,
+          status: 'approved',
+          idempotente: true,
+          novaDataExpiracao: ledger.novaDataExpiracao,
+        };
+        return;
+      }
+      throw new functions.https.HttpsError('already-exists', 'Este pagamento já foi utilizado em outra tentativa.');
+    }
+
+    if (attempt.status === 'approved') {
+      if (String(attempt.paymentId || '') === paymentId) {
+        resultado = {
+          sucesso: true,
+          status: 'approved',
+          idempotente: true,
+          novaDataExpiracao: attempt.novaDataExpiracao,
+        };
+        return;
+      }
+      throw new functions.https.HttpsError('already-exists', 'Esta tentativa já foi liquidada por outro pagamento.');
+    }
+    if (attempt.status !== 'pending') {
+      throw new functions.https.HttpsError('failed-precondition', 'A tentativa de pagamento não está pendente.');
+    }
+
+    const restauranteId = String(attempt.restauranteId || '');
+    const restRef = firestoreDb.collection('restaurantes').doc(restauranteId);
+    const restSnap = await tx.get(restRef);
+    if (!restSnap.exists) {
+      throw new functions.https.HttpsError('not-found', 'Restaurante associado ao pagamento não encontrado.');
+    }
+    const restData = restSnap.data() || {};
+    if (restData.ownerId !== attempt.ownerUid) {
+      throw new functions.https.HttpsError('permission-denied', 'Titularidade do restaurante mudou após a criação do checkout.');
+    }
+    if (restData.suspenso === true || restData.configuracoes?.suspenso === true) {
+      throw new functions.https.HttpsError('failed-precondition', 'Restaurante suspenso; o pagamento exige revisão administrativa.');
+    }
+
+    const plano = PLANOS_PRO_PAGAMENTO[attempt.planoId];
+    if (!plano || Number(attempt.valorCentavos) !== plano.valorCentavos) {
+      throw new functions.https.HttpsError('failed-precondition', 'Plano ou preço da tentativa inválido.');
+    }
+
+    const agora = new Date();
+    let dataBase = agora;
+    const expiracaoAtual = restData.assinatura?.dataExpiracao
+      ? new Date(restData.assinatura.dataExpiracao)
+      : (restData.patrocinio?.dataExpiracao ? new Date(restData.patrocinio.dataExpiracao) : null);
+    if (expiracaoAtual && Number.isFinite(expiracaoAtual.getTime()) && expiracaoAtual > agora) {
+      dataBase = expiracaoAtual;
+    }
+    const novaDataExpiracao = adicionarMesesSemOverflow(dataBase, plano.mesesValidade).toISOString();
+    const valorPago = Number(payment.transaction_amount);
+    const metodoPagamento = String(payment.payment_type_id || payment.payment_method_id || 'mercadopago');
+
+    const assinatura = {
+      ativa: true,
+      provedor: 'mercadopago',
+      planoId: plano.id,
+      planoTitulo: plano.titulo,
+      apelido: plano.titulo,
+      versao: '1.0.0',
+      valorPago,
+      valorContratado: valorPago,
+      paymentId,
+      metodoPagamento,
+      mesesAdicionados: plano.mesesValidade,
+      atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
+      contratadoEm: payment.date_approved,
+      dataExpiracao: novaDataExpiracao,
+      limites: {
+        maxMesas: 30,
+        maxItensMenu: 60,
+        modulosPermitidos: ['cardapio', 'mesas', 'kds', 'garcom', 'analytics', 'historico'],
+      },
+      garantiaAcordo: 'inalteravel',
+      status: 'ativa',
+    };
+
+    tx.update(restRef, {
+      plano: 'pro',
+      maxMesas: 30,
+      maxPratos: 60,
+      maxItensMenu: 60,
+      assinatura,
+      atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    tx.update(attemptRef, {
+      status: 'approved',
+      paymentId,
+      paymentTypeId: metodoPagamento,
+      valorPago,
+      aprovadoEm: payment.date_approved,
+      novaDataExpiracao,
+      processadoEm: admin.firestore.FieldValue.serverTimestamp(),
+      atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    tx.create(ledgerRef, {
+      paymentId,
+      attemptId,
+      ownerUid: attempt.ownerUid,
+      restauranteId,
+      planoId: plano.id,
+      valorCentavos: plano.valorCentavos,
+      currency: 'BRL',
+      liveMode: attempt.liveMode === true,
+      status: 'approved',
+      novaDataExpiracao,
+      processadoEm: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    resultado = { sucesso: true, status: 'approved', idempotente: false, novaDataExpiracao };
+  });
+
+  return resultado;
+}
+
+async function executarCriarPreferenciaProBackend(firestoreDb, auth, payload) {
+  const authUid = auth?.uid;
+  if (!authUid) throw new functions.https.HttpsError('unauthenticated', 'Autenticação necessária.');
+  const provedorAuth = auth?.token?.firebase?.sign_in_provider;
+  if (!provedorAuth || provedorAuth === 'anonymous' ||
+      auth?.token?.role === 'sponsor' || typeof auth?.token?.patrocinadorId === 'string') {
+    throw new functions.https.HttpsError('unauthenticated', 'Entre com a conta permanente do titular para contratar o plano.');
+  }
+
+  const restauranteId = String(payload?.restauranteId || '').trim();
+  const planoId = String(payload?.planoId || '');
+  const plano = PLANOS_PRO_PAGAMENTO[planoId];
+  if (!restauranteId || !plano) {
+    throw new functions.https.HttpsError('invalid-argument', 'Restaurante ou plano inválido.');
+  }
+
+  const restRef = firestoreDb.collection('restaurantes').doc(restauranteId);
+  const restSnap = await restRef.get();
+  if (!restSnap.exists) throw new functions.https.HttpsError('not-found', 'Restaurante não encontrado.');
+  const restData = restSnap.data() || {};
+  if (restData.ownerId !== authUid) {
+    throw new functions.https.HttpsError('permission-denied', 'Somente o titular pode contratar o Plano PRO.');
+  }
+  if (restData.suspenso === true || restData.configuracoes?.suspenso === true) {
+    throw new functions.https.HttpsError('failed-precondition', 'Restaurante suspenso; checkout indisponível.');
+  }
+
+  const token = process.env.MERCADO_PAGO_ACCESS_TOKEN?.trim();
+  if (!token) {
+    throw new functions.https.HttpsError('failed-precondition', 'MERCADO_PAGO_ACCESS_TOKEN não configurado no Secret Manager das Cloud Functions.');
+  }
+
+  const liveMode = process.env.MERCADO_PAGO_LIVE_MODE !== 'false';
+  const baseUrl = new URL(process.env.MAYAMENU_APP_URL || 'https://mayamenu.com.br').origin;
+  const attemptId = crypto.randomUUID();
+  const attemptRef = firestoreDb.collection('pagamentos_pro').doc(attemptId);
+  const agora = Date.now();
+  await attemptRef.create({
+    attemptId,
+    ownerUid: authUid,
+    restauranteId,
+    planoId: plano.id,
+    valorCentavos: plano.valorCentavos,
+    currency: 'BRL',
+    liveMode,
+    status: 'creating',
+    criadoEm: admin.firestore.FieldValue.serverTimestamp(),
+    expiraEm: new Date(agora + 24 * 60 * 60 * 1000),
+  });
+
+  const notificationUrl = MERCADO_PAGO_WEBHOOK_URL;
+  const preferencePayload = {
+    items: [{
+      id: plano.id,
+      title: plano.titulo,
+      description: 'Assinatura MAYaMenu PRO.',
+      quantity: 1,
+      currency_id: 'BRL',
+      unit_price: plano.preco,
+    }],
+    payer: {
+      email: auth?.token?.email || restData.email || 'lojista@mayamenu.com.br',
+      name: String(restData.nome || 'Lojista MAYaMenu').slice(0, 120),
+    },
+    external_reference: attemptId,
+    metadata: { attemptId, restauranteId, planoId: plano.id },
+    back_urls: {
+      success: baseUrl + '/admin?status_pagamento=sucesso&attempt=' + encodeURIComponent(attemptId),
+      failure: baseUrl + '/admin?status_pagamento=falha&attempt=' + encodeURIComponent(attemptId),
+      pending: baseUrl + '/admin?status_pagamento=pendente&attempt=' + encodeURIComponent(attemptId),
+    },
+    auto_return: 'approved',
+    statement_descriptor: 'MAYAMENU PRO',
+    payment_methods: { installments: 12 },
+    notification_url: notificationUrl,
+  };
+
+  try {
+    const response = await fetch('https://api.mercadopago.com/checkout/preferences', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer ' + token,
+      },
+      body: JSON.stringify(preferencePayload),
+    });
+    if (!response.ok) {
+      const errorBody = await response.text();
+      console.error('[MercadoPago] Falha ao criar preferência:', response.status, errorBody.slice(0, 1000));
+      await attemptRef.update({
+        status: 'failed',
+        falhaCodigo: 'preference_creation_failed',
+        atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      throw new functions.https.HttpsError('unavailable', 'Não foi possível iniciar o checkout do Mercado Pago.');
+    }
+
+    const preference = await response.json();
+    const initPoint = liveMode
+      ? preference.init_point
+      : (preference.sandbox_init_point || preference.init_point);
+    if (!preference.id || !initPoint) {
+      await attemptRef.update({
+        status: 'failed',
+        falhaCodigo: 'invalid_preference_response',
+        atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      throw new functions.https.HttpsError('internal', 'Resposta inválida do Mercado Pago ao criar o checkout.');
+    }
+
+    await attemptRef.update({
+      status: 'pending',
+      preferenceId: String(preference.id),
+      collectorId: preference.collector_id ? String(preference.collector_id) : null,
+      initPoint,
+      atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    return {
+      sucesso: true,
+      attemptId,
+      preferenceId: String(preference.id),
+      initPoint,
+      sandboxInitPoint: preference.sandbox_init_point || null,
+    };
+  } catch (error) {
+    const current = await attemptRef.get();
+    if (current.exists && current.data()?.status === 'creating') {
+      await attemptRef.update({
+        status: 'failed',
+        falhaCodigo: 'preference_creation_exception',
+        atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    }
+    if (error instanceof functions.https.HttpsError) throw error;
+    console.error('[MercadoPago] Erro ao criar preferência:', error);
+    throw new functions.https.HttpsError('unavailable', 'Serviço de pagamento temporariamente indisponível.');
+  }
+}
+
+async function executarConfirmarPagamentoProBackend(firestoreDb, auth, payload) {
+  const authUid = auth?.uid;
+  if (!authUid) throw new functions.https.HttpsError('unauthenticated', 'Autenticação necessária.');
+  const provedorAuth = auth?.token?.firebase?.sign_in_provider;
+  if (!provedorAuth || provedorAuth === 'anonymous' ||
+      auth?.token?.role === 'sponsor' || typeof auth?.token?.patrocinadorId === 'string') {
+    throw new functions.https.HttpsError('unauthenticated', 'Entre com a conta permanente do titular para confirmar o pagamento.');
+  }
+
+  const attemptId = String(payload?.attemptId || '');
+  if (!/^[a-f0-9-]{36}$/i.test(attemptId)) {
+    throw new functions.https.HttpsError('invalid-argument', 'Tentativa de pagamento inválida.');
+  }
+  const attemptRef = firestoreDb.collection('pagamentos_pro').doc(attemptId);
+  const attemptSnap = await attemptRef.get();
+  if (!attemptSnap.exists) throw new functions.https.HttpsError('not-found', 'Tentativa de pagamento não encontrada.');
+  const attempt = attemptSnap.data() || {};
+  if (attempt.ownerUid !== authUid) {
+    throw new functions.https.HttpsError('permission-denied', 'Esta tentativa de pagamento não pertence à sua conta.');
+  }
+  if (attempt.status === 'approved') {
+    return { sucesso: true, status: 'approved', idempotente: true, novaDataExpiracao: attempt.novaDataExpiracao };
+  }
+  if (attempt.status !== 'pending') {
+    return { sucesso: false, status: String(attempt.status || 'unknown') };
+  }
+
+  const token = process.env.MERCADO_PAGO_ACCESS_TOKEN?.trim();
+  if (!token) throw new functions.https.HttpsError('failed-precondition', 'Mercado Pago indisponível no servidor.');
+  const paymentId = String(payload?.paymentId || '');
+  if (!paymentId) return { sucesso: false, status: 'pending' };
+  const payment = await consultarPagamentoMercadoPagoServidor(paymentId, token);
+  if (!payment) return { sucesso: false, status: 'pending' };
+  if (payment.status !== 'approved') {
+    return { sucesso: false, status: String(payment.status || 'pending') };
+  }
+  const erroValidacao = validarPagamentoPro({ ...attempt, attemptId }, payment);
+  if (erroValidacao) {
+    throw new functions.https.HttpsError('failed-precondition', erroValidacao);
+  }
+  return executarProcessarPagamentoProAprovado(firestoreDb, attemptId, payment);
+}
+
+async function executarMercadoPagoWebhook(firestoreDb, req, res) {
+  if (req.method !== 'POST') {
+    res.status(405).json({ status: 'method_not_allowed' });
+    return;
+  }
+  const token = process.env.MERCADO_PAGO_ACCESS_TOKEN?.trim();
+  const secret = process.env.MERCADO_PAGO_WEBHOOK_SECRET?.trim();
+  if (!token || !secret) {
+    console.error('[MercadoPago Webhook] Secrets ausentes no Secret Manager.');
+    res.status(503).json({ status: 'payment_service_not_configured' });
+    return;
+  }
+
+  const queryDataId = req.query?.['data.id'] || req.query?.data_id;
+  const bodyDataId = req.body?.data?.id;
+  const dataId = String(queryDataId || bodyDataId || '');
+  const tipo = String(req.query?.type || req.body?.type || req.body?.topic || '');
+  if (tipo && tipo !== 'payment') {
+    res.status(200).json({ status: 'ignored_non_payment_event' });
+    return;
+  }
+  if (!dataId) {
+    res.status(200).json({ status: 'ignored_without_payment_id' });
+    return;
+  }
+
+  const xSignature = req.get('x-signature') || req.headers?.['x-signature'];
+  const xRequestId = req.get('x-request-id') || req.headers?.['x-request-id'];
+  if (!validarAssinaturaMercadoPago({ xSignature, xRequestId, dataId, secret })) {
+    res.status(401).json({ status: 'invalid_signature' });
+    return;
+  }
+
+  try {
+    const payment = await consultarPagamentoMercadoPagoServidor(dataId, token);
+    if (!payment) {
+      res.status(200).json({ status: 'payment_not_found' });
+      return;
+    }
+    if (payment.status !== 'approved') {
+      res.status(200).json({ status: 'payment_not_approved' });
+      return;
+    }
+    const attemptId = String(payment.external_reference || '');
+    if (!/^[a-f0-9-]{36}$/i.test(attemptId)) {
+      res.status(200).json({ status: 'ignored_external_reference' });
+      return;
+    }
+    const attemptSnap = await firestoreDb.collection('pagamentos_pro').doc(attemptId).get();
+    if (!attemptSnap.exists) {
+      res.status(200).json({ status: 'ignored_unknown_attempt' });
+      return;
+    }
+    const erroValidacao = validarPagamentoPro(
+      { ...attemptSnap.data(), attemptId },
+      payment
+    );
+    if (erroValidacao) {
+      console.error('[MercadoPago Webhook] Pagamento rejeitado:', erroValidacao, payment.id);
+      res.status(200).json({ status: 'payment_validation_failed' });
+      return;
+    }
+    const resultado = await executarProcessarPagamentoProAprovado(firestoreDb, attemptId, payment);
+    res.status(200).json({ status: resultado?.idempotente ? 'already_processed' : 'processed' });
+  } catch (error) {
+    console.error('[MercadoPago Webhook] Erro transitório ao processar:', error);
+    res.status(500).json({ status: 'retry' });
+  }
+}
+
 function obterItensMasterPatrocinio(patrocinadorId, catalogoSnap) {
   // O ID canônico é sempre o ID do documento; o campo id do payload do sponsor não o substitui.
   const itens = catalogoSnap.docs.map((d) => ({ ...(d.data() || {}), id: d.id }));
