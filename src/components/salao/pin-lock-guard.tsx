@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { auth, db, functions } from "@/lib/firebase";
-import { collection, getDocs, query, where } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, query, where } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { signInWithCustomToken } from "firebase/auth";
 import { CrachaScannerModal, type CrachaPayload } from "./cracha-scanner-modal";
@@ -201,16 +201,16 @@ export function PinLockGuard({ role, restauranteId, slug, children }: PinLockGua
         colaboradorId: colaboradorSelecionado.id || colaboradorSelecionado.uid,
       });
 
-      const data = res.data as { sucesso: boolean; token: string; membro: any };
-      if (data?.token) {
+      const data = res.data as { sucesso: boolean; token: string; restauranteId?: string; membro: any };
+      if (data?.token && data.membro?.role === role) {
         await signInWithCustomToken(auth, data.token);
-        sessionStorage.setItem(`mayamenu_pin_unlocked_${role}_${targetRestId}`, "true");
-        if (data.membro) {
-          sessionStorage.setItem(`mayamenu_colaborador_${role}_${targetRestId}`, JSON.stringify(data.membro));
-        }
+        const tenantAutenticado = data.restauranteId || targetRestId;
+        sessionStorage.setItem(`mayamenu_pin_unlocked_${role}_${tenantAutenticado}`, "true");
+        sessionStorage.setItem(`mayamenu_colaborador_${role}_${tenantAutenticado}`, JSON.stringify(data.membro));
         setDesbloqueado(true);
         return;
       }
+      throw new Error("O PIN não corresponde a um colaborador deste terminal.");
     } catch (err: any) {
       console.warn("Autenticação de PIN via nuvem falhou:", err);
       const msg = err?.message?.includes("bloqueado temporariamente")
@@ -234,6 +234,18 @@ export function PinLockGuard({ role, restauranteId, slug, children }: PinLockGua
       setErro("Crachá sem identificador do restaurante.");
       return;
     }
+    if (targetRestId && restIdCracha !== targetRestId) {
+      try {
+        const slugSnap = await getDoc(doc(db, "slugs", targetRestId));
+        if (!slugSnap.exists() || slugSnap.data().ownerId !== restIdCracha) {
+          setErro("Este crachá pertence a outro estabelecimento.");
+          return;
+        }
+      } catch {
+        setErro("Não foi possível validar o estabelecimento do crachá.");
+        return;
+      }
+    }
 
     setAutenticando(true);
     setErro(null);
@@ -245,15 +257,14 @@ export function PinLockGuard({ role, restauranteId, slug, children }: PinLockGua
         crachaToken: cracha.crachaToken,
       });
 
-      const data = res.data as { sucesso: boolean; token: string; membro: any };
-      if (data?.token) {
-        await signInWithCustomToken(auth, data.token);
-        sessionStorage.setItem(`mayamenu_pin_unlocked_${role}_${restIdCracha}`, "true");
-        if (data.membro) {
-          sessionStorage.setItem(`mayamenu_colaborador_${role}_${restIdCracha}`, JSON.stringify(data.membro));
-        }
-        setDesbloqueado(true);
+      const data = res.data as { sucesso: boolean; token: string; restauranteId?: string; membro: any };
+      if (!data?.token || data.membro?.role !== role || data.restauranteId !== restIdCracha) {
+        throw new Error("Crachá não pertence a este perfil ou estabelecimento.");
       }
+      await signInWithCustomToken(auth, data.token);
+      sessionStorage.setItem(`mayamenu_pin_unlocked_${role}_${data.restauranteId}`, "true");
+      sessionStorage.setItem(`mayamenu_colaborador_${role}_${data.restauranteId}`, JSON.stringify(data.membro));
+      setDesbloqueado(true);
     } catch (err: any) {
       console.error("Falha ao autenticar com crachá:", err);
       setErro("Crachá não reconhecido ou expirado.");
