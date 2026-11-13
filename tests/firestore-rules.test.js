@@ -31,7 +31,8 @@ function patchContextToNamedDatabase(context) {
   // Mantém a fachada compat usada pela suíte (db.doc/db.collection), mas troca
   // seu delegate modular para a instância nomeada com o mesmo app/token simulado.
   const compatDb = context.firestore();
-  const app = compatDb?.app;
+  const compatApp = compatDb?.app;
+  const app = compatApp?._delegate || compatApp;
   if (!app) throw new Error("RulesTestContext sem FirebaseApp para banco nomeado.");
   let db = namedFirestoreByApp.get(app);
   if (!db) {
