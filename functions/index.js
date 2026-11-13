@@ -117,7 +117,7 @@ exports.setStaffRole = functions.https.onCall(async (data, context) => {
   // 2. Valida se o chamador é dono do restaurante
   const firestoreDb = getDb();
   let restDoc = await firestoreDb.collection('restaurantes').doc(restauranteId).get();
-  
+
   if (!restDoc.exists) {
     const q = await firestoreDb.collection('restaurantes').where('slug', '==', restauranteId).limit(1).get();
     if (!q.empty) {
@@ -406,7 +406,7 @@ exports.loginComPin = functions.https.onCall(async (data, context) => {
   // 1. Extração segura de IP contra falsificação e spoofing de cabeçalhos
   const clientIp = extrairIpConviavel(context.rawRequest);
   const ipKey = sanitizarChave(clientIp);
-  
+
   // Rate limits rastreados em 3 chaves no Firestore:
   const ipRateLimitRef = restDoc.ref.collection('_pin_rate_limits').doc(`ip_${ipKey}`);
   const userRateLimitRef = restDoc.ref.collection('_pin_rate_limits').doc(`user_${sanitizarChave(colaboradorId)}`);
@@ -3953,7 +3953,7 @@ async function executarAtivarPatrocinio(firestoreDb, authUid, token, payload, ra
     const vinculados = Array.isArray(lote.restaurantesVinculados) ? lote.restaurantesVinculados.slice() : [];
     const vinculoExistente = vinculados.find((v) => v.restauranteId === restauranteId);
     if (vinculoExistente) throw new functions.https.HttpsError('already-exists', 'Este restaurante já consumiu uma cota deste lote.');
-    
+
     const categorias = Array.from(categoriasNovas);
     const novoSlot = {
       patrocinadorId, patrocinadorNome: String(pat.nomeFantasia || ''),
