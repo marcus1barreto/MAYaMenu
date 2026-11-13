@@ -474,17 +474,17 @@ export async function atualizarStatusPedido(
   novoStatus: StatusPedido,
   options?: { pedidoRefPath?: string }
 ): Promise<void> {
+  const batch = writeBatch(db);
   const pedidoRef = doc(db, refPath);
-  await updateDoc(pedidoRef, { status: novoStatus, atualizadoEm: serverTimestamp() });
+  batch.update(pedidoRef, { status: novoStatus, atualizadoEm: serverTimestamp() });
 
   if (options?.pedidoRefPath) {
-    try {
-      const pedidoOriginalRef = doc(db, options.pedidoRefPath);
-      await updateDoc(pedidoOriginalRef, { status: novoStatus });
-    } catch (e) {
-      console.warn("Aviso ao sincronizar status na comanda do cliente:", e);
-    }
+    const pedidoOriginalRef = doc(db, options.pedidoRefPath);
+    batch.update(pedidoOriginalRef, { status: novoStatus, atualizadoEm: serverTimestamp() });
   }
+
+  // Ticket KDS e pedido original mudam juntos ou não mudam.
+  await batch.commit();
 }
 
 /**
