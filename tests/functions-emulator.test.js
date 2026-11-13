@@ -406,6 +406,11 @@ async function main() {
       () => executarChamarGarcom(db, "cliente_qr", { ...base, mesa: 8, qrCredencial: qr }),
       /Aguarde/i
     );
+    // Trocar o UID anônimo não contorna o limite: o cooldown é aplicado à mesa.
+    await assert.rejects(
+      () => executarChamarGarcom(db, "cliente_qr_segundo", { ...base, mesa: 8, qrCredencial: qr }),
+      /mesa já solicitou atendimento/i
+    );
   });
 
   await runTest("Emulador: desativação detecta KDS legado em numeroMesa string", async () => {
