@@ -140,6 +140,18 @@ async function runTests() {
     await db.doc("restaurantes/rest_b/equipe/garcom_b").set({ role: "garcom", ativo: true });
     await db.doc("restaurantes/rest_b/equipe/cozinha_b").set({ role: "cozinha", ativo: true });
 
+    // Patrocinadores e dados B2B usados nos testes de isolamento.
+    await db.doc("patrocinadores/pat_a").set({
+      nomeFantasia: "Patrocinador A", chaveAcessoB2B: "CHAVE-SECRETA-A", ativo: true,
+    });
+    await db.doc("patrocinadores/pat_b").set({
+      nomeFantasia: "Patrocinador B", chaveAcessoB2B: "CHAVE-SECRETA-B", ativo: true,
+    });
+    await db.doc("patrocinadores/pat_a/catalogo_master/item_a").set({ id: "item_a", nome: "Produto A" });
+    await db.doc("patrocinadores/pat_a/metricas_sellout/item_a").set({
+      patrocinadorId: "pat_a", itemId: "item_a", totalUnidadesVendidas: 10,
+    });
+
     // Lotes de licenças B2B por patrocinador
     await db.doc("patrocinadores/pat_a/lotes_licencas/lote_a1").set({
       patrocinadorId: "pat_a",
@@ -194,6 +206,28 @@ async function runTests() {
     await assertFails(ownerDb.doc("restaurantes/rest_a").update({ ownerId: "intruso" }));
     await assertFails(ownerDb.doc("restaurantes/rest_a").update({ plano: "pro", patrocinio: { ativo: true } }));
     await assertFails(ownerDb.doc("restaurantes_publicos/rest_a").update({ nome: "perfil adulterado" }));
+  });
+
+  await test("B2B: documentos contratuais são privados e a sessão sponsor acessa somente seu tenant", async () => {
+    const anonDb = testEnv.unauthenticatedContext().firestore();
+    const sponsorADb = testEnv.authenticatedContext("pat_a", {
+      role: "sponsor", patrocinadorId: "pat_a",
+    }).firestore();
+    const sponsorBDb = testEnv.authenticatedContext("pat_b", {
+      role: "sponsor", patrocinadorId: "pat_b",
+    }).firestore();
+    await assertFails(anonDb.doc("patrocinadores/pat_a").get());
+    await assertFails(anonDb.doc("patrocinadores/pat_a/catalogo_master/item_a").get());
+    await assertFails(anonDb.doc("patrocinadores/pat_a/lotes_licencas/lote_a1").get());
+    await assertFails(anonDb.doc("patrocinadores/pat_a/metricas_sellout/item_a").get());
+    await assertSucceeds(sponsorADb.doc("patrocinadores/pat_a").get());
+    await assertSucceeds(sponsorADb.doc("patrocinadores/pat_a/catalogo_master/item_a").get());
+    await assertSucceeds(sponsorADb.doc("patrocinadores/pat_a/lotes_licencas/lote_a1").get());
+    await assertSucceeds(sponsorADb.doc("patrocinadores/pat_a/metricas_sellout/item_a").get());
+    await assertFails(sponsorBDb.doc("patrocinadores/pat_a").get());
+    await assertFails(sponsorADb.doc("patrocinadores/pat_a").update({ chaveAcessoB2B: "ROUBADA" }));
+    await assertSucceeds(sponsorADb.doc("patrocinadores/pat_a/catalogo_master/item_b").set({ id: "item_b", nome: "Produto B" }));
+    await assertFails(sponsorADb.doc("patrocinadores/pat_a/lotes_licencas/lote_b").set({ codigoCampanha: "FORJADO" }));
   });
 
   // 1. ISOLAMENTO DE MESAS
