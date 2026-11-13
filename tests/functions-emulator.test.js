@@ -350,6 +350,10 @@ async function main() {
       id: "item-inativo", nome: "Produto desativado", categoriaSugerida: "Bebidas",
       precoSugerido: 99, ativo: false,
     });
+    await patRef.collection("catalogo_master").doc("item-canonical").set({
+      id: "item-spoofed", nome: "Produto com ID adulterado", categoriaSugerida: "Alimentos",
+      precoSugerido: 8, obrigatorioNoCardapio: true,
+    });
     await patRef.collection("lotes_licencas").doc("lote-test-b2b").set({
       id: "lote-test-b2b", patrocinadorId: "spn_test_b2b", nome: "Lote Teste",
       codigoCampanha: "CAMPANHA-TESTE-01", totalLicencas: 1, licencasAtivadas: 0,
@@ -370,6 +374,8 @@ async function main() {
     const item = await db.doc("restaurantes/owner_b2b_01/cardapio/spn-item-obrigatorio").get();
     assert.strictEqual(item.exists, true);
     assert.strictEqual(item.data().bloqueadoParaExclusao, true);
+    assert.strictEqual((await db.doc("restaurantes/owner_b2b_01/cardapio/spn-item-canonical").get()).exists, true);
+    assert.strictEqual((await db.doc("restaurantes/owner_b2b_01/cardapio/spn-item-spoofed").get()).exists, false);
     assert.strictEqual((await db.doc("restaurantes/owner_b2b_01/cardapio/spn-item-inativo").get()).exists, false);
     assert.strictEqual((await patRef.collection("lotes_licencas").doc("lote-test-b2b").get()).data().licencasAtivadas, 1);
     await assert.rejects(() => executarAtivarInstancia(db, "owner_b2b_02", { firebase: { sign_in_provider: "password" } }, {
