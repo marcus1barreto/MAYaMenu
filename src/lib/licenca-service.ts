@@ -13,7 +13,6 @@ import {
   orderBy,
   onSnapshot,
   serverTimestamp,
-  writeBatch,
   runTransaction,
   type Unsubscribe,
 } from "firebase/firestore";
