@@ -2517,6 +2517,8 @@ async function executarAtivarInstancia(firestoreDb, authUid, payload) {
         restauranteId: authUid, restauranteNome: nome, slug, ownerId: authUid,
       };
       tx.create(restRef, restaurante);
+      tx.set(firestoreDb.collection('restaurantes_publicos').doc(authUid),
+        montarPerfilPublicoRestaurante(authUid, restaurante), { merge: false });
       tx.set(slugRef, {
         slug, ownerId: authUid, restauranteNome: nome,
         criadoEm: admin.firestore.FieldValue.serverTimestamp(),
@@ -2611,6 +2613,8 @@ async function executarAtivarInstancia(firestoreDb, authUid, payload) {
       atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
     };
     tx.create(restRef, restaurante);
+    tx.set(firestoreDb.collection('restaurantes_publicos').doc(authUid),
+      montarPerfilPublicoRestaurante(authUid, restaurante), { merge: false });
     tx.set(slugRef, {
       slug, ownerId: authUid, restauranteNome: nome,
       criadoEm: admin.firestore.FieldValue.serverTimestamp(),
@@ -2983,12 +2987,7 @@ exports.desativarMesaBackend = functions.https.onCall(async (data, context) => {
 // Mantém um espelho público minimizado do restaurante. O documento raiz permanece privado.
 // Somente campos explicitamente permitidos são copiados; nunca replica ownerId, plano,
 // licença, limites, dados de equipe, PINs, QR ou configurações financeiras privadas.
-async function executarSincronizarPerfilPublicoRestaurante(firestoreDb, restauranteId, data) {
-  const publicRef = firestoreDb.collection('restaurantes_publicos').doc(restauranteId);
-  if (!data) {
-    await publicRef.delete();
-    return { sucesso: true, removido: true };
-  }
+function montarPerfilPublicoRestaurante(restauranteId, data) {
   const cfg = data.configuracoes || {};
   const configuracoes = {};
   for (const key of ['corPrimaria', 'tema', 'logoUrl', 'capaUrl', 'modoOperacao', 'modoFilaKds', 'taxaServico']) {
@@ -3004,14 +3003,23 @@ async function executarSincronizarPerfilPublicoRestaurante(firestoreDb, restaura
       ativo: true,
     };
   }
-  await publicRef.set({
+  return {
     restauranteId,
     slug: String(data.slug || restauranteId),
     nome: String(data.nome || 'Restaurante'),
     suspenso: data.suspenso === true || cfg.suspenso === true,
     configuracoes,
     atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
-  }, { merge: false });
+  };
+}
+
+async function executarSincronizarPerfilPublicoRestaurante(firestoreDb, restauranteId, data) {
+  const publicRef = firestoreDb.collection('restaurantes_publicos').doc(restauranteId);
+  if (!data) {
+    await publicRef.delete();
+    return { sucesso: true, removido: true };
+  }
+  await publicRef.set(montarPerfilPublicoRestaurante(restauranteId, data), { merge: false });
   return { sucesso: true, removido: false };
 }
 
@@ -3049,6 +3057,7 @@ exports._internal = {
   executarAtivarPatrocinio,
   executarProcessarSelloutOutbox,
   executarSincronizarPerfilPublicoRestaurante,
+  montarPerfilPublicoRestaurante,
 };
 
 /**
