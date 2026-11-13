@@ -2280,7 +2280,7 @@ function normalizarCodigoAtivacao(valor) {
 }
 
 function validarCotaLoteVoucher(lote) {
-  if (lote?.ativo === false) {
+  if (lote?.ativo !== true) {
     throw new functions.https.HttpsError('failed-precondition', 'Este lote de patrocínio está inativo e não aceita novas ativações.');
   }
   const total = Number(lote?.totalLicencas);
@@ -2304,8 +2304,8 @@ function millisDataAtivacao(valor) {
 
 function validarDisponibilidadeAtivacao(dados, codigo) {
   if (!dados) throw new functions.https.HttpsError('not-found', 'Código de ativação inválido ou inexistente.');
-  if (['ativa', 'utilizada', 'suspensa', 'revogada'].includes(dados.status)) {
-    throw new functions.https.HttpsError('failed-precondition', 'Esta licença já foi utilizada, suspensa ou revogada.');
+  if (dados.status !== 'disponivel') {
+    throw new functions.https.HttpsError('failed-precondition', 'Esta licença não está disponível para ativação.');
   }
   const dataExpiracao = dados.expiracaoEm || dados.dataExpiracao;
   const expira = millisDataAtivacao(dataExpiracao);
@@ -2319,7 +2319,7 @@ function validarDisponibilidadeAtivacao(dados, codigo) {
 }
 
 async function localizarLoteVoucher(firestoreDb, codigo, transaction) {
-  const queryLotes = firestoreDb.collectionGroup('lotes_licencas').where('codigoCampanha', '==', codigo);
+  const queryLotes = firestoreDb.collectionGroup('lotes_licencas').where('codigoCampanha', '==', codigo).limit(2);
   const snap = transaction ? await transaction.get(queryLotes) : await queryLotes.get();
   // Inclui lotes inativos na checagem de unicidade: um código duplicado não pode
   // ser reutilizado por outro lote apenas porque o registro original foi desativado.
@@ -2511,7 +2511,7 @@ async function executarValidarCodigoAtivacao(firestoreDb, payload) {
   }
   const { loteDoc, lote, patrocinadorId } = encontrado;
   const patrocinadorSnap = await firestoreDb.collection('patrocinadores').doc(patrocinadorId).get();
-  if (!patrocinadorSnap.exists || patrocinadorSnap.data()?.ativo === false) {
+  if (!patrocinadorSnap.exists || patrocinadorSnap.data()?.ativo !== true) {
     throw new functions.https.HttpsError('failed-precondition', 'Patrocinador inativo ou inexistente.');
   }
   const expiracao = millisDataAtivacao(lote.dataExpiracao);
@@ -3606,7 +3606,7 @@ async function executarAtivarInstancia(firestoreDb, authUid, authToken, payload,
     // Limita a leitura e o volume transacional; 451 permite detectar excesso sem varrer catálogo ilimitado.
     const catalogoQuery = patRef.collection('catalogo_master').limit(451);
     const [patSnap, catalogoSnap] = await Promise.all([tx.get(patRef), tx.get(catalogoQuery)]);
-    if (!patSnap.exists || patSnap.data()?.ativo === false) {
+    if (!patSnap.exists || patSnap.data()?.ativo !== true) {
       throw new functions.https.HttpsError('failed-precondition', 'Patrocinador inativo ou inexistente.');
     }
     const expiracao = millisDataAtivacao(lote.dataExpiracao);
@@ -3745,7 +3745,7 @@ async function executarAtivarPatrocinio(firestoreDb, authUid, token, payload, ra
     // Limita a leitura e o volume transacional; 451 permite detectar excesso sem varrer catálogo ilimitado.
     const catalogoQuery = patRef.collection('catalogo_master').limit(451);
     const [patSnap, catalogoSnap] = await Promise.all([tx.get(patRef), tx.get(catalogoQuery)]);
-    if (!patSnap.exists || patSnap.data()?.ativo === false) throw new functions.https.HttpsError('failed-precondition', 'Patrocinador inativo.');
+    if (!patSnap.exists || patSnap.data()?.ativo !== true) throw new functions.https.HttpsError('failed-precondition', 'Patrocinador inativo.');
     const expiracaoLote = millisDataAtivacao(lote.dataExpiracao);
     if (lote.dataExpiracao && expiracaoLote === null) throw new functions.https.HttpsError('failed-precondition', 'Validade da campanha inválida.');
     if (expiracaoLote !== null && Date.now() > expiracaoLote) throw new functions.https.HttpsError('failed-precondition', 'Campanha expirada.');
