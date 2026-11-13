@@ -17,6 +17,16 @@ service cloud.firestore {
       return isSignedIn() && ('superadmin' in request.auth.token) && request.auth.token.superadmin == true;
     }
 
+    // Sessão isolada do portal B2B, emitida somente após validação da chave pelo backend.
+    function isSponsor(patrocinadorId) {
+      return isSignedIn()
+        && request.auth.uid == patrocinadorId
+        && ('role' in request.auth.token)
+        && request.auth.token.role == 'sponsor'
+        && ('patrocinadorId' in request.auth.token)
+        && request.auth.token.patrocinadorId == patrocinadorId;
+    }
+
     // -----------------------------------------------------------------
     // Papéis personalizados (custom claims) + vínculo ativo em equipe/
     // -----------------------------------------------------------------
@@ -114,33 +124,30 @@ service cloud.firestore {
     // ─────────────────────────── Módulo B2B & Patrocinadores ───────────────────────────
 
     match /patrocinadores/{patrocinadorId} {
-      // Leitura pública para exibição de selo da marca parceira nos cardápios
-      allow read: if true;
-      // Escrita restrita ao SuperAdmin ou ao próprio patrocinador autenticado
-      allow write: if isSuperAdmin() || (isSignedIn() && request.auth.uid == patrocinadorId);
+      // Dados contratuais e chave B2B nunca são públicos.
+      allow read, write: if isSuperAdmin() || isSponsor(patrocinadorId);
 
       // Subcoleção Catálogo Master da marca
       match /catalogo_master/{itemId} {
-        allow read: if true;
-        allow write: if isSuperAdmin() || (isSignedIn() && request.auth.uid == patrocinadorId);
+        allow read, write: if isSuperAdmin() || isSponsor(patrocinadorId);
       }
 
       // Subcoleção Lotes de Licenças B2B (Geração exclusiva pelo SuperAdmin ou Backend Admin SDK)
       match /lotes_licencas/{loteId} {
-        allow read: if isSuperAdmin() || (isSignedIn() && request.auth.uid == patrocinadorId);
+        allow read: if isSuperAdmin() || isSponsor(patrocinadorId);
         allow write: if isSuperAdmin();
       }
 
       // Subcoleção Métricas de Sell-Out (Gravação consolidada pelo Backend / Admin SDK)
       match /metricas_sellout/{itemId} {
-        allow read: if isSuperAdmin() || (isSignedIn() && request.auth.uid == patrocinadorId);
+        allow read: if isSuperAdmin() || isSponsor(patrocinadorId);
         allow write: if isSuperAdmin();
       }
     }
 
     // Leitura de lote de licença via collectionGroup restrita ao SuperAdmin ou ao próprio patrocinador
     match /{path=**}/lotes_licencas/{loteId} {
-      allow read: if isSuperAdmin() || (isSignedIn() && resource.data.patrocinadorId == request.auth.uid);
+      allow read: if isSuperAdmin() || isSponsor(resource.data.patrocinadorId);
     }
 
     // ─────────────────────────── Restaurantes e Operação ───────────────────────────
