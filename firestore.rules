@@ -90,32 +90,17 @@ service cloud.firestore {
       // Atualização direta de concessões restrita exclusivamente ao SuperAdmin
       allow update: if isSuperAdmin();
 
-      // Exclusão: SuperAdmin, ou lojista somente na mesma operação em que o registro correspondente
-      // no arquivo morto passa a existir, em seu nome e com o mesmo identificador (queima atômica).
-      allow delete: if isSuperAdmin() || (
-        isNonAnonymous()
-        && resource.data.status in ['disponivel', 'utilizada']
-        && existsAfter(/databases/$(database)/documents/arquivo_morto_licencas/$(licencaId))
-        && getAfter(/databases/$(database)/documents/arquivo_morto_licencas/$(licencaId)).data.ownerId == request.auth.uid
-        && getAfter(/databases/$(database)/documents/arquivo_morto_licencas/$(licencaId)).data.id == licencaId
-      );
+      // Consumo/remoção é exclusivo do backend Admin SDK ou SuperAdmin.
+      // A ativação do lojista ocorre por callable transacional, não por delete no cliente.
+      allow delete: if isSuperAdmin();
     }
 
     // Arquivo Morto de Licenças Utilizadas (Armazenamento em JSON de Auditoria)
     match /arquivo_morto_licencas/{licencaId} {
       allow read: if isSuperAdmin() || (isSignedIn() && resource.data.ownerId == request.auth.uid);
-      // Criação: SuperAdmin, ou lojista somente na mesma transação que consome uma concessão existente,
-      // elegível, com mesmo id/codigo/plano e em nome próprio (fecha criação para códigos inexistentes).
-      allow create: if isSuperAdmin() || (
-        isNonAnonymous()
-        && request.resource.data.ownerId == request.auth.uid
-        && request.resource.data.id == licencaId
-        && request.resource.data.codigo == licencaId
-        && exists(/databases/$(database)/documents/concessoes/$(licencaId))
-        && !existsAfter(/databases/$(database)/documents/concessoes/$(licencaId))
-        && get(/databases/$(database)/documents/concessoes/$(licencaId)).data.status in ['disponivel', 'utilizada']
-        && request.resource.data.dadosLicenca.plano == get(/databases/$(database)/documents/concessoes/$(licencaId)).data.get('plano', 'free')
-      );
+      // Arquivamento de concessões é exclusivo do backend Admin SDK ou SuperAdmin.
+      // Evita que qualquer titular que conheça um código válido possa consumi-lo por DoS.
+      allow create: if isSuperAdmin();
       allow update, delete: if false; // Arquivo morto é estritamente imutável (WORM - Write Once, Read Many)
     }
 
