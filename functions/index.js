@@ -2406,19 +2406,25 @@ async function executarValidarCodigoAtivacao(firestoreDb, payload) {
   if (concessaoSnap.exists) {
     const dados = concessaoSnap.data() || {};
     validarDisponibilidadeAtivacao(dados, codigo);
+    const limitesOriginais = dados.limites && typeof dados.limites === 'object' ? dados.limites : {};
+    const limitesPublicos = {};
+    for (const campo of ['maxMesas', 'maxPratos', 'maxItensMenu']) {
+      const valor = Number(limitesOriginais[campo]);
+      if (Number.isSafeInteger(valor) && valor >= 0 && valor <= 10000) limitesPublicos[campo] = valor;
+    }
+    const planoPublico = ['free', 'pro', 'enterprise'].includes(dados.plano) ? dados.plano : 'free';
+    const expiracaoMs = millisDataAtivacao(dados.expiracaoEm || dados.dataExpiracao);
     return {
       valida: true,
       tipo: 'licenca',
       licenca: {
         id: codigo,
-        status: dados.status || 'disponivel',
-        plano: dados.plano || 'free',
-        limites: dados.limites || null,
-        // "notas" é campo administrativo interno e nunca integra a resposta pública.
+        status: 'disponivel',
+        plano: planoPublico,
+        limites: Object.keys(limitesPublicos).length ? limitesPublicos : null,
+        // "notas", IDs internos e campos arbitrários nunca integram a resposta pública.
         responsavel: String(dados.responsavel || '').slice(0, 120),
-        expiracaoEm: millisDataAtivacao(dados.expiracaoEm || dados.dataExpiracao) !== null
-          ? new Date(millisDataAtivacao(dados.expiracaoEm || dados.dataExpiracao)).toISOString()
-          : null,
+        expiracaoEm: expiracaoMs !== null ? new Date(expiracaoMs).toISOString() : null,
       },
     };
   }
