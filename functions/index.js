@@ -2643,7 +2643,8 @@ async function registrarResultadoRateLimitValidacaoCodigo(firestoreDb, refs, suc
   await firestoreDb.runTransaction(async (tx) => {
     const [ipSnap, codigoSnap] = await Promise.all([tx.get(refs.ipRef), tx.get(refs.codigoRef)]);
     if (sucesso) {
-      tx.delete(refs.ipRef);
+      // Limpa somente a contagem do código correto. Preservar a janela por IP
+      // impede que um atacante use um voucher válido para zerar tentativas de enumeração.
       tx.delete(refs.codigoRef);
       return;
     }
