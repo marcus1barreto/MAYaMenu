@@ -639,6 +639,28 @@ async function main() {
     );
   });
 
+  await runTest("P1 Garçom: bloqueia pedido em restaurante suspenso e mesa reservada", async () => {
+    const dbSuspenso = createFakeFirestore(seedRestauranteBase());
+    dbSuspenso._store.get("restaurantes/rest_1").suspenso = true;
+    await assert.rejects(
+      () => executarLancamentoPedidoGarcom(dbSuspenso, "garcom_1", {}, {
+        restauranteId: "rest_1", pedidoId: "ped-suspenso-01", mesa: 3,
+        clienteId: "cli_suspenso", itens: [{ menuItemId: "burger-1", quantidade: 1 }],
+      }),
+      /estabelecimento suspenso/i
+    );
+
+    const dbReservada = createFakeFirestore(seedRestauranteBase());
+    dbReservada._store.get("restaurantes/rest_1/mesas/3").statusEstrutural = "reservada";
+    await assert.rejects(
+      () => executarLancamentoPedidoGarcom(dbReservada, "garcom_1", {}, {
+        restauranteId: "rest_1", pedidoId: "ped-reservada-01", mesa: 3,
+        clienteId: "cli_reservada", itens: [{ menuItemId: "burger-1", quantidade: 1 }],
+      }),
+      /reservada/i
+    );
+  });
+
   await runTest("P1 Garçom Idempotente & RBAC: Bloqueia cliente/inativo/cozinha, comanda paga e não duplica subtotal", async () => {
     const db = createFakeFirestore(seedRestauranteBase());
 
