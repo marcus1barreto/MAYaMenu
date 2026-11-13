@@ -2861,6 +2861,7 @@ async function executarProcessarEstornoPagamentoPro(firestoreDb, attemptId, paym
   const paymentId = String(payment?.id || '');
   const statusGateway = String(payment?.status || '');
   const valorEstornadoCentavos = Math.round(Number(payment?.transaction_amount_refunded || 0) * 100);
+  const valorTransacaoCentavos = Math.round(Number(payment?.transaction_amount) * 100);
   const statusEstorno = statusGateway === 'charged_back'
     ? 'charged_back'
     : (statusGateway === 'refunded'
@@ -2869,6 +2870,9 @@ async function executarProcessarEstornoPagamentoPro(firestoreDb, attemptId, paym
 
   if (!/^[0-9]{1,30}$/.test(paymentId) ||
       !/^[a-f0-9-]{36}$/i.test(String(attemptId || '')) ||
+      !Number.isSafeInteger(valorTransacaoCentavos) || valorTransacaoCentavos < 1 ||
+      !Number.isSafeInteger(valorEstornadoCentavos) || valorEstornadoCentavos < 0 ||
+      valorEstornadoCentavos > valorTransacaoCentavos ||
       !['refunded', 'charged_back', 'cancelled'].includes(statusGateway) && valorEstornadoCentavos <= 0) {
     throw new functions.https.HttpsError('invalid-argument', 'Notificação de estorno inválida.');
   }
