@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { B2BLogin } from "@/components/b2b/b2b-login";
 import { B2BPortal } from "@/components/b2b/b2b-portal";
-import { buscarPatrocinadorPorChave } from "@/lib/b2b-service";
+import { buscarPatrocinadorPorChave, sairPortalB2B } from "@/lib/b2b-service";
 import type { PatrocinadorB2B } from "@/types/b2b";
 
 export default function ParceirosPage() {
@@ -37,9 +37,10 @@ export default function ParceirosPage() {
     }
   }, []);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     sessionStorage.removeItem("mayamenu_b2b_token");
     sessionStorage.removeItem("mayamenu_b2b_patrocinador");
+    await sairPortalB2B().catch(() => undefined);
     setPatrocinador(null);
   };
 
