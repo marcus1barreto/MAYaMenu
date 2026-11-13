@@ -106,7 +106,8 @@ service cloud.firestore {
 
     // Slugs (Trava de Unicidade)
     match /slugs/{slug} {
-      allow read: if true; // Validação prévia
+      allow get: if true; // Consulta pontual para validar o slug, sem enumeração da coleção
+      allow list: if false;
       // Slugs são reservados atomicamente pelo backend durante a ativação da licença.
       // Escrita cliente permitiria squatting de qualquer endereço público.
       allow create, update, delete: if isSuperAdmin();
