@@ -176,9 +176,11 @@ exports.setStaffRole = functions.https.onCall(async (data, context) => {
     }
   }
 
-  // Impede downgrade de titular/SuperAdmin e troca silenciosa de tenant de uma conta existente.
+  // Impede downgrade de titular, SuperAdmin, patrocinador ou papel privilegiado.
+  const roleAtual = targetUser.customClaims?.role;
   if (targetUser.uid === callerUid || targetUser.customClaims?.superadmin === true ||
-      ['owner', 'admin'].includes(targetUser.customClaims?.role)) {
+      targetUser.customClaims?.patrocinadorId ||
+      (roleAtual && !['garcom', 'cozinha'].includes(roleAtual))) {
     throw new functions.https.HttpsError('permission-denied', 'Esta conta não pode ser convertida em colaborador.');
   }
   const restaurantesDoUsuario = await firestoreDb.collection('restaurantes')
@@ -186,7 +188,6 @@ exports.setStaffRole = functions.https.onCall(async (data, context) => {
   if (!restaurantesDoUsuario.empty) {
     throw new functions.https.HttpsError('permission-denied', 'O e-mail informado já é titular de um estabelecimento.');
   }
-  const roleAtual = targetUser.customClaims?.role;
   const restauranteAtual = targetUser.customClaims?.restauranteId;
   if (['owner', 'admin', 'garcom', 'cozinha'].includes(roleAtual) &&
       restauranteAtual && restauranteAtual !== realRestauranteId) {
