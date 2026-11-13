@@ -791,81 +791,22 @@ export async function injetarTicketContingencia(
     subtotal: number;
   }
 ): Promise<void> {
-  const comandaRef = doc(
-    db,
-    "restaurantes",
+  // Mesmo em contingência, preços e itens são recalculados pelo servidor.
+  // Nunca gravar comanda, pedido ou KDS diretamente do navegador.
+  const lancarGarcomFn = httpsCallable(functions, "lancarPedidoGarcom");
+  await lancarGarcomFn({
     restauranteId,
-    "mesas",
-    String(ticket.mesa),
-    "comandas_abertas",
-    ticket.clienteId
-  );
-
-  const pedidoRef = doc(
-    db,
-    "restaurantes",
-    restauranteId,
-    "mesas",
-    String(ticket.mesa),
-    "comandas_abertas",
-    ticket.clienteId,
-    "pedidos",
-    ticket.id
-  );
-
-  const { Timestamp } = await import("firebase/firestore");
-  const agoraTimestamp = Timestamp.now();
-
-  const dadosPedido = {
-    id: ticket.id,
-    restauranteId,
+    pedidoId: ticket.id,
+    mesa: ticket.mesa,
     clienteId: ticket.clienteId,
     nomeCliente: ticket.nomeCliente,
-    mesa: ticket.mesa,
-    numeroMesa: Number(ticket.mesa) || ticket.mesa,
-    itens: ticket.itens,
-    subtotal: ticket.subtotal,
-    status: "a_fazer" as const,
-    criadoEm: agoraTimestamp,
-  };
-
-  const dadosComanda = {
-    id: ticket.clienteId,
-    restauranteId,
-    nomeCliente: ticket.nomeCliente,
-    mesa: ticket.mesa,
-    numeroMesa: Number(ticket.mesa) || ticket.mesa,
-    criadoEm: agoraTimestamp,
-    atualizadoEm: agoraTimestamp,
-    subtotal: ticket.subtotal,
-    status: "aguardando_pratos" as const,
-  };
-
-  const kdsRef = doc(db, "restaurantes", restauranteId, "kds_tickets", ticket.id);
-  const payloadKds = {
-    id: ticket.id,
-    mesa: ticket.mesa,
-    numeroMesa: Number(ticket.mesa) || ticket.mesa,
-    clienteId: ticket.clienteId,
-    nomeCliente: ticket.nomeCliente,
-    status: "a_fazer" as const,
-    pedidoRefPath: pedidoRef.path,
-    itens: ticket.itens.map((i) => ({
-      menuItemId: i.menuItemId,
-      nome: i.nome || "",
-      quantidade: i.quantidade,
-      tempoPreparoEstimado: (i as any).tempoPreparoEstimado,
-      modificadores: i.modificadores || [],
-      observacoes: i.observacoes || "",
+    itens: ticket.itens.map((item) => ({
+      menuItemId: item.menuItemId,
+      quantidade: item.quantidade,
+      modificadores: item.modificadores || [],
+      observacoes: item.observacoes || "",
     })),
-    criadoEm: agoraTimestamp,
-  };
-
-  const batch = writeBatch(db);
-  batch.set(comandaRef, dadosComanda, { merge: true });
-  batch.set(pedidoRef, dadosPedido);
-  batch.set(kdsRef, payloadKds);
-  await batch.commit();
+  });
 }
 
 /**
