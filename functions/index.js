@@ -2900,6 +2900,12 @@ async function executarProcessarEstornoPagamentoPro(firestoreDb, attemptId, paym
 
     const ledger = ledgerSnap.exists ? ledgerSnap.data() || {} : {};
 
+    // Eventos atrasados de estorno parcial nunca podem reabrir uma liquidação final.
+    if (['refunded', 'charged_back', 'cancelled'].includes(String(attempt.status || ''))) {
+      resultado = { processado: true, idempotente: true, status: String(attempt.status) };
+      return;
+    }
+
     // Estorno parcial não equivale a chargeback/estorno integral: exige revisão,
     // preserva a assinatura e nunca restaura automaticamente o estado anterior.
     if (statusEstorno === 'partial_refund') {
