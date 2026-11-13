@@ -160,6 +160,23 @@ async function main() {
     );
   });
 
+  await runTest("Emulador: desativação detecta KDS legado em numeroMesa string", async () => {
+    const { rest } = await seed(db, 9, "cli_kds_legado");
+    await rest.collection("mesas").doc("9").set({
+      numero: 9, ativa: true, statusEstrutural: "livre", qrVersao: 1,
+    });
+    await executarFecharComanda(db, "garcom_e", {}, { ...base, mesa: 9, clienteId: "cli_kds_legado" });
+    await rest.collection("kds_tickets").doc("ticket_legado_9").set({
+      mesa: "outra-representacao",
+      numeroMesa: "9",
+      status: "pronto",
+    });
+    await assert.rejects(
+      () => executarDesativarMesa(db, "owner_e", {}, { ...base, mesa: 9 }),
+      /tickets ativos na cozinha/i
+    );
+  });
+
   await runTest("Emulador: desativarMesaBackend bloqueia com comanda/ticket ativo e desativa mesa livre", async () => {
     const { rest } = await seed(db, 6, "cli_m6");
     await rest.collection("mesas").doc("6").set({
