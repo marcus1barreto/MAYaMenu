@@ -2651,13 +2651,16 @@ async function executarAtivarInstancia(firestoreDb, authUid, payload) {
 
   const restRef = firestoreDb.collection('restaurantes').doc(authUid);
   const slugRef = firestoreDb.collection('slugs').doc(slug);
+  const publicSlugQuery = firestoreDb.collection('restaurantes_publicos').where('slug', '==', slug).limit(2);
+  const legacySlugQuery = firestoreDb.collection('restaurantes').where('slug', '==', slug).limit(2);
   const concessaoRef = firestoreDb.collection('concessoes').doc(codigo);
   const arquivoRef = firestoreDb.collection('arquivo_morto_licencas').doc(codigo);
   let resultado = null;
 
   await firestoreDb.runTransaction(async (tx) => {
-    const [restSnap, slugSnap, concessaoSnap] = await Promise.all([
+    const [restSnap, slugSnap, concessaoSnap, publicSlugSnap, legacySlugSnap] = await Promise.all([
       tx.get(restRef), tx.get(slugRef), tx.get(concessaoRef),
+      tx.get(publicSlugQuery), tx.get(legacySlugQuery),
     ]);
     if (restSnap.exists) {
       const atual = restSnap.data() || {};
@@ -2667,7 +2670,10 @@ async function executarAtivarInstancia(firestoreDb, authUid, payload) {
       }
       throw new functions.https.HttpsError('already-exists', 'Este usuário já possui um estabelecimento cadastrado.');
     }
-    if (slugSnap.exists && slugSnap.data()?.ownerId !== authUid) {
+    const slugOcupadoEmPerfilPublico = publicSlugSnap.docs.some((d) => d.id !== authUid);
+    const slugOcupadoEmRaizLegada = legacySlugSnap.docs.some((d) => d.id !== authUid);
+    if ((slugSnap.exists && slugSnap.data()?.ownerId !== authUid) ||
+        slugOcupadoEmPerfilPublico || slugOcupadoEmRaizLegada) {
       throw new functions.https.HttpsError('already-exists', 'Este endereço público já está em uso. Escolha outro slug.');
     }
 
