@@ -2355,7 +2355,7 @@ async function executarCadastrarPatrocinadorSuperadmin(firestoreDb, authUid, aut
   const dados = payload || {};
   const nomeFantasia = String(dados.nomeFantasia || '').trim().slice(0, 120);
   const razaoSocial = String(dados.razaoSocial || '').trim().slice(0, 160);
-  const cnpj = String(dados.cnpj || '').replace(/\\D/g, '');
+  const cnpj = String(dados.cnpj || '').replace(/\D/g, '');
   const contatoNome = String(dados.contatoNome || '').trim().slice(0, 100);
   const contatoEmail = String(dados.contatoEmail || '').trim().toLowerCase().slice(0, 160);
   const contatoTelefone = String(dados.contatoTelefone || '').trim().slice(0, 40);
@@ -2363,15 +2363,15 @@ async function executarCadastrarPatrocinadorSuperadmin(firestoreDb, authUid, aut
   const totalCotas = Number(dados.totalCotasContratadas);
   const validadeMeses = Number(dados.validadeMeses || 6);
 
-  if (!nomeFantasia || !razaoSocial || !/^\\d{14}$/.test(cnpj) ||
-      !contatoNome || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(contatoEmail) ||
+  if (!nomeFantasia || !razaoSocial || !/^\d{14}$/.test(cnpj) ||
+      !contatoNome || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contatoEmail) ||
       !contatoTelefone || !Number.isSafeInteger(totalCotas) || totalCotas < 1 || totalCotas > 10000 ||
       !Number.isSafeInteger(validadeMeses) || validadeMeses < 1 || validadeMeses > 36) {
     throw new functions.https.HttpsError('invalid-argument', 'Dados cadastrais, CNPJ, cotas ou validade do patrocinador são inválidos.');
   }
 
   const slug = nomeFantasia.toLowerCase().normalize('NFD')
-    .replace(/[\\u0300-\\u036f]/g, '')
+    .replace(/[\u0300-\u036f]/g, '')
     .replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '').slice(0, 60);
   if (!slug) throw new functions.https.HttpsError('invalid-argument', 'Nome fantasia não gera um identificador válido.');
 
