@@ -58,6 +58,13 @@ export const auth: Auth = getAuth(app);
 export const storage: FirebaseStorage = getStorage(app);
 export const functions: Functions = getFunctions(app, "us-central1");
 
+// O portal B2B usa uma sessão Firebase separada para não substituir a autenticação
+// do restaurante quando um patrocinador acessa o painel corporativo.
+const b2bApp = getApps().find((instance) => instance.name === "mayamenu-b2b")
+  || initializeApp(firebaseConfig, "mayamenu-b2b");
+export const b2bAuth: Auth = getAuth(b2bApp);
+export const b2bDb: Firestore = getFirestore(b2bApp, FIRESTORE_DATABASE_ID);
+
 const OFFLINE_SESSION_KEY = "mayamenu_cliente_session_id";
 
 /**
