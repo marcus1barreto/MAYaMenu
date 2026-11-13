@@ -18,7 +18,7 @@ const {
   executarFecharComanda, executarLiberarMesa, executarDefinirTaxaServicoMesa,
   executarDesativarMesa, executarReativarMesa, executarChamarGarcom, executarGarantirCredencialMesa,
   executarEmissaoSessaoMesa, executarValidarCodigoAtivacao,
-  executarCadastrarPatrocinadorSuperadmin,
+  executarCadastrarPatrocinadorSuperadmin, executarCriarLoteLicencasB2BSuperadmin,
   executarAtivarInstancia, executarAtivarPatrocinio, executarProcessarSelloutOutbox,
   executarSincronizarPerfilPublicoRestaurante, executarLancamentoPedidoGarcom,
   executarValidarCodigoAtivacaoComRateLimit, executarValidarSessaoPatrocinador,
@@ -653,6 +653,34 @@ async function main() {
     assert.strictEqual(lotes.docs[0].data().totalLicencas, 12);
     assert.strictEqual(lotes.docs[0].data().licencasAtivadas, 0);
     assert.strictEqual(lotes.docs[0].data().ativo, true);
+  });
+
+  await runTest("Emulador: lotes B2B exigem SuperAdmin, patrocinador ativo e código globalmente único", async () => {
+    await db.doc("patrocinadores/spn_lote_admin").set({
+      id: "spn_lote_admin", nomeFantasia: "Marca Lote", ativo: true, authVersion: 0,
+    });
+    const payload = {
+      patrocinadorId: "spn_lote_admin",
+      nome: "Campanha Teste",
+      codigoCampanha: "B2B-LOTE-UNICO-001",
+      totalLicencas: 5,
+      validadeMeses: 6,
+    };
+    await assert.rejects(
+      () => executarCriarLoteLicencasB2BSuperadmin(db, "intruso_lote", {}, payload),
+      /somente superadmin/i
+    );
+    const criado = await executarCriarLoteLicencasB2BSuperadmin(
+      db, "admin_lote", { superadmin: true }, payload
+    );
+    assert.ok(criado.loteId);
+    const lote = await db.doc(`patrocinadores/spn_lote_admin/lotes_licencas/${criado.loteId}`).get();
+    assert.strictEqual(lote.data().totalLicencas, 5);
+    assert.strictEqual(lote.data().licencasAtivadas, 0);
+    await assert.rejects(
+      () => executarCriarLoteLicencasB2BSuperadmin(db, "admin_lote", { superadmin: true }, payload),
+      /código de campanha já está associado/i
+    );
   });
 
   await runTest("Emulador: sessão B2B valida status/versão e nunca retorna a chave de acesso", async () => {
