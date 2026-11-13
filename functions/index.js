@@ -2691,11 +2691,32 @@ async function executarAtivarInstancia(firestoreDb, authUid, authToken, payload,
     throw new functions.https.HttpsError('invalid-argument', 'Nome, código ou endereço público inválido.');
   }
 
+  const restRef = firestoreDb.collection('restaurantes').doc(authUid);
+  const existenteAntes = await restRef.get();
+  if (existenteAntes.exists) {
+    const atual = existenteAntes.data() || {};
+    if (atual.ownerId === authUid && atual.licenca?.id === codigo) {
+      return { ...atual, id: existenteAntes.id, _tipoAtivacao: atual.patrocinio?.ativo ? 'patrocinio' : 'licenca', idempotente: true };
+    }
+    throw new functions.https.HttpsError('already-exists', 'Este usuário já possui um estabelecimento cadastrado.');
+  }
+
   // A callable de ativação também aplica o rate limit: não pode ser possível
   // contornar a proteção chamando diretamente a função sem passar pela tela de validação.
-  await executarValidarCodigoAtivacaoComRateLimit(firestoreDb, { codigo }, rawRequest);
+  try {
+    await executarValidarCodigoAtivacaoComRateLimit(firestoreDb, { codigo }, rawRequest);
+  } catch (error) {
+    // Duas requisições concorrentes podem consumir a licença entre a leitura acima
+    // e a validação. Se a primeira já criou este tenant com o mesmo código, o retry
+    // é idempotente; caso contrário, a falha original é propagada.
+    const existenteDepois = await restRef.get();
+    const atual = existenteDepois.exists ? existenteDepois.data() || {} : {};
+    if (existenteDepois.exists && atual.ownerId === authUid && atual.licenca?.id === codigo) {
+      return { ...atual, id: existenteDepois.id, _tipoAtivacao: atual.patrocinio?.ativo ? 'patrocinio' : 'licenca', idempotente: true };
+    }
+    throw error;
+  }
 
-  const restRef = firestoreDb.collection('restaurantes').doc(authUid);
   const slugRef = firestoreDb.collection('slugs').doc(slug);
   const publicSlugQuery = firestoreDb.collection('restaurantes_publicos').where('slug', '==', slug).limit(2);
   const legacySlugQuery = firestoreDb.collection('restaurantes').where('slug', '==', slug).limit(2);
