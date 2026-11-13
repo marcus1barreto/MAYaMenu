@@ -442,6 +442,12 @@ async function main() {
     assert.strictEqual(restauranteFinal.data().assinatura, undefined);
     assert.strictEqual((await db.doc(`pagamentos_pro/${attemptId}`).get()).data().status, "refunded");
     assert.strictEqual((await db.doc(`pagamentos_pro_processados/${paymentId}`).get()).data().status, "refunded");
+    const eventoParcialAtrasado = await executarProcessarEstornoPagamentoPro(db, attemptId, {
+      ...pagamento, transaction_amount_refunded: 10.00,
+    });
+    assert.strictEqual(eventoParcialAtrasado.idempotente, true);
+    assert.strictEqual(eventoParcialAtrasado.status, "refunded");
+    assert.strictEqual((await db.doc(`pagamentos_pro/${attemptId}`).get()).data().status, "refunded");
   });
 
   await runTest("Emulador: pagamento PRO com valor incorreto não altera assinatura", async () => {
