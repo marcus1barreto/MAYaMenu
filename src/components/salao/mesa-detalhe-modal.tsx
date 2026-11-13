@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import type { MesaOperacional, ComandaGarcom, ItemComandaGarcom } from "@/components/garcom/garcom-view";
 import type { MenuItem, PedidoComRef } from "@/types";
 import { CARDAPIO_DEMO } from "@/lib/mock-data";
-import { escutarPedidosMesa, fecharContaMesa, atualizarStatusPedido, definirTaxaServicoMesa } from "@/lib/restaurante-service";
+import { escutarPedidosMesa, atualizarStatusPedido, definirTaxaServicoMesa } from "@/lib/restaurante-service";
 import { calcularTotais } from "@/lib/calculo-conta";
 import { useTotalComanda } from "@/hooks/useTotalComanda";
 import {
