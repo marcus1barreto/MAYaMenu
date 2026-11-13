@@ -23,9 +23,10 @@ O checkout antigo por rotas Next.js foi desativado (HTTP 410). Antes de reativar
 1. Configurar os segredos das Cloud Functions sem versioná-los:
    - `firebase functions:secrets:set MERCADO_PAGO_ACCESS_TOKEN --project mayaranas-8ad9f`
    - `firebase functions:secrets:set MERCADO_PAGO_WEBHOOK_SECRET --project mayaranas-8ad9f`
-2. Configurar as variáveis de ambiente do Functions:
+2. Configurar as variáveis de ambiente do Functions no arquivo local não versionado `functions/.env.mayaranas-8ad9f` (ou no mecanismo de configuração equivalente do runtime):
    - `MERCADO_PAGO_LIVE_MODE=true` para produção; usar `false` somente com credenciais e checkout sandbox.
    - `MAYAMENU_APP_URL=https://mayamenu.com.br` (ajustar para o domínio oficial efetivamente publicado).
+   - Não commitar o arquivo `.env` nem incluir tokens nele; os tokens ficam exclusivamente no Secret Manager.
 3. No painel do Mercado Pago, cadastrar o webhook de pagamentos para:
    `https://us-central1-mayaranas-8ad9f.cloudfunctions.net/mercadoPagoWebhook`
 4. Copiar o segredo de assinatura gerado pelo Mercado Pago para `MERCADO_PAGO_WEBHOOK_SECRET`. Habilitar o evento de pagamentos e confirmar que a notificação inclui `x-signature`, `x-request-id` e `data.id`.
