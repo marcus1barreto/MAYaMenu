@@ -840,6 +840,9 @@ async function runTests() {
     await assertSucceeds(staffDb.doc("restaurantes/rest_a/equipe/garcom_a").update({
       statusTurno: "em_servico", turnoIniciadoEm: Date.now(), atualizadoEm: Date.now(),
     }));
+    await assertFails(staffDb.doc("restaurantes/rest_a/equipe/garcom_a").update({
+      statusTurno: "superadmin", atualizadoEm: Date.now(),
+    }));
   });
 
   await test("Mesa: estado estrutural inativa só pode ser gravado pelo backend", async () => {
