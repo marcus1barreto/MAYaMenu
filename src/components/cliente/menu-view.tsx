@@ -332,14 +332,15 @@ export function MenuView({
         clienteId: finalUid,
         nomeCliente: nomeCliente || "Cliente",
         motivo: "Atendimento no Salão",
+        qrCredencial: qrCredencialAtiva || "",
       });
 
       setGarcomChamadoSucesso(true);
       setSegundosCooldown(120); // 2 minutos de cooldown anti-flooding
     } catch (err) {
-      console.warn("Falha ao registrar chamado do garçom online, ativando cooldown local:", err);
-      setGarcomChamadoSucesso(true);
-      setSegundosCooldown(120);
+      console.warn("Falha ao registrar chamado do garçom:", err);
+      setGarcomChamadoSucesso(false);
+      setSegundosCooldown(0);
     } finally {
       setChamandoGarcom(false);
     }
