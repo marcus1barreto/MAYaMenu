@@ -2808,6 +2808,26 @@ async function executarProcessarPagamentoProAprovado(firestoreDb, attemptId, pay
   return resultado;
 }
 
+async function limitarCriacaoPreferenciaPro(firestoreDb, authUid) {
+  const rateRef = firestoreDb.collection('pagamentos_pro_rate_limits').doc(authUid);
+  await firestoreDb.runTransaction(async (tx) => {
+    const snap = await tx.get(rateRef);
+    const atual = snap.exists ? snap.data() || {} : {};
+    const agora = Date.now();
+    const inicioJanela = Number(atual.inicioJanela || 0);
+    const dentroJanela = inicioJanela > 0 && agora - inicioJanela < 10 * 60 * 1000;
+    const tentativas = dentroJanela ? Number(atual.tentativas || 0) : 0;
+    if (tentativas >= 3) {
+      throw new functions.https.HttpsError('resource-exhausted', 'Muitas tentativas de checkout. Aguarde alguns minutos.');
+    }
+    tx.set(rateRef, {
+      inicioJanela: dentroJanela ? inicioJanela : agora,
+      tentativas: tentativas + 1,
+      atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+  });
+}
+
 async function executarCriarPreferenciaProBackend(firestoreDb, auth, payload) {
   const authUid = auth?.uid;
   if (!authUid) throw new functions.https.HttpsError('unauthenticated', 'Autenticação necessária.');
@@ -2834,6 +2854,8 @@ async function executarCriarPreferenciaProBackend(firestoreDb, auth, payload) {
   if (restData.suspenso === true || restData.configuracoes?.suspenso === true) {
     throw new functions.https.HttpsError('failed-precondition', 'Restaurante suspenso; checkout indisponível.');
   }
+
+  await limitarCriacaoPreferenciaPro(firestoreDb, authUid);
 
   const token = process.env.MERCADO_PAGO_ACCESS_TOKEN?.trim();
   if (!token) {
@@ -3929,6 +3951,7 @@ exports._internal = {
   executarConfirmarPagamentoProBackend,
   executarMercadoPagoWebhook,
   marcarTentativaPagamentoRevisao,
+  limitarCriacaoPreferenciaPro,
 };
 
 /**
