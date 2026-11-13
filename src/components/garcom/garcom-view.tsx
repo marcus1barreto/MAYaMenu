@@ -673,10 +673,7 @@ export function GarcomView({
       alert("Não há comandas identificadas para liberar esta mesa.");
       return false;
     }
-    if (mesaAlvo?.comandas.some((c) => c.status !== "pago")) {
-      alert("Não é possível liberar a mesa: confirme o pagamento de todas as comandas primeiro.");
-      return false;
-    }
+    // O backend é a autoridade sobre o estado pago; não usar snapshot React possivelmente defasado.
     try {
       await liberarMesaFirestore(idRestauranteFinal, mesaNumero, comandasIds);
     } catch (err: any) {
