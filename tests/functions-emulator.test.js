@@ -9,7 +9,8 @@ process.env.MESA_SESSION_SECRET = "segredo-super-forte-de-teste-mayamenu-32bytes
 
 const admin = require("../functions/node_modules/firebase-admin");
 const { _internal } = require("../functions/index.js");
-const { executarFecharComanda, executarLiberarMesa, executarDefinirTaxaServicoMesa, executarDesativarMesa } = _internal;
+const { executarFecharComanda, executarLiberarMesa, executarDefinirTaxaServicoMesa, executarDesativarMesa, executarChamarGarcom } = _internal;
+const crypto = require("crypto");
 
 let passed = 0;
 let failed = 0;
@@ -56,6 +57,7 @@ async function main() {
 
   await runTest("Emulador: liberação concorrente (8 chamadas) gera um histórico e uma métrica", async () => {
     const { rest, comanda } = await seed(db, 2, "cli_b");
+    await executarFecharComanda(db, "garcom_e", {}, { ...base, mesa: 2, clienteId: "cli_b" });
     const args = [db, "garcom_e", {}, { ...base, mesa: 2, comandasIds: ["cli_b"] }];
     const res = await Promise.all(Array.from({ length: 8 }, () => executarLiberarMesa(...args)));
     assert.strictEqual(res.filter((r) => r.idempotente === false).length, 1);
@@ -122,6 +124,42 @@ async function main() {
     assert.strictEqual((await rest.collection("historico_sessoes_mesas").where("mesa", "==", 4).get()).size, 1);
   });
 
+  await runTest("Emulador: liberarMesaBackend rejeita comanda não paga", async () => {
+    await seed(db, 7, "cli_nao_pago");
+    await assert.rejects(
+      () => executarLiberarMesa(db, "garcom_e", {}, { ...base, mesa: 7, comandasIds: ["cli_nao_pago"] }),
+      /precisa estar paga/i
+    );
+    const snap = await db.doc("restaurantes/rest_e/mesas/7/comandas_abertas/cli_nao_pago").get();
+    assert.strictEqual(snap.data().status, "aguardando_pratos");
+    assert.strictEqual(snap.data().pagoEm, undefined);
+  });
+
+  await runTest("Emulador: chamado de garçom exige QR válido e aplica cooldown no servidor", async () => {
+    const { rest } = await seed(db, 8, "cliente_qr");
+    const qr = "qr-credencial-fisica-de-teste-123456";
+    await rest.collection("mesas").doc("8").set({
+      ativa: true,
+      statusEstrutural: "livre",
+      qrCredencialHash: crypto.createHash("sha256").update(qr).digest("hex"),
+      qrVersao: 1,
+    }, { merge: true });
+    await assert.rejects(
+      () => executarChamarGarcom(db, "cliente_qr", { ...base, mesa: 8, qrCredencial: "qr-invalido-123456789" }),
+      /QR Code inválido/i
+    );
+    const resultado = await executarChamarGarcom(db, "cliente_qr", {
+      ...base, mesa: 8, qrCredencial: qr, nomeCliente: "Cliente teste", motivo: "Atendimento",
+    });
+    assert.strictEqual(resultado.sucesso, true);
+    const comanda = await rest.collection("mesas").doc("8").collection("comandas_abertas").doc("cliente_qr").get();
+    assert.strictEqual(comanda.data().chamadoGarcom.ativo, true);
+    await assert.rejects(
+      () => executarChamarGarcom(db, "cliente_qr", { ...base, mesa: 8, qrCredencial: qr }),
+      /Aguarde/i
+    );
+  });
+
   await runTest("Emulador: desativarMesaBackend bloqueia com comanda/ticket ativo e desativa mesa livre", async () => {
     const { rest } = await seed(db, 6, "cli_m6");
     await rest.collection("mesas").doc("6").set({
@@ -138,7 +176,8 @@ async function main() {
     // Com comanda aberta, dono não pode desativar mesa
     await assert.rejects(() => executarDesativarMesa(db, "owner_e", {}, { ...base, mesa: 6 }), /comandas abertas/i);
 
-    // Libera a mesa (fecha comanda, remove pedidos/KDS, grava histórico)
+    // Fechamento explícito registra o pagamento antes da liberação.
+    await executarFecharComanda(db, "garcom_e", {}, { ...base, mesa: 6, clienteId: "cli_m6" });
     await executarLiberarMesa(db, "garcom_e", {}, { ...base, mesa: 6, comandasIds: ["cli_m6"] });
 
     // Agora o dono consegue desativar logicamente
