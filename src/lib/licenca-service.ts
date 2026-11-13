@@ -410,8 +410,30 @@ export async function alterarStatusLicenca(
   novoStatus: "ativa" | "suspensa" | "revogada"
 ): Promise<void> {
   const codigoFormatado = codigo.trim().toUpperCase();
+  if (novoStatus === "revogada") {
+    await revogarLicenca(codigoFormatado);
+    return;
+  }
 
-  await updateDoc(doc(db, "concessoes", codigoFormatado), { status: novoStatus });
+  const licencaRef = doc(db, "concessoes", codigoFormatado);
+  const arquivoRef = doc(db, "arquivo_morto_licencas", codigoFormatado);
+  await runTransaction(db, async (tx) => {
+    const [licencaSnap, arquivoSnap] = await Promise.all([
+      tx.get(licencaRef),
+      tx.get(arquivoRef),
+    ]);
+    if (!licencaSnap.exists()) throw new Error("Concessão não encontrada.");
+    if (arquivoSnap.exists()) throw new Error("Concessão arquivada é imutável.");
+    const statusAtual = String(licencaSnap.data().status || "disponivel");
+    if (["ativa", "utilizada", "revogada"].includes(statusAtual)) {
+      throw new Error("Concessão consumida ou revogada não pode ter seu estado alterado.");
+    }
+    tx.update(licencaRef, {
+      status: novoStatus,
+      atualizadoEm: serverTimestamp(),
+    });
+  });
+
   const locais = obterLicencasLocais();
   const atualizadas = locais.map((l) => (l.id === codigoFormatado ? { ...l, status: novoStatus } : l));
   if (typeof window !== "undefined") {
@@ -579,7 +601,7 @@ export async function revogarLicenca(codigo: string): Promise<void> {
     }
     if (arquivoSnap.exists()) throw new Error("Já existe um registro imutável para esta concessão.");
     const licenca = licSnap.data() as Licenca;
-    if (licenca.status === "utilizada") {
+    if (["ativa", "utilizada"].includes(licenca.status)) {
       throw new Error("Concessão já consumida; não pode ser revogada como disponível.");
     }
     const dadosLicenca: Licenca = { ...licenca, status: "revogada" };
@@ -626,8 +648,8 @@ export async function arquivarLicencaExpirada(licenca: Licenca): Promise<void> {
     // O snapshot de auditoria é derivado exclusivamente do documento atual do servidor.
     // O objeto recebido pelo navegador fornece apenas o identificador da concessão.
     const atual = licSnap.data() as Licenca;
-    if (!["disponivel", "utilizada"].includes(atual.status)) {
-      throw new Error("Somente concessões elegíveis podem ser arquivadas.");
+    if (!["disponivel", "suspensa"].includes(atual.status)) {
+      throw new Error("Somente concessões disponíveis ou suspensas podem ser arquivadas por expiração.");
     }
 
     const dadosConsolidados: Licenca = { ...atual, status: "revogada" };
