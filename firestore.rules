@@ -24,7 +24,9 @@ service cloud.firestore {
         && ('role' in request.auth.token)
         && request.auth.token.role == 'sponsor'
         && ('patrocinadorId' in request.auth.token)
-        && request.auth.token.patrocinadorId == patrocinadorId;
+        && request.auth.token.patrocinadorId == patrocinadorId
+        && get(/databases/$(database)/documents/patrocinadores/$(patrocinadorId)).data.ativo == true
+        && request.auth.token.authVersion == get(/databases/$(database)/documents/patrocinadores/$(patrocinadorId)).data.get('authVersion', 1);
     }
 
     // -----------------------------------------------------------------
