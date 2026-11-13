@@ -563,6 +563,33 @@ async function main() {
     assert.strictEqual(historico.data().subtotalTotal, 0);
   });
 
+  await runTest("Emulador: desativação rejeita comanda arquivada sem pagamento e paga sem arquivamento", async () => {
+    const rest = db.doc("restaurantes/rest_desativacao_inconsistente");
+    await rest.set({ ownerId: "owner_desativacao" });
+    await rest.collection("mesas").doc("17").set({ ativa: true, statusEstrutural: "livre" });
+    await rest.collection("mesas").doc("18").set({ ativa: true, statusEstrutural: "livre" });
+    await rest.collection("mesas").doc("17").collection("comandas_abertas").doc("cli_17").set({
+      restauranteId: "rest_desativacao_inconsistente", status: "aguardando_pratos",
+      arquivada: true, subtotal: 20,
+    });
+    await rest.collection("mesas").doc("18").collection("comandas_abertas").doc("cli_18").set({
+      restauranteId: "rest_desativacao_inconsistente", status: "pago",
+      arquivada: false, pagoEm: new Date(), subtotal: 20,
+    });
+    await assert.rejects(
+      () => executarDesativarMesa(db, "owner_desativacao", {}, {
+        restauranteId: "rest_desativacao_inconsistente", mesa: 17,
+      }),
+      /comandas abertas ou não pagas/i
+    );
+    await assert.rejects(
+      () => executarDesativarMesa(db, "owner_desativacao", {}, {
+        restauranteId: "rest_desativacao_inconsistente", mesa: 18,
+      }),
+      /comandas abertas ou não pagas/i
+    );
+  });
+
   await runTest("Emulador: desativarMesaBackend bloqueia com comanda/ticket ativo e desativa mesa livre", async () => {
     const { rest } = await seed(db, 6, "cli_m6");
     await rest.collection("mesas").doc("6").set({
