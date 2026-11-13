@@ -70,7 +70,7 @@ export function B2BLotesView({ patrocinadorId, lotes }: B2BLotesViewProps) {
 
   const copiarLinkVoucher = (codigo: string) => {
     const origin = typeof window !== "undefined" ? window.location.origin : "";
-    const link = `${origin}/admin?voucher=${codigo}`;
+    const link = `${origin}/ativar/${encodeURIComponent(codigo)}`;
     if (typeof navigator !== "undefined" && navigator.clipboard) {
       navigator.clipboard.writeText(link);
       setCopiadoId(codigo);
