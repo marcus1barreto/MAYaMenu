@@ -11,7 +11,8 @@ const admin = require("../functions/node_modules/firebase-admin");
 const { _internal } = require("../functions/index.js");
 const {
   executarFecharComanda, executarLiberarMesa, executarDefinirTaxaServicoMesa,
-  executarDesativarMesa, executarChamarGarcom, executarValidarCodigoAtivacao,
+  executarDesativarMesa, executarChamarGarcom, executarGarantirCredencialMesa,
+  executarEmissaoSessaoMesa, executarValidarCodigoAtivacao,
   executarAtivarInstancia, executarAtivarPatrocinio, executarProcessarSelloutOutbox,
   executarSincronizarPerfilPublicoRestaurante, executarLancamentoPedidoGarcom,
   executarValidarCodigoAtivacaoComRateLimit, executarValidarSessaoPatrocinador,
@@ -381,6 +382,26 @@ async function main() {
     const snap = await db.doc("restaurantes/rest_e/mesas/7/comandas_abertas/cli_nao_pago").get();
     assert.strictEqual(snap.data().status, "aguardando_pratos");
     assert.strictEqual(snap.data().pagoEm, undefined);
+  });
+
+  await runTest("Emulador: mesa estruturalmente inativa não emite QR nem inicia sessão", async () => {
+    const { rest } = await seed(db, 10, "cli_mesa_inativa");
+    const qr = "qr-credencial-mesa-inativa-123456";
+    await rest.collection("mesas").doc("10").set({
+      numero: 10, ativa: true, statusEstrutural: "inativa",
+      qrCredencialHash: crypto.createHash("sha256").update(qr).digest("hex"),
+      qrVersao: 3,
+    });
+    await assert.rejects(
+      () => executarGarantirCredencialMesa(db, "owner_e", {}, { ...base, mesa: 10 }),
+      /Ative e libere a mesa/i
+    );
+    await assert.rejects(
+      () => executarEmissaoSessaoMesa(db, "cliente_mesa_inativa", {
+        ...base, mesa: 10, qrCredencial: qr,
+      }),
+      /inativa/i
+    );
   });
 
   await runTest("Emulador: chamado de garçom exige QR válido e aplica cooldown no servidor", async () => {
