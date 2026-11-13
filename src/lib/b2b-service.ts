@@ -23,7 +23,6 @@ import type {
   LoteLicencasB2B,
   MetricasSelloutItem,
 } from "@/types/b2b";
-import type { MenuItem } from "@/types";
 import { httpsCallable } from "firebase/functions";
 
 export const PATROCINADOR_DEMO: PatrocinadorB2B = {
