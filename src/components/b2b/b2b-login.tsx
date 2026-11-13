@@ -45,8 +45,7 @@ export function B2BLogin({ onAutenticado }: B2BLoginProps) {
         return;
       }
 
-      sessionStorage.setItem("mayamenu_b2b_token", patrocinador.chaveAcessoB2B);
-      sessionStorage.setItem("mayamenu_b2b_patrocinador", JSON.stringify(patrocinador));
+      // A sessão custom-token é mantida pelo Firebase Auth isolado; não persistir a chave bruta.
       onAutenticado(patrocinador);
     } catch (err: any) {
       console.error("Erro no login B2B:", err);
