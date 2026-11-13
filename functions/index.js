@@ -2816,6 +2816,7 @@ async function executarProcessarPagamentoProAprovado(firestoreDb, attemptId, pay
         maxPratos: restData.maxPratos ?? null,
         maxItensMenu: restData.maxItensMenu ?? null,
         assinatura: restData.assinatura || null,
+        revisaoFinanceira: restData.revisaoFinanceira || null,
       },
       processadoEm: admin.firestore.FieldValue.serverTimestamp(),
     });
@@ -2934,6 +2935,7 @@ async function executarProcessarEstornoPagamentoPro(firestoreDb, attemptId, paym
         patch.maxPratos = anterior.maxPratos ?? (patch.plano === 'pro' ? 60 : 20);
         patch.maxItensMenu = anterior.maxItensMenu ?? (patch.plano === 'pro' ? 60 : 20);
         patch.assinatura = anterior.assinatura || admin.firestore.FieldValue.delete();
+        patch.revisaoFinanceira = anterior.revisaoFinanceira || admin.firestore.FieldValue.delete();
       } else {
         // Estorno de uma cobrança anterior à atual: falha fechada e revisão administrativa.
         const temProPorLicenca = restData.licenca?.plano === 'pro';
