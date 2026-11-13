@@ -2084,7 +2084,7 @@ export function AdminDashboard() {
                   <span className="text-[11px] text-muted-foreground">/mês</span>
                 </div>
                 <p className="text-[11px] text-muted-foreground leading-snug">
-                  Cobrança mensal com cancelamento a qualquer momento.
+                  Pagamento pré-pago de 1 mês, sem renovação automática.
                 </p>
               </div>
               <div className="mt-3 pt-2 border-t border-border/60 text-[10px] font-semibold text-muted-foreground">
