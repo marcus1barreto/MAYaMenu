@@ -18,6 +18,7 @@ const {
   executarSincronizarPerfilPublicoRestaurante, executarLancamentoPedidoGarcom,
   executarValidarCodigoAtivacaoComRateLimit, executarValidarSessaoPatrocinador,
   validarAssinaturaMercadoPago, validarPagamentoPro, executarProcessarPagamentoProAprovado,
+  limitarCriacaoPreferenciaPro,
 } = _internal;
 const crypto = require("crypto");
 
@@ -71,6 +72,16 @@ async function main() {
     assert.strictEqual(validar({ uid: "garcom_1", role: "garcom", ativo: false }, "garcom_1"), false);
     assert.strictEqual(validar({ uid: "uid_diferente", role: "garcom" }, "doc_membro"), false);
     assert.strictEqual(validar({ uid: "garcom_1", role: "admin" }, "garcom_1"), false);
+  });
+
+  await runTest("Emulador: limita criação de preferências PRO por titular", async () => {
+    await limitarCriacaoPreferenciaPro(db, "owner_rate_checkout");
+    await limitarCriacaoPreferenciaPro(db, "owner_rate_checkout");
+    await limitarCriacaoPreferenciaPro(db, "owner_rate_checkout");
+    await assert.rejects(
+      () => limitarCriacaoPreferenciaPro(db, "owner_rate_checkout"),
+      /muitas tentativas de checkout/i
+    );
   });
 
   await runTest("Mercado Pago: valida assinatura HMAC do webhook e rejeita adulteração", async () => {
