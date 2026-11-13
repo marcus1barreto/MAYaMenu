@@ -556,8 +556,8 @@ exports.atualizarPinColaborador = functions.https.onCall(async (data, context) =
   const restData = restDoc.data() || {};
   const isSuperadmin = context.auth.token?.superadmin === true;
   // Blindagem contra vazamento horizontal: claim role=='owner' só autoriza para o seu próprio restauranteId
-  const isOwner = restData.ownerId === context.auth.uid ||
-    (context.auth.token?.role === 'owner' && context.auth.token?.restauranteId === realRestauranteId);
+  // Titularidade é determinada pelo ownerId persistido, não por claim potencialmente obsoleto.
+  const isOwner = restData.ownerId === context.auth.uid;
 
   if (!isOwner && !isSuperadmin) {
     throw new functions.https.HttpsError('permission-denied', 'Apenas o dono deste restaurante ou superadmin pode alterar o PIN.');
