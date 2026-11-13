@@ -6,6 +6,8 @@ on:
       - main
       - security/hardening-final-7-ajustes
     paths-ignore:
+      - package.json
+      - package-lock.json
       - functions/package.json
       - functions/package-lock.json
   workflow_dispatch:
