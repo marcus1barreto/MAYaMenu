@@ -36,6 +36,12 @@ O checkout antigo por rotas Next.js foi desativado (HTTP 410). Antes de reativar
 
 **Não reativar checkout nem publicar cobrança real enquanto os dois segredos e o webhook assinado não estiverem configurados.** Sem essas configurações, as Cloud Functions falham de forma fechada e não ativam o PRO.
 
+## Rate limiting — cadeia de IP
+
+A função `loginComPin` não confia em `fastly-client-ip` nem em `x-appengine-user-ip`; valida os endereços do `X-Forwarded-For` e, na topologia de Google Cloud External Application Load Balancer documentada no código, seleciona o penúltimo nó (IP do cliente antes do IP da forwarding rule).
+
+**Antes de liberar o login por PIN em produção, confirmar a cadeia efetivamente recebida pela Cloud Function no caminho de rede publicado.** Fazer uma chamada controlada a partir de um IP externo conhecido e verificar, por log sanitizado/temporário, a quantidade de nós e qual candidato corresponde ao cliente. Não registrar a cadeia completa nem expor IPs em logs permanentes. Se a topologia real for Cloud Functions/Cloud Run direto, sem o External Application Load Balancer descrito, ajustar a extração e os testes antes da liberação. Não presumir que a cadeia do emulador representa a borda de produção.
+
 ## Migração dos gatilhos
 
 A função `setRestaurantOwnerClaims` existente em produção é de 1ª geração. O código desta branch a substitui por um gatilho de 2ª geração no banco nomeado `mayamenu-bd`. A geração não pode ser alterada in-place.
