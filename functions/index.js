@@ -915,6 +915,14 @@ async function verificarPermissaoOperacionalRestaurante(
   );
 }
 
+function normalizarIdDocumentoOperacional(id, campo = 'Identificador') {
+  const valor = String(id ?? '').trim();
+  if (!valor || valor.length > 128 || valor.includes('/')) {
+    throw new functions.https.HttpsError('invalid-argument', `${campo} inválido.`);
+  }
+  return valor;
+}
+
 function normalizarMesaIdentificador(mesa) {
   const original = String(mesa ?? '').trim();
   if (!/^\d{1,5}$/.test(original)) {
@@ -1521,10 +1529,7 @@ async function executarLancamentoPedidoGarcom(firestoreDb, authUid, authToken, p
     throw new functions.https.HttpsError('invalid-argument', 'Formato de pedidoId inválido.');
   }
 
-  const clienteIdLimpo = String(clienteId || '').trim();
-  if (!clienteIdLimpo || clienteIdLimpo.includes('/')) {
-    throw new functions.https.HttpsError('invalid-argument', 'Identificador da comanda inválido.');
-  }
+  const clienteIdLimpo = normalizarIdDocumentoOperacional(clienteId, 'Identificador da comanda');
 
   const nomeLimpo = String(nomeCliente || '').trim() || 'Mesa (Geral)';
   if (!Array.isArray(itens) || itens.length === 0 || itens.length > 50) {
@@ -1837,8 +1842,11 @@ const MAX_COMANDAS_POR_OPERACAO = 50;
 const MAX_ESCRITAS_POR_TRANSACAO = 450;
 
 function normalizarIdsComanda(comandasIds) {
+  if (!Array.isArray(comandasIds)) {
+    throw new functions.https.HttpsError('invalid-argument', 'A lista de comandas é inválida.');
+  }
   const ids = Array.from(
-    new Set(comandasIds.map((id) => String(id || '').trim()).filter(Boolean))
+    new Set(comandasIds.map((id) => normalizarIdDocumentoOperacional(id, 'Identificador de comanda')))
   );
   if (ids.length === 0 || ids.length > MAX_COMANDAS_POR_OPERACAO) {
     throw new functions.https.HttpsError(
@@ -1926,7 +1934,7 @@ async function executarFecharComanda(firestoreDb, authUid, authToken, payload) {
   );
 
   const { mesaId: mesaStr } = normalizarMesaIdentificador(mesa);
-  const cId = String(clienteId).trim();
+  const cId = normalizarIdDocumentoOperacional(clienteId, 'Identificador da comanda');
   const comandaRef = restDoc.ref.collection('mesas').doc(mesaStr).collection('comandas_abertas').doc(cId);
   // ID único por fechamento. Fica fora do callback transacional para permanecer estável
   // quando o Firestore reexecuta a transação por conflito.
