@@ -24,7 +24,7 @@ Durante a janela de publicação, remover o gatilho antigo e implantar a versão
 
 ```bash
 firebase functions:delete setRestaurantOwnerClaims --region us-central1 --project mayaranas-8ad9f
-firebase deploy --only functions,firestore --project mayaranas-8ad9f
+firebase deploy --only functions,firestore,storage --project mayaranas-8ad9f
 ```
 
 A implantação cria os gatilhos de 2ª geração `setRestaurantOwnerClaims`, `sincronizarPerfilPublicoRestaurante` e `processarSelloutOutbox`, todos vinculados explicitamente ao banco `mayamenu-bd`.
@@ -49,6 +49,7 @@ O frontend novo deve ser publicado junto da política de Rules desta branch. Em 
 Após a publicação do frontend, validar imediatamente:
 
 - Abertura de cardápio público por slug e por URL direta.
+- Upload e leitura pública de imagens do cardápio/equipe, com rejeição de MIME e tamanho fora da política.
 - Pix ativo e inativo no perfil público.
 - Login de proprietário e sessão/claims.
 - Ativação de licença convencional e voucher B2B.
