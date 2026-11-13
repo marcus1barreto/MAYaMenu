@@ -843,6 +843,12 @@ async function runTests() {
     }
   });
 
+  await test("Slug: consulta pontual pública permitida, enumeração pública negada", async () => {
+    const anonDb = testEnv.unauthenticatedContext().firestore();
+    await assertSucceeds(anonDb.doc("slugs/bistro-a").get());
+    await assertFails(anonDb.collection("slugs").get());
+  });
+
   await test("Slug: reserva e alteração são exclusivas do backend/SuperAdmin", async () => {
     const ownerA = testEnv.authenticatedContext("owner_a", { firebase: { sign_in_provider: "password" } }).firestore();
     const ownerB = testEnv.authenticatedContext("owner_b", { firebase: { sign_in_provider: "password" } }).firestore();
