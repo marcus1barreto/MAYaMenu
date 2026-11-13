@@ -51,6 +51,15 @@ async function main() {
   const db = admin.firestore();
   const base = { restauranteId: "rest_e" };
 
+  await runTest("Emulador: IDs de mesa são numéricos, limitados e canônicos", async () => {
+    const normalizar = _internal.normalizarMesaIdentificador;
+    assert.deepStrictEqual(normalizar("08"), { mesaId: "8", numero: 8, original: "08" });
+    assert.deepStrictEqual(normalizar(12), { mesaId: "12", numero: 12, original: "12" });
+    assert.throws(() => normalizar("0"), /Número de mesa inválido/i);
+    assert.throws(() => normalizar("1/2"), /Número de mesa inválido/i);
+    assert.throws(() => normalizar("100000"), /Número de mesa inválido/i);
+  });
+
   await runTest("Emulador: autenticação de equipe nunca aceita papel enviado pelo cliente", async () => {
     const validar = _internal.validarMembroEquipeParaLogin;
     assert.strictEqual(validar({ uid: "garcom_1", role: "garcom", ativo: true }, "garcom_1"), true);
