@@ -81,7 +81,8 @@ async function main() {
   await runTest("Emulador: autenticação de equipe nunca aceita papel enviado pelo cliente", async () => {
     const validar = _internal.validarMembroEquipeParaLogin;
     assert.strictEqual(validar({ uid: "garcom_1", role: "garcom", ativo: true }, "garcom_1"), true);
-    assert.strictEqual(validar({ uid: "cozinha_1", role: "cozinha" }, "cozinha_1"), true);
+    assert.strictEqual(validar({ uid: "cozinha_1", role: "cozinha", ativo: true }, "cozinha_1"), true);
+    assert.strictEqual(validar({ uid: "cozinha_1", role: "cozinha" }, "cozinha_1"), false);
     assert.strictEqual(validar({ uid: "intruso", role: "owner" }, "intruso"), false);
     assert.strictEqual(validar({ uid: "garcom_1", role: "garcom", ativo: false }, "garcom_1"), false);
     assert.strictEqual(validar({ uid: "uid_diferente", role: "garcom" }, "doc_membro"), false);
