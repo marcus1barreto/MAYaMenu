@@ -2609,6 +2609,9 @@ function validarPagamentoPro(attempt, payment) {
   if (!Number.isSafeInteger(valorCentavos) || valorCentavos !== Number(attempt.valorCentavos)) {
     return 'Valor pago não corresponde ao preço contratado.';
   }
+  if (Math.round(Number(payment.transaction_amount_refunded || 0) * 100) > 0) {
+    return 'Pagamento possui estorno parcial e não pode ativar a assinatura.';
+  }
   if (typeof payment.live_mode !== 'boolean' || payment.live_mode !== (attempt.liveMode === true)) {
     return 'Ambiente do pagamento não corresponde ao ambiente do checkout.';
   }
