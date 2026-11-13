@@ -2745,9 +2745,10 @@ async function executarProcessarPagamentoProAprovado(firestoreDb, attemptId, pay
 
     const agora = new Date();
     let dataBase = agora;
-    const expiracaoAtual = restData.assinatura?.dataExpiracao
-      ? new Date(restData.assinatura.dataExpiracao)
-      : (restData.patrocinio?.dataExpiracao ? new Date(restData.patrocinio.dataExpiracao) : null);
+    const expiracaoAtualRaw = restData.assinatura?.dataExpiracao || restData.patrocinio?.dataExpiracao;
+    const expiracaoAtual = expiracaoAtualRaw
+      ? (typeof expiracaoAtualRaw.toDate === 'function' ? expiracaoAtualRaw.toDate() : new Date(expiracaoAtualRaw))
+      : null;
     if (expiracaoAtual && Number.isFinite(expiracaoAtual.getTime()) && expiracaoAtual > agora) {
       dataBase = expiracaoAtual;
     }
@@ -2935,8 +2936,9 @@ async function executarProcessarEstornoPagamentoPro(firestoreDb, attemptId, paym
       } else {
         // Estorno de uma cobrança anterior à atual: falha fechada e revisão administrativa.
         const temProPorLicenca = restData.licenca?.plano === 'pro';
-        const patrocinioExpira = restData.patrocinio?.dataExpiracao
-          ? new Date(restData.patrocinio.dataExpiracao)
+        const patrocinioExpiraRaw = restData.patrocinio?.dataExpiracao;
+        const patrocinioExpira = patrocinioExpiraRaw
+          ? (typeof patrocinioExpiraRaw.toDate === 'function' ? patrocinioExpiraRaw.toDate() : new Date(patrocinioExpiraRaw))
           : null;
         const temProPorPatrocinio = restData.patrocinio?.ativo === true &&
           patrocinioExpira && Number.isFinite(patrocinioExpira.getTime()) && patrocinioExpira > new Date();
