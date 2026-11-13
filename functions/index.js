@@ -2979,7 +2979,20 @@ async function executarCriarPreferenciaProBackend(firestoreDb, auth, payload) {
   await limitarCriacaoPreferenciaPro(firestoreDb, authUid);
 
   const liveMode = process.env.MERCADO_PAGO_LIVE_MODE !== 'false';
-  const baseUrl = new URL(process.env.MAYAMENU_APP_URL || 'https://mayamenu.com.br').origin;
+  const appUrlConfigurada = process.env.MAYAMENU_APP_URL?.trim();
+  if (!appUrlConfigurada) {
+    throw new functions.https.HttpsError('failed-precondition', 'MAYAMENU_APP_URL precisa ser configurada nas variáveis do Functions.');
+  }
+  let baseUrl;
+  try {
+    const appUrl = new URL(appUrlConfigurada);
+    if (appUrl.protocol !== 'https:' || appUrl.username || appUrl.password) {
+      throw new Error('URL pública deve usar HTTPS e não conter credenciais.');
+    }
+    baseUrl = appUrl.origin;
+  } catch {
+    throw new functions.https.HttpsError('failed-precondition', 'MAYAMENU_APP_URL inválida; configure a URL HTTPS oficial.');
+  }
   const attemptId = crypto.randomUUID();
   const attemptRef = firestoreDb.collection('pagamentos_pro').doc(attemptId);
   const agora = Date.now();
