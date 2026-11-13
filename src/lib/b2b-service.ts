@@ -1,7 +1,7 @@
 // lib/b2b-service.ts
 // Serviços do Módulo B2B & Patrocínios em Lote (Sponsor Tiers) do MAYaMenu
 
-import { db, functions } from "@/lib/firebase";
+import { db, functions, b2bAuth, b2bDb } from "@/lib/firebase";
 import {
   collection,
   doc,
@@ -24,6 +24,7 @@ import type {
   MetricasSelloutItem,
 } from "@/types/b2b";
 import { httpsCallable } from "firebase/functions";
+import { signInWithCustomToken, signOut } from "firebase/auth";
 
 export const PATROCINADOR_DEMO: PatrocinadorB2B = {
   id: "spn-bierhaus-demo",
@@ -125,27 +126,21 @@ export async function buscarPatrocinadorPorChave(
 ): Promise<PatrocinadorB2B | null> {
   const chaveLimpa = chaveAcesso.trim().toUpperCase();
   if (!chaveLimpa) return null;
-
   try {
-    const colRef = collection(db, "patrocinadores");
-    const q = query(colRef, where("chaveAcessoB2B", "==", chaveLimpa), where("ativo", "==", true));
-    const snap = await getDocs(q);
-
-    if (snap.empty) {
-      // Fallback para buscar diretamente pelo ID do doc
-      const docSnap = await getDoc(doc(db, "patrocinadores", chaveLimpa.toLowerCase()));
-      if (docSnap.exists()) {
-        return { id: docSnap.id, ...(docSnap.data() as any) } as PatrocinadorB2B;
-      }
-      return null;
-    }
-
-    const firstDoc = snap.docs[0];
-    return { id: firstDoc.id, ...(firstDoc.data() as any) } as PatrocinadorB2B;
+    const autenticarFn = httpsCallable(functions, "autenticarPatrocinadorBackend");
+    const resposta = await autenticarFn({ chave: chaveLimpa });
+    const dados = resposta.data as { customToken?: string; patrocinador?: PatrocinadorB2B };
+    if (!dados.customToken || !dados.patrocinador?.id) return null;
+    await signInWithCustomToken(b2bAuth, dados.customToken);
+    return dados.patrocinador;
   } catch (err) {
-    console.warn("Falha ao buscar patrocinador por chave:", err);
+    console.warn("Falha ao autenticar patrocinador no backend:", err);
     return null;
   }
+}
+
+export async function sairPortalB2B(): Promise<void> {
+  if (b2bAuth.currentUser) await signOut(b2bAuth);
 }
 
 /**
@@ -215,7 +210,7 @@ export function escutarCatalogoMaster(
   patrocinadorId: string,
   onUpdate: (itens: ItemCatalogoPatrocinador[]) => void
 ): Unsubscribe {
-  const colRef = collection(db, "patrocinadores", patrocinadorId, "catalogo_master");
+  const colRef = collection(b2bDb, "patrocinadores", patrocinadorId, "catalogo_master");
   return onSnapshot(
     colRef,
     (snap) => {
@@ -247,7 +242,7 @@ export async function salvarItemCatalogoMaster(
     .replace(/(^-|-$)+/g, "");
 
   const itemId = item.id || `item-b2b-${idSlug}`;
-  const docRef = doc(db, "patrocinadores", patrocinadorId, "catalogo_master", itemId);
+  const docRef = doc(b2bDb, "patrocinadores", patrocinadorId, "catalogo_master", itemId);
 
   const payload = {
     ...item,
@@ -272,7 +267,7 @@ export async function removerItemCatalogoMaster(
   patrocinadorId: string,
   itemId: string
 ): Promise<void> {
-  const docRef = doc(db, "patrocinadores", patrocinadorId, "catalogo_master", itemId);
+  const docRef = doc(b2bDb, "patrocinadores", patrocinadorId, "catalogo_master", itemId);
   await deleteDoc(docRef);
 }
 
@@ -283,7 +278,7 @@ export function escutarLotesLicencas(
   patrocinadorId: string,
   onUpdate: (lotes: LoteLicencasB2B[]) => void
 ): Unsubscribe {
-  const colRef = collection(db, "patrocinadores", patrocinadorId, "lotes_licencas");
+  const colRef = collection(b2bDb, "patrocinadores", patrocinadorId, "lotes_licencas");
   return onSnapshot(
     colRef,
     (snap) => {
@@ -485,7 +480,7 @@ export function escutarMetricasSellout(
   patrocinadorId: string,
   onUpdate: (metricas: MetricasSelloutItem[]) => void
 ): Unsubscribe {
-  const colRef = collection(db, "patrocinadores", patrocinadorId, "metricas_sellout");
+  const colRef = collection(b2bDb, "patrocinadores", patrocinadorId, "metricas_sellout");
   return onSnapshot(
     colRef,
     (snap) => {
