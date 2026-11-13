@@ -140,6 +140,15 @@ async function runTests() {
     await db.doc("restaurantes/rest_b/equipe/garcom_b").set({ role: "garcom", ativo: true });
     await db.doc("restaurantes/rest_b/equipe/cozinha_b").set({ role: "cozinha", ativo: true });
 
+    await db.doc("restaurantes/rest_a/cardapio/item_normal").set({
+      id: "item_normal", nome: "Item normal", precoBase: 10, ativo: true,
+    });
+    await db.doc("restaurantes/rest_a/cardapio/spn_item").set({
+      id: "spn_item", nome: "Produto patrocinado", precoBase: 12, ativo: true,
+      origemPatrocinadorId: "pat_a", patrocinioId: "lote_a", idMaster: "master_1",
+      bloqueadoParaExclusao: true, posicaoFixaTopo: true, seloPatrocinador: "Parceiro Oficial",
+    });
+
     // Patrocinadores e dados B2B usados nos testes de isolamento.
     await db.doc("patrocinadores/pat_a").set({
       nomeFantasia: "Patrocinador A", chaveAcessoB2B: "CHAVE-SECRETA-A", ativo: true,
@@ -209,6 +218,27 @@ async function runTests() {
     }));
     await assertFails(ownerDb.doc("restaurantes/rest_a").update({ plano: "pro", patrocinio: { ativo: true } }));
     await assertFails(ownerDb.doc("restaurantes_publicos/rest_a").update({ nome: "perfil adulterado" }));
+  });
+
+  await test("Cardápio: lojista não pode forjar, editar ou excluir itens patrocinados", async () => {
+    const ownerDb = testEnv.authenticatedContext("owner_a", {
+      role: "owner", restauranteId: "rest_a",
+    }).firestore();
+    await assertSucceeds(ownerDb.doc("restaurantes/rest_a/cardapio/item_normal").update({ precoBase: 11 }));
+    await assertSucceeds(ownerDb.doc("restaurantes/rest_a/cardapio/item_novo").set({
+      id: "item_novo", nome: "Novo item", precoBase: 8, ativo: true,
+    }));
+    await assertFails(ownerDb.doc("restaurantes/rest_a/cardapio/item_falso").set({
+      id: "item_falso", nome: "Falso patrocinado", precoBase: 1,
+      origemPatrocinadorId: "pat_a", bloqueadoParaExclusao: true,
+    }));
+    await assertFails(ownerDb.doc("restaurantes/rest_a/cardapio/spn_item").update({
+      origemPatrocinadorId: "pat_b",
+    }));
+    await assertFails(ownerDb.doc("restaurantes/rest_a/cardapio/spn_item").update({
+      bloqueadoParaExclusao: false,
+    }));
+    await assertFails(ownerDb.doc("restaurantes/rest_a/cardapio/spn_item").delete());
   });
 
   await test("B2B: documentos contratuais são privados e a sessão sponsor acessa somente seu tenant", async () => {
