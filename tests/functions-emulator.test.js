@@ -361,6 +361,25 @@ async function main() {
     );
   });
 
+  await runTest("Emulador: callable de patrocínio não permite contornar rate limit por chamada direta", async () => {
+    await db.doc("restaurantes/rest_rate_b2b").set({ ownerId: "owner_rate_b2b" });
+    const rawRequest = { headers: { "x-forwarded-for": "198.51.100.89" } };
+    for (let tentativa = 0; tentativa < 5; tentativa++) {
+      await assert.rejects(
+        () => executarAtivarPatrocinio(db, "owner_rate_b2b", {}, {
+          restauranteId: "rest_rate_b2b", codigoVoucher: "VOUCHER-B2B-INEXISTENTE",
+        }, rawRequest),
+        /inválido|inexistente|não encontrada/i
+      );
+    }
+    await assert.rejects(
+      () => executarAtivarPatrocinio(db, "owner_rate_b2b", {}, {
+        restauranteId: "rest_rate_b2b", codigoVoucher: "VOUCHER-B2B-INEXISTENTE",
+      }, rawRequest),
+      /muitas tentativas|bloqueado temporariamente/i
+    );
+  });
+
   await runTest("Emulador: voucher B2B ativa PRO, injeta catálogo e consome uma única cota", async () => {
     const patRef = db.doc("patrocinadores/spn_test_b2b");
     await patRef.set({ nomeFantasia: "Marca Teste", ativo: true, slug: "marca-teste" });
