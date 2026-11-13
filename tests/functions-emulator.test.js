@@ -582,7 +582,7 @@ async function main() {
       restauranteId: "rest_e", pedidoId: "pedido_mesa_inativa", mesa: 14,
       clienteId: "cli_mesa_inativa", nomeCliente: "Cliente",
       itens: [{ menuItemId: "spn-item", quantidade: 1 }],
-    }), /inativa ou bloqueada/i);
+    }), /inativa, reservada ou bloqueada/i);
     await assert.rejects(() => executarLancamentoPedidoGarcom(db, "garcom_e", {}, {
       restauranteId: "rest_e", pedidoId: "pedido_mesa_inexistente", mesa: 15,
       clienteId: "cli_mesa_inexistente", nomeCliente: "Cliente",
