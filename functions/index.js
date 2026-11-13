@@ -3222,12 +3222,6 @@ async function executarCriarPreferenciaProBackend(firestoreDb, auth, payload) {
     throw new functions.https.HttpsError('failed-precondition', 'Restaurante suspenso; checkout indisponível.');
   }
 
-  const token = process.env.MERCADO_PAGO_ACCESS_TOKEN?.trim();
-  if (!token) {
-    throw new functions.https.HttpsError('failed-precondition', 'MERCADO_PAGO_ACCESS_TOKEN não configurado no Secret Manager das Cloud Functions.');
-  }
-  await limitarCriacaoPreferenciaPro(firestoreDb, authUid);
-
   const liveModeRaw = String(process.env.MERCADO_PAGO_LIVE_MODE || '').trim().toLowerCase();
   if (liveModeRaw !== 'true' && liveModeRaw !== 'false') {
     throw new functions.https.HttpsError(
@@ -3236,6 +3230,12 @@ async function executarCriarPreferenciaProBackend(firestoreDb, auth, payload) {
     );
   }
   const liveMode = liveModeRaw === 'true';
+
+  const token = process.env.MERCADO_PAGO_ACCESS_TOKEN?.trim();
+  if (!token) {
+    throw new functions.https.HttpsError('failed-precondition', 'MERCADO_PAGO_ACCESS_TOKEN não configurado no Secret Manager das Cloud Functions.');
+  }
+  await limitarCriacaoPreferenciaPro(firestoreDb, authUid);
   const appUrlConfigurada = process.env.MAYAMENU_APP_URL?.trim();
   if (!appUrlConfigurada) {
     throw new functions.https.HttpsError('failed-precondition', 'MAYAMENU_APP_URL precisa ser configurada nas variáveis do Functions.');
