@@ -55,6 +55,7 @@ export async function buscarPatrocinadorPorChave(
     return dados.patrocinador;
   } catch (err) {
     console.warn("Falha ao autenticar patrocinador no backend:", err);
+    await signOut(b2bAuth).catch(() => undefined);
     return null;
   }
 }
