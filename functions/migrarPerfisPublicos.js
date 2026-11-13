@@ -49,6 +49,7 @@ async function main() {
         suspenso: data.suspenso === true || cfg.suspenso === true,
         configuracoes,
         atualizadoEm: FieldValue.serverTimestamp(),
+        sourceUpdatedAt: docSnap.updateTime.toDate().toISOString(),
       });
     }
     await batch.commit();
