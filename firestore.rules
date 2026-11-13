@@ -282,9 +282,10 @@ service cloud.firestore {
           && get(/databases/$(database)/documents/restaurantes/$(restauranteId)).data.maxMesas is int
           && request.resource.data.numero >= 1
           && request.resource.data.numero <= get(/databases/$(database)/documents/restaurantes/$(restauranteId)).data.maxMesas
+          && request.resource.data.ativa is bool
+          && request.resource.data.ativa == true
           && (!('statusEstrutural' in request.resource.data)
-            || request.resource.data.statusEstrutural in ['livre', 'reservada', 'bloqueada'])
-          && (!('ativa' in request.resource.data) || request.resource.data.ativa is bool);
+            || request.resource.data.statusEstrutural in ['livre', 'reservada', 'bloqueada']);
         allow update: if (
           isSuperAdmin()
           || ((isOwner(restauranteId) || isGarcom(restauranteId))
