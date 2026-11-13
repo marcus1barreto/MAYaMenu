@@ -14,6 +14,7 @@ import {
   where,
   onSnapshot,
   serverTimestamp,
+  increment,
   type Unsubscribe,
 } from "firebase/firestore";
 import type {
@@ -570,6 +571,7 @@ export async function alternarStatusPatrocinador(
   const docRef = doc(db, "patrocinadores", patrocinadorId);
   await updateDoc(docRef, {
     ativo,
+    authVersion: increment(1),
     atualizadoEm: serverTimestamp(),
   });
 }
