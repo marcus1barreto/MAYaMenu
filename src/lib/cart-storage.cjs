@@ -19,9 +19,20 @@ function fingerprintQrCredencial(valor) {
   return (hash >>> 0).toString(16);
 }
 
+function isMesaTokenCacheValido(cache, qrCredencial, agora = Date.now()) {
+  return Boolean(
+    cache
+    && typeof cache.token === "string"
+    && cache.token.length > 0
+    && cache.qrFingerprint === fingerprintQrCredencial(qrCredencial)
+    && Number(cache.expiraEm) > agora + 60_000
+  );
+}
+
 module.exports = {
   SESSAO_MESA_TIMEOUT_MS,
   getCartStorageKey,
   isCarrinhoExpirado,
   fingerprintQrCredencial,
+  isMesaTokenCacheValido,
 };
