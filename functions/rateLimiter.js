@@ -3,12 +3,13 @@
  * Compartilhado entre Cloud Functions e suíte de testes automatizados.
  * 
  * Regras:
- * 1. Extração segura de IP contra spoofing de X-Forwarded-For:
- *    No Google Cloud Functions / Cloud Run (Google Frontend Proxy GFE),
- *    o GFE appenda o IP de conexão direta do cliente ao FINAL do cabeçalho X-Forwarded-For.
- *    Qualquer IP pré-existente enviado pelo atacante fica nos primeiros elementos (spoofable).
- *    Portanto, o IP confiável e validado pela infraestrutura Google é ips[ips.length - 1],
- *    ou o cabeçalho 'fastly-client-ip' / socket.remoteAddress.
+ * 1. Extração de IP alinhada à topologia coberta pelos testes:
+ *    No Google Cloud External Application Load Balancer, a infraestrutura acrescenta
+ *    CLIENT_IP e, depois, FORWARDING_RULE_IP ao fim do X-Forwarded-For.
+ *    Valores anteriores podem ter sido enviados pelo cliente e não são confiáveis;
+ *    nessa topologia, CLIENT_IP é o penúltimo elemento.
+ *    Não confiar em fastly-client-ip nem x-appengine-user-ip sem garantia explícita
+ *    de que o proxy de produção os remove/substitui antes de chegar à Function.
  * 2. Janelas deslizantes de 15 minutos com reset automático e contenção atômica de 3 camadas:
  *    - IP (5 tentativas)
  *    - Colaborador (5 tentativas)
@@ -65,13 +66,9 @@ function extrairIpConviavel(rawRequest) {
     }
   }
 
-  // 2. Cabeçalho de usuário AppEngine/GCP caso injetado pela infraestrutura gerenciada
-  const gcpUserIp = rawRequest.headers?.['x-appengine-user-ip'];
-  if (gcpUserIp && /^[a-fA-F0-9:.]+$/.test(String(gcpUserIp).trim())) {
-    return String(gcpUserIp).trim();
-  }
-
-  // 3. Fallback para conexão de socket direto (emulação local / Express)
+  // Não usar x-appengine-user-ip: Cloud Functions gen2 não documenta esse campo
+  // como uma fonte autenticada para esta topologia. Fallback conservador ao peer direto.
+  // 2. Fallback para conexão de socket direto (emulação local / Express)
   if (rawRequest.ip) {
     return rawRequest.ip;
   }
