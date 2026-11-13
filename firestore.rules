@@ -198,18 +198,17 @@ service cloud.firestore {
       // Gestão de Equipe (Garçons e Cozinha)
       match /equipe/{membroId} {
         allow read: if isOwner(restauranteId) || isSuperAdmin() || (isSignedIn() && request.auth.uid == membroId);
-        allow create, delete: if isOwner(restauranteId) || isSuperAdmin();
-        // Permite ao dono/admin gerenciar tudo ou ao próprio colaborador atualizar seu turno de serviço
-        allow update: if isOwner(restauranteId) || isSuperAdmin() || (
-          isSignedIn() && request.auth.uid == membroId
+        // Cadastro, remoção, PIN, papel, crachá e estado ativo são exclusivos do backend Admin SDK.
+        allow create, delete: if false;
+        // O colaborador só pode alterar os próprios campos de turno.
+        allow update: if isSignedIn() && request.auth.uid == membroId
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             'statusTurno',
             'turnoIniciadoEm',
             'turnoPausadoEm',
             'turnoEncerradoEm',
             'atualizadoEm'
-          ])
-        );
+          ]);
       }
 
       // Cardápio público. Itens patrocinados são inseridos pelo backend e não podem
