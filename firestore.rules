@@ -218,10 +218,39 @@ service cloud.firestore {
         );
       }
 
-      // Cardápio
+      // Cardápio público. Itens patrocinados são inseridos pelo backend e não podem
+      // ser falsificados, editados ou removidos pelo estabelecimento.
       match /cardapio/{itemId} {
         allow read: if true;
-        allow write: if isOwner(restauranteId) || isSuperAdmin();
+        allow create: if isSuperAdmin() || (
+          isOwner(restauranteId)
+          && !('origemPatrocinadorId' in request.resource.data)
+          && !('patrocinioId' in request.resource.data)
+          && !('idMaster' in request.resource.data)
+          && !('bloqueadoParaExclusao' in request.resource.data)
+          && !('posicaoFixaTopo' in request.resource.data)
+          && !('seloPatrocinador' in request.resource.data)
+        );
+        allow update: if isSuperAdmin() || (
+          isOwner(restauranteId)
+          && !('origemPatrocinadorId' in resource.data)
+          && !('origemPatrocinadorId' in request.resource.data)
+          && !('patrocinioId' in resource.data)
+          && !('patrocinioId' in request.resource.data)
+          && !('idMaster' in resource.data)
+          && !('idMaster' in request.resource.data)
+          && !('bloqueadoParaExclusao' in resource.data)
+          && !('bloqueadoParaExclusao' in request.resource.data)
+          && !('posicaoFixaTopo' in resource.data)
+          && !('posicaoFixaTopo' in request.resource.data)
+          && !('seloPatrocinador' in resource.data)
+          && !('seloPatrocinador' in request.resource.data)
+        );
+        allow delete: if isSuperAdmin() || (
+          isOwner(restauranteId)
+          && !('origemPatrocinadorId' in resource.data)
+          && resource.data.get('bloqueadoParaExclusao', false) != true
+        );
       }
 
       // Fila Operacional da Cozinha (KDS Tickets Isolados)
