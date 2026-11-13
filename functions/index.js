@@ -2849,11 +2849,13 @@ async function executarProcessarEstornoPagamentoPro(firestoreDb, attemptId, paym
   const valorEstornadoCentavos = Math.round(Number(payment?.transaction_amount_refunded || 0) * 100);
   const statusEstorno = statusGateway === 'charged_back'
     ? 'charged_back'
-    : (statusGateway === 'refunded' ? 'refunded' : 'partial_refund');
+    : (statusGateway === 'refunded'
+      ? 'refunded'
+      : (statusGateway === 'cancelled' ? 'cancelled' : 'partial_refund'));
 
   if (!/^[0-9]{1,30}$/.test(paymentId) ||
       !/^[a-f0-9-]{36}$/i.test(String(attemptId || '')) ||
-      !['refunded', 'charged_back'].includes(statusGateway) && valorEstornadoCentavos <= 0) {
+      !['refunded', 'charged_back', 'cancelled'].includes(statusGateway) && valorEstornadoCentavos <= 0) {
     throw new functions.https.HttpsError('invalid-argument', 'Notificação de estorno inválida.');
   }
 
@@ -3147,7 +3149,7 @@ async function executarConfirmarPagamentoProBackend(firestoreDb, auth, payload) 
   const payment = await consultarPagamentoMercadoPagoServidor(paymentId, token);
   if (!payment) return { sucesso: false, status: 'pending' };
   const valorEstornadoCentavos = Math.round(Number(payment.transaction_amount_refunded || 0) * 100);
-  if (['refunded', 'charged_back'].includes(String(payment.status)) || valorEstornadoCentavos > 0) {
+  if (['refunded', 'charged_back', 'cancelled'].includes(String(payment.status)) || valorEstornadoCentavos > 0) {
     const estorno = await executarProcessarEstornoPagamentoPro(firestoreDb, attemptId, payment);
     return { sucesso: false, status: estorno.status || String(payment.status || 'refunded'), idempotente: estorno.idempotente };
   }
@@ -3211,7 +3213,7 @@ async function executarMercadoPagoWebhook(firestoreDb, req, res) {
     }
       const attemptId = String(payment.external_reference || '');
     const valorEstornadoCentavos = Math.round(Number(payment.transaction_amount_refunded || 0) * 100);
-    if (['refunded', 'charged_back'].includes(String(payment.status)) || valorEstornadoCentavos > 0) {
+    if (['refunded', 'charged_back', 'cancelled'].includes(String(payment.status)) || valorEstornadoCentavos > 0) {
       if (!/^[a-f0-9-]{36}$/i.test(attemptId)) {
         res.status(200).json({ status: 'ignored_refund_reference' });
         return;
