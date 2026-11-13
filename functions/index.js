@@ -3491,9 +3491,6 @@ async function executarAtivarInstancia(firestoreDb, authUid, authToken, payload,
       tx.get(restRef), tx.get(slugRef), tx.get(concessaoRef), tx.get(arquivoRef),
       tx.get(publicSlugQuery), tx.get(legacySlugQuery),
     ]);
-    if (arquivoSnap.exists) {
-      throw new functions.https.HttpsError('failed-precondition', 'Este código já foi consumido e arquivado; não pode ser reutilizado.');
-    }
     if (restSnap.exists) {
       const atual = restSnap.data() || {};
       if (atual.ownerId === authUid && atual.licenca?.id === codigo) {
@@ -3501,6 +3498,9 @@ async function executarAtivarInstancia(firestoreDb, authUid, authToken, payload,
         return;
       }
       throw new functions.https.HttpsError('already-exists', 'Este usuário já possui um estabelecimento cadastrado.');
+    }
+    if (arquivoSnap.exists) {
+      throw new functions.https.HttpsError('failed-precondition', 'Este código já foi consumido e arquivado; não pode ser reutilizado.');
     }
     const slugOcupadoEmPerfilPublico = publicSlugSnap.docs.some((d) => d.id !== authUid);
     const slugOcupadoEmRaizLegada = legacySlugSnap.docs.some((d) => d.id !== authUid);
