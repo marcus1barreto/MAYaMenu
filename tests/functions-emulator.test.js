@@ -14,6 +14,7 @@ const {
   executarDesativarMesa, executarChamarGarcom, executarValidarCodigoAtivacao,
   executarAtivarInstancia, executarAtivarPatrocinio, executarProcessarSelloutOutbox,
   executarSincronizarPerfilPublicoRestaurante, executarLancamentoPedidoGarcom,
+  executarValidarCodigoAtivacaoComRateLimit,
 } = _internal;
 const crypto = require("crypto");
 
@@ -153,6 +154,23 @@ async function main() {
     assert.strictEqual(validacao.licenca.id, "MAYA-TESTE-01");
     assert.strictEqual(validacao.licenca.plano, "pro");
     assert.strictEqual(validacao.licenca.ownerUid, undefined);
+  });
+
+  await runTest("Emulador: validação pública de voucher bloqueia enumeração após falhas por IP/código", async () => {
+    const rawRequest = {
+      ip: "198.51.100.44",
+      headers: { "x-forwarded-for": "198.51.100.44" },
+    };
+    for (let tentativa = 0; tentativa < 5; tentativa++) {
+      await assert.rejects(
+        () => executarValidarCodigoAtivacaoComRateLimit(db, { codigo: "MAYA-NAO-EXISTE-01" }, rawRequest),
+        /inválido|não encontrada/i
+      );
+    }
+    await assert.rejects(
+      () => executarValidarCodigoAtivacaoComRateLimit(db, { codigo: "MAYA-NAO-EXISTE-01" }, rawRequest),
+      /tentativas|aguarde|bloquead/i
+    );
   });
 
   await runTest("Emulador: ativação de licença comum consome concessão e cria restaurante/slug/arquivo morto atomicamente", async () => {
