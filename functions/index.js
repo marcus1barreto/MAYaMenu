@@ -2734,6 +2734,13 @@ function validarAssinaturaMercadoPago({ xSignature, xRequestId, dataId, secret }
     if (chave && valor) partes[chave.trim()] = valor.trim();
   }
   if (!partes.ts || !partes.v1 || !/^[a-f0-9]{64}$/i.test(partes.v1)) return false;
+  const timestampInformado = Number(partes.ts);
+  if (!Number.isFinite(timestampInformado) || timestampInformado <= 0) return false;
+  // O Mercado Pago documenta exemplos em segundos e milissegundos; aceita ambos.
+  const timestampMs = timestampInformado > 1e12 ? timestampInformado : timestampInformado * 1000;
+  const toleranciaMs = 5 * 60 * 1000;
+  if (Math.abs(Date.now() - timestampMs) > toleranciaMs) return false;
+
   const manifest = 'id:' + String(dataId).toLowerCase() +
     ';request-id:' + String(xRequestId) + ';ts:' + partes.ts + ';';
   const esperado = crypto.createHmac('sha256', secret).update(manifest).digest();
