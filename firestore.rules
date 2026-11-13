@@ -224,6 +224,7 @@ service cloud.firestore {
         allow read: if true;
         allow create: if isSuperAdmin() || (
           isOwner(restauranteId)
+          && !itemId.matches('^spn-.*')
           && !('origemPatrocinadorId' in request.resource.data)
           && !('patrocinioId' in request.resource.data)
           && !('idMaster' in request.resource.data)
@@ -233,6 +234,7 @@ service cloud.firestore {
         );
         allow update: if isSuperAdmin() || (
           isOwner(restauranteId)
+          && !itemId.matches('^spn-.*')
           && !('origemPatrocinadorId' in resource.data)
           && !('origemPatrocinadorId' in request.resource.data)
           && !('patrocinioId' in resource.data)
@@ -248,6 +250,7 @@ service cloud.firestore {
         );
         allow delete: if isSuperAdmin() || (
           isOwner(restauranteId)
+          && !itemId.matches('^spn-.*')
           && !('origemPatrocinadorId' in resource.data)
           && resource.data.get('bloqueadoParaExclusao', false) != true
         );
