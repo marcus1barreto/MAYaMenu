@@ -12,11 +12,11 @@ import {
 } from "@/components/ui/dialog";
 import {
   salvarConfigMesa,
-  desativarMesaFirestore,
   alternarStatusLoteMesas,
   escutarConfigsMesas,
   type ConfigMesa,
 } from "@/lib/mesas-service";
+import { desativarMesaFirestore } from "@/lib/restaurante-service";
 import { db } from "@/lib/firebase";
 import { collection, onSnapshot, query, where, deleteField } from "firebase/firestore";
 import {
