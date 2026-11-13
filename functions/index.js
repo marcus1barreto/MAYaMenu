@@ -2884,7 +2884,8 @@ exports.fecharComandaBackend = functions.https.onCall(async (data, context) => {
 async function executarChamarGarcom(firestoreDb, authUid, payload) {
   const { restauranteId, mesa, nomeCliente, motivo, qrCredencial } = payload || {};
   if (!authUid) throw new functions.https.HttpsError('unauthenticated', 'Autenticação necessária.');
-  if (!restauranteId || mesa === undefined || mesa === null || typeof qrCredencial !== 'string' || qrCredencial.length < 16) {
+  if (!restauranteId || mesa === undefined || mesa === null ||
+      typeof qrCredencial !== 'string' || qrCredencial.trim().length < 16 || qrCredencial.length > 512) {
     throw new functions.https.HttpsError('invalid-argument', 'Dados do chamado ou credencial QR inválidos.');
   }
   let restDoc = await firestoreDb.collection('restaurantes').doc(String(restauranteId)).get();
@@ -2897,10 +2898,13 @@ async function executarChamarGarcom(firestoreDb, authUid, payload) {
   if (restData.suspenso === true || restData.configuracoes?.suspenso === true) {
     throw new functions.https.HttpsError('failed-precondition', 'Estabelecimento suspenso.');
   }
-  const mesaStr = String(mesa).trim();
-  if (!/^\d+$/.test(mesaStr) || Number(mesaStr) < 1) {
+  const mesaInformada = String(mesa).trim();
+  const numeroMesa = Number(mesaInformada);
+  if (!/^\d+$/.test(mesaInformada) || !Number.isSafeInteger(numeroMesa) || numeroMesa < 1 || numeroMesa > 99999) {
     throw new functions.https.HttpsError('invalid-argument', 'Número de mesa inválido.');
   }
+  // IDs numéricos de mesa são canônicos: "01" e "1" não podem divergir.
+  const mesaStr = String(numeroMesa);
   const mesaRef = restDoc.ref.collection('mesas').doc(mesaStr);
   const comandaRef = mesaRef.collection('comandas_abertas').doc(authUid);
   const nome = String(nomeCliente || 'Cliente').trim().slice(0, 80) || 'Cliente';
@@ -2911,6 +2915,13 @@ async function executarChamarGarcom(firestoreDb, authUid, payload) {
     const m = mesaSnap.data() || {};
     if (m.ativa === false || m.statusEstrutural === 'inativa' || m.statusEstrutural === 'bloqueada') {
       throw new functions.https.HttpsError('failed-precondition', 'Mesa indisponível.');
+    }
+    const ultimoChamadoMesa = m.ultimoChamadoGarcomEm;
+    const ultimoChamadoMesaMs = ultimoChamadoMesa?.toMillis
+      ? ultimoChamadoMesa.toMillis()
+      : (ultimoChamadoMesa instanceof Date ? ultimoChamadoMesa.getTime() : 0);
+    if (ultimoChamadoMesaMs && Date.now() - ultimoChamadoMesaMs < 120000) {
+      throw new functions.https.HttpsError('resource-exhausted', 'Esta mesa já solicitou atendimento. Aguarde antes de chamar novamente.');
     }
     const recebido = hashQrCredencial(qrCredencial.trim());
     if (typeof m.qrCredencialHash !== 'string' || !compararSegredoConstante(recebido, m.qrCredencialHash)) {
@@ -2930,14 +2941,22 @@ async function executarChamarGarcom(firestoreDb, authUid, payload) {
         chamadoGarcom: { ativo: true, solicitadoEm: admin.firestore.FieldValue.serverTimestamp(), motivo: motivoSeguro },
         atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
       });
+      t.update(mesaRef, {
+        ultimoChamadoGarcomEm: admin.firestore.FieldValue.serverTimestamp(),
+        ultimoChamadoGarcomPorUid: authUid,
+      });
     } else {
       t.create(comandaRef, {
         id: authUid, restauranteId: restDoc.id, slug: String(restData.slug || restDoc.id),
-        nomeCliente: nome, mesa: Number(mesaStr), numeroMesa: Number(mesaStr),
+        nomeCliente: nome, mesa: numeroMesa, numeroMesa,
         subtotal: 0, status: 'pedindo',
         criadoEm: admin.firestore.FieldValue.serverTimestamp(),
         atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
         chamadoGarcom: { ativo: true, solicitadoEm: admin.firestore.FieldValue.serverTimestamp(), motivo: motivoSeguro },
+      });
+      t.update(mesaRef, {
+        ultimoChamadoGarcomEm: admin.firestore.FieldValue.serverTimestamp(),
+        ultimoChamadoGarcomPorUid: authUid,
       });
     }
   });
