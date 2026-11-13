@@ -2170,6 +2170,18 @@ function normalizarCodigoAtivacao(valor) {
   return String(valor || '').trim().toUpperCase();
 }
 
+function validarCotaLoteVoucher(lote) {
+  const total = Number(lote?.totalLicencas);
+  const usadas = Number(lote?.licencasAtivadas || 0);
+  if (!Number.isInteger(total) || total < 1 || !Number.isInteger(usadas) || usadas < 0 || usadas > total) {
+    throw new functions.https.HttpsError('failed-precondition', 'Lote B2B possui cotas inválidas; operação bloqueada.');
+  }
+  if (usadas >= total) {
+    throw new functions.https.HttpsError('resource-exhausted', 'Este lote de licenças patrocinadas já esgotou suas cotas.');
+  }
+  return { total, usadas };
+}
+
 function millisDataAtivacao(valor) {
   if (!valor) return null;
   if (typeof valor.toMillis === 'function') return valor.toMillis();
@@ -2183,7 +2195,11 @@ function validarDisponibilidadeAtivacao(dados, codigo) {
   if (['ativa', 'utilizada', 'suspensa', 'revogada'].includes(dados.status)) {
     throw new functions.https.HttpsError('failed-precondition', 'Esta licença já foi utilizada, suspensa ou revogada.');
   }
-  const expira = millisDataAtivacao(dados.expiracaoEm || dados.dataExpiracao);
+  const dataExpiracao = dados.expiracaoEm || dados.dataExpiracao;
+  const expira = millisDataAtivacao(dataExpiracao);
+  if (dataExpiracao && expira === null) {
+    throw new functions.https.HttpsError('failed-precondition', 'A validade da licença está em formato inválido.');
+  }
   if (expira !== null && Date.now() > expira) {
     throw new functions.https.HttpsError('failed-precondition', 'Este link de ativação expirou.');
   }
@@ -2291,7 +2307,7 @@ async function executarAutenticarPatrocinador(firestoreDb, payload, rawRequest) 
 
 async function executarValidarCodigoAtivacao(firestoreDb, payload) {
   const codigo = normalizarCodigoAtivacao(payload?.codigo);
-  if (!codigo || codigo.length > 100) {
+  if (!/^[A-Z0-9_-]{4,100}$/.test(codigo)) {
     throw new functions.https.HttpsError('invalid-argument', 'Código de ativação inválido.');
   }
 
@@ -2326,12 +2342,13 @@ async function executarValidarCodigoAtivacao(firestoreDb, payload) {
     throw new functions.https.HttpsError('failed-precondition', 'Patrocinador inativo ou inexistente.');
   }
   const expiracao = millisDataAtivacao(lote.dataExpiracao);
+  if (lote.dataExpiracao && expiracao === null) {
+    throw new functions.https.HttpsError('failed-precondition', 'A validade da campanha está em formato inválido.');
+  }
   if (expiracao !== null && Date.now() > expiracao) {
     throw new functions.https.HttpsError('failed-precondition', 'A validade desta campanha de patrocínio expirou.');
   }
-  if (Number(lote.licencasAtivadas || 0) >= Number(lote.totalLicencas || 0)) {
-    throw new functions.https.HttpsError('resource-exhausted', 'Este lote de licenças patrocinadas já esgotou suas cotas.');
-  }
+  validarCotaLoteVoucher(lote);
   const pat = patrocinadorSnap.data() || {};
   return {
     valida: true,
@@ -2435,7 +2452,7 @@ async function executarAtivarInstancia(firestoreDb, authUid, payload) {
   const slug = String(payload?.slug || '').trim().toLowerCase();
   const nome = String(payload?.restauranteNome || '').trim().slice(0, 120);
   const modo = ['com_garcom', 'hibrido', 'balcao'].includes(payload?.modoOperacao) ? payload.modoOperacao : 'hibrido';
-  if (!codigo || codigo.length > 100 || !nome || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) || slug.length > 60) {
+  if (!/^[A-Z0-9_-]{4,100}$/.test(codigo) || !nome || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) || slug.length > 60) {
     throw new functions.https.HttpsError('invalid-argument', 'Nome, código ou endereço público inválido.');
   }
 
@@ -2521,12 +2538,13 @@ async function executarAtivarInstancia(firestoreDb, authUid, payload) {
       throw new functions.https.HttpsError('failed-precondition', 'Patrocinador inativo ou inexistente.');
     }
     const expiracao = millisDataAtivacao(lote.dataExpiracao);
+    if (lote.dataExpiracao && expiracao === null) {
+      throw new functions.https.HttpsError('failed-precondition', 'A validade da campanha está em formato inválido.');
+    }
     if (expiracao !== null && Date.now() > expiracao) {
       throw new functions.https.HttpsError('failed-precondition', 'A validade desta campanha de patrocínio expirou.');
     }
-    if (Number(lote.licencasAtivadas || 0) >= Number(lote.totalLicencas || 0)) {
-      throw new functions.https.HttpsError('resource-exhausted', 'Este lote de licenças patrocinadas já esgotou suas cotas.');
-    }
+    const cotas = validarCotaLoteVoucher(lote);
     const pat = patSnap.data() || {};
     const itensMaster = obterItensMasterPatrocinio(patrocinadorId, catalogoSnap);
     if (itensMaster.length === 0) {
@@ -2594,7 +2612,7 @@ async function executarAtivarInstancia(firestoreDb, authUid, payload) {
       tx.create(restRef.collection('cardapio').doc(item.id), item);
     }
     tx.update(loteDoc.ref, {
-      licencasAtivadas: Number(lote.licencasAtivadas || 0) + 1,
+      licencasAtivadas: cotas.usadas + 1,
       restaurantesVinculados: [...vinculados, vinculo],
       atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
     });
@@ -2612,7 +2630,7 @@ async function executarAtivarPatrocinio(firestoreDb, authUid, token, payload) {
   if (!authUid) throw new functions.https.HttpsError('unauthenticated', 'Autenticação necessária.');
   const restauranteId = String(payload?.restauranteId || '').trim();
   const codigo = normalizarCodigoAtivacao(payload?.codigoVoucher);
-  if (!restauranteId || !codigo) throw new functions.https.HttpsError('invalid-argument', 'Restaurante e voucher são obrigatórios.');
+  if (!restauranteId || !/^[A-Z0-9_-]{4,100}$/.test(codigo)) throw new functions.https.HttpsError('invalid-argument', 'Restaurante e voucher são obrigatórios.');
   const superadmin = token?.superadmin === true;
   const restRef = firestoreDb.collection('restaurantes').doc(restauranteId);
   let resultado = null;
@@ -2635,7 +2653,9 @@ async function executarAtivarPatrocinio(firestoreDb, authUid, token, payload) {
     const [patSnap, catalogoSnap] = await Promise.all([tx.get(patRef), tx.get(catalogoQuery)]);
     if (!patSnap.exists || patSnap.data()?.ativo === false) throw new functions.https.HttpsError('failed-precondition', 'Patrocinador inativo.');
     const expiracaoLote = millisDataAtivacao(lote.dataExpiracao);
+    if (lote.dataExpiracao && expiracaoLote === null) throw new functions.https.HttpsError('failed-precondition', 'Validade da campanha inválida.');
     if (expiracaoLote !== null && Date.now() > expiracaoLote) throw new functions.https.HttpsError('failed-precondition', 'Campanha expirada.');
+    const cotas = validarCotaLoteVoucher(lote);
     const pat = patSnap.data() || {};
     const patrocinioExistente = rest.patrocinio || {};
     const slots = Array.isArray(patrocinioExistente.slots) ? patrocinioExistente.slots : (
@@ -2678,9 +2698,7 @@ async function executarAtivarPatrocinio(firestoreDb, authUid, token, payload) {
     const vinculados = Array.isArray(lote.restaurantesVinculados) ? lote.restaurantesVinculados.slice() : [];
     const vinculoExistente = vinculados.find((v) => v.restauranteId === restauranteId);
     if (vinculoExistente) throw new functions.https.HttpsError('already-exists', 'Este restaurante já consumiu uma cota deste lote.');
-    if (Number(lote.licencasAtivadas || 0) >= Number(lote.totalLicencas || 0)) {
-      throw new functions.https.HttpsError('resource-exhausted', 'Lote de patrocínio sem cotas disponíveis.');
-    }
+    
     const categorias = Array.from(categoriasNovas);
     const novoSlot = {
       patrocinadorId, patrocinadorNome: String(pat.nomeFantasia || ''),
@@ -2697,7 +2715,7 @@ async function executarAtivarPatrocinio(firestoreDb, authUid, token, payload) {
       codigoVoucherUtilizado: codigo, ativadoEm: agora.toISOString(), status: 'ativo',
     };
     tx.update(loteDoc.ref, {
-      licencasAtivadas: Number(lote.licencasAtivadas || 0) + 1,
+      licencasAtivadas: cotas.usadas + 1,
       restaurantesVinculados: [...vinculados, novoVinculo],
       atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
     });
