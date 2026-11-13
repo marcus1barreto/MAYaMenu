@@ -211,10 +211,10 @@ async function runTests() {
   await test("B2B: documentos contratuais são privados e a sessão sponsor acessa somente seu tenant", async () => {
     const anonDb = testEnv.unauthenticatedContext().firestore();
     const sponsorADb = testEnv.authenticatedContext("pat_a", {
-      role: "sponsor", patrocinadorId: "pat_a", authVersion: 1,
+      role: "sponsor", patrocinadorId: "pat_a", authVersion: 0,
     }).firestore();
     const sponsorBDb = testEnv.authenticatedContext("pat_b", {
-      role: "sponsor", patrocinadorId: "pat_b", authVersion: 1,
+      role: "sponsor", patrocinadorId: "pat_b", authVersion: 0,
     }).firestore();
     await assertFails(anonDb.doc("patrocinadores/pat_a").get());
     await assertFails(anonDb.doc("patrocinadores/pat_a/catalogo_master/item_a").get());
