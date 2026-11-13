@@ -6,7 +6,11 @@
  * ou GOOGLE_APPLICATION_CREDENTIALS apontando para uma chave de serviço protegida.
  */
 const admin = require("firebase-admin");
-const { getFirestore } = require("firebase-admin/firestore");
+const {
+  getFirestore,
+  FieldPath,
+  FieldValue,
+} = require("firebase-admin/firestore");
 
 const PROJECT_ID = process.env.MAYAMENU_PROJECT_ID || "mayaranas-8ad9f";
 if (PROJECT_ID !== "mayaranas-8ad9f") {
