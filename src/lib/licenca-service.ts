@@ -307,7 +307,7 @@ export async function validarLicencaParaAtivacao(codigo: string): Promise<{
     return { valida: true, licenca: dados.licenca };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Não foi possível validar o código no servidor.";
-    return { valida: false, motivo: message.replace(/^functions\\/[a-z-]+:\\s*/i, "") };
+    return { valida: false, motivo: message.replace(/^functions\/[a-z-]+:\s*/i, "") };
   }
 }
 
