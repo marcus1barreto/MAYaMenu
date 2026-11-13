@@ -38,9 +38,9 @@ O checkout antigo por rotas Next.js foi desativado (HTTP 410). Antes de reativar
 
 ## Rate limiting — cadeia de IP
 
-A função `loginComPin` não confia em `fastly-client-ip` nem em `x-appengine-user-ip`; valida os endereços do `X-Forwarded-For` e, na topologia de Google Cloud External Application Load Balancer documentada no código, seleciona o penúltimo nó (IP do cliente antes do IP da forwarding rule).
+A função `loginComPin` não confia em `fastly-client-ip` nem em `x-appengine-user-ip`; valida os endereços do `X-Forwarded-For` e seleciona o último nó válido à direita (`ips[ips.length - 1])), conforme a exigência de priorizar o salto acrescentado pela borda gerenciada Google Cloud (GFE).
 
-**Antes de liberar o login por PIN em produção, confirmar a cadeia efetivamente recebida pela Cloud Function no caminho de rede publicado.** Fazer uma chamada controlada a partir de um IP externo conhecido e verificar, por log sanitizado/temporário, a quantidade de nós e qual candidato corresponde ao cliente. Não registrar a cadeia completa nem expor IPs em logs permanentes. Se a topologia real for Cloud Functions/Cloud Run direto, sem o External Application Load Balancer descrito, ajustar a extração e os testes antes da liberação. Não presumir que a cadeia do emulador representa a borda de produção.
+**Antes de liberar o login por PIN em produção, confirmar a cadeia efetivamente recebida pela Cloud Function no caminho de rede publicado.** Fazer uma chamada controlada a partir de um IP externo conhecido e verificar, por log sanitizado/temporário, a quantidade de nós e qual candidato corresponde ao cliente. Atenção: em uma topologia de External Application Load Balancer, o último nó pode representar o IP da forwarding rule, e não o IP do cliente. Se for esse o caso, não liberar o login por PIN até alinhar a extração com a cadeia real e atualizar os testes. Não registrar a cadeia completa nem expor IPs em logs permanentes; o emulador não comprova a topologia da borda de produção.
 
 ## Migração dos gatilhos
 
