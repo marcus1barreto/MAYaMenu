@@ -147,17 +147,8 @@ service cloud.firestore {
     // Perfil público minimizado. Nenhum dado de titularidade, licença, plano ou operação é publicado aqui.
     match /restaurantes_publicos/{restauranteId} {
       allow read: if true;
-      allow create: if isNonAnonymous()
-        && request.resource.data.restauranteId == restauranteId
-        && getAfter(/databases/$(database)/documents/restaurantes/$(restauranteId)).data.ownerId == request.auth.uid
-        && request.resource.data.keys().hasOnly([
-          'restauranteId', 'slug', 'nome', 'suspenso', 'configuracoes', 'atualizadoEm'
-        ])
-        && request.resource.data.configuracoes.keys().hasOnly([
-          'corPrimaria', 'tema', 'logoUrl', 'capaUrl', 'modoOperacao', 'modoFilaKds', 'taxaServico'
-        ]);
-      // Atualizações e exclusões do espelho público são feitas exclusivamente pelo Admin SDK.
-      allow update, delete: if false;
+      // Escrita exclusiva do Admin SDK pelo trigger de sincronização.
+      allow create, update, delete: if false;
     }
 
     match /restaurantes/{restauranteId} {
@@ -176,7 +167,7 @@ service cloud.firestore {
         && !existsAfter(/databases/$(database)/documents/concessoes/$(request.resource.data.licenca.id))
         && getAfter(/databases/$(database)/documents/arquivo_morto_licencas/$(request.resource.data.licenca.id)).data.ownerId == request.auth.uid
         && getAfter(/databases/$(database)/documents/arquivo_morto_licencas/$(request.resource.data.licenca.id)).data.dadosLicenca.plano == request.resource.data.plano
-        && existsAfter(/databases/$(database)/documents/restaurantes_publicos/$(restauranteId));
+        ;
 
       // Lojista só altera campos cadastrais não privilegiados. Plano, licença, titularidade,
       // suspensão e limites são governados exclusivamente pelo SuperAdmin/backend.
