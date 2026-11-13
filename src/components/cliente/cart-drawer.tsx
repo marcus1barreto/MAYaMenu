@@ -23,6 +23,9 @@ import {
 import confetti from "canvas-confetti";
 import { salvarVisitaLocal, gerarComprovanteHash } from "@/lib/historico-cliente";
 import { enfileirarPedidoOffline } from "@/lib/offline-queue";
+import cartStorage from "@/lib/cart-storage.cjs";
+
+const { fingerprintQrCredencial } = cartStorage;
 
 function gerarIdempotencyKey(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -31,17 +34,6 @@ function gerarIdempotencyKey(): string {
   return `ped-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
 }
 
-// Fingerprint não secreto usado apenas para particionar o cache local por QR.
-// A autorização continua sendo exclusivamente validada pelo backend.
-function fingerprintQrCredencial(valor?: string): string {
-  if (!valor) return "sem-credencial";
-  let hash = 2166136261;
-  for (let i = 0; i < valor.length; i++) {
-    hash ^= valor.charCodeAt(i);
-    hash = Math.imul(hash, 16777619);
-  }
-  return (hash >>> 0).toString(16);
-}
 
 interface CartDrawerProps {
   isOpen: boolean;
