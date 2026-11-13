@@ -13,7 +13,8 @@ Esta branch contém mudanças incompatíveis com o cliente anterior: concessões
 3. Confirmar APIs Cloud Functions 2nd gen, Cloud Run e Eventarc habilitadas.
 4. Identificar a conta de serviço de execução de `autenticarPatrocinadorBackend` e conceder a ela `roles/iam.serviceAccountTokenCreator` sobre si mesma. Não conceder a permissão no projeto inteiro.
 5. Reemitir credenciais de patrocinadores legadas: o portal aceita somente chaves no formato `SPN-` + 26 caracteres CSPRNG. Não reutilizar chaves curtas anteriores.
-6. Garantir credencial administrativa segura para executar a migração. Não versionar chave JSON.
+6. Confirmar que o Secret Manager contém `MESA_SESSION_SECRET` com pelo menos 32 caracteres aleatórios. Se estiver ausente, gerar e configurar o segredo antes do deploy; nunca inserir seu valor no repositório ou em logs.
+7. Garantir credencial administrativa segura para executar a migração. Não versionar chave JSON.
 
 ## Migração dos gatilhos
 
