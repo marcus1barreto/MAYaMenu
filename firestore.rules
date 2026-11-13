@@ -66,7 +66,8 @@ service cloud.firestore {
 
     // Concessões/Licenças (MAYaRAnas SuperAdmin)
     match /concessoes/{licencaId} {
-      allow get: if true; // Permite ler 1 licença na rota efêmera /ativar/[codigo]
+      // A validação pública ocorre por callable, que retorna apenas dados minimizados.
+      allow get: if isSuperAdmin();
       allow list: if isSuperAdmin(); // Apenas SuperAdmin lista todas as concessões
       allow create: if isSuperAdmin(); // Apenas SuperAdmin gera novas licenças
 
