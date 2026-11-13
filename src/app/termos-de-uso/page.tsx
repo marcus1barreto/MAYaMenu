@@ -278,7 +278,7 @@ export default function TermosDeUsoPage() {
                 Cancelamento, Rescisão e Descontinuidade
               </h2>
               <p>
-                <strong>7.1. Cancelamento Voluntário pelo Estabelecimento:</strong> A contratação do Plano Pro é pré-paga e não possui renovação automática. Para encerrar a contratação, a LICENCIADA basta não adquirir novo período ao término da vigência atual. O acesso aos recursos Pro permanece disponível até o término do período já liquidado, sem multa de fidelidade.
+                <strong>7.1. Cancelamento Voluntário pelo Estabelecimento:</strong> A contratação do Plano Pro é pré-paga e não possui renovação automática. Para encerrar a contratação, basta à LICENCIADA não adquirir novo período ao término da vigência atual. O acesso aos recursos Pro permanece disponível até o término do período já liquidado, sem multa de fidelidade.
               </p>
               <p>
                 <strong>7.2. Rescisão por Infração:</strong> A MAYARANAS SISTEMAS reserva-se o direito de suspender ou banir imediatamente a conta do estabelecimento que utilizar a plataforma para práticas fraudulentas, veiculação de conteúdos ofensivos, comércio ilegal ou ataques à segurança do sistema.
