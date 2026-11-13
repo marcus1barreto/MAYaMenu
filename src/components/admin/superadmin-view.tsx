@@ -281,7 +281,7 @@ export function SuperAdminView() {
     setTimeout(() => setCopiadoLoteTexto(false), 2500);
   };
 
-  const handleAlterarStatus = async (codigo: string, novoStatus: "ativa" | "suspensa" | "revogada") => {
+  const handleAlterarStatus = async (codigo: string, novoStatus: "disponivel" | "suspensa" | "revogada") => {
     try {
       await alterarStatusLicenca(codigo, novoStatus);
       if (novoStatus === "revogada") {
@@ -1667,7 +1667,7 @@ export function SuperAdminView() {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => handleAlterarStatus(lic.id, "ativa")}
+                            onClick={() => handleAlterarStatus(lic.id, "disponivel")}
                             className="w-full bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-xl text-[10px] font-bold uppercase tracking-wider h-8 shadow-xs"
                           >
                             <RotateCcw className="w-3.5 h-3.5 mr-1" />
