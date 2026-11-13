@@ -2899,6 +2899,35 @@ async function executarProcessarEstornoPagamentoPro(firestoreDb, attemptId, paym
     }
 
     const ledger = ledgerSnap.exists ? ledgerSnap.data() || {} : {};
+
+    // Estorno parcial não equivale a chargeback/estorno integral: exige revisão,
+    // preserva a assinatura e nunca restaura automaticamente o estado anterior.
+    if (statusEstorno === 'partial_refund') {
+      if (attempt.status === 'review_required' &&
+          attempt.statusEstorno === 'partial_refund' &&
+          Number(attempt.valorEstornadoCentavos || 0) >= valorEstornadoCentavos &&
+          (!ledgerSnap.exists || ledger.status === 'partial_refund_review')) {
+        resultado = { processado: true, idempotente: true, status: 'partial_refund_review' };
+        return;
+      }
+      tx.update(attemptRef, {
+        status: 'review_required',
+        statusEstorno: 'partial_refund',
+        paymentId,
+        valorEstornadoCentavos,
+        motivoRevisao: 'Estorno parcial recebido; requer decisão administrativa sem revogação automática da assinatura.',
+        atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      if (ledgerSnap.exists) {
+        tx.update(ledgerRef, {
+          status: 'partial_refund_review',
+          valorEstornadoCentavos,
+          estornoParcialEm: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      }
+      resultado = { processado: true, idempotente: false, status: 'partial_refund_review', revisaoNecessaria: true };
+      return;
+    }
     if (ledger.status === statusEstorno && attempt.status === statusEstorno &&
         Number(ledger.valorEstornadoCentavos || 0) >= valorEstornadoCentavos) {
       resultado = { processado: true, idempotente: true, status: statusEstorno };
@@ -3272,7 +3301,10 @@ async function executarMercadoPagoWebhook(firestoreDb, req, res) {
         return;
       }
       const estorno = await executarProcessarEstornoPagamentoPro(firestoreDb, attemptId, payment);
-      res.status(200).json({ status: estorno.idempotente ? 'refund_already_processed' : 'refund_processed' });
+      const statusResposta = estorno.status === 'partial_refund_review'
+        ? (estorno.idempotente ? 'partial_refund_review_already_recorded' : 'partial_refund_review_required')
+        : (estorno.idempotente ? 'refund_already_processed' : 'refund_processed');
+      res.status(200).json({ status: statusResposta });
       return;
     }
     if (payment.status !== 'approved') {
