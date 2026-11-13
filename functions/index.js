@@ -2349,7 +2349,7 @@ async function localizarLoteVoucher(firestoreDb, codigo, transaction) {
 
 function validarCnpjBasico(valor) {
   const cnpj = String(valor || '').replace(/\D/g, '');
-  if (!validarCnpjBasico(cnpj) || /^([0-9])\1{13}$/.test(cnpj)) return false;
+  if (!/^\d{14}$/.test(cnpj) || /^([0-9])\1{13}$/.test(cnpj)) return false;
   const calcular = (base, pesos) => {
     const soma = base.split('').reduce((total, digito, index) => total + Number(digito) * pesos[index], 0);
     const resto = soma % 11;
@@ -2376,7 +2376,7 @@ async function executarCadastrarPatrocinadorSuperadmin(firestoreDb, authUid, aut
   const totalCotas = Number(dados.totalCotasContratadas);
   const validadeMeses = Number(dados.validadeMeses || 6);
 
-  if (!nomeFantasia || !razaoSocial || !/^\d{14}$/.test(cnpj) ||
+  if (!nomeFantasia || !razaoSocial || !validarCnpjBasico(cnpj) ||
       !contatoNome || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contatoEmail) ||
       !contatoTelefone || !Number.isSafeInteger(totalCotas) || totalCotas < 1 || totalCotas > 10000 ||
       !Number.isSafeInteger(validadeMeses) || validadeMeses < 1 || validadeMeses > 36) {
@@ -4475,6 +4475,7 @@ exports._internal = {
   executarValidarCodigoAtivacao,
   executarValidarCodigoAtivacaoComRateLimit,
   executarAutenticarPatrocinador,
+  executarValidarSessaoPatrocinador,
   executarCadastrarPatrocinadorSuperadmin,
   validarCnpjBasico,
   executarCriarLoteLicencasB2BSuperadmin,
