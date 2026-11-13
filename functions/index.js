@@ -2206,10 +2206,10 @@ async function executarLiberarMesa(firestoreDb, authUid, authToken, payload) {
         throw new functions.https.HttpsError('failed-precondition', 'Volume de pedidos excede o limite operacional da liberação.');
       }
 
-      subtotalTotalCentavos +=
-        subtotalComandaCentavos > 0
-          ? subtotalComandaCentavos
-          : Math.round((Number(item.data.subtotal) || 0) * 100);
+      // O subtotal autoritativo vem exclusivamente dos pedidos não cancelados.
+      // Nunca reaproveita o agregado legado da comanda quando o total recalculado é zero:
+      // isso poderia registrar receita de uma sessão composta apenas por itens cancelados.
+      subtotalTotalCentavos += subtotalComandaCentavos;
       if (item.data.criadoEm && !abertaEm) abertaEm = item.data.criadoEm;
       if (item.data.pagoEm || item.data.atualizadoEm) pagaEm = item.data.pagoEm || item.data.atualizadoEm;
 
