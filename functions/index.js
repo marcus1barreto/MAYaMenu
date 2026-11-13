@@ -2643,6 +2643,22 @@ async function consultarPagamentoMercadoPagoServidor(paymentId, token) {
   return response.json();
 }
 
+async function marcarTentativaPagamentoRevisao(firestoreDb, attemptId, paymentId, motivo) {
+  const attemptRef = firestoreDb.collection('pagamentos_pro').doc(attemptId);
+  await firestoreDb.runTransaction(async (tx) => {
+    const snap = await tx.get(attemptRef);
+    if (!snap.exists) return;
+    const atual = snap.data() || {};
+    if (atual.status === 'approved') return;
+    tx.update(attemptRef, {
+      status: 'review_required',
+      paymentId: paymentId ? String(paymentId) : (atual.paymentId || null),
+      motivoRevisao: String(motivo || 'Falha de validação financeira').slice(0, 240),
+      atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  });
+}
+
 async function executarProcessarPagamentoProAprovado(firestoreDb, attemptId, payment) {
   const paymentId = String(payment?.id || '');
   if (!/^[0-9]{1,30}$/.test(paymentId)) {
@@ -2991,7 +3007,7 @@ async function executarMercadoPagoWebhook(firestoreDb, req, res) {
   const bodyDataId = req.body?.data?.id;
   const dataId = String(queryDataId || bodyDataId || '');
   const tipo = String(req.query?.type || req.body?.type || req.body?.topic || '');
-  if (tipo && tipo !== 'payment') {
+  if (tipo !== 'payment') {
     res.status(200).json({ status: 'ignored_non_payment_event' });
     return;
   }
@@ -3027,17 +3043,33 @@ async function executarMercadoPagoWebhook(firestoreDb, req, res) {
       res.status(200).json({ status: 'ignored_unknown_attempt' });
       return;
     }
+    const attemptData = attemptSnap.data() || {};
+    if (attemptData.status !== 'pending' && attemptData.status !== 'approved') {
+      res.status(200).json({ status: 'ignored_attempt_state' });
+      return;
+    }
     const erroValidacao = validarPagamentoPro(
-      { ...attemptSnap.data(), attemptId },
+      { ...attemptData, attemptId },
       payment
     );
     if (erroValidacao) {
-      console.error('[MercadoPago Webhook] Pagamento rejeitado:', erroValidacao, payment.id);
-      res.status(200).json({ status: 'payment_validation_failed' });
+      console.error('[MercadoPago Webhook] Pagamento exige revisão:', erroValidacao, payment.id);
+      await marcarTentativaPagamentoRevisao(firestoreDb, attemptId, payment.id, erroValidacao);
+      res.status(200).json({ status: 'payment_validation_review_required' });
       return;
     }
-    const resultado = await executarProcessarPagamentoProAprovado(firestoreDb, attemptId, payment);
-    res.status(200).json({ status: resultado?.idempotente ? 'already_processed' : 'processed' });
+    try {
+      const resultado = await executarProcessarPagamentoProAprovado(firestoreDb, attemptId, payment);
+      res.status(200).json({ status: resultado?.idempotente ? 'already_processed' : 'processed' });
+    } catch (error) {
+      if (error instanceof functions.https.HttpsError &&
+          ['failed-precondition', 'permission-denied', 'already-exists'].includes(error.code)) {
+        await marcarTentativaPagamentoRevisao(firestoreDb, attemptId, payment.id, error.message);
+        res.status(200).json({ status: 'payment_validation_review_required' });
+        return;
+      }
+      throw error;
+    }
   } catch (error) {
     console.error('[MercadoPago Webhook] Erro transitório ao processar:', error);
     res.status(500).json({ status: 'retry' });
@@ -3887,6 +3919,7 @@ exports._internal = {
   executarCriarPreferenciaProBackend,
   executarConfirmarPagamentoProBackend,
   executarMercadoPagoWebhook,
+  marcarTentativaPagamentoRevisao,
 };
 
 /**
