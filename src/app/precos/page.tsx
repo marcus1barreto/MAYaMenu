@@ -329,7 +329,7 @@ export default function PrecosPage() {
                   <Award className="w-5 h-5 text-amber-400" />
                 </h3>
                 <p className="text-xs text-neutral-300 mt-2 min-h-[48px] leading-relaxed">
-                  O plano mais vantajoso. Máxima economia, relatórios analíticos e suporte prioritário no WhatsApp.
+                  O plano mais vantajoso. Máxima economia, relatórios analíticos e suporte prioritário por e-mail.
                 </p>
 
                 {/* Preços */}
@@ -384,7 +384,7 @@ export default function PrecosPage() {
                   </div>
                   <div className="flex items-start gap-2.5">
                     <Check className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
-                    <span><strong>Suporte Prioritário</strong> direto pelo WhatsApp</span>
+                    <span><strong>Suporte Prioritário</strong> por e-mail</span>
                   </div>
                   <div className="flex items-start gap-2.5">
                     <Check className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
@@ -746,10 +746,10 @@ export default function PrecosPage() {
                       Central & Comunidade
                     </td>
                     <td className="py-3.5 px-3 sm:px-4 text-center text-neutral-800 text-xs font-semibold">
-                      E-mail e Ticket
+                      E-mail
                     </td>
                     <td className="py-3.5 px-3 sm:px-4 text-center text-rose-700 bg-rose-50/30 text-xs font-bold">
-                      WhatsApp Prioritário
+                      E-mail prioritário
                     </td>
                     <td className="py-3.5 px-3 sm:px-4 text-center text-neutral-800 text-xs font-semibold">
                       Parceiro & Suporte
