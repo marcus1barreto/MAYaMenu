@@ -20,11 +20,10 @@ import {
 import type { LoteLicencasB2B } from "@/types/b2b";
 
 interface B2BLotesViewProps {
-  patrocinadorId: string;
   lotes: LoteLicencasB2B[];
 }
 
-export function B2BLotesView({ patrocinadorId, lotes }: B2BLotesViewProps) {
+export function B2BLotesView({ lotes }: B2BLotesViewProps) {
   const [copiadoId, setCopiadoId] = useState<string | null>(null);
 
   const totalGeral = lotes.reduce((acc, l) => acc + (l.totalLicencas || 0), 0);
