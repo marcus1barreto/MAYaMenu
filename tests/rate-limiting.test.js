@@ -88,6 +88,19 @@ async function runUnitTests() {
   console.log("[PASSOU] Rejeição de cabeçalho arbitrário fastly-client-ip não autenticado");
   passed++;
 
+  // Cabeçalho AppEngine não documentado como confiável em Cloud Functions gen2.
+  const mockReqSpoofingAppEngine = {
+    headers: { "x-appengine-user-ip": "1.2.3.4" },
+    socket: { remoteAddress: "35.191.0.20" },
+  };
+  assert.strictEqual(
+    extrairIpConviavel(mockReqSpoofingAppEngine),
+    "35.191.0.20",
+    "Não deve confiar em x-appengine-user-ip enviado pelo cliente"
+  );
+  console.log("[PASSOU] Rejeição de x-appengine-user-ip não autenticado; usa peer de socket");
+  passed++;
+
   // Cenário 3: Requisição direta de salto único (apenas o IP do cliente no header)
   const mockReqSaltoUnico = {
     headers: {
