@@ -16,6 +16,24 @@ Esta branch contém mudanças incompatíveis com o cliente anterior: concessões
 6. Confirmar que o Secret Manager contém `MESA_SESSION_SECRET` com pelo menos 32 caracteres aleatórios. Se estiver ausente, gerar e configurar o segredo antes do deploy; nunca inserir seu valor no repositório ou em logs.
 7. Garantir credencial administrativa segura para executar a migração. Não versionar chave JSON.
 
+## Mercado Pago — configuração obrigatória
+
+O checkout antigo por rotas Next.js foi desativado (HTTP 410). Antes de reativar cobranças:
+
+1. Configurar os segredos das Cloud Functions sem versioná-los:
+   - `firebase functions:secrets:set MERCADO_PAGO_ACCESS_TOKEN --project mayaranas-8ad9f`
+   - `firebase functions:secrets:set MERCADO_PAGO_WEBHOOK_SECRET --project mayaranas-8ad9f`
+2. Configurar as variáveis de ambiente do Functions:
+   - `MERCADO_PAGO_LIVE_MODE=true` para produção; usar `false` somente com credenciais e checkout sandbox.
+   - `MAYAMENU_APP_URL=https://mayamenu.com.br` (ajustar para o domínio oficial efetivamente publicado).
+3. No painel do Mercado Pago, cadastrar o webhook de pagamentos para:
+   `https://us-central1-mayaranas-8ad9f.cloudfunctions.net/mercadoPagoWebhook`
+4. Copiar o segredo de assinatura gerado pelo Mercado Pago para `MERCADO_PAGO_WEBHOOK_SECRET`. Habilitar o evento de pagamentos e confirmar que a notificação inclui `x-signature`, `x-request-id` e `data.id`.
+5. Validar primeiro com credenciais sandbox e `MERCADO_PAGO_LIVE_MODE=false`. Não usar pagamentos reais para testar.
+6. Confirmar que o retorno do checkout contém `attempt` e que a assinatura só é ativada depois de o backend consultar a API oficial, validar valor, moeda, referência e ambiente, e registrar o pagamento de forma idempotente.
+
+**Não reativar checkout nem publicar cobrança real enquanto os dois segredos e o webhook assinado não estiverem configurados.** Sem essas configurações, as Cloud Functions falham de forma fechada e não ativam o PRO.
+
 ## Migração dos gatilhos
 
 A função `setRestaurantOwnerClaims` existente em produção é de 1ª geração. O código desta branch a substitui por um gatilho de 2ª geração no banco nomeado `mayamenu-bd`. A geração não pode ser alterada in-place.
