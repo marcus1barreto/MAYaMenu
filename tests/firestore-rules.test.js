@@ -267,6 +267,8 @@ async function runTests() {
     const adminDb = testEnv.authenticatedContext("admin_uid", { superadmin: true }).firestore();
     await assertSucceeds(adminDb.doc("patrocinadores/pat_a").update({ ativo: false, authVersion: 2 }));
     await assertFails(sponsorADb.doc("patrocinadores/pat_a/catalogo_master/item_a").get());
+    // Restaura o tenant para os testes subsequentes; o contexto antigo continua inválido.
+    await assertSucceeds(adminDb.doc("patrocinadores/pat_a").update({ ativo: true, authVersion: 0 }));
   });
 
   // 1. ISOLAMENTO DE MESAS
