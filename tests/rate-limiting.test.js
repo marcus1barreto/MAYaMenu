@@ -101,6 +101,19 @@ async function runUnitTests() {
   console.log("[PASSOU] Rejeição de x-appengine-user-ip não autenticado; usa peer de socket");
   passed++;
 
+  // Cabeçalhos com valores que parecem hexadecimais, mas não são IPs válidos, não podem alterar a seleção.
+  const mockReqIpMalformado = {
+    headers: { 'x-forwarded-for': '999.999.999.999, deadbeef' },
+    socket: { remoteAddress: '35.191.0.20' },
+  };
+  assert.strictEqual(
+    extrairIpConviavel(mockReqIpMalformado),
+    '35.191.0.20',
+    'X-Forwarded-For malformado deve ser descartado e usar o peer confiável'
+  );
+  console.log("[PASSOU] Rejeição de endereços IPv4/IPv6 malformados");
+  passed++;
+
   // Cenário 3: Requisição direta de salto único (apenas o IP do cliente no header)
   const mockReqSaltoUnico = {
     headers: {
