@@ -3213,14 +3213,26 @@ function montarPerfilPublicoRestaurante(restauranteId, data) {
   };
 }
 
-async function executarSincronizarPerfilPublicoRestaurante(firestoreDb, restauranteId, data) {
+async function executarSincronizarPerfilPublicoRestaurante(firestoreDb, restauranteId, data, sourceUpdatedAt) {
   const publicRef = firestoreDb.collection('restaurantes_publicos').doc(restauranteId);
-  if (!data) {
-    await publicRef.delete();
-    return { sucesso: true, removido: true };
-  }
-  await publicRef.set(montarPerfilPublicoRestaurante(restauranteId, data), { merge: false });
-  return { sucesso: true, removido: false };
+  const versaoOrigem = String(sourceUpdatedAt || new Date().toISOString());
+  return firestoreDb.runTransaction(async (t) => {
+    const publicSnap = await t.get(publicRef);
+    const versaoPublicada = String(publicSnap.data()?.sourceUpdatedAt || '');
+    // Eventos do Firestore podem chegar fora de ordem. Nunca sobrescreve uma versão mais nova.
+    if (versaoPublicada && versaoPublicada > versaoOrigem) {
+      return { sucesso: true, ignorado: true, motivo: 'evento_obsoleto' };
+    }
+    if (!data) {
+      if (publicSnap.exists) t.delete(publicRef);
+      return { sucesso: true, removido: true };
+    }
+    t.set(publicRef, {
+      ...montarPerfilPublicoRestaurante(restauranteId, data),
+      sourceUpdatedAt: versaoOrigem,
+    }, { merge: false });
+    return { sucesso: true, removido: false };
+  });
 }
 
 exports.sincronizarPerfilPublicoRestaurante = onDocumentWritten({
@@ -3231,10 +3243,14 @@ exports.sincronizarPerfilPublicoRestaurante = onDocumentWritten({
 }, async (event) => {
   const after = event.data?.after;
   const restauranteId = event.params.restauranteId;
+  const sourceUpdatedAt = after?.exists && after.updateTime
+    ? after.updateTime.toDate().toISOString()
+    : event.time;
   return executarSincronizarPerfilPublicoRestaurante(
     getDb(),
     restauranteId,
-    after?.exists ? after.data() : null
+    after?.exists ? after.data() : null,
+    sourceUpdatedAt
   );
 });
 
