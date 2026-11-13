@@ -1,0 +1,57 @@
+name: Security and Quality Gate
+
+on:
+  push:
+    branches:
+      - "security/**"
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-quality-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: TypeScript, emulator tests and production build
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24.12.0"
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Setup Java for Firebase Emulators
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Install application dependencies
+        run: npm ci
+
+      - name: Install Cloud Functions dependencies
+        run: npm ci --prefix functions
+
+      - name: TypeScript
+        run: npx tsc --noEmit
+
+      - name: Unit, Firestore Rules, Storage Rules and Functions emulator tests
+        run: npm test
+        env:
+          CI: "true"
+
+      - name: Production build
+        run: npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
