@@ -29,6 +29,10 @@ import { GestaoEquipe } from "./gestao-equipe";
 import { SetupMesas } from "./setup-mesas";
 import { MAYA_MEDIA_LIBRARY } from "@/lib/maya-media-library";
 import { validarVoucherPatrocinio, ativarPatrocinioNoRestaurante } from "@/lib/b2b-service";
+import {
+  criarPreferenciaMercadoPago,
+  confirmarPagamentoProBackend,
+} from "@/lib/mercadopago-service";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -211,103 +215,109 @@ export function AdminDashboard() {
     }
   };
 
-  // Processa retorno de pagamento do Mercado Pago (via URL query params)
+  // O retorno do checkout é apenas uma indicação; a confirmação real vem do backend/PSP.
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined" || !user?.uid || !restaurante?.id) return;
 
     const params = new URLSearchParams(window.location.search);
     const statusPagamento = params.get("status_pagamento");
-    const planoId = (params.get("plano") as "pro_mensal" | "pro_semestral") || "pro_mensal";
+    if (!statusPagamento) return;
+
+    const attemptId = params.get("attempt") || "";
     const paymentId = params.get("payment_id") || params.get("collection_id") || undefined;
-    const restParam = params.get("rest");
+    const limparRetorno = () => {
+      window.history.replaceState({}, "", window.location.pathname);
+    };
 
-    if (statusPagamento === "sucesso") {
-      try {
-        confetti({
-          particleCount: 90,
-          spread: 60,
-          origin: { y: 0.6 },
-        });
-      } catch (e) {
-        // ignora se canvas falhar
-      }
-
-      setAvisoCheckout({
-        tipo: "sucesso",
-        msg: "Parabéns! Sua assinatura MAYaMenu PRO foi confirmada. Seus limites foram atualizados para 30 mesas e 60 itens de menu!",
-      });
-
-      // Confirmação no backend para sincronização imediata
-      const targetRestId = restaurante?.id || restParam;
-      if (targetRestId) {
-        fetch("/api/pagamentos/mercadopago/confirmar-retorno", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            restauranteId: targetRestId,
-            planoId,
-            paymentId,
-          }),
-        }).catch((err) => console.error("Erro ao sincronizar retorno de pagamento:", err));
-      }
-
-      const novaUrl = window.location.pathname;
-      window.history.replaceState({}, "", novaUrl);
-    } else if (statusPagamento === "pendente") {
-      setAvisoCheckout({
-        tipo: "info",
-        msg: "Seu pagamento está em processamento pelo Mercado Pago. Se pagou por Pix ou boleto, a ativação ocorrerá assim que compensado.",
-      });
-      const novaUrl = window.location.pathname;
-      window.history.replaceState({}, "", novaUrl);
-    } else if (statusPagamento === "falha") {
+    if (statusPagamento === "falha") {
       setAvisoCheckout({
         tipo: "erro",
-        msg: "O checkout não foi finalizado. Nenhuma cobrança foi realizada. Você pode tentar novamente a qualquer momento.",
+        msg: "O checkout não foi finalizado. Nenhuma assinatura foi ativada. Você pode tentar novamente.",
       });
-      const novaUrl = window.location.pathname;
-      window.history.replaceState({}, "", novaUrl);
+      limparRetorno();
+      return;
     }
-  }, [restaurante?.id]);
 
-  // Inicia o Checkout Oficial do Mercado Pago
+    if (statusPagamento !== "sucesso" && statusPagamento !== "pendente") {
+      limparRetorno();
+      return;
+    }
+
+    if (!attemptId) {
+      setAvisoCheckout({
+        tipo: "erro",
+        msg: "Não foi possível identificar a tentativa de pagamento. Nenhuma alteração foi feita na assinatura.",
+      });
+      limparRetorno();
+      return;
+    }
+
+    let cancelado = false;
+    (async () => {
+      try {
+        const resultado = await confirmarPagamentoProBackend({ attemptId, paymentId });
+        if (cancelado) return;
+
+        if (resultado.sucesso && resultado.status === "approved") {
+          try {
+            confetti({ particleCount: 90, spread: 60, origin: { y: 0.6 } });
+          } catch {
+            // A animação é opcional; não interfere na confirmação financeira.
+          }
+          setAvisoCheckout({
+            tipo: "sucesso",
+            msg: "Pagamento confirmado pelo Mercado Pago. Sua assinatura MAYaMenu PRO está ativa, com 30 mesas e 60 itens de menu.",
+          });
+        } else if (["pending", "in_process", "authorized"].includes(resultado.status)) {
+          setAvisoCheckout({
+            tipo: "info",
+            msg: "O Mercado Pago ainda não confirmou a compensação. A assinatura será ativada automaticamente após a aprovação.",
+          });
+        } else {
+          setAvisoCheckout({
+            tipo: "erro",
+            msg: "O pagamento não foi aprovado. Nenhuma assinatura foi ativada.",
+          });
+        }
+      } catch (err: any) {
+        if (cancelado) return;
+        console.error("Falha ao confirmar pagamento no backend:", err);
+        setAvisoCheckout({
+          tipo: "erro",
+          msg: err?.message || "Não foi possível confirmar o pagamento. Nenhuma ativação foi realizada.",
+        });
+      } finally {
+        if (!cancelado) limparRetorno();
+      }
+    })();
+
+    return () => {
+      cancelado = true;
+    };
+  }, [restaurante?.id, user?.uid]);
+
+  // Inicia o Checkout Oficial do Mercado Pago. O servidor define preço, titular,
+  // referência externa, URLs de retorno e URL do webhook.
   const handleIniciarCheckoutMercadoPago = async () => {
     if (!restaurante?.id) return;
     setIniciandoCheckout(true);
     setAvisoCheckout(null);
 
     try {
-      const res = await fetch("/api/pagamentos/mercadopago/criar-preferencia", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          restauranteId: restaurante.id,
-          planoId: planoCheckoutSelecionado,
-          userEmail: user?.email || "lojista@mayamenu.com.br",
-          userName: restaurante.nome || "Restaurante MAYaMenu",
-        }),
+      const data = await criarPreferenciaMercadoPago({
+        restauranteId: restaurante.id,
+        planoId: planoCheckoutSelecionado,
       });
 
-      const data = await res.json();
-
-      if (!res.ok || !data.sucesso) {
-        if (data.modoDemo) {
-          setAvisoCheckout({
-            tipo: "info",
-            msg: "Modo Demonstração: Configure o MERCADO_PAGO_ACCESS_TOKEN no arquivo .env.local para processar cobranças reais.",
-          });
-        } else {
-          setAvisoCheckout({
-            tipo: "erro",
-            msg: data.erro || "Não foi possível criar a sessão de pagamento no Mercado Pago.",
-          });
-        }
+      if (!data.sucesso || !data.initPoint) {
+        setAvisoCheckout({
+          tipo: "erro",
+          msg: "Não foi possível criar a sessão de pagamento no Mercado Pago.",
+        });
         return;
       }
 
-      if (data.initPoint) {
-        window.location.href = data.initPoint;
-      }
+      window.location.assign(data.initPoint);
     } catch (err: any) {
       setAvisoCheckout({
         tipo: "erro",
