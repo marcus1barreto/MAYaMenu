@@ -556,13 +556,13 @@ async function runTests() {
 
   await test("Patrocinador NÃO pode ler lotes_licencas de outro patrocinador via collectionGroup", async () => {
     const patBDb = testEnv.authenticatedContext("pat_b", {
-      firebase: { sign_in_provider: "password" },
+      role: "sponsor", patrocinadorId: "pat_b", authVersion: 0,
     }).firestore();
     await assertFails(
       patBDb.collectionGroup("lotes_licencas").where("patrocinadorId", "==", "pat_a").get()
     );
     const patADb = testEnv.authenticatedContext("pat_a", {
-      firebase: { sign_in_provider: "password" },
+      role: "sponsor", patrocinadorId: "pat_a", authVersion: 0,
     }).firestore();
     await assertSucceeds(
       patADb.collectionGroup("lotes_licencas").where("patrocinadorId", "==", "pat_a").get()
