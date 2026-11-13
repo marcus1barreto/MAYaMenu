@@ -823,7 +823,7 @@ export function GarcomView({
     try {
       // O backend valida permissão, mesa, disponibilidade dos itens e recalcula os preços.
       // Só refletimos sucesso na interface depois da confirmação da transação.
-      await injetarTicketContingencia(restauranteId, {
+      const pedidoConfirmado = await injetarTicketContingencia(restauranteId, {
         id: ticket.id,
         mesa: mesaNum,
         clienteId: ticket.c.id,
@@ -841,8 +841,8 @@ export function GarcomView({
       const novaComanda: ComandaGarcom = {
         id: ticket.c.id,
         nomeCliente: ticket.c.n,
-        subtotal: subtotalCalculado,
-        status: ticket.tot !== undefined ? "conta_pedida" : "aguardando_pratos",
+        subtotal: pedidoConfirmado.subtotal,
+        status: "aguardando_pratos",
         itens: ticket.i.map((it) => ({
           nome: `Item (${it.id})`,
           quantidade: it.q,
@@ -856,7 +856,7 @@ export function GarcomView({
           : m
         )
       );
-      setFeedbackInjecao(`Pedido de ${ticket.c.n} registrado e validado na Mesa ${mesaNum}!`);
+      setFeedbackInjecao(`Pedido de ${ticket.c.n} registrado na Mesa ${mesaNum}. Total validado: ${pedidoConfirmado.subtotal.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}.`);
     } catch (err) {
       console.error("Falha ao registrar pedido de contingência no backend:", err);
       setFeedbackInjecao("Pedido não registrado. Verifique a mesa, os itens e a conexão antes de tentar novamente.");
