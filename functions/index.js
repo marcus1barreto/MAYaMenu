@@ -52,6 +52,7 @@ exports.setRestaurantOwnerClaims = onDocumentCreated({
   document: 'restaurantes/{restId}',
   database: 'mayamenu-bd',
   region: 'us-central1',
+  retry: true,
 }, async (event) => {
     const snap = event.data;
     if (!snap) return null;
@@ -63,11 +64,13 @@ exports.setRestaurantOwnerClaims = onDocumentCreated({
       return null;
     }
     try {
-      const claims = { role: 'owner', restauranteId: restId };
+      const user = await admin.auth().getUser(ownerUid);
+      const claims = { ...(user.customClaims || {}), role: 'owner', restauranteId: restId };
       await admin.auth().setCustomUserClaims(ownerUid, claims);
       console.info(`Custom claim 'owner' atribuído ao UID ${ownerUid} para restaurante ${restId}`);
     } catch (error) {
       console.error('Erro ao definir custom claims:', error);
+      throw error;
     }
     return null;
   });
@@ -2947,6 +2950,7 @@ exports.processarSelloutOutbox = onDocumentCreated({
   document: 'restaurantes/{restauranteId}/_sellout_outbox/{eventId}',
   database: 'mayamenu-bd',
   region: 'us-central1',
+  retry: true,
 }, async (event) => {
   if (!event.data) return null;
   return executarProcessarSelloutOutbox(getDb(), event.params.restauranteId, event.params.eventId);
@@ -2984,12 +2988,13 @@ exports.sincronizarPerfilPublicoRestaurante = onDocumentWritten({
   document: 'restaurantes/{restauranteId}',
   database: 'mayamenu-bd',
   region: 'us-central1',
+  retry: true,
 }, async (event) => {
     const after = event.data?.after;
     const restauranteId = event.params.restauranteId;
     const publicRef = getDb().collection('restaurantes_publicos').doc(restauranteId);
     if (!after?.exists) {
-      await publicRef.delete().catch(() => {});
+      await publicRef.delete();
       return null;
     }
     const data = after.data() || {};
