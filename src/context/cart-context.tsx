@@ -3,16 +3,10 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import type { MenuItem } from "@/types";
 
-import { obterUltimoNomeCliente, SESSAO_MESA_TIMEOUT_MS } from "@/lib/historico-cliente";
+import { obterUltimoNomeCliente } from "@/lib/historico-cliente";
+import cartStorage from "@/lib/cart-storage.cjs";
 
-export function getCartStorageKey(restSlug: string, numMesa: number | string): string {
-  return `mayamenu_cart_${restSlug}_mesa_${String(numMesa)}`;
-}
-
-export function isCarrinhoExpirado(atualizadoEm: unknown, agora: number = Date.now()): boolean {
-  if (typeof atualizadoEm !== "number" || !Number.isFinite(atualizadoEm)) return true;
-  return agora - atualizadoEm > SESSAO_MESA_TIMEOUT_MS;
-}
+const { getCartStorageKey, isCarrinhoExpirado } = cartStorage;
 
 export interface ItemCarrinho {
   idUnico: string; // identificador único do item configurado
