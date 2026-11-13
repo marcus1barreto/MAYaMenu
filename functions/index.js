@@ -2560,7 +2560,8 @@ function adicionarMesesSemOverflow(dataBase, meses) {
 }
 
 function obterItensMasterPatrocinio(patrocinadorId, catalogoSnap) {
-  const itens = catalogoSnap.docs.map((d) => ({ id: d.id, ...(d.data() || {}) }));
+  // O ID canônico é sempre o ID do documento; o campo id do payload do sponsor não o substitui.
+  const itens = catalogoSnap.docs.map((d) => ({ ...(d.data() || {}), id: d.id }));
   // Itens desativados pelo próprio patrocinador não podem ser injetados no cardápio.
   const itensAtivos = itens.filter((item) => item.ativo !== false);
   if (catalogoSnap.size > 0 || patrocinadorId !== 'spn-bierhaus-demo') return itensAtivos;
