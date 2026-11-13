@@ -274,13 +274,21 @@ service cloud.firestore {
         allow create: if (isOwner(restauranteId) || isGarcom(restauranteId) || isSuperAdmin())
           && !('qrCredencialHash' in request.resource.data)
           && !('qrVersao' in request.resource.data)
-          && !('qrCredencial' in request.resource.data);
+          && !('qrCredencial' in request.resource.data)
+          && (!('statusEstrutural' in request.resource.data)
+            || request.resource.data.statusEstrutural in ['livre', 'reservada', 'bloqueada'])
+          && (!('ativa' in request.resource.data) || request.resource.data.ativa is bool);
         allow update: if (isOwner(restauranteId) || isGarcom(restauranteId) || isSuperAdmin())
           && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
             'qrCredencialHash',
             'qrVersao',
             'qrCredencial'
-          ]);
+          ])
+          // "inativa" só pode ser gravado pela Cloud Function que revoga o QR.
+          && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['statusEstrutural'])
+            || request.resource.data.statusEstrutural in ['livre', 'reservada', 'bloqueada'])
+          && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['ativa'])
+            || request.resource.data.ativa is bool);
         // Exclusão física de mesas bloqueada no client (usar desativarMesaBackend para desativação lógica segura)
         allow delete: if false;
 
