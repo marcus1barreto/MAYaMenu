@@ -1114,7 +1114,7 @@ async function executarEmissaoSessaoMesa(firestoreDb, authUid, payload) {
   }
 
   const mData = mesaSnap.data() || {};
-  if (mData.ativa === false || mData.statusEstrutural === 'inativa' || mData.statusEstrutural === 'bloqueada') {
+  if (mData.ativa !== true || mData.statusEstrutural === 'inativa' || mData.statusEstrutural === 'bloqueada') {
     throw new functions.https.HttpsError('failed-precondition', 'Esta mesa está inativa ou bloqueada e não está disponível para atendimento.');
   }
 
@@ -1313,8 +1313,8 @@ async function executarCriacaoPedidoCliente(firestoreDb, authUid, payload) {
         'Sessão da mesa revogada ou expirada. Escaneie o QR Code atualizado da mesa.'
       );
     }
-    if (mData.ativa === false || mData.statusEstrutural === 'inativa') {
-      throw new functions.https.HttpsError('failed-precondition', 'Esta mesa está inativa no momento.');
+    if (mData.ativa !== true || mData.statusEstrutural === 'inativa') {
+      throw new functions.https.HttpsError('failed-precondition', 'Esta mesa está inativa ou não foi habilitada para atendimento.');
     }
     if (mData.statusEstrutural === 'bloqueada') {
       throw new functions.https.HttpsError('failed-precondition', 'Esta mesa está bloqueada para atendimento.');
@@ -1682,7 +1682,7 @@ async function executarLancamentoPedidoGarcom(firestoreDb, authUid, authToken, p
       throw new functions.https.HttpsError('not-found', 'Mesa não cadastrada neste restaurante.');
     }
     const mesaData = mesaSnap.data() || {};
-    if (mesaData.ativa === false ||
+    if (mesaData.ativa !== true ||
         ['inativa', 'bloqueada', 'reservada'].includes(mesaData.statusEstrutural)) {
       throw new functions.https.HttpsError('failed-precondition', 'Mesa inexistente, inativa, reservada ou bloqueada para atendimento.');
     }
@@ -3927,7 +3927,7 @@ async function executarChamarGarcom(firestoreDb, authUid, payload) {
     const [mesaSnap, comandaSnap] = await Promise.all([t.get(mesaRef), t.get(comandaRef)]);
     if (!mesaSnap.exists) throw new functions.https.HttpsError('not-found', 'Mesa não cadastrada.');
     const m = mesaSnap.data() || {};
-    if (m.ativa === false ||
+    if (m.ativa !== true ||
         ['inativa', 'bloqueada', 'reservada'].includes(m.statusEstrutural)) {
       throw new functions.https.HttpsError('failed-precondition', 'Mesa indisponível.');
     }
