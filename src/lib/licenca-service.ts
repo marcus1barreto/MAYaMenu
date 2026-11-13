@@ -89,10 +89,14 @@ export async function criarNovaLicenca(params: {
     notas: params.notas?.trim() || "",
   };
 
-  // A licença só entra no cache depois da confirmação do servidor.
-  await setDoc(licencaRef, {
-    ...novaLicenca,
-    criadaEm: serverTimestamp(),
+  // Código é criado, nunca sobrescrito: colisão exige gerar outro código.
+  await runTransaction(db, async (tx) => {
+    const atual = await tx.get(licencaRef);
+    if (atual.exists()) throw new Error("Colisão de código de licença; gere uma nova concessão.");
+    tx.set(licencaRef, {
+      ...novaLicenca,
+      criadaEm: serverTimestamp(),
+    });
   });
   salvarLicencaLocal(novaLicenca);
   return novaLicenca;
@@ -148,18 +152,14 @@ export async function criarLoteLicencas(params: {
     });
   }
 
-  // Persiste primeiro no servidor; em caso de falha, nenhum lote é apresentado como emitido.
-  const CHUNK_SIZE = 400;
-  for (let i = 0; i < loteCriado.length; i += CHUNK_SIZE) {
-    const chunk = loteCriado.slice(i, i + CHUNK_SIZE);
-    const batch = writeBatch(db);
-    for (const lic of chunk) {
-      batch.set(doc(db, "concessoes", lic.id), {
-        ...lic,
-        criadaEm: serverTimestamp(),
-      });
-    }
-    await batch.commit();
+  // Cada código é criado com precondição de inexistência. Falhas são propagadas.
+  for (const lic of loteCriado) {
+    const licRef = doc(db, "concessoes", lic.id);
+    await runTransaction(db, async (tx) => {
+      const atual = await tx.get(licRef);
+      if (atual.exists()) throw new Error(`Colisão no código ${lic.id}; lote não concluído.`);
+      tx.set(licRef, { ...lic, criadaEm: serverTimestamp() });
+    });
   }
   salvarLoteLicencasLocal(loteCriado);
   return loteCriado;
@@ -681,17 +681,11 @@ export async function alterarStatusRestaurante(
 ): Promise<void> {
   try {
     const restRef = doc(db, "restaurantes", restauranteId);
-    await setDoc(
-      restRef,
-      {
-        suspenso,
-        configuracoes: {
-          suspenso,
-        },
-        atualizadoEm: serverTimestamp(),
-      },
-      { merge: true }
-    );
+    await updateDoc(restRef, {
+      suspenso,
+      "configuracoes.suspenso": suspenso,
+      atualizadoEm: serverTimestamp(),
+    });
   } catch (err) {
     console.error("Falha ao alterar status de suspensão do restaurante:", err);
     throw err;
@@ -708,54 +702,41 @@ export async function alterarPlanoRestaurante(
 ): Promise<void> {
   const novosLimites = LIMITES_POR_PLANO[novoPlano];
 
-  // 1. Atualiza no documento do restaurante (usando setDoc com merge para garantir criação ou update resiliente)
-  try {
-    const restRef = doc(db, "restaurantes", restauranteId);
-    await setDoc(
-      restRef,
-      {
-        plano: novoPlano,
-        maxMesas: novosLimites.maxMesas,
-        maxPratos: novosLimites.maxPratos,
-        licenca: {
-          plano: novoPlano,
-          limites: novosLimites,
-        },
-        atualizadoEm: serverTimestamp(),
-      },
-      { merge: true }
-    );
-  } catch (err) {
-    console.error("Falha ao atualizar plano no restaurante:", err);
-    throw err;
-  }
+  const restRef = doc(db, "restaurantes", restauranteId);
+  const patchRest = {
+    plano: novoPlano,
+    maxMesas: novosLimites.maxMesas,
+    maxPratos: novosLimites.maxPratos,
+    licenca: { plano: novoPlano, limites: novosLimites },
+    atualizadoEm: serverTimestamp(),
+  };
 
-  // 2. Se houver licença vinculada, atualiza também a concessão
   if (licencaCodigo) {
     const codigoFormatado = licencaCodigo.trim().toUpperCase();
-    try {
-      const licRef = doc(db, "concessoes", codigoFormatado);
-      await setDoc(
-        licRef,
-        {
+    const licRef = doc(db, "concessoes", codigoFormatado);
+    await runTransaction(db, async (tx) => {
+      const [restSnap, licSnap] = await Promise.all([tx.get(restRef), tx.get(licRef)]);
+      if (!restSnap.exists()) throw new Error("Restaurante não encontrado; plano não alterado.");
+      tx.update(restRef, patchRest);
+      // Concessões já consumidas/arquivadas não são reescritas. Se ainda existir, sincroniza.
+      if (licSnap.exists()) {
+        if (licSnap.data().status !== "disponivel") {
+          throw new Error("A concessão vinculada não está disponível para alteração.");
+        }
+        tx.update(licRef, {
           plano: novoPlano,
           limites: novosLimites,
           atualizadoEm: serverTimestamp(),
-        },
-        { merge: true }
-      );
-    } catch (err) {
-      // Ignora se for licença já utilizada / arquivada
-      console.warn("Concessão não atualizada diretamente (pode estar arquivada):", err);
-    }
-
+        });
+      }
+    });
     const locais = obterLicencasLocais();
     const atualizadas = locais.map((l) =>
       l.id === codigoFormatado ? { ...l, plano: novoPlano, limites: novosLimites } : l
     );
-    if (typeof window !== "undefined") {
-      localStorage.setItem("mayamenu_concessoes_locais", JSON.stringify(atualizadas));
-    }
+    if (typeof window !== "undefined") localStorage.setItem("mayamenu_concessoes_locais", JSON.stringify(atualizadas));
+  } else {
+    await updateDoc(restRef, patchRest);
   }
 }
 
