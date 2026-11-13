@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import {
   salvarConfigMesa,
+  desativarMesaFirestore,
   alternarStatusLoteMesas,
   escutarConfigsMesas,
   type ConfigMesa,
@@ -100,12 +101,19 @@ export function SetupMesas({ restauranteId, maxMesas }: SetupMesasProps) {
   ) => {
     setSalvandoNum(num);
     try {
-      await salvarConfigMesa(restauranteId, num, {
-        ativa: !estadoAtual,
-        ...(!estadoAtual && statusEstrutural === "inativa" ? { statusEstrutural: "livre" } : {}),
-      });
+      if (estadoAtual) {
+        // Desativação permanente: backend verifica comandas/KDS e revoga a credencial QR.
+        await desativarMesaFirestore(restauranteId, num);
+      } else {
+        // Reativação após desativação permanente exige nova emissão de QR ao abrir a mesa.
+        await salvarConfigMesa(restauranteId, num, {
+          ativa: true,
+          ...(statusEstrutural === "inativa" ? { statusEstrutural: "livre" } : {}),
+        });
+      }
     } catch (err) {
-      console.error("Falha ao salvar status da mesa:", err);
+      console.error("Falha ao alterar estado da mesa:", err);
+      alert(err instanceof Error ? err.message : "Não foi possível alterar o estado da mesa.");
     } finally {
       setSalvandoNum(null);
     }
