@@ -3817,7 +3817,8 @@ async function executarChamarGarcom(firestoreDb, authUid, payload) {
     const [mesaSnap, comandaSnap] = await Promise.all([t.get(mesaRef), t.get(comandaRef)]);
     if (!mesaSnap.exists) throw new functions.https.HttpsError('not-found', 'Mesa não cadastrada.');
     const m = mesaSnap.data() || {};
-    if (m.ativa === false || m.statusEstrutural === 'inativa' || m.statusEstrutural === 'bloqueada') {
+    if (m.ativa === false ||
+        ['inativa', 'bloqueada', 'reservada'].includes(m.statusEstrutural)) {
       throw new functions.https.HttpsError('failed-precondition', 'Mesa indisponível.');
     }
     const ultimoChamadoMesa = m.ultimoChamadoGarcomEm;
