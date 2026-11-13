@@ -2309,7 +2309,9 @@ async function executarValidarCodigoAtivacao(firestoreDb, payload) {
         limites: dados.limites || null,
         responsavel: dados.responsavel || '',
         notas: dados.notas || '',
-        expiracaoEm: dados.expiracaoEm || null,
+        expiracaoEm: millisDataAtivacao(dados.expiracaoEm || dados.dataExpiracao) !== null
+          ? new Date(millisDataAtivacao(dados.expiracaoEm || dados.dataExpiracao)).toISOString()
+          : null,
       },
     };
   }
@@ -2341,7 +2343,10 @@ async function executarValidarCodigoAtivacao(firestoreDb, payload) {
         totalLicencas: Number(lote.totalLicencas || 0),
         licencasAtivadas: Number(lote.licencasAtivadas || 0),
         validadeMeses: Number(lote.validadeMeses || 6),
-        dataExpiracao: lote.dataExpiracao || null, ativo: lote.ativo !== false,
+        dataExpiracao: millisDataAtivacao(lote.dataExpiracao) !== null
+          ? new Date(millisDataAtivacao(lote.dataExpiracao)).toISOString()
+          : null,
+        ativo: lote.ativo !== false,
       },
       patrocinador: {
         id: patrocinadorId, nomeFantasia: String(pat.nomeFantasia || ''),
