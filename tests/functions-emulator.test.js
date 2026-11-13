@@ -239,13 +239,30 @@ async function main() {
     );
   });
 
+  await runTest("Emulador: ativação de licença rejeita sessão anônima sem consumir concessão", async () => {
+    await db.doc("concessoes/MAYA-ANON-01").set({
+      status: "disponivel", plano: "free",
+      limites: { maxMesas: 10, maxPratos: 20 },
+    });
+    await assert.rejects(
+      () => executarAtivarInstancia(db, "uid_anon_01", {
+        firebase: { sign_in_provider: "anonymous" },
+      }, {
+        codigo: "MAYA-ANON-01", slug: "anon-rest-01", restauranteNome: "Restaurante Anônimo",
+      }),
+      /conta permanente/i
+    );
+    assert.strictEqual((await db.doc("concessoes/MAYA-ANON-01").get()).exists, true);
+    assert.strictEqual((await db.doc("restaurantes/uid_anon_01").get()).exists, false);
+  });
+
   await runTest("Emulador: ativação de licença comum consome concessão e cria restaurante/slug/arquivo morto atomicamente", async () => {
     await db.doc("concessoes/MAYA-ATOMIC-01").set({
       status: "disponivel", plano: "free",
       limites: { maxMesas: 10, maxPratos: 20, maxItensMenu: 20 },
       expiracaoEm: new Date(Date.now() + 86400000).toISOString(),
     });
-    const restaurante = await executarAtivarInstancia(db, "owner_atomic_01", {
+    const restaurante = await executarAtivarInstancia(db, "owner_atomic_01", { firebase: { sign_in_provider: "password" } }, {
       codigo: "MAYA-ATOMIC-01", slug: "atomic-rest-01", restauranteNome: "Atomic Restaurante",
       modoOperacao: "hibrido",
     });
@@ -259,7 +276,7 @@ async function main() {
     assert.strictEqual(perfilPublico.data().nome, "Atomic Restaurante");
     assert.strictEqual(perfilPublico.data().ownerId, undefined);
     assert.strictEqual(perfilPublico.data().licenca, undefined);
-    await assert.rejects(() => executarAtivarInstancia(db, "owner_atomic_02", {
+    await assert.rejects(() => executarAtivarInstancia(db, "owner_atomic_02", { firebase: { sign_in_provider: "password" } }, {
       codigo: "MAYA-ATOMIC-01", slug: "atomic-rest-02", restauranteNome: "Outro Restaurante",
     }));
   });
@@ -277,7 +294,7 @@ async function main() {
       expiracaoEm: new Date(Date.now() + 86400000).toISOString(),
     });
     await assert.rejects(
-      () => executarAtivarInstancia(db, "owner_novo", {
+      () => executarAtivarInstancia(db, "owner_novo", { firebase: { sign_in_provider: "password" } }, {
         codigo: "lic_slug", slug: "slug-em-uso", restauranteNome: "Novo",
       }),
       /endereço público já está em uso/i
@@ -306,7 +323,7 @@ async function main() {
     });
     const validacao = await executarValidarCodigoAtivacao(db, { codigo: "CAMPANHA-TESTE-01" });
     assert.strictEqual(validacao.tipo, "patrocinio");
-    const restaurante = await executarAtivarInstancia(db, "owner_b2b_01", {
+    const restaurante = await executarAtivarInstancia(db, "owner_b2b_01", { firebase: { sign_in_provider: "password" } }, {
       codigo: "CAMPANHA-TESTE-01", slug: "b2b-rest-01", restauranteNome: "Restaurante B2B",
     });
     assert.strictEqual(restaurante.plano, "pro");
@@ -320,7 +337,7 @@ async function main() {
     assert.strictEqual(item.data().bloqueadoParaExclusao, true);
     assert.strictEqual((await db.doc("restaurantes/owner_b2b_01/cardapio/spn-item-inativo").get()).exists, false);
     assert.strictEqual((await patRef.collection("lotes_licencas").doc("lote-test-b2b").get()).data().licencasAtivadas, 1);
-    await assert.rejects(() => executarAtivarInstancia(db, "owner_b2b_02", {
+    await assert.rejects(() => executarAtivarInstancia(db, "owner_b2b_02", { firebase: { sign_in_provider: "password" } }, {
       codigo: "CAMPANHA-TESTE-01", slug: "b2b-rest-02", restauranteNome: "Segundo B2B",
     }));
   });
