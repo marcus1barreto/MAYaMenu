@@ -224,7 +224,10 @@ async function runTests() {
     await assertSucceeds(sponsorADb.doc("patrocinadores/pat_a/catalogo_master/item_a").get());
     await assertSucceeds(sponsorADb.doc("patrocinadores/pat_a/lotes_licencas/lote_a1").get());
     await assertSucceeds(sponsorADb.doc("patrocinadores/pat_a/metricas_sellout/item_a").get());
+    await assertFails(sponsorADb.doc("patrocinadores/pat_a/metricas_sellout/item_a").update({ totalUnidadesVendidas: 999 }));
     await assertFails(sponsorBDb.doc("patrocinadores/pat_a").get());
+    await assertFails(anonDb.doc("restaurantes/rest_a/_sellout_outbox/evento_fake").get());
+    await assertFails(sponsorADb.doc("patrocinadores/pat_a/metricas_sellout_eventos/evento_fake").set({ eventId: "fake" }));
     await assertFails(sponsorADb.doc("patrocinadores/pat_a").update({ chaveAcessoB2B: "ROUBADA" }));
     await assertSucceeds(sponsorADb.doc("patrocinadores/pat_a/catalogo_master/item_b").set({ id: "item_b", nome: "Produto B" }));
     await assertFails(sponsorADb.doc("patrocinadores/pat_a/lotes_licencas/lote_b").set({ codigoCampanha: "FORJADO" }));
