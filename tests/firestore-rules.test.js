@@ -232,6 +232,9 @@ async function runTests() {
       id: "item_falso", nome: "Falso patrocinado", precoBase: 1,
       origemPatrocinadorId: "pat_a", bloqueadoParaExclusao: true,
     }));
+    await assertFails(ownerDb.doc("restaurantes/rest_a/cardapio/spn_falso").set({
+      id: "spn_falso", nome: "Produto com prefixo reservado", precoBase: 1,
+    }));
     await assertFails(ownerDb.doc("restaurantes/rest_a/cardapio/spn_item").update({
       origemPatrocinadorId: "pat_b",
     }));
