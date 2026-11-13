@@ -39,7 +39,7 @@ async function runTest(name, fn) {
 
 async function seed(db, mesa, clienteId) {
   const rest = db.doc("restaurantes/rest_e");
-  await rest.set({ nome: "Rest Emulador", slug: "rest-e", ownerId: "owner_e" });
+  await rest.set({ nome: "Rest Emulador", slug: "rest-e", ownerId: "owner_e", maxMesas: 30 });
   await rest.collection("equipe").doc("garcom_e").set({ role: "garcom", ativo: true });
   await rest.collection("equipe").doc("garcom_off").set({ role: "garcom", ativo: false });
   const comanda = rest.collection("mesas").doc(String(mesa)).collection("comandas_abertas").doc(clienteId);
@@ -1102,7 +1102,7 @@ async function main() {
 
   await runTest("Emulador: emissão inicial e rotação de QR só retornam segredo uma vez", async () => {
     const rest = db.doc("restaurantes/rest_qr_inicial");
-    await rest.set({ ownerId: "owner_qr_inicial", nome: "Rest QR", slug: "rest-qr" });
+    await rest.set({ ownerId: "owner_qr_inicial", nome: "Rest QR", slug: "rest-qr", maxMesas: 30 });
     await rest.collection("mesas").doc("11").set({
       numero: 11, ativa: true, statusEstrutural: "livre", qrVersao: 0,
     });
