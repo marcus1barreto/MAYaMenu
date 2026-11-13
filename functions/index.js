@@ -910,6 +910,18 @@ async function verificarPermissaoOperacionalRestaurante(
   );
 }
 
+function normalizarMesaIdentificador(mesa) {
+  const original = String(mesa ?? '').trim();
+  if (!/^\d{1,5}$/.test(original)) {
+    throw new functions.https.HttpsError('invalid-argument', 'Número de mesa inválido.');
+  }
+  const numero = Number(original);
+  if (!Number.isSafeInteger(numero) || numero < 1 || numero > 99999) {
+    throw new functions.https.HttpsError('invalid-argument', 'Número de mesa inválido.');
+  }
+  return { mesaId: String(numero), numero, original };
+}
+
 /**
  * Gera ou rotaciona a credencial secreta de QR Code de uma mesa física.
  * Armazena apenas o hash SHA-256 no Firestore (qrCredencialHash) e entrega a credencial
@@ -942,7 +954,7 @@ async function executarGarantirCredencialMesa(firestoreDb, authUid, authToken, p
   );
 
   const restData = restDoc.data() || {};
-  const mesaStr = String(mesa).trim();
+  const { mesaId: mesaStr } = normalizarMesaIdentificador(mesa);
   const numMesaParsed = Number(mesaStr);
   if (!Number.isInteger(numMesaParsed) || numMesaParsed < 1) {
     throw new functions.https.HttpsError('invalid-argument', 'Número de mesa inválido.');
