@@ -2816,6 +2816,9 @@ async function executarProcessarPagamentoProAprovado(firestoreDb, attemptId, pay
         maxPratos: restData.maxPratos ?? null,
         maxItensMenu: restData.maxItensMenu ?? null,
         assinatura: restData.assinatura || null,
+        licencaPlano: restData.licenca?.plano || null,
+        patrocinioAtivo: restData.patrocinio?.ativo === true,
+        patrocinioDataExpiracao: restData.patrocinio?.dataExpiracao || null,
         revisaoFinanceira: restData.revisaoFinanceira || null,
       },
       processadoEm: admin.firestore.FieldValue.serverTimestamp(),
@@ -2930,11 +2933,43 @@ async function executarProcessarEstornoPagamentoPro(firestoreDb, attemptId, paym
       if (ledger.previousState &&
           (paymentIdAtual === paymentId || aindaNoEstadoAnterior)) {
         const anterior = ledger.previousState;
-        patch.plano = anterior.plano || 'free';
-        patch.maxMesas = anterior.maxMesas ?? (patch.plano === 'pro' ? 30 : 10);
-        patch.maxPratos = anterior.maxPratos ?? (patch.plano === 'pro' ? 60 : 20);
-        patch.maxItensMenu = anterior.maxItensMenu ?? (patch.plano === 'pro' ? 60 : 20);
-        patch.assinatura = anterior.assinatura || admin.firestore.FieldValue.delete();
+        const assinaturaAnterior = anterior.assinatura;
+        const expiracaoAssinaturaRaw = assinaturaAnterior?.dataExpiracao;
+        const expiracaoAssinatura = expiracaoAssinaturaRaw
+          ? (typeof expiracaoAssinaturaRaw.toDate === 'function'
+            ? expiracaoAssinaturaRaw.toDate()
+            : new Date(expiracaoAssinaturaRaw))
+          : null;
+        const assinaturaAnteriorAtiva = assinaturaAnterior?.ativa === true &&
+          expiracaoAssinatura && Number.isFinite(expiracaoAssinatura.getTime()) &&
+          expiracaoAssinatura > new Date();
+        const patrocinioAnteriorRaw = anterior.patrocinioDataExpiracao;
+        const patrocinioAnteriorExpira = patrocinioAnteriorRaw
+          ? (typeof patrocinioAnteriorRaw.toDate === 'function'
+            ? patrocinioAnteriorRaw.toDate()
+            : new Date(patrocinioAnteriorRaw))
+          : null;
+        const patrocinioAnteriorAtivo = anterior.patrocinioAtivo === true &&
+          patrocinioAnteriorExpira && Number.isFinite(patrocinioAnteriorExpira.getTime()) &&
+          patrocinioAnteriorExpira > new Date();
+        const planoAnteriorSemAssinatura = !assinaturaAnterior &&
+          (anterior.licencaPlano === 'pro' || patrocinioAnteriorAtivo || anterior.plano === 'pro');
+        const planoRestaurado = assinaturaAnteriorAtiva || planoAnteriorSemAssinatura ? 'pro' : 'free';
+        patch.plano = assinaturaAnteriorAtiva
+          ? (anterior.plano || 'pro')
+          : (planoAnteriorSemAssinatura ? (anterior.plano || 'pro') : 'free');
+        patch.maxMesas = assinaturaAnteriorAtiva
+          ? (anterior.maxMesas ?? 30)
+          : (planoRestaurado === 'pro' ? (anterior.maxMesas ?? 30) : 10);
+        patch.maxPratos = assinaturaAnteriorAtiva
+          ? (anterior.maxPratos ?? 60)
+          : (planoRestaurado === 'pro' ? (anterior.maxPratos ?? 60) : 20);
+        patch.maxItensMenu = assinaturaAnteriorAtiva
+          ? (anterior.maxItensMenu ?? 60)
+          : (planoRestaurado === 'pro' ? (anterior.maxItensMenu ?? 60) : 20);
+        patch.assinatura = assinaturaAnteriorAtiva
+          ? assinaturaAnterior
+          : admin.firestore.FieldValue.delete();
         patch.revisaoFinanceira = anterior.revisaoFinanceira || admin.firestore.FieldValue.delete();
       } else {
         // Estorno de uma cobrança anterior à atual: falha fechada e revisão administrativa.
