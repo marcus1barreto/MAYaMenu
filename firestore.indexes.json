@@ -45,6 +45,16 @@
           "order": "ASCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "lotes_licencas",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        {
+          "fieldPath": "codigoCampanha",
+          "order": "ASCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": [
