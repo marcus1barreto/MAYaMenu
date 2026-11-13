@@ -546,6 +546,7 @@ export async function cadastrarPatrocinadorSuperadmin(dados: {
       cargo: dados.contatoCargo || "Gestor de Trade Marketing",
     },
     ativo: true,
+    authVersion: 0,
     criadoEm: serverTimestamp(),
   };
 
