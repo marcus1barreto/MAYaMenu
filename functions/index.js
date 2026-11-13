@@ -2786,6 +2786,7 @@ async function executarProcessarPagamentoProAprovado(firestoreDb, attemptId, pay
       maxPratos: 60,
       maxItensMenu: 60,
       assinatura,
+      revisaoFinanceira: admin.firestore.FieldValue.delete(),
       atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
     });
     tx.update(attemptRef, {
