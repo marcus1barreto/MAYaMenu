@@ -1,0 +1,56 @@
+name: Security and integration validation
+
+on:
+  push:
+    branches:
+      - security/hardening-final-7-ajustes
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Setup Java for Firebase Emulator
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Install application dependencies
+        run: npm ci
+
+      - name: Install Cloud Functions dependencies
+        run: npm ci --prefix functions
+
+      - name: Run unit, regression, Firestore Rules and Functions emulator tests
+        run: npm test
+
+      - name: TypeScript typecheck
+        run: npx tsc --noEmit
+
+      - name: Production build
+        run: npm run build
+
+      - name: Check whitespace and patch errors
+        run: git diff --check origin/main...HEAD
