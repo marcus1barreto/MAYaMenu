@@ -36,10 +36,12 @@ service cloud.firestore {
     // -----------------------------------------------------------------
     // Papéis personalizados (custom claims) + vínculo ativo em equipe/
     // -----------------------------------------------------------------
-    function isActiveStaffMember(restauranteId) {
+    function isActiveStaffMember(restauranteId, role) {
       return isSignedIn()
         && exists(/databases/$(database)/documents/restaurantes/$(restauranteId)/equipe/$(request.auth.uid))
-        && get(/databases/$(database)/documents/restaurantes/$(restauranteId)/equipe/$(request.auth.uid)).data.ativo != false;
+        && get(/databases/$(database)/documents/restaurantes/$(restauranteId)/equipe/$(request.auth.uid)).data.ativo == true
+        // O papel atual no Firestore prevalece sobre claims antigas ainda presentes no ID token.
+        && get(/databases/$(database)/documents/restaurantes/$(restauranteId)/equipe/$(request.auth.uid)).data.role == role;
     }
 
     function hasRole(restauranteId, role) {
@@ -51,7 +53,7 @@ service cloud.firestore {
           (
             ('restauranteId' in request.auth.token) &&
             request.auth.token.restauranteId == restauranteId &&
-            isActiveStaffMember(restauranteId)
+            isActiveStaffMember(restauranteId, role)
           )
         );
     }
