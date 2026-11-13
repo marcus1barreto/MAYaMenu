@@ -688,6 +688,28 @@ async function main() {
     assert.strictEqual((await db.doc("concessoes/lic_slug").get()).exists, true);
   });
 
+  await runTest("Emulador: código de licença arquivado não pode ser reutilizado como voucher B2B", async () => {
+    const codigo = "CODIGO-ARQUIVADO-NAO-REUTILIZAR";
+    await db.doc(`arquivo_morto_licencas/${codigo}`).set({
+      id: codigo, codigo, ownerId: "owner_antigo", motivo: "ativacao_concluida",
+    });
+    const pat = db.doc("patrocinadores/spn_codigo_arquivado");
+    await pat.set({ nomeFantasia: "Marca Arquivada", ativo: true });
+    await pat.collection("catalogo_master").doc("item").set({
+      id: "item", nome: "Produto", categoriaSugerida: "Bebidas", precoSugerido: 5,
+      obrigatorioNoCardapio: true,
+    });
+    await pat.collection("lotes_licencas").doc("lote-arquivado").set({
+      id: "lote-arquivado", patrocinadorId: pat.id, nome: "Lote",
+      codigoCampanha: codigo, totalLicencas: 2, licencasAtivadas: 0,
+      validadeMeses: 6, ativo: true, restaurantesVinculados: [],
+    });
+    await assert.rejects(
+      () => executarValidarCodigoAtivacao(db, { codigo }),
+      /já foi consumido e está arquivado/i
+    );
+  });
+
   await runTest("Emulador: voucher de lote B2B inativo não pode ser validado nem consumido", async () => {
     const pat = db.doc("patrocinadores/spn_lote_inativo");
     await pat.set({ nomeFantasia: "Marca Inativa", ativo: true });
