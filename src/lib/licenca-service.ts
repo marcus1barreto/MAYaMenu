@@ -407,7 +407,7 @@ export async function ativarLicencaNoRestaurante(params: {
  */
 export async function alterarStatusLicenca(
   codigo: string,
-  novoStatus: "ativa" | "suspensa" | "revogada"
+  novoStatus: "disponivel" | "suspensa" | "revogada"
 ): Promise<void> {
   const codigoFormatado = codigo.trim().toUpperCase();
   if (novoStatus === "revogada") {
@@ -424,9 +424,9 @@ export async function alterarStatusLicenca(
     ]);
     if (!licencaSnap.exists()) throw new Error("Concessão não encontrada.");
     if (arquivoSnap.exists()) throw new Error("Concessão arquivada é imutável.");
-    const statusAtual = String(licencaSnap.data().status || "disponivel");
-    if (["ativa", "utilizada", "revogada"].includes(statusAtual)) {
-      throw new Error("Concessão consumida ou revogada não pode ter seu estado alterado.");
+    const statusAtual = String(licencaSnap.data().status || "");
+    if (!["disponivel", "suspensa"].includes(statusAtual)) {
+      throw new Error("Somente concessões disponíveis ou suspensas podem ter seu estado alterado.");
     }
     tx.update(licencaRef, {
       status: novoStatus,
@@ -561,9 +561,9 @@ export async function renovarValidadeLicenca(
     ]);
     if (!licencaSnap.exists()) throw new Error("Concessão não encontrada.");
     if (arquivoSnap.exists()) throw new Error("Concessão arquivada não pode ser reativada.");
-    const statusAtual = String(licencaSnap.data().status || "disponivel");
-    if (["ativa", "utilizada", "revogada"].includes(statusAtual)) {
-      throw new Error("Concessão já utilizada ou revogada não pode ser renovada.");
+    const statusAtual = String(licencaSnap.data().status || "");
+    if (!["disponivel", "suspensa"].includes(statusAtual)) {
+      throw new Error("Somente concessões disponíveis ou suspensas podem ser renovadas.");
     }
     tx.update(licencaRef, {
       expiracaoEm: novaExpiracao,
@@ -601,8 +601,8 @@ export async function revogarLicenca(codigo: string): Promise<void> {
     }
     if (arquivoSnap.exists()) throw new Error("Já existe um registro imutável para esta concessão.");
     const licenca = licSnap.data() as Licenca;
-    if (["ativa", "utilizada"].includes(licenca.status)) {
-      throw new Error("Concessão já consumida; não pode ser revogada como disponível.");
+    if (!["disponivel", "suspensa", "revogada"].includes(licenca.status)) {
+      throw new Error("Somente concessões disponíveis, suspensas ou já revogadas podem ser arquivadas.");
     }
     const dadosLicenca: Licenca = { ...licenca, status: "revogada" };
     const arquivo: LicencaArquivada = {
