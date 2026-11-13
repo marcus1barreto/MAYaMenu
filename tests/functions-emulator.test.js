@@ -385,6 +385,65 @@ async function main() {
     assert.strictEqual(ledger.data().status, "refunded");
   });
 
+  await runTest("Emulador: estorno parcial exige revisão e preserva assinatura até estorno integral", async () => {
+    const attemptId = "123e4567-e89b-12d3-a456-426614174004";
+    const paymentId = "987654325";
+    const restRef = db.doc("restaurantes/rest_mp_estorno_parcial");
+    await restRef.set({
+      ownerId: "owner_mp_estorno_parcial", plano: "free",
+      maxMesas: 10, maxPratos: 20, maxItensMenu: 20,
+    });
+    await db.doc(`pagamentos_pro/${attemptId}`).set({
+      attemptId,
+      ownerUid: "owner_mp_estorno_parcial",
+      restauranteId: "rest_mp_estorno_parcial",
+      planoId: "pro_mensal",
+      valorCentavos: 4990,
+      currency: "BRL",
+      liveMode: false,
+      collectorId: "12345",
+      status: "pending",
+      expiraEm: new Date(Date.now() + 60 * 60 * 1000),
+    });
+    const pagamento = {
+      id: paymentId, status: "approved", external_reference: attemptId,
+      currency_id: "BRL", transaction_amount: 49.90, live_mode: false,
+      collector_id: "12345", date_approved: new Date().toISOString(),
+      payment_type_id: "pix",
+    };
+    await executarProcessarPagamentoProAprovado(db, attemptId, pagamento);
+    const assinaturaAntes = (await restRef.get()).data().assinatura;
+
+    const parcial = await executarProcessarEstornoPagamentoPro(db, attemptId, {
+      ...pagamento, transaction_amount_refunded: 10.00,
+    });
+    assert.strictEqual(parcial.status, "partial_refund_review");
+    assert.strictEqual(parcial.revisaoNecessaria, true);
+    const tentativaParcial = await db.doc(`pagamentos_pro/${attemptId}`).get();
+    const ledgerParcial = await db.doc(`pagamentos_pro_processados/${paymentId}`).get();
+    const restauranteParcial = await restRef.get();
+    assert.strictEqual(tentativaParcial.data().status, "review_required");
+    assert.strictEqual(tentativaParcial.data().valorEstornadoCentavos, 1000);
+    assert.strictEqual(ledgerParcial.data().status, "partial_refund_review");
+    assert.strictEqual(restauranteParcial.data().plano, "pro");
+    assert.strictEqual(restauranteParcial.data().assinatura.paymentId, assinaturaAntes.paymentId);
+
+    const repetido = await executarProcessarEstornoPagamentoPro(db, attemptId, {
+      ...pagamento, transaction_amount_refunded: 10.00,
+    });
+    assert.strictEqual(repetido.idempotente, true);
+
+    const integral = await executarProcessarEstornoPagamentoPro(db, attemptId, {
+      ...pagamento, status: "refunded", transaction_amount_refunded: 49.90,
+    });
+    assert.strictEqual(integral.status, "refunded");
+    const restauranteFinal = await restRef.get();
+    assert.strictEqual(restauranteFinal.data().plano, "free");
+    assert.strictEqual(restauranteFinal.data().assinatura, undefined);
+    assert.strictEqual((await db.doc(`pagamentos_pro/${attemptId}`).get()).data().status, "refunded");
+    assert.strictEqual((await db.doc(`pagamentos_pro_processados/${paymentId}`).get()).data().status, "refunded");
+  });
+
   await runTest("Emulador: pagamento PRO com valor incorreto não altera assinatura", async () => {
     const attemptId = "123e4567-e89b-12d3-a456-426614174002";
     const restRef = db.doc("restaurantes/rest_mp_valor_invalido");
