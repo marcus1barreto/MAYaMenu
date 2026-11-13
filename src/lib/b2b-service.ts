@@ -14,7 +14,6 @@ import {
   where,
   onSnapshot,
   serverTimestamp,
-  increment,
   type Unsubscribe,
 } from "firebase/firestore";
 import type {
@@ -431,47 +430,7 @@ export async function vincularRestauranteManualSuperadmin(params: {
 /**
  * Registra a venda de um item patrocinado para telemetria agregada de Sell-Out
  */
-export async function registrarVendaItemPatrocinado(params: {
-  patrocinadorId: string;
-  itemId: string;
-  itemNome: string;
-  quantidade: number;
-  valorTotal: number;
-  restauranteId: string;
-}): Promise<void> {
-  if (!params.patrocinadorId || !params.itemId) return;
 
-  try {
-    const cleanItemId = params.itemId.replace(/^spn-/, "");
-    const docRef = doc(db, "patrocinadores", params.patrocinadorId, "metricas_sellout", cleanItemId);
-
-    const docSnap = await getDoc(docRef);
-    if (!docSnap.exists()) {
-      await setDoc(docRef, {
-        itemId: cleanItemId,
-        itemNome: params.itemNome,
-        patrocinadorId: params.patrocinadorId,
-        totalUnidadesVendidas: params.quantidade,
-        faturamentoTotalEstimado: params.valorTotal,
-        restaurantesContabilizados: [params.restauranteId],
-        ultimaVendaEm: new Date().toISOString(),
-      });
-    } else {
-      const data = docSnap.data();
-      const rests = new Set(data?.restaurantesContabilizados || []);
-      rests.add(params.restauranteId);
-
-      await updateDoc(docRef, {
-        totalUnidadesVendidas: increment(params.quantidade),
-        faturamentoTotalEstimado: increment(params.valorTotal),
-        restaurantesContabilizados: Array.from(rests),
-        ultimaVendaEm: new Date().toISOString(),
-      });
-    }
-  } catch (err) {
-    console.warn("Falha ao registrar sellout:", err);
-  }
-}
 
 /**
  * Escuta as métricas agregadas de Sell-Out em tempo real para o patrocinador
