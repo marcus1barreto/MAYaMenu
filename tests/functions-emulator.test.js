@@ -18,7 +18,7 @@ const {
   executarSincronizarPerfilPublicoRestaurante, executarLancamentoPedidoGarcom,
   executarValidarCodigoAtivacaoComRateLimit, executarValidarSessaoPatrocinador,
   validarAssinaturaMercadoPago, validarPagamentoPro, executarProcessarPagamentoProAprovado,
-  limitarCriacaoPreferenciaPro,
+  executarProcessarEstornoPagamentoPro, limitarCriacaoPreferenciaPro,
 } = _internal;
 const crypto = require("crypto");
 
@@ -175,6 +175,52 @@ async function main() {
     assert.strictEqual(rest.data().assinatura.paymentId, paymentId);
     assert.strictEqual(attempt.data().status, "approved");
     assert.strictEqual(ledger.exists, true);
+  });
+
+  await runTest("Emulador: estorno/chargeback restaura plano anterior e é idempotente", async () => {
+    const attemptId = "123e4567-e89b-12d3-a456-426614174003";
+    const paymentId = "987654324";
+    const restRef = db.doc("restaurantes/rest_mp_estorno");
+    await restRef.set({
+      ownerId: "owner_mp_estorno", plano: "free",
+      maxMesas: 10, maxPratos: 20, maxItensMenu: 20,
+    });
+    await db.doc(`pagamentos_pro/${attemptId}`).set({
+      attemptId,
+      ownerUid: "owner_mp_estorno",
+      restauranteId: "rest_mp_estorno",
+      planoId: "pro_mensal",
+      valorCentavos: 4990,
+      currency: "BRL",
+      liveMode: false,
+      collectorId: "12345",
+      status: "pending",
+      expiraEm: new Date(Date.now() + 60 * 60 * 1000),
+    });
+    const paymentAprovado = {
+      id: paymentId, status: "approved", external_reference: attemptId,
+      currency_id: "BRL", transaction_amount: 49.90, live_mode: false,
+      collector_id: "12345", date_approved: new Date().toISOString(),
+      payment_type_id: "pix",
+    };
+    await executarProcessarPagamentoProAprovado(db, attemptId, paymentAprovado);
+    const paymentEstornado = {
+      ...paymentAprovado, status: "refunded", transaction_amount_refunded: 49.90,
+    };
+    const primeiro = await executarProcessarEstornoPagamentoPro(db, attemptId, paymentEstornado);
+    assert.strictEqual(primeiro.processado, true);
+    assert.strictEqual(primeiro.idempotente, false);
+    const segundo = await executarProcessarEstornoPagamentoPro(db, attemptId, paymentEstornado);
+    assert.strictEqual(segundo.idempotente, true);
+
+    const rest = await restRef.get();
+    const attempt = await db.doc(`pagamentos_pro/${attemptId}`).get();
+    const ledger = await db.doc(`pagamentos_pro_processados/${paymentId}`).get();
+    assert.strictEqual(rest.data().plano, "free");
+    assert.strictEqual(rest.data().assinatura, undefined);
+    assert.strictEqual(rest.data().maxMesas, 10);
+    assert.strictEqual(attempt.data().status, "refunded");
+    assert.strictEqual(ledger.data().status, "refunded");
   });
 
   await runTest("Emulador: pagamento PRO com valor incorreto não altera assinatura", async () => {
