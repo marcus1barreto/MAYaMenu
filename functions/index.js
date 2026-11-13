@@ -2984,46 +2984,52 @@ exports.desativarMesaBackend = functions.https.onCall(async (data, context) => {
 // Mantém um espelho público minimizado do restaurante. O documento raiz permanece privado.
 // Somente campos explicitamente permitidos são copiados; nunca replica ownerId, plano,
 // licença, limites, dados de equipe, PINs, QR ou configurações financeiras privadas.
+async function executarSincronizarPerfilPublicoRestaurante(firestoreDb, restauranteId, data) {
+  const publicRef = firestoreDb.collection('restaurantes_publicos').doc(restauranteId);
+  if (!data) {
+    await publicRef.delete();
+    return { sucesso: true, removido: true };
+  }
+  const cfg = data.configuracoes || {};
+  const configuracoes = {};
+  for (const key of ['corPrimaria', 'tema', 'logoUrl', 'capaUrl', 'modoOperacao', 'modoFilaKds', 'taxaServico']) {
+    if (cfg[key] !== undefined) configuracoes[key] = cfg[key];
+  }
+  // Chave Pix é divulgada apenas quando explicitamente ativa e com campos mínimos.
+  if (cfg.pixConfig?.ativo === true && cfg.pixConfig.chave && cfg.pixConfig.tipoChave) {
+    configuracoes.pixConfig = {
+      chave: String(cfg.pixConfig.chave),
+      tipoChave: String(cfg.pixConfig.tipoChave),
+      beneficiario: String(cfg.pixConfig.beneficiario || '').slice(0, 25),
+      cidade: String(cfg.pixConfig.cidade || '').slice(0, 15),
+      ativo: true,
+    };
+  }
+  await publicRef.set({
+    restauranteId,
+    slug: String(data.slug || restauranteId),
+    nome: String(data.nome || 'Restaurante'),
+    suspenso: data.suspenso === true || cfg.suspenso === true,
+    configuracoes,
+    atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
+  }, { merge: false });
+  return { sucesso: true, removido: false };
+}
+
 exports.sincronizarPerfilPublicoRestaurante = onDocumentWritten({
   document: 'restaurantes/{restauranteId}',
   database: 'mayamenu-bd',
   region: 'us-central1',
   retry: true,
 }, async (event) => {
-    const after = event.data?.after;
-    const restauranteId = event.params.restauranteId;
-    const publicRef = getDb().collection('restaurantes_publicos').doc(restauranteId);
-    if (!after?.exists) {
-      await publicRef.delete();
-      return null;
-    }
-    const data = after.data() || {};
-    const cfg = data.configuracoes || {};
-    const configuracoes = {};
-    for (const key of ['corPrimaria', 'tema', 'logoUrl', 'capaUrl', 'modoOperacao', 'modoFilaKds', 'taxaServico']) {
-      if (cfg[key] !== undefined) configuracoes[key] = cfg[key];
-    }
-    // Chave Pix e dados EMV são públicos por natureza do pagamento; publicar apenas
-    // quando explicitamente ativo e somente os campos necessários à cobrança.
-    if (cfg.pixConfig?.ativo === true && cfg.pixConfig.chave && cfg.pixConfig.tipoChave) {
-      configuracoes.pixConfig = {
-        chave: String(cfg.pixConfig.chave),
-        tipoChave: String(cfg.pixConfig.tipoChave),
-        beneficiario: String(cfg.pixConfig.beneficiario || '').slice(0, 25),
-        cidade: String(cfg.pixConfig.cidade || '').slice(0, 15),
-        ativo: true,
-      };
-    }
-    await publicRef.set({
-      restauranteId,
-      slug: String(data.slug || restauranteId),
-      nome: String(data.nome || 'Restaurante'),
-      suspenso: data.suspenso === true || cfg.suspenso === true,
-      configuracoes,
-      atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
-    }, { merge: false });
-    return null;
-  });
+  const after = event.data?.after;
+  const restauranteId = event.params.restauranteId;
+  return executarSincronizarPerfilPublicoRestaurante(
+    getDb(),
+    restauranteId,
+    after?.exists ? after.data() : null
+  );
+});
 
 exports._internal = {
   getMesaTokenSecret,
@@ -3043,6 +3049,7 @@ exports._internal = {
   executarAtivarInstancia,
   executarAtivarPatrocinio,
   executarProcessarSelloutOutbox,
+  executarSincronizarPerfilPublicoRestaurante,
 };
 
 /**
