@@ -5,6 +5,7 @@ on:
     branches:
       - security/hardening-final-7-ajustes
     paths:
+      - package.json
       - functions/package.json
 
 permissions:
@@ -25,6 +26,11 @@ jobs:
         with:
           node-version: 22
 
+      - name: Refresh application lockfile and remediate compatible advisories
+        run: |
+          npm install --package-lock-only --no-audit --no-fund
+          npm audit fix --package-lock-only --no-fund || true
+
       - name: Resolve and refresh Functions lockfile
         run: npm install --prefix functions --package-lock-only --no-audit --no-fund
 
@@ -34,8 +40,8 @@ jobs:
           if ! git diff --quiet -- functions/package-lock.json; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add functions/package-lock.json
-            git commit -m "chore: refresh Cloud Functions dependency lockfile"
+            git add package-lock.json functions/package-lock.json
+            git commit -m "chore: refresh application and Cloud Functions dependency lockfiles"
             git fetch origin "${GITHUB_REF_NAME}"
             git rebase "origin/${GITHUB_REF_NAME}"
             git push origin "HEAD:${GITHUB_REF_NAME}"
