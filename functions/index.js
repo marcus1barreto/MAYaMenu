@@ -970,7 +970,7 @@ async function executarGarantirCredencialMesa(firestoreDb, authUid, authToken, p
     restDoc,
     authUid,
     authToken,
-    ['owner', 'admin', 'garcom']
+    ['owner', 'admin']
   );
 
   const restData = restDoc.data() || {};
