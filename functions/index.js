@@ -2037,6 +2037,425 @@ async function executarLiberarMesa(firestoreDb, authUid, authToken, payload) {
   return resultado;
 }
 
+
+function normalizarCodigoAtivacao(valor) {
+  return String(valor || '').trim().toUpperCase();
+}
+
+function millisDataAtivacao(valor) {
+  if (!valor) return null;
+  if (typeof valor.toMillis === 'function') return valor.toMillis();
+  if (valor instanceof Date) return valor.getTime();
+  const ms = Date.parse(String(valor));
+  return Number.isFinite(ms) ? ms : null;
+}
+
+function validarDisponibilidadeAtivacao(dados, codigo) {
+  if (!dados) throw new functions.https.HttpsError('not-found', 'Código de ativação inválido ou inexistente.');
+  if (['ativa', 'utilizada', 'suspensa', 'revogada'].includes(dados.status)) {
+    throw new functions.https.HttpsError('failed-precondition', 'Esta licença já foi utilizada, suspensa ou revogada.');
+  }
+  const expira = millisDataAtivacao(dados.expiracaoEm || dados.dataExpiracao);
+  if (expira !== null && Date.now() > expira) {
+    throw new functions.https.HttpsError('failed-precondition', 'Este link de ativação expirou.');
+  }
+  return true;
+}
+
+async function localizarLoteVoucher(firestoreDb, codigo, transaction) {
+  const queryLotes = firestoreDb.collectionGroup('lotes_licencas').where('codigoCampanha', '==', codigo);
+  const snap = transaction ? await transaction.get(queryLotes) : await queryLotes.get();
+  const candidatos = snap.docs.filter((d) => d.data()?.ativo !== false);
+  if (candidatos.length === 0) return null;
+  if (candidatos.length !== 1) {
+    throw new functions.https.HttpsError('failed-precondition', 'Código de campanha ambíguo. Contate a administração.');
+  }
+  const loteDoc = candidatos[0];
+  const lote = loteDoc.data() || {};
+  const patrocinadorId = String(lote.patrocinadorId || loteDoc.ref.parent.parent?.id || '');
+  if (!patrocinadorId) throw new functions.https.HttpsError('failed-precondition', 'Lote sem patrocinador vinculado.');
+  return { loteDoc, lote, patrocinadorId };
+}
+
+async function executarValidarCodigoAtivacao(firestoreDb, payload) {
+  const codigo = normalizarCodigoAtivacao(payload?.codigo);
+  if (!codigo || codigo.length > 100) {
+    throw new functions.https.HttpsError('invalid-argument', 'Código de ativação inválido.');
+  }
+
+  const concessaoSnap = await firestoreDb.collection('concessoes').doc(codigo).get();
+  if (concessaoSnap.exists) {
+    const dados = concessaoSnap.data() || {};
+    validarDisponibilidadeAtivacao(dados, codigo);
+    return {
+      valida: true,
+      tipo: 'licenca',
+      licenca: {
+        id: codigo,
+        status: dados.status || 'disponivel',
+        plano: dados.plano || 'free',
+        limites: dados.limites || null,
+        responsavel: dados.responsavel || '',
+        notas: dados.notas || '',
+        expiracaoEm: dados.expiracaoEm || null,
+      },
+    };
+  }
+
+  const encontrado = await localizarLoteVoucher(firestoreDb, codigo);
+  if (!encontrado) {
+    throw new functions.https.HttpsError('not-found', 'Link de ativação inválido ou inexistente.');
+  }
+  const { loteDoc, lote, patrocinadorId } = encontrado;
+  const patrocinadorSnap = await firestoreDb.collection('patrocinadores').doc(patrocinadorId).get();
+  if (!patrocinadorSnap.exists || patrocinadorSnap.data()?.ativo === false) {
+    throw new functions.https.HttpsError('failed-precondition', 'Patrocinador inativo ou inexistente.');
+  }
+  const expiracao = millisDataAtivacao(lote.dataExpiracao);
+  if (expiracao !== null && Date.now() > expiracao) {
+    throw new functions.https.HttpsError('failed-precondition', 'A validade desta campanha de patrocínio expirou.');
+  }
+  if (Number(lote.licencasAtivadas || 0) >= Number(lote.totalLicencas || 0)) {
+    throw new functions.https.HttpsError('resource-exhausted', 'Este lote de licenças patrocinadas já esgotou suas cotas.');
+  }
+  const pat = patrocinadorSnap.data() || {};
+  return {
+    valida: true,
+    tipo: 'patrocinio',
+    licenca: {
+      id: codigo,
+      status: 'disponivel',
+      plano: 'pro',
+      limites: { maxPratos: 60, maxItensMenu: 60, maxMesas: 30 },
+      responsavel: 'Patrocinado por ' + String(pat.nomeFantasia || 'Parceiro MAYaMenu'),
+      notas: 'Campanha B2B: ' + String(lote.nome || loteDoc.id),
+      patrocinadorId,
+      loteId: loteDoc.id,
+    },
+  };
+}
+
+function adicionarMesesSemOverflow(dataBase, meses) {
+  const original = new Date(dataBase);
+  const dia = original.getDate();
+  original.setDate(1);
+  original.setMonth(original.getMonth() + meses);
+  const ultimoDia = new Date(original.getFullYear(), original.getMonth() + 1, 0).getDate();
+  original.setDate(Math.min(dia, ultimoDia));
+  return original;
+}
+
+function montarItemPatrocinado(itemMaster, patrocinadorId) {
+  const idMaster = String(itemMaster.id || '').trim();
+  if (!idMaster || idMaster.includes('/')) {
+    throw new functions.https.HttpsError('failed-precondition', 'Catálogo contém identificador de produto inválido.');
+  }
+  const preco = Number(itemMaster.precoSugerido || 0);
+  if (!Number.isFinite(preco) || preco < 0) {
+    throw new functions.https.HttpsError('failed-precondition', 'Catálogo contém preço inválido.');
+  }
+  return {
+    id: 'spn-' + idMaster,
+    nome: String(itemMaster.nome || 'Produto patrocinado').slice(0, 120),
+    categoria: String(itemMaster.categoriaSugerida || 'Especiais da Casa').slice(0, 80),
+    descricao: String(itemMaster.descricaoOficial || '').slice(0, 1000),
+    precoBase: preco,
+    fotoUrl: String(itemMaster.fotoOficialUrl || '').slice(0, 2048),
+    ativo: true,
+    ordem: -100,
+    posicaoFixaTopo: true,
+    origemPatrocinadorId: patrocinadorId,
+    bloqueadoParaExclusao: itemMaster.obrigatorioNoCardapio !== false,
+    seloPatrocinador: String(itemMaster.seloPatrocinador || 'Parceiro Oficial').slice(0, 80),
+  };
+}
+
+async function executarAtivarInstancia(firestoreDb, authUid, payload) {
+  if (!authUid) throw new functions.https.HttpsError('unauthenticated', 'Autenticação necessária.');
+  const codigo = normalizarCodigoAtivacao(payload?.codigo);
+  const slug = String(payload?.slug || '').trim().toLowerCase();
+  const nome = String(payload?.restauranteNome || '').trim().slice(0, 120);
+  const modo = ['com_garcom', 'hibrido', 'balcao'].includes(payload?.modoOperacao) ? payload.modoOperacao : 'hibrido';
+  if (!codigo || codigo.length > 100 || !nome || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) || slug.length > 60) {
+    throw new functions.https.HttpsError('invalid-argument', 'Nome, código ou endereço público inválido.');
+  }
+
+  const restRef = firestoreDb.collection('restaurantes').doc(authUid);
+  const slugRef = firestoreDb.collection('slugs').doc(slug);
+  const concessaoRef = firestoreDb.collection('concessoes').doc(codigo);
+  const arquivoRef = firestoreDb.collection('arquivo_morto_licencas').doc(codigo);
+  let resultado = null;
+
+  await firestoreDb.runTransaction(async (tx) => {
+    const [restSnap, slugSnap, concessaoSnap] = await Promise.all([
+      tx.get(restRef), tx.get(slugRef), tx.get(concessaoRef),
+    ]);
+    if (restSnap.exists) {
+      const atual = restSnap.data() || {};
+      if (atual.ownerId === authUid && atual.licenca?.id === codigo) {
+        resultado = { ...atual, id: restSnap.id, idempotente: true };
+        return;
+      }
+      throw new functions.https.HttpsError('already-exists', 'Este usuário já possui um estabelecimento cadastrado.');
+    }
+    if (slugSnap.exists && slugSnap.data()?.ownerId !== authUid) {
+      throw new functions.https.HttpsError('already-exists', 'Este endereço público já está em uso. Escolha outro slug.');
+    }
+
+    if (concessaoSnap.exists) {
+      const licData = concessaoSnap.data() || {};
+      validarDisponibilidadeAtivacao(licData, codigo);
+      const arquivoSnap = await tx.get(arquivoRef);
+      if (arquivoSnap.exists) {
+        throw new functions.https.HttpsError('already-exists', 'Esta licença já foi utilizada e transferida para o Arquivo Morto.');
+      }
+      const plano = String(licData.plano || 'free');
+      const limites = licData.limites || (plano === 'pro'
+        ? { maxPratos: 60, maxItensMenu: 60, maxMesas: 30 }
+        : plano === 'enterprise'
+          ? { maxPratos: 999, maxItensMenu: 999, maxMesas: 999 }
+          : { maxPratos: 20, maxItensMenu: 20, maxMesas: 10 });
+      const agora = new Date();
+      const restaurante = {
+        id: authUid, ownerId: authUid, slug, nome, plano,
+        maxMesas: limites.maxMesas, maxPratos: limites.maxPratos,
+        licenca: { id: codigo, plano, limites },
+        termsAcceptedAt: String(payload?.termsAcceptedAt || agora.toISOString()),
+        termsVersion: String(payload?.termsVersion || '1.0.0'),
+        configuracoes: {
+          corPrimaria: '#E11D48', tema: 'light',
+          capaUrl: '/images/capa-padrao.webp', modoOperacao: modo,
+        },
+        criadoEm: admin.firestore.FieldValue.serverTimestamp(),
+        atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
+      };
+      const dadosConsolidados = {
+        ...licData, status: 'utilizada', consumidaEm: agora, ativadaEm: agora,
+        restauranteId: authUid, restauranteNome: nome, slug, ownerId: authUid,
+      };
+      tx.create(restRef, restaurante);
+      tx.set(slugRef, {
+        slug, ownerId: authUid, restauranteNome: nome,
+        criadoEm: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      tx.create(arquivoRef, {
+        id: codigo, codigo, arquivadoEm: admin.firestore.FieldValue.serverTimestamp(),
+        motivo: 'ativacao_concluida', restauranteId: authUid,
+        restauranteNome: nome, slug, ownerId: authUid,
+        snapshotJson: JSON.stringify(dadosConsolidados),
+        dadosLicenca: dadosConsolidados,
+      });
+      tx.delete(concessaoRef);
+      resultado = restaurante;
+      return;
+    }
+
+    const voucher = await localizarLoteVoucher(firestoreDb, codigo, tx);
+    if (!voucher) {
+      throw new functions.https.HttpsError('not-found', 'Código de ativação inválido ou concessão não encontrada.');
+    }
+    const { loteDoc, lote, patrocinadorId } = voucher;
+    const patRef = firestoreDb.collection('patrocinadores').doc(patrocinadorId);
+    const catalogoQuery = patRef.collection('catalogo_master');
+    const [patSnap, catalogoSnap] = await Promise.all([tx.get(patRef), tx.get(catalogoQuery)]);
+    if (!patSnap.exists || patSnap.data()?.ativo === false) {
+      throw new functions.https.HttpsError('failed-precondition', 'Patrocinador inativo ou inexistente.');
+    }
+    const expiracao = millisDataAtivacao(lote.dataExpiracao);
+    if (expiracao !== null && Date.now() > expiracao) {
+      throw new functions.https.HttpsError('failed-precondition', 'A validade desta campanha de patrocínio expirou.');
+    }
+    if (Number(lote.licencasAtivadas || 0) >= Number(lote.totalLicencas || 0)) {
+      throw new functions.https.HttpsError('resource-exhausted', 'Este lote de licenças patrocinadas já esgotou suas cotas.');
+    }
+    const pat = patSnap.data() || {};
+    const itensMaster = catalogoSnap.docs.map((d) => ({ id: d.id, ...(d.data() || {}) }));
+    if (itensMaster.length > 450) {
+      throw new functions.https.HttpsError('failed-precondition', 'O catálogo excede o limite seguro de itens por ativação.');
+    }
+    const itens = itensMaster.map((item) => montarItemPatrocinado(item, patrocinadorId));
+    const dataBase = new Date();
+    const meses = Math.max(1, Math.min(36, Number(lote.validadeMeses) || 6));
+    const expiracaoPatrocinio = adicionarMesesSemOverflow(dataBase, meses).toISOString();
+    const categorias = Array.from(new Set(itensMaster.map((i) => String(i.categoriaSugerida || '').trim()).filter(Boolean)));
+    const categoriaPrincipal = categorias[0] || 'Especiais da Marca';
+    const vinculo = {
+      restauranteId: authUid, nomeRestaurante: nome, slugRestaurante: slug,
+      codigoVoucherUtilizado: codigo, ativadoEm: new Date().toISOString(), status: 'ativo',
+    };
+    const vinculados = Array.isArray(lote.restaurantesVinculados) ? lote.restaurantesVinculados.slice() : [];
+    if (vinculados.some((v) => v.restauranteId === authUid)) {
+      throw new functions.https.HttpsError('already-exists', 'Este estabelecimento já consumiu uma cota deste lote.');
+    }
+    const restaurante = {
+      id: authUid, ownerId: authUid, slug, nome, plano: 'pro',
+      maxMesas: 30, maxPratos: 60, maxItensMenu: 60,
+      licenca: { id: codigo, plano: 'pro', limites: { maxPratos: 60, maxItensMenu: 60, maxMesas: 30 } },
+      termsAcceptedAt: String(payload?.termsAcceptedAt || new Date().toISOString()),
+      termsVersion: String(payload?.termsVersion || '1.0.0'),
+      configuracoes: {
+        corPrimaria: '#E11D48', tema: 'light',
+        capaUrl: '/images/capa-padrao.webp', modoOperacao: modo,
+      },
+      assinatura: {
+        planoId: 'plan_b2b_patrocinado_v1',
+        apelido: 'Patrocinado por ' + String(pat.nomeFantasia || 'Parceiro MAYaMenu'),
+        versao: '1.0.0', contratadoEm: new Date().toISOString(),
+        dataExpiracao: expiracaoPatrocinio, valorContratado: 0,
+        periodicidade: 'patrocinado',
+        limites: {
+          maxMesas: 30, maxItensMenu: 60,
+          modulosPermitidos: ['cardapio', 'mesas', 'kds', 'garcom', 'analytics', 'patrocinio_topo'],
+        },
+        garantiaAcordo: 'inalteravel', status: 'ativa',
+      },
+      patrocinio: {
+        ativo: true, patrocinadorId, patrocinadorNome: String(pat.nomeFantasia || ''),
+        loteId: loteDoc.id, dataExpiracao: expiracaoPatrocinio,
+        itensInjetados: itens.map((i) => i.id),
+        slots: [{
+          patrocinadorId, patrocinadorNome: String(pat.nomeFantasia || ''),
+          categoriaSugerida: categoriaPrincipal, loteId: loteDoc.id,
+          codigoVoucher: codigo, itensInjetados: itens.map((i) => i.id),
+          mesesAdicionados: meses, vinculadoEm: new Date().toISOString(),
+        }],
+      },
+      criadoEm: admin.firestore.FieldValue.serverTimestamp(),
+      atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
+    };
+    tx.create(restRef, restaurante);
+    tx.set(slugRef, {
+      slug, ownerId: authUid, restauranteNome: nome,
+      criadoEm: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    for (const item of itens) {
+      tx.create(restRef.collection('cardapio').doc(item.id), item);
+    }
+    tx.update(loteDoc.ref, {
+      licencasAtivadas: Number(lote.licencasAtivadas || 0) + 1,
+      restaurantesVinculados: [...vinculados, vinculo],
+      atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    resultado = restaurante;
+  });
+
+  return resultado;
+}
+
+async function executarAtivarPatrocinio(firestoreDb, authUid, token, payload) {
+  if (!authUid) throw new functions.https.HttpsError('unauthenticated', 'Autenticação necessária.');
+  const restauranteId = String(payload?.restauranteId || '').trim();
+  const codigo = normalizarCodigoAtivacao(payload?.codigoVoucher);
+  if (!restauranteId || !codigo) throw new functions.https.HttpsError('invalid-argument', 'Restaurante e voucher são obrigatórios.');
+  const superadmin = token?.superadmin === true;
+  const restRef = firestoreDb.collection('restaurantes').doc(restauranteId);
+  let resultado = null;
+
+  await firestoreDb.runTransaction(async (tx) => {
+    const restSnap = await tx.get(restRef);
+    if (!restSnap.exists) throw new functions.https.HttpsError('not-found', 'Restaurante não encontrado.');
+    const rest = restSnap.data() || {};
+    if (!superadmin && rest.ownerId !== authUid) {
+      throw new functions.https.HttpsError('permission-denied', 'Somente o titular ou SuperAdmin pode vincular patrocínio.');
+    }
+    const voucher = await localizarLoteVoucher(firestoreDb, codigo, tx);
+    if (!voucher) throw new functions.https.HttpsError('not-found', 'Voucher de patrocínio não encontrado.');
+    const { loteDoc, lote, patrocinadorId } = voucher;
+    const patRef = firestoreDb.collection('patrocinadores').doc(patrocinadorId);
+    const catalogoQuery = patRef.collection('catalogo_master');
+    const [patSnap, catalogoSnap] = await Promise.all([tx.get(patRef), tx.get(catalogoQuery)]);
+    if (!patSnap.exists || patSnap.data()?.ativo === false) throw new functions.https.HttpsError('failed-precondition', 'Patrocinador inativo.');
+    const expiracaoLote = millisDataAtivacao(lote.dataExpiracao);
+    if (expiracaoLote !== null && Date.now() > expiracaoLote) throw new functions.https.HttpsError('failed-precondition', 'Campanha expirada.');
+    const pat = patSnap.data() || {};
+    const patrocinioExistente = rest.patrocinio || {};
+    const slots = Array.isArray(patrocinioExistente.slots) ? patrocinioExistente.slots : (
+      patrocinioExistente.ativo ? [{
+        patrocinadorId: patrocinioExistente.patrocinadorId,
+        patrocinadorNome: patrocinioExistente.patrocinadorNome,
+        categoriaSugerida: 'Chopps & Cervejas',
+        itensInjetados: patrocinioExistente.itensInjetados || [],
+      }] : []
+    );
+    const itensMaster = catalogoSnap.docs.map((d) => ({ id: d.id, ...(d.data() || {}) }));
+    const categoriasNovas = new Set(itensMaster.map((i) => String(i.categoriaSugerida || '').trim().toLowerCase()).filter(Boolean));
+    if (slots.some((slot) => slot.patrocinadorId === patrocinadorId)) {
+      throw new functions.https.HttpsError('already-exists', 'Esta marca já está vinculada ao estabelecimento.');
+    }
+    for (const slot of slots) {
+      const categoria = String(slot.categoriaSugerida || '').trim().toLowerCase();
+      if (categoria && categoriasNovas.has(categoria)) {
+        throw new functions.https.HttpsError('failed-precondition', 'Conflito de categoria com outro patrocinador já vinculado.');
+      }
+    }
+    const meses = Math.max(1, Math.min(36, Number(lote.validadeMeses) || 6));
+    const agora = new Date();
+    let dataBase = agora;
+    const expiracaoAtual = millisDataAtivacao(patrocinioExistente.dataExpiracao);
+    if (expiracaoAtual !== null && expiracaoAtual > agora.getTime()) dataBase = new Date(expiracaoAtual);
+    const novaExpiracao = adicionarMesesSemOverflow(dataBase, meses).toISOString();
+    const itens = itensMaster.map((i) => montarItemPatrocinado(i, patrocinadorId));
+    if (itens.length > 450) throw new functions.https.HttpsError('failed-precondition', 'Catálogo excede o limite seguro por ativação.');
+    const refs = itens.map((i) => restRef.collection('cardapio').doc(i.id));
+    const existentes = await Promise.all(refs.map((ref) => tx.get(ref)));
+    existentes.forEach((snap, index) => {
+      if (snap.exists && snap.data()?.origemPatrocinadorId !== patrocinadorId) {
+        throw new functions.https.HttpsError('already-exists', 'Produto patrocinado conflita com item já existente no cardápio.');
+      }
+    });
+    const vinculados = Array.isArray(lote.restaurantesVinculados) ? lote.restaurantesVinculados.slice() : [];
+    const vinculoExistente = vinculados.find((v) => v.restauranteId === restauranteId);
+    if (vinculoExistente) throw new functions.https.HttpsError('already-exists', 'Este restaurante já consumiu uma cota deste lote.');
+    if (Number(lote.licencasAtivadas || 0) >= Number(lote.totalLicencas || 0)) {
+      throw new functions.https.HttpsError('resource-exhausted', 'Lote de patrocínio sem cotas disponíveis.');
+    }
+    const categorias = Array.from(categoriasNovas);
+    const novoSlot = {
+      patrocinadorId, patrocinadorNome: String(pat.nomeFantasia || ''),
+      categoriaSugerida: categorias[0] || 'Especiais da Marca',
+      loteId: loteDoc.id, codigoVoucher: codigo,
+      itensInjetados: itens.map((i) => i.id), mesesAdicionados: meses,
+      vinculadoEm: agora.toISOString(),
+    };
+    const novosSlots = [...slots, novoSlot];
+    const todosItens = Array.from(new Set([...(patrocinioExistente.itensInjetados || []), ...itens.map((i) => i.id)]));
+    const novoVinculo = {
+      restauranteId, nomeRestaurante: String(rest.nome || ''),
+      slugRestaurante: String(rest.slug || ''),
+      codigoVoucherUtilizado: codigo, ativadoEm: agora.toISOString(), status: 'ativo',
+    };
+    tx.update(loteDoc.ref, {
+      licencasAtivadas: Number(lote.licencasAtivadas || 0) + 1,
+      restaurantesVinculados: [...vinculados, novoVinculo],
+      atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    itens.forEach((item, index) => {
+      if (existentes[index].exists) tx.set(refs[index], item, { merge: true });
+      else tx.create(refs[index], item);
+    });
+    tx.update(restRef, {
+      plano: 'pro', maxMesas: 30, maxPratos: 60, maxItensMenu: 60,
+      assinatura: {
+        planoId: 'plan_b2b_patrocinado_v1',
+        apelido: 'Patrocinado por ' + String(pat.nomeFantasia || ''),
+        versao: '1.0.0', contratadoEm: agora.toISOString(),
+        dataExpiracao: novaExpiracao, valorContratado: 0,
+        periodicidade: 'patrocinado',
+        limites: { maxMesas: 30, maxItensMenu: 60, modulosPermitidos: ['cardapio', 'mesas', 'kds', 'garcom', 'analytics', 'patrocinio_topo'] },
+        garantiaAcordo: 'inalteravel', status: 'ativa',
+      },
+      patrocinio: {
+        ativo: true, patrocinadorId, patrocinadorNome: String(pat.nomeFantasia || ''),
+        loteId: loteDoc.id, dataExpiracao: novaExpiracao,
+        itensInjetados: todosItens, slots: novosSlots,
+      },
+      atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    resultado = { sucesso: true, novaDataExpiracao: novaExpiracao, mesesAdicionados: meses };
+  });
+  return resultado;
+}
+
 exports.garantirCredencialMesa = functions.https.onCall(async (data, context) => {
   return executarGarantirCredencialMesa(getDb(), context.auth?.uid, context.auth?.token, data);
 });
@@ -2225,6 +2644,18 @@ async function executarDesativarMesa(firestoreDb, authUid, authToken, payload) {
   return resultado;
 }
 
+exports.validarCodigoAtivacaoBackend = functions.https.onCall(async (data) => {
+  return executarValidarCodigoAtivacao(getDb(), data);
+});
+
+exports.ativarInstanciaBackend = functions.https.onCall(async (data, context) => {
+  return executarAtivarInstancia(getDb(), context.auth?.uid, data);
+});
+
+exports.ativarPatrocinioBackend = functions.https.onCall(async (data, context) => {
+  return executarAtivarPatrocinio(getDb(), context.auth?.uid, context.auth?.token, data);
+});
+
 exports.chamarGarcomBackend = functions.https.onCall(async (data, context) => {
   return executarChamarGarcom(getDb(), context.auth?.uid, data);
 });
@@ -2290,6 +2721,9 @@ exports._internal = {
   executarLiberarMesa,
   executarDesativarMesa,
   executarChamarGarcom,
+  executarValidarCodigoAtivacao,
+  executarAtivarInstancia,
+  executarAtivarPatrocinio,
 };
 
 /**
