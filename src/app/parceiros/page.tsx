@@ -29,7 +29,7 @@ export default function ParceirosPage() {
         .finally(() => setCarregando(false));
     } else {
       sessionStorage.removeItem("mayamenu_b2b_patrocinador");
-      setCarregando(false);
+      sairPortalB2B().catch(() => undefined).finally(() => setCarregando(false));
     }
   }, []);
 
