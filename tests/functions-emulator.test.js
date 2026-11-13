@@ -9,7 +9,11 @@ process.env.MESA_SESSION_SECRET = "segredo-super-forte-de-teste-mayamenu-32bytes
 
 const admin = require("../functions/node_modules/firebase-admin");
 const { _internal } = require("../functions/index.js");
-const { executarFecharComanda, executarLiberarMesa, executarDefinirTaxaServicoMesa, executarDesativarMesa, executarChamarGarcom } = _internal;
+const {
+  executarFecharComanda, executarLiberarMesa, executarDefinirTaxaServicoMesa,
+  executarDesativarMesa, executarChamarGarcom, executarValidarCodigoAtivacao,
+  executarAtivarInstancia, executarAtivarPatrocinio,
+} = _internal;
 const crypto = require("crypto");
 
 let passed = 0;
@@ -43,6 +47,107 @@ async function seed(db, mesa, clienteId) {
 async function main() {
   const db = admin.firestore();
   const base = { restauranteId: "rest_e" };
+
+  await runTest("Emulador: validação de licença não exige leitura pública e retorna apenas dados mínimos", async () => {
+    await db.doc("concessoes/MAYA-TESTE-01").set({
+      status: "disponivel", plano: "pro",
+      limites: { maxMesas: 30, maxPratos: 60, maxItensMenu: 60 },
+      responsavel: "Restaurante teste",
+    });
+    const validacao = await executarValidarCodigoAtivacao(db, { codigo: "maya-teste-01" });
+    assert.strictEqual(validacao.valida, true);
+    assert.strictEqual(validacao.licenca.id, "MAYA-TESTE-01");
+    assert.strictEqual(validacao.licenca.plano, "pro");
+    assert.strictEqual(validacao.licenca.ownerUid, undefined);
+  });
+
+  await runTest("Emulador: ativação de licença comum consome concessão e cria restaurante/slug/arquivo morto atomicamente", async () => {
+    await db.doc("concessoes/MAYA-ATOMIC-01").set({
+      status: "disponivel", plano: "free",
+      limites: { maxMesas: 10, maxPratos: 20, maxItensMenu: 20 },
+      expiracaoEm: new Date(Date.now() + 86400000).toISOString(),
+    });
+    const restaurante = await executarAtivarInstancia(db, "owner_atomic_01", {
+      codigo: "MAYA-ATOMIC-01", slug: "atomic-rest-01", restauranteNome: "Atomic Restaurante",
+      modoOperacao: "hibrido",
+    });
+    assert.strictEqual(restaurante.ownerId, "owner_atomic_01");
+    assert.strictEqual(restaurante.plano, "free");
+    assert.strictEqual((await db.doc("concessoes/MAYA-ATOMIC-01").get()).exists, false);
+    assert.strictEqual((await db.doc("arquivo_morto_licencas/MAYA-ATOMIC-01").get()).exists, true);
+    assert.strictEqual((await db.doc("slugs/atomic-rest-01").get()).data().ownerId, "owner_atomic_01");
+    await assert.rejects(() => executarAtivarInstancia(db, "owner_atomic_02", {
+      codigo: "MAYA-ATOMIC-01", slug: "atomic-rest-02", restauranteNome: "Outro Restaurante",
+    }));
+  });
+
+  await runTest("Emulador: voucher B2B ativa PRO, injeta catálogo e consome uma única cota", async () => {
+    const patRef = db.doc("patrocinadores/spn_test_b2b");
+    await patRef.set({ nomeFantasia: "Marca Teste", ativo: true, slug: "marca-teste" });
+    await patRef.collection("catalogo_master").doc("item-obrigatorio").set({
+      id: "item-obrigatorio", nome: "Produto Patrocinado", categoriaSugerida: "Bebidas",
+      descricaoOficial: "Produto oficial", fotoOficialUrl: "/produto.webp",
+      precoSugerido: 12.5, obrigatorioNoCardapio: true, seloPatrocinador: "Parceiro Oficial",
+    });
+    await patRef.collection("lotes_licencas").doc("lote-test-b2b").set({
+      id: "lote-test-b2b", patrocinadorId: "spn_test_b2b", nome: "Lote Teste",
+      codigoCampanha: "CAMPANHA-TESTE-01", totalLicencas: 1, licencasAtivadas: 0,
+      validadeMeses: 6, dataExpiracao: new Date(Date.now() + 86400000).toISOString(),
+      ativo: true, restaurantesVinculados: [],
+    });
+    const validacao = await executarValidarCodigoAtivacao(db, { codigo: "CAMPANHA-TESTE-01" });
+    assert.strictEqual(validacao.tipo, "patrocinio");
+    const restaurante = await executarAtivarInstancia(db, "owner_b2b_01", {
+      codigo: "CAMPANHA-TESTE-01", slug: "b2b-rest-01", restauranteNome: "Restaurante B2B",
+    });
+    assert.strictEqual(restaurante.plano, "pro");
+    assert.strictEqual(restaurante.patrocinio.patrocinadorId, "spn_test_b2b");
+    const item = await db.doc("restaurantes/owner_b2b_01/cardapio/spn-item-obrigatorio").get();
+    assert.strictEqual(item.exists, true);
+    assert.strictEqual(item.data().bloqueadoParaExclusao, true);
+    assert.strictEqual((await patRef.collection("lotes_licencas").doc("lote-test-b2b").get()).data().licencasAtivadas, 1);
+    await assert.rejects(() => executarAtivarInstancia(db, "owner_b2b_02", {
+      codigo: "CAMPANHA-TESTE-01", slug: "b2b-rest-02", restauranteNome: "Segundo B2B",
+    }));
+  });
+
+  await runTest("Emulador: patrocínios adicionais respeitam titularidade, quota e bloqueio de categoria", async () => {
+    const restRef = db.doc("restaurantes/owner_multi_b2b");
+    await restRef.set({ ownerId: "owner_multi_b2b", nome: "Restaurante Multi", slug: "multi-b2b", plano: "free" });
+    const patA = db.doc("patrocinadores/spn_multi_a");
+    const patB = db.doc("patrocinadores/spn_multi_b");
+    await patA.set({ nomeFantasia: "Marca A", ativo: true });
+    await patB.set({ nomeFantasia: "Marca B", ativo: true });
+    await patA.collection("catalogo_master").doc("a1").set({
+      id: "a1", nome: "Item A", categoriaSugerida: "Bebidas", precoSugerido: 5,
+      obrigatorioNoCardapio: true,
+    });
+    await patB.collection("catalogo_master").doc("b1").set({
+      id: "b1", nome: "Item B", categoriaSugerida: "bebidas", precoSugerido: 6,
+      obrigatorioNoCardapio: true,
+    });
+    for (const [pat, lote, codigo] of [
+      [patA, "lote-a", "VOUCHER-MULTI-A"],
+      [patB, "lote-b", "VOUCHER-MULTI-B"],
+    ]) {
+      await pat.collection("lotes_licencas").doc(lote).set({
+        id: lote, patrocinadorId: pat.id, nome: lote, codigoCampanha: codigo,
+        totalLicencas: 2, licencasAtivadas: 0, validadeMeses: 6,
+        dataExpiracao: new Date(Date.now() + 86400000).toISOString(),
+        ativo: true, restaurantesVinculados: [],
+      });
+    }
+    await assert.rejects(() => executarAtivarPatrocinio(db, "intruso_multi", {}, {
+      restauranteId: restRef.id, codigoVoucher: "VOUCHER-MULTI-A",
+    }));
+    const primeiro = await executarAtivarPatrocinio(db, "owner_multi_b2b", {}, {
+      restauranteId: restRef.id, codigoVoucher: "VOUCHER-MULTI-A",
+    });
+    assert.strictEqual(primeiro.sucesso, true);
+    await assert.rejects(() => executarAtivarPatrocinio(db, "owner_multi_b2b", {}, {
+      restauranteId: restRef.id, codigoVoucher: "VOUCHER-MULTI-B",
+    }), /categoria/i);
+  });
 
   await runTest("Emulador: fechamento concorrente (8 chamadas) altera uma única vez", async () => {
     const { comanda } = await seed(db, 1, "cli_a");
