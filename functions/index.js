@@ -2276,6 +2276,9 @@ function normalizarCodigoAtivacao(valor) {
 }
 
 function validarCotaLoteVoucher(lote) {
+  if (lote?.ativo === false) {
+    throw new functions.https.HttpsError('failed-precondition', 'Este lote de patrocínio está inativo e não aceita novas ativações.');
+  }
   const total = Number(lote?.totalLicencas);
   const usadas = Number(lote?.licencasAtivadas || 0);
   if (!Number.isInteger(total) || total < 1 || !Number.isInteger(usadas) || usadas < 0 || usadas > total) {
