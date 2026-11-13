@@ -2860,8 +2860,15 @@ async function executarProcessarEstornoPagamentoPro(firestoreDb, attemptId, paym
     ]);
     if (!attemptSnap.exists) return;
     const attempt = attemptSnap.data() || {};
-    if (String(attempt.attemptId || attemptSnap.id) !== attemptId) {
+    if (String(attempt.attemptId || attemptSnap.id) !== attemptId ||
+        String(payment.external_reference || '') !== attemptId) {
       throw new functions.https.HttpsError('failed-precondition', 'Referência da tentativa não confere.');
+    }
+    if (String(payment.currency_id || '').toUpperCase() !== 'BRL' ||
+        Math.round(Number(payment.transaction_amount) * 100) !== Number(attempt.valorCentavos) ||
+        payment.live_mode !== (attempt.liveMode === true) ||
+        (attempt.collectorId && String(payment.collector_id || '') !== String(attempt.collectorId))) {
+      throw new functions.https.HttpsError('failed-precondition', 'Dados do pagamento/estorno não correspondem à cobrança original.');
     }
     if (ledgerSnap.exists && ledgerSnap.data()?.attemptId !== attemptId) {
       throw new functions.https.HttpsError('already-exists', 'Pagamento associado a outra tentativa.');
