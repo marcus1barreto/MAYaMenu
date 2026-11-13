@@ -91,7 +91,8 @@ exports.setStaffRole = functions.https.onCall(async (data, context) => {
   const callerUid = context.auth.uid;
   const { restauranteId, email, role, nome, fotoUrl, pin } = data || {};
 
-  if (!restauranteId || !email || !role) {
+  if (typeof restauranteId !== 'string' || !restauranteId.trim() || restauranteId.includes('/') ||
+      typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) || email.length > 254 || !role) {
     throw new functions.https.HttpsError(
       'invalid-argument',
       'Campos obrigatórios: restauranteId, email, role.'
@@ -141,37 +142,33 @@ exports.setStaffRole = functions.https.onCall(async (data, context) => {
     );
   }
 
-  const nomeFormatado = (nome || '').trim() || email.split('@')[0];
+  const nomeFormatado = String(nome || '').trim() || email.trim().split('@')[0];
   // A senha Firebase nunca é o PIN operacional. Conta nova recebe segredo aleatório
   // não compartilhado; o acesso de salão ocorre exclusivamente pelo fluxo PIN/crachá.
   const senhaInicialAleatoria = crypto.randomBytes(48).toString('base64url');
 
-  // 3. Busca ou CRIA AUTOMATICAMENTE o usuário no Firebase Auth
+  // 3. Busca o usuário. Só cria uma conta quando o erro é realmente user-not-found;
+  // falhas transitórias de Auth nunca devem disparar uma tentativa de criação alternativa.
   let targetUser;
   try {
-    targetUser = await admin.auth().getUserByEmail(email);
-    // Atualiza nome ou foto se informados
-    const updates = {};
-    if (nomeFormatado && targetUser.displayName !== nomeFormatado) updates.displayName = nomeFormatado;
-    if (fotoUrl) updates.photoURL = fotoUrl;
-    if (Object.keys(updates).length > 0) {
-      targetUser = await admin.auth().updateUser(targetUser.uid, updates);
-    }
+    targetUser = await admin.auth().getUserByEmail(email.trim().toLowerCase());
   } catch (err) {
-    // Se o usuário não existe, CRIA AUTOMATICAMENTE sem lançar 404
+    if (err.code !== 'auth/user-not-found') {
+      throw new functions.https.HttpsError('unavailable', 'Não foi possível consultar a conta do colaborador no Firebase Auth.');
+    }
     try {
       targetUser = await admin.auth().createUser({
-        email,
+        email: email.trim().toLowerCase(),
         password: senhaInicialAleatoria,
         displayName: nomeFormatado,
-        photoURL: fotoUrl || null,
+        ...(fotoUrl ? { photoURL: fotoUrl } : {}),
       });
       console.info(`Novo colaborador criado automaticamente: ${email} (UID: ${targetUser.uid})`);
     } catch (createErr) {
       console.error('Falha ao criar colaborador no Firebase Auth:', createErr);
       throw new functions.https.HttpsError(
         'internal',
-        `Não foi possível registrar o usuário no sistema: ${createErr.message}`
+        'Não foi possível registrar o usuário no sistema.'
       );
     }
   }
@@ -193,10 +190,16 @@ exports.setStaffRole = functions.https.onCall(async (data, context) => {
       restauranteAtual && restauranteAtual !== realRestauranteId) {
     throw new functions.https.HttpsError('failed-precondition', 'Este usuário já está vinculado a outro restaurante. Remova o vínculo anterior antes de transferi-lo.');
   }
-  // Contas de equipe legadas podem ter sido criadas com o PIN como senha. Ao atualizar
-  // um vínculo de equipe já existente, rotaciona também a senha Firebase para segredo aleatório.
+  // Só depois da autorização atualiza o perfil e a senha. Contas de equipe legadas
+  // podem ter sido criadas com o PIN como senha; ao atualizar o vínculo, rotaciona a senha.
+  const updates = {};
+  if (nomeFormatado && targetUser.displayName !== nomeFormatado) updates.displayName = nomeFormatado;
+  if (fotoUrl) updates.photoURL = fotoUrl;
   if (['garcom', 'cozinha'].includes(roleAtual) && restauranteAtual === realRestauranteId) {
-    targetUser = await admin.auth().updateUser(targetUser.uid, { password: senhaInicialAleatoria });
+    updates.password = senhaInicialAleatoria;
+  }
+  if (Object.keys(updates).length > 0) {
+    targetUser = await admin.auth().updateUser(targetUser.uid, updates);
   }
 
   // 4. Gera token seguro para Crachá QR Code (para login rápido com câmera)
