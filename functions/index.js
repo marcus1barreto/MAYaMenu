@@ -382,7 +382,7 @@ exports.loginComCracha = functions.https.onCall(async (data, context) => {
  * Protegida com rate limiting atômico simultâneo (IP e Colaborador)
  * e validação estrita exclusiva de hash scrypt + salt (rejeita texto puro).
  */
-exports.loginComPin = functions.https.onCall(async (data, context) => {
+async function executarLoginComPin(firestoreDb, data, rawRequest) {
   const { restauranteId, pin, colaboradorId } = data || {};
   if (typeof restauranteId !== 'string' || !restauranteId.trim() || restauranteId.length > 128 ||
       typeof colaboradorId !== 'string' || !colaboradorId.trim() || colaboradorId.length > 128 ||
@@ -393,7 +393,6 @@ exports.loginComPin = functions.https.onCall(async (data, context) => {
     );
   }
 
-  const firestoreDb = getDb();
   let restDoc = await firestoreDb.collection('restaurantes').doc(restauranteId).get();
   if (!restDoc.exists) {
     const q = await firestoreDb.collection('restaurantes').where('slug', '==', restauranteId).limit(1).get();
@@ -408,7 +407,7 @@ exports.loginComPin = functions.https.onCall(async (data, context) => {
   const agora = Date.now();
 
   // 1. Extração segura de IP contra falsificação e spoofing de cabeçalhos
-  const clientIp = extrairIpConviavel(context.rawRequest);
+  const clientIp = extrairIpConviavel(rawRequest);
   const ipKey = sanitizarChave(clientIp);
 
   // Rate limits rastreados em 3 chaves no Firestore:
@@ -504,6 +503,10 @@ exports.loginComPin = functions.https.onCall(async (data, context) => {
       fotoUrl: targetFoto,
     },
   };
+}
+
+exports.loginComPin = functions.https.onCall(async (data, context) => {
+  return executarLoginComPin(getDb(), data, context.rawRequest);
 });
 
 /**
@@ -4508,6 +4511,7 @@ exports._internal = {
   normalizarMesaIdentificador,
   validarLimiteMesaLicenciado,
   validarMembroEquipeParaLogin,
+  executarLoginComPin,
   getMesaTokenSecret,
   verificarMesaToken,
   validarModificadoresServidor,
