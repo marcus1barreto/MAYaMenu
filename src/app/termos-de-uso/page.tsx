@@ -189,10 +189,10 @@ export default function TermosDeUsoPage() {
 
               <div className="p-4 rounded-2xl bg-rose-50/50 border border-rose-200 space-y-2">
                 <div className="font-bold text-slate-900 flex items-center gap-1.5 text-xs uppercase tracking-wider text-rose-700">
-                  <Sparkles className="w-4 h-4 text-rose-600" /> 3.2. Do Plano Pro (Assinatura Recorrente)
+                  <Sparkles className="w-4 h-4 text-rose-600" /> 3.2. Do Plano Pro (Contratação Pré-paga por Período)
                 </div>
                 <p className="text-xs text-slate-600 leading-relaxed">
-                  A adesão ao Plano Pro é opcional e confere capacidade ampliada de mesas simultâneas (até 30 mesas), cardápio estendido (até 60 itens de menu), painel KDS de cozinha, módulo do garçom e relatórios de vendas. A contratação é cobrada de forma pré-paga nas opções mensal ou semestral, via gateway regulado (Mercado Pago ou PayPal), com cancelamento a qualquer momento sem incidência de multa de fidelidade.
+                  A adesão ao Plano Pro é opcional e confere capacidade ampliada de mesas simultâneas (até 30 mesas), cardápio estendido (até 60 itens de menu), painel KDS de cozinha, módulo do garçom e relatórios de vendas. A contratação é pré-paga por período de 1 ou 6 meses e processada pelo Mercado Pago (Pix ou cartão). Não há cobrança recorrente automática: ao fim da vigência, o titular decide se deseja contratar um novo período. A não renovação não gera multa de fidelidade.
                 </p>
               </div>
 
