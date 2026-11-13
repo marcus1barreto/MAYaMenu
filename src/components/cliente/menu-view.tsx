@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import type { MenuItem, Restaurante, ComandaCliente } from "@/types";
 import { useCart } from "@/context/cart-context";
@@ -58,17 +58,23 @@ export function MenuView({
   const { totalItens, subtotal, nomeCliente, limparCarrinho, mesa, setMesa } = useCart();
   const numeroMesa = mesa || numeroMesaProp;
   const [qrCredencialAtiva, setQrCredencialAtiva] = useState<string | undefined>(() => qrCredencialInicial);
+  const qrInicialConsumidaRef = useRef(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     const storageKey = `mayamenu_qr_${restauranteInicial.id}_mesa_${String(numeroMesa)}`;
     // A credencial inicial da URL só pode ser aplicada à mesa inicial.
     // Trocas internas usam a credencial persistida para a mesa recém-escaneada.
+    // A credencial da URL é consumida uma única vez; voltar à mesa inicial
+    // não pode reaplicar um QR antigo sobre uma credencial recém-escaneada.
+    const permitirQrInicial = !qrInicialConsumidaRef.current;
+    qrInicialConsumidaRef.current = true;
     const qrDetectada = obterQrCredencialInicial(
       numeroMesa,
       numeroMesaProp,
       qrCredencialInicial,
-      window.location.hash || ""
+      window.location.hash || "",
+      permitirQrInicial
     );
 
     if (qrDetectada) {
