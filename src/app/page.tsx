@@ -489,7 +489,7 @@ export default function LandingPage() {
                   </div>
 
                   <div className="text-[11px] text-neutral-500 text-center sm:text-right">
-                    <span>Opção de faturamento internacional via <strong className="text-neutral-800">PayPal</strong> sob consulta.</span>
+                    <span>Condições institucionais disponíveis sob consulta com nossa equipe comercial.</span>
                   </div>
                 </div>
               </div>
