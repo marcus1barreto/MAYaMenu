@@ -57,6 +57,7 @@ export const db: Firestore = createFirestore();
 export const auth: Auth = getAuth(app);
 export const storage: FirebaseStorage = getStorage(app);
 export const functions: Functions = getFunctions(app, "us-central1");
+export const b2bFunctions: Functions = getFunctions(b2bApp, "us-central1");
 
 // O portal B2B usa uma sessão Firebase separada para não substituir a autenticação
 // do restaurante quando um patrocinador acessa o painel corporativo.
