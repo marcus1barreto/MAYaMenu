@@ -31,6 +31,18 @@ function gerarIdempotencyKey(): string {
   return `ped-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
 }
 
+// Fingerprint não secreto usado apenas para particionar o cache local por QR.
+// A autorização continua sendo exclusivamente validada pelo backend.
+function fingerprintQrCredencial(valor?: string): string {
+  if (!valor) return "sem-credencial";
+  let hash = 2166136261;
+  for (let i = 0; i < valor.length; i++) {
+    hash ^= valor.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(16);
+}
+
 interface CartDrawerProps {
   isOpen: boolean;
   onClose: () => void;
@@ -129,13 +141,20 @@ export function CartDrawer({
 
       const obterOuEmitirMesaToken = async (): Promise<string | undefined> => {
         const cacheKey = `mayamenu_mesa_token_${idRestauranteFinal}_${String(mesa)}_${uid}`;
+        const qrFingerprint = fingerprintQrCredencial(qrCredencial);
         try {
           const cached = sessionStorage.getItem(cacheKey);
           if (cached) {
             const parsed = JSON.parse(cached);
-            if (parsed?.token && Number(parsed?.expiraEm) > Date.now() + 60_000) {
+            if (
+              parsed?.token
+              && parsed?.qrFingerprint === qrFingerprint
+              && Number(parsed?.expiraEm) > Date.now() + 60_000
+            ) {
               return parsed.token;
             }
+            // Token emitido com outro QR (por exemplo, antes de uma rotação) não pode ser reutilizado.
+            sessionStorage.removeItem(cacheKey);
           }
         } catch {
           // Ignora
@@ -161,7 +180,11 @@ export function CartDrawer({
           try {
             sessionStorage.setItem(
               cacheKey,
-              JSON.stringify({ token, expiraEm: resp?.data?.expiraEm || Date.now() + 3600_000 })
+              JSON.stringify({
+                token,
+                expiraEm: resp?.data?.expiraEm || Date.now() + 3600_000,
+                qrFingerprint,
+              })
             );
           } catch {
             // Ignora
