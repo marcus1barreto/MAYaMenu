@@ -2788,8 +2788,11 @@ async function executarAtivarInstancia(firestoreDb, authUid, authToken, payload)
     const dataBase = new Date();
     const meses = Math.max(1, Math.min(36, Number(lote.validadeMeses) || 6));
     const expiracaoPatrocinio = adicionarMesesSemOverflow(dataBase, meses).toISOString();
-    const categorias = Array.from(new Set(itensMaster.map((i) => String(i.categoriaSugerida || '').trim()).filter(Boolean)));
-    const categoriaPrincipal = categorias[0] || 'Especiais da Marca';
+    const categorias = Array.from(new Set(itensMaster.map((i) =>
+      String(i.categoriaSugerida || 'Especiais da Casa').trim()
+    ).filter(Boolean)));
+    if (categorias.length === 0) categorias.push('Especiais da Casa');
+    const categoriaPrincipal = categorias[0];
     const vinculo = {
       restauranteId: authUid, nomeRestaurante: nome, slugRestaurante: slug,
       codigoVoucherUtilizado: codigo, ativadoEm: new Date().toISOString(), status: 'ativo',
@@ -2826,7 +2829,8 @@ async function executarAtivarInstancia(firestoreDb, authUid, authToken, payload)
         itensInjetados: itens.map((i) => i.id),
         slots: [{
           patrocinadorId, patrocinadorNome: String(pat.nomeFantasia || ''),
-          categoriaSugerida: categoriaPrincipal, loteId: loteDoc.id,
+          categoriaSugerida: categoriaPrincipal, categoriasSugeridas: categorias,
+          loteId: loteDoc.id,
           codigoVoucher: codigo, itensInjetados: itens.map((i) => i.id),
           mesesAdicionados: meses, vinculadoEm: new Date().toISOString(),
         }],
@@ -2903,15 +2907,21 @@ async function executarAtivarPatrocinio(firestoreDb, authUid, token, payload) {
     if (itensMaster.length === 0) {
       throw new functions.https.HttpsError('failed-precondition', 'Patrocinador sem produtos cadastrados no Catálogo Master.');
     }
-    const categoriasNovas = new Set(itensMaster.map((i) => String(i.categoriaSugerida || '').trim().toLowerCase()).filter(Boolean));
+    const categoriasNovas = new Set(itensMaster.map((i) =>
+      String(i.categoriaSugerida || 'Especiais da Casa').trim().toLowerCase()
+    ).filter(Boolean));
+    if (categoriasNovas.size === 0) categoriasNovas.add('especiais da casa');
     if (slots.some((slot) => slot.patrocinadorId === patrocinadorId)) {
       throw new functions.https.HttpsError('already-exists', 'Esta marca já está vinculada ao estabelecimento.');
     }
-    for (const slot of slots) {
-      const categoria = String(slot.categoriaSugerida || '').trim().toLowerCase();
-      if (categoria && categoriasNovas.has(categoria)) {
-        throw new functions.https.HttpsError('failed-precondition', 'Conflito de categoria com outro patrocinador já vinculado.');
-      }
+    const categoriasExistentes = new Set(slots.flatMap((slot) => {
+      const categoriasSlot = Array.isArray(slot.categoriasSugeridas)
+        ? slot.categoriasSugeridas
+        : [slot.categoriaSugerida || 'Especiais da Casa'];
+      return categoriasSlot.map((categoria) => String(categoria || '').trim().toLowerCase()).filter(Boolean);
+    }));
+    if (Array.from(categoriasNovas).some((categoria) => categoriasExistentes.has(categoria))) {
+      throw new functions.https.HttpsError('failed-precondition', 'Conflito de categoria com outro patrocinador já vinculado.');
     }
     const meses = Math.max(1, Math.min(36, Number(lote.validadeMeses) || 6));
     const agora = new Date();
@@ -2935,7 +2945,8 @@ async function executarAtivarPatrocinio(firestoreDb, authUid, token, payload) {
     const categorias = Array.from(categoriasNovas);
     const novoSlot = {
       patrocinadorId, patrocinadorNome: String(pat.nomeFantasia || ''),
-      categoriaSugerida: categorias[0] || 'Especiais da Marca',
+      categoriaSugerida: categorias[0] || 'especiais da casa',
+      categoriasSugeridas: categorias,
       loteId: loteDoc.id, codigoVoucher: codigo,
       itensInjetados: itens.map((i) => i.id), mesesAdicionados: meses,
       vinculadoEm: agora.toISOString(),
