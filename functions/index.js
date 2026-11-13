@@ -2619,6 +2619,14 @@ function validarPagamentoPro(attempt, payment) {
   if (!payment.date_approved || !Number.isFinite(Date.parse(payment.date_approved))) {
     return 'Pagamento aprovado sem data de aprovação válida.';
   }
+  if (attempt.expiraEm) {
+    const expiraEm = typeof attempt.expiraEm.toDate === 'function'
+      ? attempt.expiraEm.toDate()
+      : new Date(attempt.expiraEm);
+    if (Number.isFinite(expiraEm.getTime()) && Date.parse(payment.date_approved) > expiraEm.getTime()) {
+      return 'Pagamento aprovado após a expiração da tentativa.';
+    }
+  }
   return null;
 }
 
