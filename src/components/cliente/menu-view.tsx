@@ -91,9 +91,10 @@ export function MenuView({
     }
     try {
       const salva = sessionStorage.getItem(storageKey);
-      if (salva) setQrCredencialAtiva(salva);
+      // Não manter a credencial da mesa anterior quando a nova mesa não tem QR salvo.
+      setQrCredencialAtiva(salva || undefined);
     } catch {
-      // Ignora
+      setQrCredencialAtiva(undefined);
     }
   }, [qrCredencialInicial, restauranteInicial.id, numeroMesa]);
   const [restaurante, setRestaurante] = useState<Restaurante>(restauranteInicial);
