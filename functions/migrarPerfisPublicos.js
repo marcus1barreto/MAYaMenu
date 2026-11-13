@@ -29,7 +29,6 @@ async function main() {
     const snap = await q.get();
     if (snap.empty) break;
 
-    const batch = db.batch();
     for (const docSnap of snap.docs) {
       const data = docSnap.data() || {};
       const cfg = data.configuracoes || {};
@@ -50,22 +49,34 @@ async function main() {
           ativo: true,
         };
       }
-      batch.set(db.collection("restaurantes_publicos").doc(docSnap.id), {
-        restauranteId: docSnap.id,
-        slug: String(data.slug || docSnap.id),
-        nome: String(data.nome || "Restaurante"),
-        suspenso: data.suspenso === true || cfg.suspenso === true,
-        configuracoes,
-        atualizadoEm: FieldValue.serverTimestamp(),
-        sourceUpdatedAt: docSnap.updateTime.toDate().toISOString(),
+
+      const sourceUpdatedAt = docSnap.updateTime.toDate().toISOString();
+      const perfilRef = db.collection("restaurantes_publicos").doc(docSnap.id);
+      // Transação por perfil impede que a migração sobrescreva uma versão mais nova
+      // que já tenha sido publicada pelo trigger enquanto a paginação está em curso.
+      const gravou = await db.runTransaction(async (tx) => {
+        const atualSnap = await tx.get(perfilRef);
+        const versaoAtual = atualSnap.exists
+          ? String(atualSnap.data()?.sourceUpdatedAt || "")
+          : "";
+        if (versaoAtual && versaoAtual > sourceUpdatedAt) return false;
+        tx.set(perfilRef, {
+          restauranteId: docSnap.id,
+          slug: String(data.slug || docSnap.id),
+          nome: String(data.nome || "Restaurante"),
+          suspenso: data.suspenso === true || cfg.suspenso === true,
+          configuracoes,
+          atualizadoEm: FieldValue.serverTimestamp(),
+          sourceUpdatedAt,
+        }, { merge: false });
+        return true;
       });
+      if (gravou) total++;
     }
-    await batch.commit();
-    total += snap.size;
     cursor = snap.docs[snap.docs.length - 1];
     process.stdout.write(`Perfis sincronizados: ${total}\\n`);
   } while (cursor);
-  process.stdout.write(`Migração concluída: ${total} restaurantes.\\n`);
+  process.stdout.write(`Migração concluída: ${total} perfis gravados ou confirmados.\\n`);
 }
 
 main().catch((err) => {
