@@ -2577,7 +2577,6 @@ const PLANOS_PRO_PAGAMENTO = Object.freeze({
 });
 
 const MERCADO_PAGO_WEBHOOK_URL =
-  process.env.MERCADO_PAGO_WEBHOOK_URL ||
   'https://us-central1-mayaranas-8ad9f.cloudfunctions.net/mercadoPagoWebhook';
 
 function validarAssinaturaMercadoPago({ xSignature, xRequestId, dataId, secret }) {
