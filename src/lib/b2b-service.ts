@@ -23,7 +23,7 @@ import type {
   MetricasSelloutItem,
 } from "@/types/b2b";
 import { httpsCallable } from "firebase/functions";
-import { signInWithCustomToken, signOut } from "firebase/auth";
+import { browserSessionPersistence, setPersistence, signInWithCustomToken, signOut } from "firebase/auth";
 
 function gerarTokenB2BSeguro(tamanho: number): string {
   const alfabeto = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -140,6 +140,7 @@ export async function buscarPatrocinadorPorChave(
     const resposta = await autenticarFn({ chave: chaveLimpa });
     const dados = resposta.data as { customToken?: string; patrocinador?: PatrocinadorB2B };
     if (!dados.customToken || !dados.patrocinador?.id) return null;
+    await setPersistence(b2bAuth, browserSessionPersistence);
     await signInWithCustomToken(b2bAuth, dados.customToken);
     return dados.patrocinador;
   } catch (err) {
