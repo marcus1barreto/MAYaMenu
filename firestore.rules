@@ -106,10 +106,8 @@ service cloud.firestore {
     match /slugs/{slug} {
       allow read: if true; // Validação prévia
       allow create: if isNonAnonymous() && request.resource.data.ownerId == request.auth.uid;
-      allow update: if isNonAnonymous()
-        && resource.data.ownerId == request.auth.uid
-        && request.resource.data.ownerId == request.auth.uid;
-      allow delete: if isNonAnonymous() && resource.data.ownerId == request.auth.uid;
+      // Trava de slug é imutável pelo cliente após a criação.
+      allow update, delete: if isSuperAdmin();
     }
 
     // ─────────────────────────── Módulo B2B & Patrocinadores ───────────────────────────
@@ -146,29 +144,57 @@ service cloud.firestore {
 
     // ─────────────────────────── Restaurantes e Operação ───────────────────────────
 
-    match /restaurantes/{restauranteId} {
-      // Leitura pública do restaurante
+    // Perfil público minimizado. Nenhum dado de titularidade, licença, plano ou operação é publicado aqui.
+    match /restaurantes_publicos/{restauranteId} {
       allow read: if true;
+      allow create: if isNonAnonymous()
+        && request.resource.data.restauranteId == restauranteId
+        && getAfter(/databases/$(database)/documents/restaurantes/$(restauranteId)).data.ownerId == request.auth.uid
+        && request.resource.data.keys().hasOnly([
+          'restauranteId', 'slug', 'nome', 'suspenso', 'configuracoes', 'atualizadoEm'
+        ])
+        && request.resource.data.configuracoes.keys().hasOnly([
+          'corPrimaria', 'tema', 'logoUrl', 'capaUrl', 'modoOperacao', 'modoFilaKds', 'taxaServico'
+        ]);
+      // Atualizações e exclusões do espelho público são feitas exclusivamente pelo Admin SDK.
+      allow update, delete: if false;
+    }
 
-      // Criação inicial via runTransaction de ativação
-      allow create: if isNonAnonymous() && request.resource.data.ownerId == request.auth.uid;
+    match /restaurantes/{restauranteId} {
+      // Documento raiz é privado: titular/equipe ativa e SuperAdmin.
+      allow get: if isOwner(restauranteId) || isActiveStaffMember(restauranteId) || isSuperAdmin();
+      allow list: if isSuperAdmin();
 
-      // Permite atualização de dados cadastrais/temas pelo Dono,
-      // governança de suspensão/limites livres é do SuperAdmin, mas o Dono pode ativar patrocínio PRO legítimo
-      allow update: if (
+      // Criação somente no fluxo de ativação: consome uma licença e trava o slug atomicamente.
+      allow create: if isNonAnonymous()
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.slug is string
+        && request.resource.data.licenca.id is string
+        && existsAfter(/databases/$(database)/documents/slugs/$(request.resource.data.slug))
+        && getAfter(/databases/$(database)/documents/slugs/$(request.resource.data.slug)).data.ownerId == request.auth.uid
+        && existsAfter(/databases/$(database)/documents/arquivo_morto_licencas/$(request.resource.data.licenca.id))
+        && !existsAfter(/databases/$(database)/documents/concessoes/$(request.resource.data.licenca.id))
+        && getAfter(/databases/$(database)/documents/arquivo_morto_licencas/$(request.resource.data.licenca.id)).data.ownerId == request.auth.uid
+        && getAfter(/databases/$(database)/documents/arquivo_morto_licencas/$(request.resource.data.licenca.id)).data.dadosLicenca.plano == request.resource.data.plano
+        && existsAfter(/databases/$(database)/documents/restaurantes_publicos/$(restauranteId));
+
+      // Lojista só altera campos cadastrais não privilegiados. Plano, licença, titularidade,
+      // suspensão e limites são governados exclusivamente pelo SuperAdmin/backend.
+      allow update: if isSuperAdmin() || (
         isOwner(restauranteId)
-        && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
-          'suspenso',
-          'maxMesas',
-          'maxPratos'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'nome', 'configuracoes', 'atualizadoEm'
         ])
         && (
-          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['plano'])
-          || (request.resource.data.plano == 'pro' && request.resource.data.patrocinio.ativo == true)
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['configuracoes'])
+          || request.resource.data.configuracoes.diff(resource.data.configuracoes).affectedKeys().hasOnly([
+            'corPrimaria', 'tema', 'logoUrl', 'capaUrl', 'modoOperacao', 'modoFilaKds', 'taxaServico'
+          ])
         )
-      ) || isSuperAdmin();
+      );
 
-      allow delete: if isOwner(restauranteId) || isSuperAdmin();
+      // Exclusão física do tenant é operação administrativa, não do cliente.
+      allow delete: if isSuperAdmin();
 
       // Gestão de Equipe (Garçons e Cozinha)
       match /equipe/{membroId} {
