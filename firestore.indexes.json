@@ -45,19 +45,32 @@
           "order": "ASCENDING"
         }
       ]
-    },
-    {
-      "collectionGroup": "lotes_licencas",
-      "queryScope": "COLLECTION_GROUP",
-      "fields": [
-        {
-          "fieldPath": "codigoCampanha",
-          "order": "ASCENDING"
-        }
-      ]
     }
   ],
   "fieldOverrides": [
+    {
+      "collectionGroup": "lotes_licencas",
+      "fieldPath": "codigoCampanha",
+      "ttl": false,
+      "indexes": [
+        {
+          "order": "ASCENDING",
+          "queryScope": "COLLECTION"
+        },
+        {
+          "order": "DESCENDING",
+          "queryScope": "COLLECTION"
+        },
+        {
+          "arrayConfig": "CONTAINS",
+          "queryScope": "COLLECTION"
+        },
+        {
+          "order": "ASCENDING",
+          "queryScope": "COLLECTION_GROUP"
+        }
+      ]
+    },
     {
       "collectionGroup": "comandas_abertas",
       "fieldPath": "restauranteId",
