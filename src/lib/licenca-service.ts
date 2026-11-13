@@ -43,14 +43,14 @@ export const LIMITES_POR_PLANO: Record<PlanoTipo, LimitesPlano> = {
  * Gera um token alfanumérico amigável e memorável no formato MAYA-XXXX-XXXX
  */
 export function gerarCodigoLicenca(): string {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // sem I, O, 0, 1 para evitar ambiguidades
-  let p1 = "";
-  let p2 = "";
-  for (let i = 0; i < 4; i++) {
-    p1 += chars.charAt(Math.floor(Math.random() * chars.length));
-    p2 += chars.charAt(Math.floor(Math.random() * chars.length));
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // 32 símbolos; índice uniforme com 5 bits
+  const bytes = new Uint8Array(8);
+  if (!globalThis.crypto?.getRandomValues) {
+    throw new Error("Gerador criptográfico seguro indisponível; licença não foi gerada.");
   }
-  return `MAYA-${p1}-${p2}`;
+  globalThis.crypto.getRandomValues(bytes);
+  const codigo = Array.from(bytes, (b) => chars[b & 31]).join("");
+  return `MAYA-${codigo.slice(0, 4)}-${codigo.slice(4)}`;
 }
 
 /**
