@@ -65,6 +65,14 @@ async function main() {
     assert.throws(() => normalizar("100000"), /Número de mesa inválido/i);
   });
 
+  await runTest("Emulador: capacidade de mesas ausente ou excedida falha fechada", async () => {
+    const validarLimite = _internal.validarLimiteMesaLicenciado;
+    assert.strictEqual(validarLimite({ maxMesas: 30 }, 30), 30);
+    assert.throws(() => validarLimite({ maxMesas: 30 }, 31), /capacidade licenciada/i);
+    assert.throws(() => validarLimite({}, 1), /limite de mesas da licença ausente/i);
+    assert.throws(() => validarLimite({ licenca: { limites: { maxMesas: 0 } } }, 1), /limite de mesas da licença ausente/i);
+  });
+
   await runTest("Emulador: autenticação de equipe nunca aceita papel enviado pelo cliente", async () => {
     const validar = _internal.validarMembroEquipeParaLogin;
     assert.strictEqual(validar({ uid: "garcom_1", role: "garcom", ativo: true }, "garcom_1"), true);
