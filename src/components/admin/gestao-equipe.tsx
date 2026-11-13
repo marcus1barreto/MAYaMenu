@@ -41,6 +41,18 @@ import {
 import { QRCodeSVG } from "qrcode.react";
 import { uploadFotoEquipe } from "@/lib/storage-service";
 
+function gerarPinOperacionalSeguro(): string {
+  if (!globalThis.crypto?.getRandomValues) {
+    throw new Error("Gerador criptográfico indisponível para gerar PIN.");
+  }
+  const limite = Math.floor(0x100000000 / 9000) * 9000;
+  const valor = new Uint32Array(1);
+  do {
+    globalThis.crypto.getRandomValues(valor);
+  } while (valor[0] >= limite);
+  return String(1000 + (valor[0] % 9000));
+}
+
 export interface MembroEquipe {
   id: string;
   uid: string;
@@ -128,8 +140,11 @@ export function GestaoEquipe({ restauranteId, nomeRestaurante = "MAYaMenu" }: Ge
   };
 
   const handleGerarPinAleatorio = () => {
-    const pin = Math.floor(1000 + Math.random() * 9000).toString();
-    setPinNovo(pin);
+    try {
+      setPinNovo(gerarPinOperacionalSeguro());
+    } catch (err) {
+      setMensagemErro(err instanceof Error ? err.message : "Não foi possível gerar um PIN seguro.");
+    }
   };
 
   const togglePinVisivel = (id: string) => {
@@ -154,7 +169,12 @@ export function GestaoEquipe({ restauranteId, nomeRestaurante = "MAYaMenu" }: Ge
     let pinLimpo = pinNovo.trim();
     if (!pinLimpo) {
       // Se não informou PIN, gera automaticamente um PIN de 4 dígitos
-      pinLimpo = Math.floor(1000 + Math.random() * 9000).toString();
+      try {
+        pinLimpo = gerarPinOperacionalSeguro();
+      } catch (err) {
+        setMensagemErro(err instanceof Error ? err.message : "Não foi possível gerar um PIN seguro.");
+        return;
+      }
     } else if (!/^\d{4,6}$/.test(pinLimpo)) {
       setMensagemErro("O PIN deve conter de 4 a 6 dígitos numéricos (apenas números).");
       return;
