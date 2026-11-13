@@ -2670,10 +2670,11 @@ async function executarValidarCodigoAtivacaoComRateLimit(firestoreDb, payload, r
 async function executarAtivarInstancia(firestoreDb, authUid, authToken, payload) {
   if (!authUid) throw new functions.https.HttpsError('unauthenticated', 'Autenticação necessária.');
   const provedorAuth = authToken?.firebase?.sign_in_provider;
-  if (!provedorAuth || provedorAuth === 'anonymous') {
+  if (!provedorAuth || provedorAuth === 'anonymous' ||
+      authToken?.role === 'sponsor' || typeof authToken?.patrocinadorId === 'string') {
     throw new functions.https.HttpsError(
       'unauthenticated',
-      'Crie ou acesse uma conta permanente antes de consumir a licença e assumir a titularidade do restaurante.'
+      'Use uma conta de proprietário permanente para consumir a licença; sessões anônimas ou B2B não podem assumir a titularidade.'
     );
   }
   const codigo = normalizarCodigoAtivacao(payload?.codigo);
