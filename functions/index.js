@@ -2689,12 +2689,18 @@ async function executarProcessarPagamentoProAprovado(firestoreDb, attemptId, pay
     if (ledgerSnap.exists) {
       const ledger = ledgerSnap.data() || {};
       if (ledger.attemptId === attemptId) {
-        resultado = {
-          sucesso: true,
-          status: 'approved',
-          idempotente: true,
-          novaDataExpiracao: ledger.novaDataExpiracao,
-        };
+        resultado = ledger.status === 'approved'
+          ? {
+              sucesso: true,
+              status: 'approved',
+              idempotente: true,
+              novaDataExpiracao: ledger.novaDataExpiracao,
+            }
+          : {
+              sucesso: false,
+              status: String(ledger.status || 'review_required'),
+              idempotente: true,
+            };
         return;
       }
       throw new functions.https.HttpsError('already-exists', 'Este pagamento já foi utilizado em outra tentativa.');
