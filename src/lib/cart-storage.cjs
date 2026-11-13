@@ -29,8 +29,8 @@ function isMesaTokenCacheValido(cache, qrCredencial, agora = Date.now()) {
   );
 }
 
-function obterQrCredencialInicial(numeroMesa, numeroMesaInicial, qrCredencialInicial, hash = "") {
-  if (String(numeroMesa) !== String(numeroMesaInicial)) return undefined;
+function obterQrCredencialInicial(numeroMesa, numeroMesaInicial, qrCredencialInicial, hash = "", permitirAplicacao = true) {
+  if (!permitirAplicacao || String(numeroMesa) !== String(numeroMesaInicial)) return undefined;
   let credencial = qrCredencialInicial;
   try {
     if (String(hash).includes("qr=")) {
