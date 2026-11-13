@@ -472,6 +472,52 @@ async function main() {
     assert.strictEqual(restaurado.patrocinio.patrocinadorId, "spn_b2b_preservado");
   });
 
+  await runTest("Emulador: estorno de pagamento antigo não revoga patrocínio B2B ativado depois", async () => {
+    const attemptId = "123e4567-e89b-12d3-a456-426614174411";
+    const paymentId = "987654411";
+    const restRef = db.doc("restaurantes/rest_mp_b2b_posterior");
+    await restRef.set({
+      ownerId: "owner_mp_b2b_posterior", plano: "free",
+      maxMesas: 10, maxPratos: 20, maxItensMenu: 20,
+    });
+    await db.doc(`pagamentos_pro/${attemptId}`).set({
+      attemptId, ownerUid: "owner_mp_b2b_posterior", restauranteId: restRef.id,
+      planoId: "pro_mensal", valorCentavos: 4990, currency: "BRL",
+      liveMode: false, collectorId: "12345", status: "pending",
+      expiraEm: new Date(Date.now() + 60 * 60 * 1000),
+    });
+    const pagamento = {
+      id: paymentId, status: "approved", external_reference: attemptId,
+      currency_id: "BRL", transaction_amount: 49.90, live_mode: false,
+      collector_id: "12345", date_approved: new Date().toISOString(),
+    };
+    await executarProcessarPagamentoProAprovado(db, attemptId, pagamento);
+
+    const validadeB2B = new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString();
+    await restRef.update({
+      assinatura: {
+        planoId: "plan_b2b_patrocinado_v1",
+        periodicidade: "patrocinado",
+        status: "ativa",
+        dataExpiracao: validadeB2B,
+        valorContratado: 0,
+      },
+      patrocinio: {
+        ativo: true, patrocinadorId: "spn_ativado_depois",
+        dataExpiracao: validadeB2B,
+      },
+    });
+
+    await executarProcessarEstornoPagamentoPro(db, attemptId, {
+      ...pagamento, status: "refunded", transaction_amount_refunded: 49.90,
+    });
+    const aposEstorno = (await restRef.get()).data();
+    assert.strictEqual(aposEstorno.plano, "pro");
+    assert.strictEqual(aposEstorno.assinatura.planoId, "plan_b2b_patrocinado_v1");
+    assert.strictEqual(aposEstorno.patrocinio.ativo, true);
+    assert.strictEqual(aposEstorno.patrocinio.patrocinadorId, "spn_ativado_depois");
+  });
+
   await runTest("Emulador: estorno fora de ordem não remove assinatura PRO mais recente", async () => {
     const restRef = db.doc("restaurantes/rest_mp_estorno_fora_ordem");
     await restRef.set({
