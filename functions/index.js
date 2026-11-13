@@ -3845,11 +3845,11 @@ async function executarAtivarInstancia(firestoreDb, authUid, authToken, payload,
 function normalizarCategoriaPatrocinio(valor) {
   return String(valor || 'Especiais da Casa')
     .normalize('NFD')
-    .replace(/[\\u0300-\\u036f]/g, '')
+    .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, ' ')
     .trim()
-    .replace(/\\s+/g, ' ');
+    .replace(/\s+/g, ' ');
 }
 
 async function executarAtivarPatrocinio(firestoreDb, authUid, token, payload, rawRequest) {
