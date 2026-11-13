@@ -16,6 +16,7 @@ import {
   alternarStatusLoteMesas,
   escutarConfigsMesas,
   reativarMesaFirestore,
+  emitirCredencialMesaFirestore,
   type ConfigMesa,
 } from "@/lib/mesas-service";
 import { desativarMesaFirestore } from "@/lib/restaurante-service";
@@ -136,6 +137,35 @@ export function SetupMesas({ restauranteId, maxMesas }: SetupMesasProps) {
     } catch (err) {
       console.error("Falha ao alterar estado da mesa:", err);
       alert(err instanceof Error ? err.message : "Não foi possível alterar o estado da mesa.");
+    } finally {
+      setSalvandoNum(null);
+    }
+  };
+
+  // Emite ou rotaciona o QR físico; o segredo só é mostrado nesta sessão.
+  const handleEmitirQr = async (num: number, rotacionar: boolean) => {
+    if (rotacionar && !window.confirm("Rotacionar o QR invalidará imediatamente o código físico anterior. Deseja continuar?")) {
+      return;
+    }
+    setSalvandoNum(num);
+    try {
+      const resultado = await emitirCredencialMesaFirestore(restauranteId, num, rotacionar);
+      if (!resultado.qrCredencial || !resultado.slug || !resultado.qrVersao) {
+        alert("Esta mesa já possui QR configurado. Para obter um novo código, confirme a rotação.");
+        return;
+      }
+      const url = new URL(`/r/${encodeURIComponent(resultado.slug)}`, window.location.origin);
+      url.searchParams.set("mesa", String(num));
+      url.searchParams.set("qr", resultado.qrCredencial);
+      setQrReativacao({
+        mesa: num,
+        url: url.toString(),
+        qrCredencial: resultado.qrCredencial,
+        qrVersao: resultado.qrVersao,
+      });
+    } catch (err) {
+      console.error("Falha ao emitir QR da mesa:", err);
+      alert(err instanceof Error ? err.message : "Não foi possível emitir o QR da mesa.");
     } finally {
       setSalvandoNum(null);
     }
@@ -425,6 +455,18 @@ export function SetupMesas({ restauranteId, maxMesas }: SetupMesasProps) {
                     Mesa Reservada
                   </Badge>
                 )}
+
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={!isAtiva || isBloqueada || salvandoNum === num}
+                  onClick={() => handleEmitirQr(num, cfg.qrConfigurado === true)}
+                  className="h-7 px-2 text-[11px] font-bold"
+                  title={cfg.qrConfigurado ? "Rotacionar credencial e invalidar QR anterior" : "Emitir QR seguro desta mesa"}
+                >
+                  {cfg.qrConfigurado ? "Rotacionar QR" : "Gerar QR"}
+                </Button>
 
                 <Button
                   type="button"
