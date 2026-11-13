@@ -12,7 +12,8 @@ Esta branch contém mudanças incompatíveis com o cliente anterior: concessões
 2. Confirmar que o banco nomeado `mayamenu-bd` existe no projeto `mayaranas-8ad9f`.
 3. Confirmar APIs Cloud Functions 2nd gen, Cloud Run e Eventarc habilitadas.
 4. Identificar a conta de serviço de execução de `autenticarPatrocinadorBackend` e conceder a ela `roles/iam.serviceAccountTokenCreator` sobre si mesma. Não conceder a permissão no projeto inteiro.
-5. Garantir credencial administrativa segura para executar a migração. Não versionar chave JSON.
+5. Reemitir credenciais de patrocinadores legadas: o portal aceita somente chaves no formato `SPN-` + 26 caracteres CSPRNG. Não reutilizar chaves curtas anteriores.
+6. Garantir credencial administrativa segura para executar a migração. Não versionar chave JSON.
 
 ## Migração dos gatilhos
 
