@@ -58,6 +58,14 @@ async function runTests() {
       ownerId: "owner_b",
       plano: "free",
     });
+    await db.doc("restaurantes_publicos/rest_a").set({
+      restauranteId: "rest_a", slug: "rest-a", nome: "Restaurante A", suspenso: false,
+      configuracoes: { corPrimaria: "#E11D48", tema: "light", modoOperacao: "hibrido" },
+    });
+    await db.doc("restaurantes_publicos/rest_b").set({
+      restauranteId: "rest_b", slug: "rest-b", nome: "Restaurante B", suspenso: false,
+      configuracoes: { corPrimaria: "#E11D48", tema: "light", modoOperacao: "hibrido" },
+    });
 
     // Mesa 1 no Restaurante A
     await db.doc("restaurantes/rest_a/mesas/1").set({
@@ -168,6 +176,21 @@ async function runTests() {
       failed++;
     }
   }
+
+  await test("Restaurante: raiz privada, perfil público minimizado e titularidade/plano imutáveis pelo lojista", async () => {
+    const anonDb = testEnv.unauthenticatedContext().firestore();
+    const ownerDb = testEnv.authenticatedContext("owner_a", {
+      role: "owner", restauranteId: "rest_a",
+    }).firestore();
+    const otherDb = testEnv.authenticatedContext("intruso").firestore();
+    await assertSucceeds(anonDb.doc("restaurantes_publicos/rest_a").get());
+    await assertFails(anonDb.doc("restaurantes/rest_a").get());
+    await assertSucceeds(ownerDb.doc("restaurantes/rest_a").get());
+    await assertFails(otherDb.doc("restaurantes/rest_a").get());
+    await assertFails(ownerDb.doc("restaurantes/rest_a").update({ ownerId: "intruso" }));
+    await assertFails(ownerDb.doc("restaurantes/rest_a").update({ plano: "pro", patrocinio: { ativo: true } }));
+    await assertFails(ownerDb.doc("restaurantes_publicos/rest_a").update({ nome: "perfil adulterado" }));
+  });
 
   // 1. ISOLAMENTO DE MESAS
   await test("Público/Anônimo NÃO pode ler /mesas", async () => {
