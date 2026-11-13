@@ -28,19 +28,23 @@ const DATABASE_ID = "mayamenu-bd";
 const namedFirestoreByApp = new WeakMap();
 
 function patchContextToNamedDatabase(context) {
-  // A implementação v6 mantém o FirebaseApp como campo privado e expõe getApp()
-  // internamente. Reutilizamos o app/token simulados para acessar o banco nomeado.
-  const app = typeof context.getApp === "function"
-    ? context.getApp()
-    : context.firestore()?.app;
+  // Mantém a fachada compat usada pela suíte (db.doc/db.collection), mas troca
+  // seu delegate modular para a instância nomeada com o mesmo app/token simulado.
+  const compatDb = context.firestore();
+  const app = compatDb?.app;
   if (!app) throw new Error("RulesTestContext sem FirebaseApp para banco nomeado.");
   let db = namedFirestoreByApp.get(app);
   if (!db) {
-    db = getFirestore(app, DATABASE_ID);
-    connectFirestoreEmulator(db, "127.0.0.1", 8080, {
+    const namedDb = getFirestore(app, DATABASE_ID);
+    connectFirestoreEmulator(namedDb, "127.0.0.1", 8080, {
       mockUserToken: context.authToken,
     });
+    compatDb._delegate = namedDb;
+    db = compatDb;
     namedFirestoreByApp.set(app, db);
+  } else {
+    compatDb._delegate = db._delegate;
+    db = compatDb;
   }
   context.firestore = () => db;
   return context;
