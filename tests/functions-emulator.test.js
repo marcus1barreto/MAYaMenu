@@ -17,6 +17,7 @@ const {
   executarAtivarInstancia, executarAtivarPatrocinio, executarProcessarSelloutOutbox,
   executarSincronizarPerfilPublicoRestaurante, executarLancamentoPedidoGarcom,
   executarValidarCodigoAtivacaoComRateLimit, executarValidarSessaoPatrocinador,
+  validarAssinaturaMercadoPago, validarPagamentoPro, executarProcessarPagamentoProAprovado,
 } = _internal;
 const crypto = require("crypto");
 
@@ -70,6 +71,131 @@ async function main() {
     assert.strictEqual(validar({ uid: "garcom_1", role: "garcom", ativo: false }, "garcom_1"), false);
     assert.strictEqual(validar({ uid: "uid_diferente", role: "garcom" }, "doc_membro"), false);
     assert.strictEqual(validar({ uid: "garcom_1", role: "admin" }, "garcom_1"), false);
+  });
+
+  await runTest("Mercado Pago: valida assinatura HMAC do webhook e rejeita adulteração", async () => {
+    const secret = "segredo-webhook-teste";
+    const dataId = "123456789";
+    const requestId = "request-teste-001";
+    const ts = "1710000000";
+    const manifest = `id:${dataId};request-id:${requestId};ts:${ts};`;
+    const v1 = crypto.createHmac("sha256", secret).update(manifest).digest("hex");
+    const xSignature = `ts=${ts},v1=${v1}`;
+    assert.strictEqual(validarAssinaturaMercadoPago({
+      xSignature, xRequestId: requestId, dataId, secret,
+    }), true);
+    assert.strictEqual(validarAssinaturaMercadoPago({
+      xSignature, xRequestId: requestId, dataId: "987654321", secret,
+    }), false);
+    assert.strictEqual(validarAssinaturaMercadoPago({
+      xSignature, xRequestId: requestId, dataId, secret: "segredo-incorreto",
+    }), false);
+  });
+
+  await runTest("Mercado Pago: exige referência, moeda, valor, ambiente e validade exatos", async () => {
+    const attempt = {
+      attemptId: "123e4567-e89b-12d3-a456-426614174000",
+      valorCentavos: 4990,
+      currency: "BRL",
+      liveMode: false,
+      collectorId: "12345",
+      expiraEm: new Date(Date.now() + 60 * 60 * 1000),
+    };
+    const payment = {
+      id: "987654321",
+      status: "approved",
+      external_reference: attempt.attemptId,
+      currency_id: "BRL",
+      transaction_amount: 49.90,
+      live_mode: false,
+      collector_id: "12345",
+      date_approved: new Date().toISOString(),
+    };
+    assert.strictEqual(validarPagamentoPro(attempt, payment), null);
+    assert.match(validarPagamentoPro(attempt, { ...payment, transaction_amount: 1 }), /valor pago/i);
+    assert.match(validarPagamentoPro(attempt, { ...payment, currency_id: "USD" }), /moeda/i);
+    assert.match(validarPagamentoPro(attempt, { ...payment, live_mode: true }), /ambiente/i);
+    assert.match(validarPagamentoPro(attempt, { ...payment, external_reference: "outra-tentativa" }), /referência externa/i);
+    assert.match(validarPagamentoPro(attempt, {
+      ...payment, date_approved: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
+    }), /expiração/i);
+  });
+
+  await runTest("Emulador: pagamento PRO é transacional e idempotente por paymentId", async () => {
+    const attemptId = "123e4567-e89b-12d3-a456-426614174001";
+    const paymentId = "987654322";
+    const restRef = db.doc("restaurantes/rest_mp_idempotente");
+    await restRef.set({ ownerId: "owner_mp_idempotente", plano: "free" });
+    await db.doc(`pagamentos_pro/${attemptId}`).set({
+      attemptId,
+      ownerUid: "owner_mp_idempotente",
+      restauranteId: "rest_mp_idempotente",
+      planoId: "pro_mensal",
+      valorCentavos: 4990,
+      currency: "BRL",
+      liveMode: false,
+      collectorId: "12345",
+      status: "pending",
+      expiraEm: new Date(Date.now() + 60 * 60 * 1000),
+    });
+    const payment = {
+      id: paymentId,
+      status: "approved",
+      external_reference: attemptId,
+      currency_id: "BRL",
+      transaction_amount: 49.90,
+      live_mode: false,
+      collector_id: "12345",
+      date_approved: new Date().toISOString(),
+      payment_type_id: "pix",
+    };
+
+    const first = await executarProcessarPagamentoProAprovado(db, attemptId, payment);
+    assert.strictEqual(first.sucesso, true);
+    assert.strictEqual(first.idempotente, false);
+    const second = await executarProcessarPagamentoProAprovado(db, attemptId, payment);
+    assert.strictEqual(second.sucesso, true);
+    assert.strictEqual(second.idempotente, true);
+
+    const rest = await restRef.get();
+    const attempt = await db.doc(`pagamentos_pro/${attemptId}`).get();
+    const ledger = await db.doc(`pagamentos_pro_processados/${paymentId}`).get();
+    assert.strictEqual(rest.data().plano, "pro");
+    assert.strictEqual(rest.data().assinatura.paymentId, paymentId);
+    assert.strictEqual(attempt.data().status, "approved");
+    assert.strictEqual(ledger.exists, true);
+  });
+
+  await runTest("Emulador: pagamento PRO com valor incorreto não altera assinatura", async () => {
+    const attemptId = "123e4567-e89b-12d3-a456-426614174002";
+    const restRef = db.doc("restaurantes/rest_mp_valor_invalido");
+    await restRef.set({ ownerId: "owner_mp_valor_invalido", plano: "free" });
+    await db.doc(`pagamentos_pro/${attemptId}`).set({
+      attemptId,
+      ownerUid: "owner_mp_valor_invalido",
+      restauranteId: "rest_mp_valor_invalido",
+      planoId: "pro_mensal",
+      valorCentavos: 4990,
+      currency: "BRL",
+      liveMode: false,
+      status: "pending",
+      expiraEm: new Date(Date.now() + 60 * 60 * 1000),
+    });
+    await assert.rejects(
+      () => executarProcessarPagamentoProAprovado(db, attemptId, {
+        id: "987654323",
+        status: "approved",
+        external_reference: attemptId,
+        currency_id: "BRL",
+        transaction_amount: 0.10,
+        live_mode: false,
+        date_approved: new Date().toISOString(),
+      }),
+      /valor pago/i
+    );
+    assert.strictEqual((await restRef.get()).data().plano, "free");
+    assert.strictEqual((await db.doc(`pagamentos_pro/${attemptId}`).get()).data().status, "pending");
+    assert.strictEqual((await db.doc("pagamentos_pro_processados/987654323").get()).exists, false);
   });
 
   await runTest("Emulador: pedido de garçom preserva origem patrocinada e rejeita produto inativo", async () => {
