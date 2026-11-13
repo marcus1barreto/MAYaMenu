@@ -3873,12 +3873,37 @@ exports._internal = {
   executarProcessarSelloutOutbox,
   executarSincronizarPerfilPublicoRestaurante,
   montarPerfilPublicoRestaurante,
+  validarAssinaturaMercadoPago,
+  validarPagamentoPro,
+  executarProcessarPagamentoProAprovado,
+  executarCriarPreferenciaProBackend,
+  executarConfirmarPagamentoProBackend,
+  executarMercadoPagoWebhook,
 };
 
 /**
  * Webhook HTTPS legado para Pix (DESCONTINUADO por segurança).
  * Responde 410 Gone. O fluxo de pagamento ativo e seguro é processado via Mercado Pago Webhook oficial.
  */
+const mercadoPagoCheckoutRuntime = functions.runWith({
+  secrets: ['MERCADO_PAGO_ACCESS_TOKEN'],
+});
+const mercadoPagoWebhookRuntime = functions.runWith({
+  secrets: ['MERCADO_PAGO_ACCESS_TOKEN', 'MERCADO_PAGO_WEBHOOK_SECRET'],
+});
+
+exports.criarPreferenciaProBackend = mercadoPagoCheckoutRuntime.https.onCall(async (data, context) => {
+  return executarCriarPreferenciaProBackend(getDb(), context.auth, data);
+});
+
+exports.confirmarPagamentoProBackend = mercadoPagoCheckoutRuntime.https.onCall(async (data, context) => {
+  return executarConfirmarPagamentoProBackend(getDb(), context.auth, data);
+});
+
+exports.mercadoPagoWebhook = mercadoPagoWebhookRuntime.https.onRequest(async (req, res) => {
+  return executarMercadoPagoWebhook(getDb(), req, res);
+});
+
 exports.pixWebhook = functions.https.onRequest(async (req, res) => {
   res.status(410).json({
     erro: 'Endpoint legado descontinuado por motivos de conformidade e segurança.',
