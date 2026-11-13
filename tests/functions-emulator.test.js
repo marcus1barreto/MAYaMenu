@@ -8,6 +8,7 @@ const assert = require("assert");
 process.env.MESA_SESSION_SECRET = "segredo-super-forte-de-teste-mayamenu-32bytes-ok";
 
 const admin = require("../functions/node_modules/firebase-admin");
+const { getFirestore } = require("../functions/node_modules/firebase-admin/firestore");
 const { _internal } = require("../functions/index.js");
 const {
   executarFecharComanda, executarLiberarMesa, executarDefinirTaxaServicoMesa,
@@ -48,7 +49,8 @@ async function seed(db, mesa, clienteId) {
 }
 
 async function main() {
-  const db = admin.firestore();
+  // O backend de produção usa o banco nomeado mayamenu-bd; os testes também.
+  const db = getFirestore("mayamenu-bd");
   const base = { restauranteId: "rest_e" };
 
   await runTest("Emulador: IDs de mesa são numéricos, limitados e canônicos", async () => {
