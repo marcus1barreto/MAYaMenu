@@ -19,7 +19,7 @@ import {
   type Unsubscribe,
 } from "firebase/firestore";
 import type { Licenca, PlanoTipo, LimitesPlano, Restaurante } from "@/types";
-import { parseDateToMillis, millisOu } from "@/lib/datas";
+import { millisOu } from "@/lib/datas";
 import { httpsCallable } from "firebase/functions";
 
 export const LIMITES_POR_PLANO: Record<PlanoTipo, LimitesPlano> = {
@@ -314,7 +314,7 @@ export async function validarLicencaParaAtivacao(codigo: string): Promise<{
 /**
  * Executa a queima atômica (Burn-After-Reading) da licença, arquivamento definitivo
  * em JSON no 'arquivo_morto_licencas', remoção de 'concessoes' e criação da instância do restaurante
- * usando runTransaction do Firestore, garantindo anti-race condition e uso único estrito.
+ * por Cloud Function autenticada, garantindo anti-race condition e uso único estrito.
  */
 export async function ativarLicencaEInstanciaAtomica(params: {
   codigo: string;
