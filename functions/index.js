@@ -2255,6 +2255,17 @@ exports.sincronizarPerfilPublicoRestaurante = functions.firestore
     for (const key of ['corPrimaria', 'tema', 'logoUrl', 'capaUrl', 'modoOperacao', 'modoFilaKds', 'taxaServico']) {
       if (cfg[key] !== undefined) configuracoes[key] = cfg[key];
     }
+    // Chave Pix e dados EMV são públicos por natureza do pagamento; publicar apenas
+    // quando explicitamente ativo e somente os campos necessários à cobrança.
+    if (cfg.pixConfig?.ativo === true && cfg.pixConfig.chave && cfg.pixConfig.tipoChave) {
+      configuracoes.pixConfig = {
+        chave: String(cfg.pixConfig.chave),
+        tipoChave: String(cfg.pixConfig.tipoChave),
+        beneficiario: String(cfg.pixConfig.beneficiario || '').slice(0, 25),
+        cidade: String(cfg.pixConfig.cidade || '').slice(0, 15),
+        ativo: true,
+      };
+    }
     await publicRef.set({
       restauranteId: context.params.restauranteId,
       slug: String(data.slug || context.params.restauranteId),
