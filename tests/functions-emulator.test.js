@@ -197,9 +197,17 @@ async function main() {
       ativo: true, authVersion: 4, chaveAcessoB2B: "SPN-SEGREDO-QUE-NAO-PODE-RETORNAR",
       nomeFantasia: "Patrocinador Sessão",
     });
+    const claims = _internal.criarClaimsSessaoPatrocinador("pat_sessao", { authVersion: 4 });
+    assert.deepStrictEqual(claims, {
+      role: "sponsor", patrocinadorId: "pat_sessao", authVersion: 4,
+    });
+    assert.throws(
+      () => _internal.criarClaimsSessaoPatrocinador("pat_sessao", { authVersion: -1 }),
+      /Versão de autenticação B2B inválida/i
+    );
     const authContext = {
       uid: "pat_sessao",
-      token: { role: "sponsor", patrocinadorId: "pat_sessao", authVersion: 4 },
+      token: claims,
     };
     const validacao = await executarValidarSessaoPatrocinador(db, authContext);
     assert.strictEqual(validacao.patrocinador.id, "pat_sessao");
