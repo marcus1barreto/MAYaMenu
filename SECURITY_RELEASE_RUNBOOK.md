@@ -20,17 +20,18 @@ Esta branch contém mudanças incompatíveis com o cliente anterior: concessões
 
 O checkout antigo por rotas Next.js foi desativado (HTTP 410). Antes de reativar cobranças:
 
-1. Configurar os segredos das Cloud Functions sem versioná-los:
+1. Configurar o Access Token das Cloud Functions sem versioná-lo:
    - `firebase functions:secrets:set MERCADO_PAGO_ACCESS_TOKEN --project mayaranas-8ad9f`
+2. No painel do Mercado Pago, cadastrar o webhook de pagamentos para:
+   `https://us-central1-mayaranas-8ad9f.cloudfunctions.net/mercadoPagoWebhook`
+   Salvar a configuração, habilitar o evento Pagamentos e revelar/copiar a chave secreta gerada pela aplicação.
+3. Configurar essa chave no Secret Manager:
    - `firebase functions:secrets:set MERCADO_PAGO_WEBHOOK_SECRET --project mayaranas-8ad9f`
-2. Configurar as variáveis de ambiente do Functions no arquivo local não versionado `functions/.env.mayaranas-8ad9f` (ou no mecanismo de configuração equivalente do runtime):
+4. Configurar as variáveis de ambiente do Functions no arquivo local não versionado `functions/.env.mayaranas-8ad9f` (ou no mecanismo equivalente do runtime):
    - `MERCADO_PAGO_LIVE_MODE=true` para produção; usar `false` somente com credenciais e checkout sandbox.
    - `MAYAMENU_APP_URL=https://<dominio-oficial>` (obrigatório; usar o domínio HTTPS efetivamente publicado no Firebase App Hosting ou domínio próprio).
    - Não commitar o arquivo `.env` nem incluir tokens nele; os tokens ficam exclusivamente no Secret Manager.
-3. No painel do Mercado Pago, cadastrar o webhook de pagamentos para:
-   `https://us-central1-mayaranas-8ad9f.cloudfunctions.net/mercadoPagoWebhook`
-4. Copiar o segredo de assinatura gerado pelo Mercado Pago para `MERCADO_PAGO_WEBHOOK_SECRET`. Habilitar o evento de pagamentos e confirmar que a notificação inclui `x-signature`, `x-request-id` e `data.id`.
-5. Validar primeiro com credenciais sandbox e `MERCADO_PAGO_LIVE_MODE=false`. Não usar pagamentos reais para testar.
+5. Validar primeiro com credenciais sandbox e `MERCADO_PAGO_LIVE_MODE=false`. Não usar pagamentos reais para testar. O simulador de Webhooks do Mercado Pago deve confirmar o recebimento HTTP 200 e a validação de assinatura.
 6. Confirmar que o retorno do checkout contém `attempt` e que a assinatura só é ativada depois de o backend consultar a API oficial, validar valor, moeda, referência e ambiente, e registrar o pagamento de forma idempotente.
 
 **Não reativar checkout nem publicar cobrança real enquanto os dois segredos e o webhook assinado não estiverem configurados.** Sem essas configurações, as Cloud Functions falham de forma fechada e não ativam o PRO.
