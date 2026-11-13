@@ -385,9 +385,10 @@ export function MenuView({
       await updateDoc(comandaRef, dadosUpdate);
       setContaPedidaSucesso(true);
     } catch (e) {
-      console.warn("Conta pedida localmente ou offline:", e);
-      // Mesmo com fallback de rede, registra feedback de sucesso visual ao cliente
-      setContaPedidaSucesso(true);
+      console.warn("Falha ao enviar solicitação de conta:", e);
+      // Não sinaliza sucesso quando o Firestore rejeita a solicitação.
+      setContaPedidaSucesso(false);
+      window.alert("Não foi possível enviar sua solicitação. Verifique a conexão e tente novamente.");
     } finally {
       setPedindoConta(false);
     }
