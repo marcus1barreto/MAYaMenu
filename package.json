@@ -13,7 +13,8 @@
     "test": "node tests/rate-limiting.test.js && node tests/regressions.test.js && npx firebase emulators:exec --only firestore \"node tests/firestore-rules.test.js && node tests/functions-emulator.test.js\"",
     "test:unit": "node tests/rate-limiting.test.js && node tests/regressions.test.js",
     "test:rules": "npx firebase emulators:exec --only firestore \"node tests/firestore-rules.test.js && node tests/functions-emulator.test.js\"",
-    "test:e2e": "../agentes_teste_python/venv/bin/python tests/e2e/test_novidades_superadmin_caixa.py"
+    "test:e2e": "../agentes_teste_python/venv/bin/python tests/e2e/test_novidades_superadmin_caixa.py",
+    "migrate:public-profiles": "node functions/migrarPerfisPublicos.js"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",
