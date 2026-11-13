@@ -2662,8 +2662,15 @@ async function executarValidarCodigoAtivacaoComRateLimit(firestoreDb, payload, r
   }
 }
 
-async function executarAtivarInstancia(firestoreDb, authUid, payload) {
+async function executarAtivarInstancia(firestoreDb, authUid, authToken, payload) {
   if (!authUid) throw new functions.https.HttpsError('unauthenticated', 'Autenticação necessária.');
+  const provedorAuth = authToken?.firebase?.sign_in_provider;
+  if (!provedorAuth || provedorAuth === 'anonymous') {
+    throw new functions.https.HttpsError(
+      'unauthenticated',
+      'Crie ou acesse uma conta permanente antes de consumir a licença e assumir a titularidade do restaurante.'
+    );
+  }
   const codigo = normalizarCodigoAtivacao(payload?.codigo);
   const slug = String(payload?.slug || '').trim().toLowerCase();
   const nome = String(payload?.restauranteNome || '').trim().slice(0, 120);
@@ -3215,7 +3222,7 @@ exports.validarCodigoAtivacaoBackend = functions.https.onCall(async (data, conte
 });
 
 exports.ativarInstanciaBackend = functions.https.onCall(async (data, context) => {
-  return executarAtivarInstancia(getDb(), context.auth?.uid, data);
+  return executarAtivarInstancia(getDb(), context.auth?.uid, context.auth?.token, data);
 });
 
 exports.ativarPatrocinioBackend = functions.https.onCall(async (data, context) => {
