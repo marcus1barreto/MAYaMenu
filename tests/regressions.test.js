@@ -18,6 +18,7 @@ const {
   isCarrinhoExpirado,
   fingerprintQrCredencial,
   isMesaTokenCacheValido,
+  obterQrCredencialInicial,
 } = require("../src/lib/cart-storage.cjs");
 const {
   getMesaTokenSecret,
@@ -253,6 +254,21 @@ async function main() {
     assert.strictEqual(isCarrinhoExpirado(agora - 30 * 60 * 1000, agora), false);
     assert.strictEqual(isCarrinhoExpirado("timestamp-inválido", agora), true);
     assert.strictEqual(isCarrinhoExpirado(undefined, agora), true);
+  });
+
+  await runTest("QR: credencial da URL inicial não sobrescreve QR da mesa trocada", async () => {
+    assert.strictEqual(
+      obterQrCredencialInicial(3, 3, "qr-mesa-3", "#qr=qr-hash-mesa-3"),
+      "qr-hash-mesa-3"
+    );
+    assert.strictEqual(
+      obterQrCredencialInicial(5, 3, "qr-mesa-3", ""),
+      undefined
+    );
+    assert.strictEqual(
+      obterQrCredencialInicial(3, 3, "qr-mesa-3", ""),
+      "qr-mesa-3"
+    );
   });
 
   await runTest("QR: cache de sessão não reutiliza token após rotação da credencial", async () => {
