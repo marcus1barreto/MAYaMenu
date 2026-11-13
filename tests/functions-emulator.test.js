@@ -78,6 +78,17 @@ async function main() {
       clienteId: "cli_spn_12", nomeCliente: "Cliente",
       itens: [{ menuItemId: "item-inativo", quantidade: 1 }],
     }), /indisponível/i);
+    await rest.collection("mesas").doc("14").set({ ativa: true, statusEstrutural: "inativa" });
+    await assert.rejects(() => executarLancamentoPedidoGarcom(db, "garcom_e", {}, {
+      restauranteId: "rest_e", pedidoId: "pedido_mesa_inativa", mesa: 14,
+      clienteId: "cli_mesa_inativa", nomeCliente: "Cliente",
+      itens: [{ menuItemId: "spn-item", quantidade: 1 }],
+    }), /inativa ou bloqueada/i);
+    await assert.rejects(() => executarLancamentoPedidoGarcom(db, "garcom_e", {}, {
+      restauranteId: "rest_e", pedidoId: "pedido_mesa_inexistente", mesa: 15,
+      clienteId: "cli_mesa_inexistente", nomeCliente: "Cliente",
+      itens: [{ menuItemId: "spn-item", quantidade: 1 }],
+    }), /Mesa não cadastrada/i);
   });
 
   await runTest("Emulador: fechamento gera outbox sell-out idempotente e métricas confiáveis", async () => {
