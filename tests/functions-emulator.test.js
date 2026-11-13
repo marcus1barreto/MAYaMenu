@@ -1101,11 +1101,13 @@ async function main() {
   });
 
   await runTest("Emulador: emissão inicial e rotação de QR só retornam segredo uma vez", async () => {
-    const { rest } = await seed(db, 11, "cli_qr_setup");
+    const rest = db.doc("restaurantes/rest_qr_inicial");
+    await rest.set({ ownerId: "owner_qr_inicial", nome: "Rest QR", slug: "rest-qr" });
     await rest.collection("mesas").doc("11").set({
       numero: 11, ativa: true, statusEstrutural: "livre", qrVersao: 0,
-    }, { merge: true });
-    const primeira = await executarGarantirCredencialMesa(db, "owner_e", {}, { ...base, mesa: 11 });
+    });
+    const payload = { restauranteId: "rest_qr_inicial", mesa: 11 };
+    const primeira = await executarGarantirCredencialMesa(db, "owner_qr_inicial", {}, payload);
     assert.strictEqual(primeira.jaConfigurada, false);
     assert.strictEqual(primeira.qrCredencial.length, 48);
     assert.strictEqual(primeira.qrVersao, 1);
@@ -1115,11 +1117,11 @@ async function main() {
       mesa.data().qrCredencialHash,
       crypto.createHash("sha256").update(primeira.qrCredencial).digest("hex")
     );
-    const repetida = await executarGarantirCredencialMesa(db, "owner_e", {}, { ...base, mesa: 11 });
+    const repetida = await executarGarantirCredencialMesa(db, "owner_qr_inicial", {}, payload);
     assert.strictEqual(repetida.jaConfigurada, true);
     assert.strictEqual(repetida.qrCredencial, undefined);
-    const rotacionada = await executarGarantirCredencialMesa(db, "owner_e", {}, {
-      ...base, mesa: 11, rotacionar: true,
+    const rotacionada = await executarGarantirCredencialMesa(db, "owner_qr_inicial", {}, {
+      ...payload, rotacionar: true,
     });
     assert.strictEqual(rotacionada.jaConfigurada, false);
     assert.strictEqual(rotacionada.qrVersao, 2);
