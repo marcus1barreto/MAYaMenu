@@ -271,7 +271,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             // Verifica se o restaurante já foi criado anteriormente
             const restExistenteSnap = await getDoc(doc(db, "restaurantes", uid));
             if (restExistenteSnap.exists()) {
-              throw new Error("Este e-mail já possui um estabelecimento ativo. Acesse o painel de login.");
+              const existente = restExistenteSnap.data() || {};
+              if (existente.ownerId !== uid || existente.licenca?.id !== codigoLicenca.trim().toUpperCase()) {
+                throw new Error("Este e-mail já possui um estabelecimento ativo. Acesse o painel de login.");
+              }
+              // Se a resposta da ativação anterior se perdeu após o commit, o backend
+              // reconhece a mesma licença/UID como repetição idempotente.
             }
           } catch (loginErr: unknown) {
             if (loginErr instanceof Error && loginErr.message.includes("estabelecimento ativo")) {
@@ -303,6 +308,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Garante estado limpo e vazio para novo onboarding (Guided Empty State)
       setRestaurante(novoRest);
+      setRole("owner");
+      // Atualiza o token após a criação do restaurante; a trigger também atribui a claim owner.
+      await auth.currentUser?.getIdToken(true).catch(() => undefined);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Erro no cadastro";
       throw new Error(msg);
