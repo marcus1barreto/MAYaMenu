@@ -4011,6 +4011,7 @@ async function executarAtivarPatrocinio(firestoreDb, authUid, token, payload, ra
     tx.update(restRef, {
       plano: 'pro', maxMesas: 30, maxPratos: 60, maxItensMenu: 60,
       assinatura: {
+        ativa: true,
         planoId: 'plan_b2b_patrocinado_v1',
         apelido: 'Patrocinado por ' + String(pat.nomeFantasia || ''),
         versao: '1.0.0', contratadoEm: agora.toISOString(),
