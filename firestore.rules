@@ -210,9 +210,7 @@ service cloud.firestore {
             'atualizadoEm'
           ])
           && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['statusTurno'])
-            || request.resource.data.statusTurno in ['fora_de_turno', 'em_servico', 'pausa'])
-          && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['atualizadoEm'])
-            || request.resource.data.atualizadoEm == request.time);
+            || request.resource.data.statusTurno in ['fora_de_turno', 'em_servico', 'pausa']);
       }
 
       // Cardápio público. Itens patrocinados são inseridos pelo backend e não podem
