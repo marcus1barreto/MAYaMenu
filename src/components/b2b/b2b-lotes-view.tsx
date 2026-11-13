@@ -2,7 +2,6 @@
 
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
   Layers,
@@ -18,14 +17,7 @@ import {
   QrCode,
   Sparkles,
 } from "lucide-react";
-import { criarLoteLicencas } from "@/lib/b2b-service";
 import type { LoteLicencasB2B } from "@/types/b2b";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 
 interface B2BLotesViewProps {
   patrocinadorId: string;
@@ -33,40 +25,12 @@ interface B2BLotesViewProps {
 }
 
 export function B2BLotesView({ patrocinadorId, lotes }: B2BLotesViewProps) {
-  const [modalNovoLoteAberto, setModalNovoLoteAberto] = useState(false);
-  const [nomeLote, setNomeLote] = useState("");
-  const [codigoCampanha, setCodigoCampanha] = useState("");
-  const [totalLicencas, setTotalLicencas] = useState(50);
-  const [validadeMeses, setValidadeMeses] = useState(12);
-  const [salvando, setSalvando] = useState(false);
   const [copiadoId, setCopiadoId] = useState<string | null>(null);
 
   const totalGeral = lotes.reduce((acc, l) => acc + (l.totalLicencas || 0), 0);
   const ativadasGeral = lotes.reduce((acc, l) => acc + (l.licencasAtivadas || 0), 0);
   const disponiveisGeral = Math.max(0, totalGeral - ativadasGeral);
 
-  const handleCriarLote = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!nomeLote.trim() || !codigoCampanha.trim()) return;
-
-    setSalvando(true);
-    try {
-      await criarLoteLicencas(patrocinadorId, {
-        nome: nomeLote.trim(),
-        codigoCampanha: codigoCampanha.trim().toUpperCase(),
-        totalLicencas: Number(totalLicencas) || 10,
-        validadeMeses: Number(validadeMeses) || 12,
-      });
-
-      setNomeLote("");
-      setCodigoCampanha("");
-      setModalNovoLoteAberto(false);
-    } catch (err: any) {
-      alert(err?.message || "Falha ao emitir lote.");
-    } finally {
-      setSalvando(false);
-    }
-  };
 
   const copiarLinkVoucher = (codigo: string) => {
     const origin = typeof window !== "undefined" ? window.location.origin : "";
@@ -251,86 +215,7 @@ export function B2BLotesView({ patrocinadorId, lotes }: B2BLotesViewProps) {
         </div>
       )}
 
-      {/* MODAL PARA CRIAÇÃO DE NOVO LOTE */}
-      <Dialog open={modalNovoLoteAberto} onOpenChange={setModalNovoLoteAberto}>
-        <DialogContent className="bg-white border-neutral-200 text-neutral-900 rounded-3xl max-w-md p-6 shadow-xl">
-          <DialogHeader>
-            <DialogTitle className="text-lg font-black text-neutral-950 flex items-center gap-2">
-              <Layers className="w-5 h-5 text-rose-600" />
-              <span>Emitir Novo Lote de Licenças B2B</span>
-            </DialogTitle>
-          </DialogHeader>
 
-          <form onSubmit={handleCriarLote} className="space-y-4 mt-2">
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-neutral-700 uppercase tracking-wider">
-                Nome da Campanha
-              </label>
-              <Input
-                type="text"
-                value={nomeLote}
-                onChange={(e) => setNomeLote(e.target.value)}
-                placeholder="Ex: Campanha Primavera Gastronômica"
-                required
-                className="bg-neutral-50 border-neutral-200 text-neutral-900 focus:bg-white focus:border-rose-500 rounded-xl h-11"
-              />
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-neutral-700 uppercase tracking-wider">
-                Código do Voucher de Ativação
-              </label>
-              <Input
-                type="text"
-                value={codigoCampanha}
-                onChange={(e) => setCodigoCampanha(e.target.value)}
-                placeholder="Ex: BIERHAUS2026"
-                required
-                className="bg-neutral-50 border-neutral-200 text-neutral-900 focus:bg-white focus:border-rose-500 rounded-xl h-11 uppercase font-mono"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-neutral-700 uppercase tracking-wider">
-                  Total de Licenças (Cotas)
-                </label>
-                <Input
-                  type="number"
-                  min={1}
-                  value={totalLicencas}
-                  onChange={(e) => setTotalLicencas(Number(e.target.value))}
-                  required
-                  className="bg-neutral-50 border-neutral-200 text-neutral-900 focus:bg-white focus:border-rose-500 rounded-xl h-11"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-neutral-700 uppercase tracking-wider">
-                  Validade (Meses)
-                </label>
-                <Input
-                  type="number"
-                  min={1}
-                  max={60}
-                  value={validadeMeses}
-                  onChange={(e) => setValidadeMeses(Number(e.target.value))}
-                  required
-                  className="bg-neutral-50 border-neutral-200 text-neutral-900 focus:bg-white focus:border-rose-500 rounded-xl h-11"
-                />
-              </div>
-            </div>
-
-            <Button
-              type="submit"
-              disabled={salvando}
-              className="w-full h-11 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-black text-xs shadow-xs mt-2"
-            >
-              {salvando ? "Emitindo Lote..." : "Confirmar Emissão do Lote"}
-            </Button>
-          </form>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
