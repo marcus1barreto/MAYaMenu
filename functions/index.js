@@ -2409,6 +2409,49 @@ async function executarCadastrarPatrocinadorSuperadmin(firestoreDb, authUid, aut
   return { id, chaveAcessoB2B, codigoVoucherInicial };
 }
 
+async function executarCriarLoteLicencasB2BSuperadmin(firestoreDb, authUid, authToken, payload) {
+  if (!authUid || authToken?.superadmin !== true) {
+    throw new functions.https.HttpsError('permission-denied', 'Somente SuperAdmin pode criar lotes B2B.');
+  }
+  const patrocinadorId = String(payload?.patrocinadorId || '').trim();
+  const nome = String(payload?.nome || '').trim().slice(0, 120);
+  const codigoCampanha = String(payload?.codigoCampanha || '').trim().toUpperCase();
+  const totalLicencas = Number(payload?.totalLicencas);
+  const validadeMeses = Number(payload?.validadeMeses);
+  if (!patrocinadorId || patrocinadorId.includes('/') || !nome ||
+      !/^[A-Z0-9_-]{4,100}$/.test(codigoCampanha) ||
+      !Number.isSafeInteger(totalLicencas) || totalLicencas < 1 || totalLicencas > 10000 ||
+      !Number.isSafeInteger(validadeMeses) || validadeMeses < 1 || validadeMeses > 36) {
+    throw new functions.https.HttpsError('invalid-argument', 'Nome, campanha, cotas ou validade do lote são inválidos.');
+  }
+  const patrocinadorRef = firestoreDb.collection('patrocinadores').doc(patrocinadorId);
+  const lotesRef = patrocinadorRef.collection('lotes_licencas');
+  const duplicadoQuery = firestoreDb.collectionGroup('lotes_licencas')
+    .where('codigoCampanha', '==', codigoCampanha).limit(1);
+  const loteId = `lote-${codigoCampanha.toLowerCase()}-${crypto.randomBytes(6).toString('hex')}`;
+  const loteRef = lotesRef.doc(loteId);
+  const dataExpiracao = adicionarMesesSemOverflow(new Date(), validadeMeses).toISOString();
+
+  await firestoreDb.runTransaction(async (tx) => {
+    const [patSnap, duplicadoSnap] = await Promise.all([
+      tx.get(patrocinadorRef), tx.get(duplicadoQuery),
+    ]);
+    if (!patSnap.exists || patSnap.data()?.ativo !== true) {
+      throw new functions.https.HttpsError('failed-precondition', 'Patrocinador inexistente ou inativo.');
+    }
+    if (!duplicadoSnap.empty) {
+      throw new functions.https.HttpsError('already-exists', 'Este código de campanha já está associado a outro lote.');
+    }
+    tx.create(loteRef, {
+      id: loteId, patrocinadorId, nome, codigoCampanha,
+      totalLicencas, licencasAtivadas: 0, validadeMeses, dataExpiracao,
+      ativo: true, restaurantesVinculados: [],
+      criadoEm: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  });
+  return { loteId, codigoCampanha, dataExpiracao };
+}
+
 function criarClaimsSessaoPatrocinador(patrocinadorId, patrocinadorData) {
   const versao = Number(patrocinadorData?.authVersion || 0);
   if (!Number.isSafeInteger(versao) || versao < 0) {
@@ -4146,6 +4189,10 @@ async function executarDesativarMesa(firestoreDb, authUid, authToken, payload) {
   return resultado;
 }
 
+exports.criarLoteLicencasB2BSuperadminBackend = functions.https.onCall(async (data, context) => {
+  return executarCriarLoteLicencasB2BSuperadmin(getDb(), context.auth?.uid, context.auth?.token, data);
+});
+
 exports.cadastrarPatrocinadorSuperadminBackend = functions.https.onCall(async (data, context) => {
   return executarCadastrarPatrocinadorSuperadmin(getDb(), context.auth?.uid, context.auth?.token, data);
 });
@@ -4394,6 +4441,7 @@ exports._internal = {
   executarValidarCodigoAtivacaoComRateLimit,
   executarAutenticarPatrocinador,
   executarCadastrarPatrocinadorSuperadmin,
+  executarCriarLoteLicencasB2BSuperadmin,
   criarClaimsSessaoPatrocinador,
   executarAtivarInstancia,
   executarAtivarPatrocinio,
