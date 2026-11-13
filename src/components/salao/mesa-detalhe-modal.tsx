@@ -42,6 +42,8 @@ import Link from "next/link";
 import { QRCodeSVG } from "qrcode.react";
 import type { PedidoFilaOffline } from "@/lib/offline-queue";
 import { BotaoImprimirCaixa } from "@/components/caixa/botao-imprimir-caixa";
+import { functions } from "@/lib/firebase";
+import { httpsCallable } from "firebase/functions";
 
 interface MesaDetalheModalProps {
   mesa: MesaOperacional | null;
@@ -99,6 +101,57 @@ export function MesaDetalheModal({
   const [modalTransferirAberto, setModalTransferirAberto] = useState(false);
   const [garcomDestinoId, setGarcomDestinoId] = useState<string>("");
   const [salvandoAtribuicao, setSalvandoAtribuicao] = useState(false);
+  const [qrCredencialMesa, setQrCredencialMesa] = useState<string | null>(null);
+  const [qrJaConfigurada, setQrJaConfigurada] = useState(false);
+  const [rotacionandoQr, setRotacionandoQr] = useState(false);
+
+  const solicitarQrMesa = async (rotacionar: boolean) => {
+    const restTarget = (restauranteId || slug || "").trim();
+    if (!mesa?.numero || !restTarget) return;
+    if (rotacionar) setRotacionandoQr(true);
+    try {
+      const fn = httpsCallable(functions, "garantirCredencialMesa");
+      const resp = (await fn({ restauranteId: restTarget, mesa: mesa.numero, rotacionar })) as {
+        data?: { qrCredencial?: string; jaConfigurada?: boolean };
+      };
+      const storageKey = `mayamenu_qr_emitida_${restTarget}_${mesa.numero}`;
+      if (resp?.data?.qrCredencial) {
+        setQrCredencialMesa(resp.data.qrCredencial);
+        setQrJaConfigurada(false);
+        try {
+          sessionStorage.setItem(storageKey, resp.data.qrCredencial);
+        } catch {
+          // Ignora
+        }
+      } else if (resp?.data?.jaConfigurada) {
+        setQrJaConfigurada(true);
+      }
+    } catch (err) {
+      console.warn("Aviso ao obter credencial QR da mesa:", err);
+    } finally {
+      if (rotacionar) setRotacionandoQr(false);
+    }
+  };
+
+  useEffect(() => {
+    const restTarget = (restauranteId || slug || "").trim();
+    if (!isOpen || !mesa?.numero || !restTarget) {
+      setQrCredencialMesa(null);
+      setQrJaConfigurada(false);
+      return;
+    }
+    try {
+      const cached = sessionStorage.getItem(`mayamenu_qr_emitida_${restTarget}_${mesa.numero}`);
+      if (cached) {
+        setQrCredencialMesa(cached);
+        setQrJaConfigurada(false);
+        return;
+      }
+    } catch {
+      // Ignora
+    }
+    solicitarQrMesa(false);
+  }, [isOpen, mesa?.numero, restauranteId, slug]);
 
   const handleMarcarEntregue = async (refPath?: string) => {
     if (!refPath) {
@@ -205,7 +258,9 @@ export function MesaDetalheModal({
   const todasPagas =
     comandasComItens.length > 0 && comandasComItens.every((c) => c.status === "pago");
 
-  const urlMesa = `/r/${slug}?mesa=${mesa.numero}`;
+  const urlMesa = qrCredencialMesa
+    ? `/r/${slug}?mesa=${mesa.numero}#qr=${encodeURIComponent(qrCredencialMesa)}`
+    : `/r/${slug}?mesa=${mesa.numero}`;
   const urlCompleta = typeof window !== "undefined" ? `${window.location.origin}${urlMesa}` : urlMesa;
 
   const handleEncerrarComandaMesa = async (clienteId: string, nomeCliente?: string) => {
@@ -941,47 +996,83 @@ export function MesaDetalheModal({
           {/* 3. ABA: QR CODE E LINK DA MESA FÍSICA */}
           {abaInterna === "qrcode" && (
             <div className="max-w-md mx-auto text-center space-y-4">
-              <div className="p-6 bg-white rounded-3xl inline-block shadow-lg border border-border">
-                <QRCodeSVG
-                  value={urlCompleta}
-                  size={200}
-                  level="H"
-                  includeMargin={true}
-                  className="rounded-lg"
-                />
-              </div>
+              {qrCredencialMesa ? (
+                <>
+                  <div className="p-6 bg-white rounded-3xl inline-block shadow-lg border border-border">
+                    <QRCodeSVG
+                      value={urlCompleta}
+                      size={200}
+                      level="H"
+                      includeMargin={true}
+                      className="rounded-lg"
+                    />
+                  </div>
 
-              <div>
-                <h4 className="text-base font-bold text-foreground">QR Code Físico da Mesa {mesa.numero}</h4>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Imprima e cole este código na mesa física. O cliente escaneia com o celular e abre o cardápio automaticamente já vinculado à Mesa {mesa.numero}.
-                </p>
-              </div>
+                  <div>
+                    <h4 className="text-base font-bold text-foreground">QR Code Físico da Mesa {mesa.numero}</h4>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Imprima e cole este código na mesa física. O cliente escaneia com o celular e abre o cardápio automaticamente já vinculado à Mesa {mesa.numero}.
+                    </p>
+                  </div>
 
-              <div className="flex justify-center gap-3 pt-2">
-                <Link href={urlMesa} target="_blank">
+                  <div className="flex flex-wrap justify-center gap-3 pt-2">
+                    <Link href={urlMesa} target="_blank">
+                      <Button
+                        variant="outline"
+                        className="h-10 px-4 text-xs font-bold border-border bg-card hover:bg-muted text-primary rounded-xl flex items-center gap-2 shadow-xs"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        <span>Testar como Cliente</span>
+                      </Button>
+                    </Link>
+
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        if (typeof window !== "undefined") {
+                          window.print();
+                        }
+                      }}
+                      className="h-10 px-4 text-xs font-bold bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl flex items-center gap-2 shadow-xs"
+                    >
+                      <QrCode className="w-3.5 h-3.5" />
+                      <span>Imprimir QR Code</span>
+                    </Button>
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={rotacionandoQr}
+                      onClick={() => solicitarQrMesa(true)}
+                      className="h-10 px-4 text-xs font-bold border-amber-500/40 text-amber-600 hover:bg-amber-500/10 rounded-xl flex items-center gap-2 shadow-xs"
+                    >
+                      {rotacionandoQr ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <QrCode className="w-3.5 h-3.5" />}
+                      <span>Rotacionar Credencial</span>
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <div className="p-6 rounded-2xl border border-border bg-muted/30 space-y-4">
+                  <QrCode className="w-10 h-10 text-muted-foreground mx-auto" />
+                  <div className="space-y-1">
+                    <h4 className="text-sm font-bold text-foreground">
+                      {qrJaConfigurada ? "QR Code já emitido com segurança (hash protegido)" : "Emitir QR Code da Mesa"}
+                    </h4>
+                    <p className="text-xs text-muted-foreground">
+                      Por segurança, o servidor armazena apenas o hash da credencial. Para imprimir um novo QR Code para a Mesa {mesa.numero} (revogando o anterior), clique abaixo.
+                    </p>
+                  </div>
                   <Button
-                    variant="outline"
-                    className="h-10 px-4 text-xs font-bold border-border bg-card hover:bg-muted text-primary rounded-xl flex items-center gap-2 shadow-xs"
+                    type="button"
+                    disabled={rotacionandoQr}
+                    onClick={() => solicitarQrMesa(true)}
+                    className="h-10 px-4 text-xs font-bold bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl inline-flex items-center gap-2"
                   >
-                    <ExternalLink className="w-3.5 h-3.5" />
-                    <span>Testar como Cliente</span>
+                    {rotacionandoQr ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <QrCode className="w-3.5 h-3.5" />}
+                    <span>{qrJaConfigurada ? "Reemitir QR Code da Mesa" : "Gerar QR Code da Mesa"}</span>
                   </Button>
-                </Link>
-
-                <Button
-                  type="button"
-                  onClick={() => {
-                    if (typeof window !== "undefined") {
-                      window.print();
-                    }
-                  }}
-                  className="h-10 px-4 text-xs font-bold bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl flex items-center gap-2 shadow-xs"
-                >
-                  <QrCode className="w-3.5 h-3.5" />
-                  <span>Imprimir QR Code</span>
-                </Button>
-              </div>
+                </div>
+              )}
             </div>
           )}
             </div>

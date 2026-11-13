@@ -431,37 +431,43 @@ export async function ativarLicencaEInstanciaAtomica(params: {
         }
       }
 
-      // 2. Checa se já existe no Arquivo Morto
+      // 2. Verifica se já existe restaurante cadastrado para este proprietário
+      const restSnap = await transaction.get(restRef);
+      if (restSnap.exists()) {
+        throw new Error("Este usuário já possui um restaurante cadastrado e ativo.");
+      }
+
+      // 3. Checa se já existe no Arquivo Morto
       const arquivoSnap = await transaction.get(arquivoMortoRef);
       if (arquivoSnap.exists()) {
         throw new Error("Esta licença já foi utilizada, ativada e transferida para o Arquivo Morto.");
       }
 
       const licSnap = await transaction.get(licencaRef);
-      let licData: Licenca | null = null;
+      if (!licSnap.exists()) {
+        throw new Error("Código de ativação inválido ou concessão não encontrada.");
+      }
 
-      if (licSnap.exists()) {
-        licData = licSnap.data() as Licenca;
+      const licData = licSnap.data() as Licenca;
 
-        // 3. Confirma dentro da transação que a licença continua disponível
-        if (licData.status === "utilizada" || licData.status === "ativa") {
-          throw new Error("Esta licença já foi utilizada e extinta.");
-        }
-        if (licData.status === "suspensa" || licData.status === "revogada") {
-          throw new Error("Esta licença foi revogada ou suspensa.");
-        }
+      // 4. Confirma dentro da transação que a licença continua disponível
+      if (licData.status === "utilizada" || licData.status === "ativa") {
+        throw new Error("Esta licença já foi utilizada e extinta.");
+      }
+      if (licData.status === "suspensa" || licData.status === "revogada") {
+        throw new Error("Esta licença foi revogada ou suspensa.");
+      }
 
-        if (licData.expiracaoEm) {
-          const expMillis = parseDateToMillis(licData.expiracaoEm);
-          if (expMillis !== null && Date.now() > expMillis) {
-            throw new Error("Este link de ativação expirou.");
-          }
+      if (licData.expiracaoEm) {
+        const expMillis = parseDateToMillis(licData.expiracaoEm);
+        if (expMillis !== null && Date.now() > expMillis) {
+          throw new Error("Este link de ativação expirou.");
         }
       }
 
-      // 4. Grava o documento do restaurante vinculado ao ownerId
-      const planoAtivo = licData?.plano || "free";
-      const limitesAtivos = licData?.limites || LIMITES_POR_PLANO[planoAtivo];
+      // 5. Grava o documento do restaurante vinculado ao ownerId
+      const planoAtivo = licData.plano || "free";
+      const limitesAtivos = licData.limites || LIMITES_POR_PLANO[planoAtivo];
       novoRest.plano = planoAtivo;
       novoRest.maxMesas = limitesAtivos.maxMesas;
       novoRest.maxPratos = limitesAtivos.maxPratos;
@@ -472,7 +478,7 @@ export async function ativarLicencaEInstanciaAtomica(params: {
       };
       transaction.set(restRef, novoRest);
 
-      // 5. Grava a trava de unicidade do slug
+      // 6. Grava a trava de unicidade do slug
       transaction.set(slugTravaRef, {
         slug: slugLimpo,
         ownerId: params.ownerUid,
@@ -480,15 +486,10 @@ export async function ativarLicencaEInstanciaAtomica(params: {
         criadoEm: serverTimestamp(),
       });
 
-      // 6. Prepara os dados consolidados para o Arquivo Morto (WORM)
+      // 7. Prepara os dados consolidados para o Arquivo Morto (WORM)
       const agora = new Date();
       const dadosConsolidados: Licenca = {
-        ...(licData || {
-          id: codigoFormatado,
-          plano: "free",
-          limites: { maxPratos: 15, maxMesas: 5 },
-          criadaEm: agora,
-        }),
+        ...licData,
         status: "utilizada",
         consumidaEm: agora,
         ativadaEm: agora,
@@ -511,63 +512,16 @@ export async function ativarLicencaEInstanciaAtomica(params: {
         dadosLicenca: dadosConsolidados,
       };
 
-      // 7. Grava no Arquivo Morto
+      // 8. Grava no Arquivo Morto e remove da coleção concessoes atomicamente
       transaction.set(arquivoMortoRef, arquivoMortoDoc);
-
-      // 8. Remove da coleção concessoes para sumir do portal e evitar reuso
-      if (licSnap.exists()) {
-        transaction.delete(licencaRef);
-      }
+      transaction.delete(licencaRef);
     });
   } catch (err: unknown) {
-    console.warn("Falha ou indisponibilidade de transação no Firestore (executando fallback resiliente):", err);
-    // Se a mensagem for de negócio ("já utilizada", "slug já está em uso", etc), repassa o erro
-    if (err instanceof Error && (err.message.includes("utilizada") || err.message.includes("revogada") || err.message.includes("expirou") || err.message.includes("slug") || err.message.includes("Arquivo Morto"))) {
+    console.error("Ativação transacional da licença falhou:", err);
+    if (err instanceof Error) {
       throw err;
     }
-    // Caso de offline ou fallback
-    try {
-      const { deleteDoc } = await import("firebase/firestore");
-      await setDoc(restRef, novoRest);
-      await setDoc(slugTravaRef, {
-        slug: slugLimpo,
-        ownerId: params.ownerUid,
-        restauranteNome: nomeLimpo,
-        criadoEm: new Date(),
-      }, { merge: true });
-
-      const agora = new Date();
-      const dadosConsolidados: Licenca = {
-        id: codigoFormatado,
-        plano: "free",
-        limites: { maxPratos: 15, maxMesas: 5 },
-        criadaEm: agora,
-        status: "utilizada",
-        consumidaEm: agora,
-        ativadaEm: agora,
-        restauranteId: params.ownerUid,
-        restauranteNome: nomeLimpo,
-        slug: slugLimpo,
-        ownerId: params.ownerUid,
-      };
-
-      await setDoc(arquivoMortoRef, {
-        id: codigoFormatado,
-        codigo: codigoFormatado,
-        arquivadoEm: agora,
-        motivo: "ativacao_concluida",
-        restauranteId: params.ownerUid,
-        restauranteNome: nomeLimpo,
-        slug: slugLimpo,
-        ownerId: params.ownerUid,
-        snapshotJson: JSON.stringify(dadosConsolidados, null, 2),
-        dadosLicenca: dadosConsolidados,
-      });
-
-      await deleteDoc(licencaRef);
-    } catch {
-      // Ignora erro se totalmente desconectado
-    }
+    throw new Error("Não foi possível concluir a ativação no servidor. Verifique sua conexão e tente novamente.");
   }
 
   // 9. Atualiza cache local: remove de concessões ativas e move para arquivo morto local

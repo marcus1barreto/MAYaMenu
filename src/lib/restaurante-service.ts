@@ -2,7 +2,8 @@
 // Serviço para resolução de restaurante e cardápio dinâmicos via Firestore
 // com fallback resiliente para mock offline
 
-import { db } from "@/lib/firebase";
+import { db, functions } from "@/lib/firebase";
+import { httpsCallable } from "firebase/functions";
 import {
   collection,
   collectionGroup,
@@ -572,6 +573,13 @@ export async function marcarComandaPagaFirestore(
   mesaNumero: number | string,
   clienteId: string
 ): Promise<void> {
+  const fecharComandaFn = httpsCallable(functions, "fecharComandaBackend");
+  await fecharComandaFn({
+    restauranteId,
+    mesa: mesaNumero,
+    clienteId,
+  });
+
   const comandaRef = doc(
     db,
     "restaurantes",
@@ -581,7 +589,6 @@ export async function marcarComandaPagaFirestore(
     "comandas_abertas",
     clienteId
   );
-  await updateDoc(comandaRef, { status: "pago" });
 
   // Telemetria automática de Sell-Out para itens de patrocinadores
   try {
@@ -701,156 +708,29 @@ export async function definirTaxaServicoMesa(
   comandasIds: string[],
   ativa: boolean
 ): Promise<void> {
-  await Promise.all(
-    comandasIds.map((cId) =>
-      updateDoc(
-        doc(db, "restaurantes", restauranteId, "mesas", String(mesaNumero), "comandas_abertas", cId),
-        { taxaServicoAtiva: ativa, atualizadoEm: serverTimestamp() }
-      ).catch((e) => console.warn("Falha ao definir taxa de serviço da comanda", cId, e))
-    )
-  );
+  const definirTaxaFn = httpsCallable(functions, "definirTaxaServicoMesaBackend");
+  await definirTaxaFn({
+    restauranteId,
+    mesa: mesaNumero,
+    comandasIds,
+    ativa,
+  });
 }
 
 /**
- * Libera a mesa fechando as comandas e limpando/entregando os pedidos filhos daquela mesa via writeBatch
- * para evitar que pedidos órfãos fiquem aparecendo no KDS da cozinha.
+ * Libera a mesa fechando as comandas, limpando os pedidos filhos e registrando o histórico no backend.
  */
 export async function liberarMesaFirestore(
   restauranteId: string,
   mesaNumero: number | string,
   comandasIds: string[]
 ): Promise<void> {
-  const { writeBatch } = await import("firebase/firestore");
-  const batch = writeBatch(db);
-
-  // 1. Coleta e consolidação de dados da sessão para histórico analítico
-  let subtotalTotal = 0;
-  let quantidadePagantes = 0;
-  let abertaEmTimestamp: any = null;
-  let pagaEmTimestamp: any = null;
-
-  for (const cId of comandasIds) {
-    const comandaRef = doc(
-      db,
-      "restaurantes",
-      restauranteId,
-      "mesas",
-      String(mesaNumero),
-      "comandas_abertas",
-      cId
-    );
-
-    try {
-      const snapComanda = await getDoc(comandaRef);
-      if (snapComanda.exists()) {
-        const cData = snapComanda.data();
-        quantidadePagantes++;
-
-        if (cData.criadoEm) {
-          if (!abertaEmTimestamp || millisOu(cData.criadoEm, Infinity) < millisOu(abertaEmTimestamp, Infinity)) {
-            abertaEmTimestamp = cData.criadoEm;
-          }
-        }
-        if (cData.atualizadoEm) {
-          pagaEmTimestamp = cData.atualizadoEm;
-        }
-
-        // Busca pedidos filhos para somar ao histórico e apagá-los evitando órfãos no KDS
-        let subtotalComandaCalculado = 0;
-        try {
-          const pedidosCol = collection(
-            db,
-            "restaurantes",
-            restauranteId,
-            "mesas",
-            String(mesaNumero),
-            "comandas_abertas",
-            cId,
-            "pedidos"
-          );
-          const snapPedidos = await getDocs(pedidosCol);
-          snapPedidos.forEach((pDoc) => {
-            const pData = pDoc.data();
-            if (pData.status !== "cancelado" && pData.status !== "estornado") {
-              subtotalComandaCalculado += Number(pData.subtotal) || 0;
-            }
-            // Apaga os pedidos ativos para limpar o KDS
-            batch.delete(pDoc.ref);
-            // Também remove o ticket desacoplado na fila do KDS para não deixar tickets zumbis na cozinha
-            const kdsTicketRef = doc(db, "restaurantes", restauranteId, "kds_tickets", pDoc.id);
-            batch.delete(kdsTicketRef);
-          });
-        } catch (e) {
-          console.warn("Falha ao buscar pedidos da comanda para baixa em lote:", e);
-        }
-
-        // Se houver pedidos filhos reais, usa a soma dos pedidos; caso contrário, usa o subtotal da comanda pai
-        subtotalTotal += subtotalComandaCalculado > 0 ? subtotalComandaCalculado : (Number(cData.subtotal) || 0);
-      }
-    } catch (e) {
-      console.warn(`Aviso ao ler comanda ${cId} para consolidar histórico da mesa:`, e);
-    }
-
-    // Sela a comanda ativa como 'pago' (tombstone) para disparar o onSnapshot do cliente
-    batch.update(comandaRef, {
-      status: "pago",
-      encerradaEm: serverTimestamp(),
-      arquivada: true,
-      atualizadoEm: serverTimestamp(),
-    });
-  }
-
-  // 2. Gravação atômica do documento histórico de sessão
-  try {
-    const idHistorico = `sessao_${mesaNumero}_${Date.now()}`;
-    const historicoRef = doc(
-      db,
-      "restaurantes",
-      restauranteId,
-      "historico_sessoes_mesas",
-      idHistorico
-    );
-
-    batch.set(historicoRef, {
-      id: idHistorico,
-      restauranteId,
-      mesa: Number(mesaNumero) || mesaNumero,
-      subtotalTotal,
-      quantidadePagantes: Math.max(quantidadePagantes, comandasIds.length),
-      comandasIds,
-      abertaEm: abertaEmTimestamp || serverTimestamp(),
-      pagaEm: pagaEmTimestamp || serverTimestamp(),
-      liberadaEm: serverTimestamp(),
-    });
-
-    // 3. Atualização econômica do Documento Agregador Resumo (Analytics Econômico para Free & PRO)
-    const agora = new Date();
-    const chaveMes = `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, "0")}`;
-    const resumoRef = doc(
-      db,
-      "restaurantes",
-      restauranteId,
-      "metricas_consolidadas",
-      chaveMes
-    );
-
-    batch.set(
-      resumoRef,
-      {
-        anoMes: chaveMes,
-        restauranteId,
-        totalFaturado: increment(subtotalTotal),
-        totalSessoes: increment(1),
-        totalClientes: increment(Math.max(quantidadePagantes, comandasIds.length)),
-        atualizadoEm: serverTimestamp(),
-      },
-      { merge: true }
-    );
-  } catch (errHistorico) {
-    console.warn("Falha ao preparar gravação de histórico de sessão no lote:", errHistorico);
-  }
-
-  await batch.commit();
+  const liberarMesaFn = httpsCallable(functions, "liberarMesaBackend");
+  await liberarMesaFn({
+    restauranteId,
+    mesa: mesaNumero,
+    comandasIds,
+  });
 }
 
 /**
@@ -1072,97 +952,37 @@ export async function lancarItemManualFirestore(params: {
       criadoEmMillis: Date.now(),
       tentativas: 0,
       status: "pendente",
+      origem: "garcom",
     });
     return;
   }
 
-  // 2. DISPARO ONLINE COM INTERCEPTAÇÃO RESILIENTE
+  // 2. DISPARO ONLINE TRANSACIONAL & IDEMPOTENTE NO BACKEND
   try {
-    const comandaRef = doc(
-      db,
-      "restaurantes",
-      idFinal,
-      "mesas",
-      String(params.mesaNumero),
-      "comandas_abertas",
-      cId
-    );
-
-    const pedidoRef = doc(
-      db,
-      "restaurantes",
-      idFinal,
-      "mesas",
-      String(params.mesaNumero),
-      "comandas_abertas",
-      cId,
-      "pedidos",
-      pedidoId
-    );
-
-    const kdsRef = doc(db, "restaurantes", idFinal, "kds_tickets", pedidoId);
-
-    const dadosPedidoRodada = {
-      id: pedidoId,
+    const lancarGarcomFn = httpsCallable(functions, "lancarPedidoGarcom");
+    await lancarGarcomFn({
       restauranteId: idFinal,
       slug: params.slug || idFinal,
+      pedidoId,
+      mesa: params.mesaNumero,
       clienteId: cId,
       nomeCliente: params.clienteNome.trim(),
-      mesa: params.mesaNumero,
-      numeroMesa: Number(params.mesaNumero) || params.mesaNumero,
       itens: itensMapeados,
-      subtotal: subtotalItem,
-      status: "a_fazer" as const,
-      criadoEm: serverTimestamp(),
-    };
-
-    const payloadKds = {
-      id: pedidoId,
-      mesa: params.mesaNumero,
-      numeroMesa: Number(params.mesaNumero) || params.mesaNumero,
-      clienteId: cId,
-      nomeCliente: params.clienteNome.trim(),
-      status: "a_fazer" as const,
-      pedidoRefPath: pedidoRef.path,
-      itens: itensMapeados,
-      criadoEm: serverTimestamp(),
-    };
-
-    const comandaSnap = await getDoc(comandaRef);
-    const batch = writeBatch(db);
-
-    if (!comandaSnap.exists()) {
-      batch.set(comandaRef, {
-        id: cId,
-        restauranteId: idFinal,
-        slug: params.slug || idFinal,
-        nomeCliente: params.clienteNome.trim(),
-        mesa: params.mesaNumero,
-        numeroMesa: Number(params.mesaNumero) || params.mesaNumero,
-        criadoEm: serverTimestamp(),
-        atualizadoEm: serverTimestamp(),
-        subtotal: subtotalItem,
-        status: "aguardando_pratos" as const,
-      });
-    } else {
-      batch.update(comandaRef, {
-        restauranteId: idFinal,
-        slug: params.slug || idFinal,
-        nomeCliente: params.clienteNome.trim(),
-        mesa: params.mesaNumero,
-        numeroMesa: Number(params.mesaNumero) || params.mesaNumero,
-        atualizadoEm: serverTimestamp(),
-        subtotal: increment(subtotalItem),
-        status: "aguardando_pratos" as const,
-      });
+    });
+  } catch (err: any) {
+    const code = String(err?.code || "");
+    const erroPermanente =
+      code.includes("permission-denied") ||
+      code.includes("unauthenticated") ||
+      code.includes("invalid-argument") ||
+      code.includes("not-found") ||
+      code.includes("failed-precondition") ||
+      code.includes("already-exists");
+    if (erroPermanente) {
+      throw err;
     }
 
-    batch.set(pedidoRef, dadosPedidoRodada);
-    batch.set(kdsRef, payloadKds);
-
-    await batch.commit();
-  } catch (err: any) {
-    console.warn("Falha de rede ao submeter pedido no Firestore. Roteando para fila IndexedDB offline:", err);
+    console.warn("Falha de rede ao submeter pedido do garçom. Roteando para fila IndexedDB offline:", err);
     // Em caso de falha de conexão ou timeout, enfileira o mesmo pedidoId para persistência idempotente
     await enfileirarPedidoOffline({
       id: pedidoId,
@@ -1177,6 +997,7 @@ export async function lancarItemManualFirestore(params: {
       criadoEmMillis: Date.now(),
       tentativas: 1,
       status: "pendente",
+      origem: "garcom",
       ultimoErro: String(err?.message || err),
     });
   }
@@ -1261,47 +1082,12 @@ export async function fecharContaMesa(
   mesa: string | number,
   clienteId: string
 ): Promise<void> {
-  const batch = writeBatch(db);
-
-  const comandaRef = doc(
-    db,
-    "restaurantes",
+  const fecharComandaFn = httpsCallable(functions, "fecharComandaBackend");
+  await fecharComandaFn({
     restauranteId,
-    "mesas",
-    String(mesa),
-    "comandas_abertas",
-    clienteId
-  );
-  const pedidosRef = collection(comandaRef, "pedidos");
-
-  // 1. Busca todos os pedidos atuais da mesa
-  const pedidosSnap = await getDocs(pedidosRef);
-
-  // 2. Marca cada pedido individual como 'pago'
-  pedidosSnap.forEach((pedidoDoc) => {
-    // Ao atualizar para 'pago', o pedido some automaticamente do KDS da Cozinha
-    batch.update(pedidoDoc.ref, {
-      status: "pago",
-      fechadoEm: new Date().toISOString(),
-    });
-    // Atualiza também o ticket desacoplado na fila do KDS
-    const kdsTicketRef = doc(db, "restaurantes", restauranteId, "kds_tickets", pedidoDoc.id);
-    batch.update(kdsTicketRef, {
-      status: "pago",
-      fechadoEm: new Date().toISOString(),
-    });
+    mesa,
+    clienteId,
   });
-
-  // 3. Sela a comanda pai como 'pago' (tombstone) para disparar feedback em tempo real
-  batch.update(comandaRef, {
-    status: "pago",
-    encerradaEm: serverTimestamp(),
-    arquivada: true,
-    atualizadoEm: serverTimestamp(),
-  });
-
-  // 4. Executa a transação completa de uma vez só
-  await batch.commit();
 }
 
 /**

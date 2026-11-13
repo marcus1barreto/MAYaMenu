@@ -534,6 +534,1636 @@ exports.atualizarPinColaborador = functions.https.onCall(async (data, context) =
 });
 
 
+const PEDIDO_ID_REGEX = /^[a-zA-Z0-9_-]{8,80}$/;
+const STATUS_COMANDA_PERMITIDOS = new Set(['pedindo', 'aguardando_pratos']);
+const MAX_SUBTOTAL_CENTAVOS = 5000000; // R$ 50.000,00 limite operacional por pedido
+const MESA_SESSION_TTL_MS = 12 * 60 * 60 * 1000; // 12 horas
+
+function getMesaTokenSecret() {
+  const secret = process.env.MESA_SESSION_SECRET;
+  if (!secret || typeof secret !== 'string' || secret.length < 32) {
+    throw new functions.https.HttpsError(
+      'internal',
+      'Segredo de sessão de mesa não configurado corretamente.'
+    );
+  }
+  return secret;
+}
+
+function compararSegredoConstante(valorA, valorB) {
+  if (typeof valorA !== 'string' || typeof valorB !== 'string' || !valorA || !valorB) {
+    return false;
+  }
+  const bufA = Buffer.from(valorA, 'utf8');
+  const bufB = Buffer.from(valorB, 'utf8');
+  if (bufA.length !== bufB.length) {
+    return false;
+  }
+  return crypto.timingSafeEqual(bufA, bufB);
+}
+
+function assinarMesaToken(restauranteId, mesaStr, authUid, expMillis, qrVersao = 1) {
+  const versao = Number.isInteger(Number(qrVersao)) && Number(qrVersao) >= 1 ? Number(qrVersao) : 1;
+  const payload = `${restauranteId}:${mesaStr}:${authUid}:${expMillis}:${versao}`;
+  const sig = crypto
+    .createHmac('sha256', getMesaTokenSecret())
+    .update(payload)
+    .digest('hex');
+  return `${expMillis}.${versao}.${sig}`;
+}
+
+function verificarMesaToken(mesaToken, restauranteId, mesaStr, authUid, qrVersaoEsperada) {
+  if (typeof mesaToken !== 'string' || !mesaToken.includes('.')) {
+    return false;
+  }
+  const partes = mesaToken.split('.');
+  if (partes.length !== 3) {
+    return false;
+  }
+  const [expRaw, versaoRaw, sigRaw] = partes;
+  const expMillis = Number(expRaw);
+  const versao = Number(versaoRaw);
+  if (!Number.isInteger(expMillis) || expMillis < Date.now()) {
+    return false;
+  }
+  if (!Number.isInteger(versao) || versao < 1) {
+    return false;
+  }
+  if (qrVersaoEsperada !== undefined && versao !== Number(qrVersaoEsperada)) {
+    return false;
+  }
+  if (!/^[a-f0-9]{64}$/i.test(sigRaw)) {
+    return false;
+  }
+  const esperado = assinarMesaToken(restauranteId, mesaStr, authUid, expMillis, versao).split('.')[2];
+  try {
+    return crypto.timingSafeEqual(Buffer.from(sigRaw, 'hex'), Buffer.from(esperado, 'hex'));
+  } catch {
+    return false;
+  }
+}
+
+function toCentavosSeguro(valor, campo) {
+  if (typeof valor !== 'number' || !Number.isFinite(valor) || valor < 0) {
+    throw new functions.https.HttpsError('failed-precondition', `${campo} inválido no cardápio do servidor.`);
+  }
+  const centavos = Math.round(valor * 100);
+  if (!Number.isSafeInteger(centavos) || centavos < 0 || centavos > MAX_SUBTOTAL_CENTAVOS) {
+    throw new functions.https.HttpsError('failed-precondition', `${campo} fora dos limites operacionais.`);
+  }
+  return centavos;
+}
+
+function gerarHashPayloadPedido(dados) {
+  return crypto.createHash('sha256').update(JSON.stringify(dados)).digest('hex');
+}
+
+/**
+ * Valida modificadores enviados contra a definição oficial de grupoModificadores no servidor.
+ * Também valida a consistência da configuração do catálogo (unicidade, mínimo/máximo válidos).
+ * Retorna os modificadores normalizados com soma em centavos inteiros.
+ */
+function validarModificadoresServidor(modificadoresCliente, grupoModificadoresServidor) {
+  const grupos = Array.isArray(grupoModificadoresServidor) ? grupoModificadoresServidor : [];
+  const listaCliente = Array.isArray(modificadoresCliente) ? modificadoresCliente : [];
+
+  // 1. Valida consistência do catálogo de grupos e opções no servidor
+  const nomesGruposVistos = new Set();
+  const idsGruposVistos = new Set();
+  const regrasPorGrupo = new Map();
+
+  for (const g of grupos) {
+    const nomeGrupo = String(g?.nome || '').trim();
+    const idGrupo = g?.id ? String(g.id).trim() : '';
+    const chaveGrupo = nomeGrupo || idGrupo;
+
+    if (!chaveGrupo) {
+      throw new functions.https.HttpsError(
+        'failed-precondition',
+        'Configuração de grupo de modificadores sem identificador no cardápio.'
+      );
+    }
+    if (nomeGrupo && nomesGruposVistos.has(nomeGrupo)) {
+      throw new functions.https.HttpsError(
+        'failed-precondition',
+        `Grupo de modificadores duplicado no cardápio: "${nomeGrupo}".`
+      );
+    }
+    if (idGrupo && idsGruposVistos.has(idGrupo)) {
+      throw new functions.https.HttpsError(
+        'failed-precondition',
+        `Identificador de grupo duplicado no cardápio: "${idGrupo}".`
+      );
+    }
+    if (nomeGrupo) nomesGruposVistos.add(nomeGrupo);
+    if (idGrupo) idsGruposVistos.add(idGrupo);
+
+    let minReq = 0;
+    if (g?.minimo !== undefined && g?.minimo !== null) {
+      if (typeof g.minimo !== 'number' || !Number.isInteger(g.minimo) || g.minimo < 0) {
+        throw new functions.https.HttpsError(
+          'failed-precondition',
+          `Configuração de mínimo inválida no grupo "${chaveGrupo}".`
+        );
+      }
+      minReq = g.minimo;
+    }
+    if (g?.obrigatorio) {
+      minReq = Math.max(1, minReq);
+    }
+
+    let maxReq = null;
+    if (g?.maximo !== undefined && g?.maximo !== null) {
+      if (typeof g.maximo !== 'number' || !Number.isInteger(g.maximo) || g.maximo < 1) {
+        throw new functions.https.HttpsError(
+          'failed-precondition',
+          `Configuração de máximo inválida no grupo "${chaveGrupo}".`
+        );
+      }
+      maxReq = g.maximo;
+    }
+
+    if (maxReq !== null && minReq > maxReq) {
+      throw new functions.https.HttpsError(
+        'failed-precondition',
+        `Configuração inconsistente (mínimo maior que máximo) no grupo "${chaveGrupo}".`
+      );
+    }
+
+    const opcoes = Array.isArray(g?.opcoes) ? g.opcoes : [];
+    const nomesOpcoesVistos = new Set();
+    const idsOpcoesVistos = new Set();
+    for (const op of opcoes) {
+      const nomeOp = String(op?.nome || '').trim();
+      const idOp = op?.id ? String(op.id).trim() : '';
+      if (!nomeOp && !idOp) {
+        throw new functions.https.HttpsError(
+          'failed-precondition',
+          `Opção sem identificador no grupo "${chaveGrupo}".`
+        );
+      }
+      if (nomeOp && nomesOpcoesVistos.has(nomeOp)) {
+        throw new functions.https.HttpsError(
+          'failed-precondition',
+          `Opção duplicada "${nomeOp}" no grupo "${chaveGrupo}".`
+        );
+      }
+      if (idOp && idsOpcoesVistos.has(idOp)) {
+        throw new functions.https.HttpsError(
+          'failed-precondition',
+          `Identificador de opção duplicado "${idOp}" no grupo "${chaveGrupo}".`
+        );
+      }
+      if (nomeOp) nomesOpcoesVistos.add(nomeOp);
+      if (idOp) idsOpcoesVistos.add(idOp);
+    }
+
+    regrasPorGrupo.set(chaveGrupo, {
+      grupo: g,
+      minReq,
+      maxReq,
+      permiteRepeticao: Boolean(g?.permiteRepeticao || g?.permitirDuplicadas),
+    });
+  }
+
+  // 2. Valida modificadores selecionados pelo cliente
+  const contagemPorGrupo = new Map();
+  const opcoesSelecionadasPorGrupo = new Map();
+  const modificadoresValidados = [];
+  let somaAdicionaisCentavos = 0;
+
+  for (const mod of listaCliente) {
+    const grupoNome = String(mod?.grupo || '').trim();
+    const opcaoNome = String(mod?.opcao || '').trim();
+    if (!grupoNome || !opcaoNome) {
+      throw new functions.https.HttpsError('invalid-argument', 'Modificador inválido no pedido.');
+    }
+
+    const grupoServer = grupos.find(
+      (g) => String(g?.nome || '').trim() === grupoNome || (g?.id && String(g.id).trim() === grupoNome)
+    );
+    if (!grupoServer) {
+      throw new functions.https.HttpsError(
+        'invalid-argument',
+        `Grupo de modificadores inválido: ${grupoNome}.`
+      );
+    }
+
+    const opcoes = Array.isArray(grupoServer.opcoes) ? grupoServer.opcoes : [];
+    const opcaoServer = opcoes.find(
+      (o) => String(o?.nome || '').trim() === opcaoNome || (o?.id && String(o.id).trim() === opcaoNome)
+    );
+    if (!opcaoServer) {
+      throw new functions.https.HttpsError(
+        'invalid-argument',
+        `Opção de modificador inválida (${opcaoNome}) no grupo ${grupoNome}.`
+      );
+    }
+
+    const chaveGrupo = String(grupoServer.nome || grupoServer.id).trim();
+    const chaveOpcao = String(opcaoServer.nome || opcaoServer.id).trim();
+    const regraGrupo = regrasPorGrupo.get(chaveGrupo);
+
+    if (!opcoesSelecionadasPorGrupo.has(chaveGrupo)) {
+      opcoesSelecionadasPorGrupo.set(chaveGrupo, new Set());
+    }
+    const jaSelecionadas = opcoesSelecionadasPorGrupo.get(chaveGrupo);
+    if (jaSelecionadas.has(chaveOpcao) && !regraGrupo?.permiteRepeticao) {
+      throw new functions.https.HttpsError(
+        'invalid-argument',
+        `Opção "${chaveOpcao}" não pode ser selecionada mais de uma vez no grupo "${chaveGrupo}".`
+      );
+    }
+    jaSelecionadas.add(chaveOpcao);
+
+    const precoAdicionalRaw = opcaoServer.precoAdicional === undefined ? 0 : opcaoServer.precoAdicional;
+    const precoAdicionalCentavos = toCentavosSeguro(precoAdicionalRaw, 'Preço de adicional');
+
+    contagemPorGrupo.set(chaveGrupo, (contagemPorGrupo.get(chaveGrupo) || 0) + 1);
+    somaAdicionaisCentavos += precoAdicionalCentavos;
+    modificadoresValidados.push({
+      grupo: String(grupoServer.nome || grupoNome),
+      opcao: String(opcaoServer.nome || opcaoNome),
+      precoAdicional: precoAdicionalCentavos / 100,
+    });
+  }
+
+  for (const [chaveGrupo, regra] of regrasPorGrupo.entries()) {
+    const qtd = contagemPorGrupo.get(chaveGrupo) || 0;
+    if (qtd < regra.minReq) {
+      throw new functions.https.HttpsError(
+        'invalid-argument',
+        `Seleção obrigatória incompleta no grupo "${chaveGrupo}".`
+      );
+    }
+    if (regra.maxReq !== null && qtd > regra.maxReq) {
+      throw new functions.https.HttpsError(
+        'invalid-argument',
+        `Quantidade máxima excedida no grupo "${chaveGrupo}".`
+      );
+    }
+  }
+
+  return { modificadoresValidados, somaAdicionaisCentavos };
+}
+
+function hashQrCredencial(qrCredencial) {
+  return crypto.createHash('sha256').update(String(qrCredencial || '')).digest('hex');
+}
+
+async function verificarPermissaoOperacionalRestaurante(
+  firestoreDb,
+  restDoc,
+  authUid,
+  authToken,
+  rolesPermitidos = ['owner', 'admin', 'garcom', 'cozinha']
+) {
+  if (!authUid) {
+    throw new functions.https.HttpsError('unauthenticated', 'Autenticação necessária.');
+  }
+  const restData = restDoc.data() || {};
+  if (authToken?.superadmin === true || restData.ownerId === authUid) {
+    return true;
+  }
+
+  // Sempre valida vínculo e estado ativo no documento da equipe no backend (revogação imediata)
+  const membroSnap = await restDoc.ref.collection('equipe').doc(authUid).get();
+  if (membroSnap.exists) {
+    const mData = membroSnap.data() || {};
+    const roleEquipe = String(mData.role || '');
+    if (mData.ativo !== false && rolesPermitidos.includes(roleEquipe)) {
+      return true;
+    }
+    throw new functions.https.HttpsError(
+      'permission-denied',
+      'Colaborador inativo ou sem permissão para esta operação.'
+    );
+  }
+
+  throw new functions.https.HttpsError(
+    'permission-denied',
+    'Usuário sem vínculo operacional autorizado neste estabelecimento.'
+  );
+}
+
+/**
+ * Gera ou rotaciona a credencial secreta de QR Code de uma mesa física.
+ * Armazena apenas o hash SHA-256 no Firestore (qrCredencialHash) e entrega a credencial
+ * em texto claro exclusivamente no ato da geração ou reemissão explícita (rotacionar: true).
+ */
+async function executarGarantirCredencialMesa(firestoreDb, authUid, authToken, payload) {
+  const { restauranteId, mesa, rotacionar } = payload || {};
+  if (!authUid) {
+    throw new functions.https.HttpsError('unauthenticated', 'Autenticação necessária.');
+  }
+  if (!restauranteId || mesa === undefined || mesa === null || String(mesa).trim() === '') {
+    throw new functions.https.HttpsError('invalid-argument', 'Campos restauranteId e mesa são obrigatórios.');
+  }
+
+  let restDoc = await firestoreDb.collection('restaurantes').doc(String(restauranteId)).get();
+  if (!restDoc.exists) {
+    const q = await firestoreDb.collection('restaurantes').where('slug', '==', String(restauranteId)).limit(1).get();
+    if (!q.empty) restDoc = q.docs[0];
+  }
+  if (!restDoc.exists) {
+    throw new functions.https.HttpsError('not-found', 'Restaurante não encontrado.');
+  }
+
+  await verificarPermissaoOperacionalRestaurante(
+    firestoreDb,
+    restDoc,
+    authUid,
+    authToken,
+    ['owner', 'admin', 'garcom']
+  );
+
+  const restData = restDoc.data() || {};
+  const mesaStr = String(mesa).trim();
+  const numMesaParsed = Number(mesaStr);
+  if (!Number.isInteger(numMesaParsed) || numMesaParsed < 1) {
+    throw new functions.https.HttpsError('invalid-argument', 'Número de mesa inválido.');
+  }
+  const maxMesasRest = Number(restData.maxMesas || restData.licenca?.maxMesas || 0);
+  if (maxMesasRest > 0 && numMesaParsed > maxMesasRest) {
+    throw new functions.https.HttpsError('invalid-argument', 'Mesa fora da capacidade licenciada.');
+  }
+
+  const mesaRef = restDoc.ref.collection('mesas').doc(mesaStr);
+  let respostaCredencial = null;
+
+  await firestoreDb.runTransaction(async (t) => {
+    const mesaSnap = await t.get(mesaRef);
+    const mData = mesaSnap.exists ? mesaSnap.data() || {} : {};
+
+    if (!rotacionar && typeof mData.qrCredencialHash === 'string' && mData.qrCredencialHash.length === 64) {
+      respostaCredencial = {
+        sucesso: true,
+        jaConfigurada: true,
+        restauranteId: restDoc.id,
+        mesa: numMesaParsed,
+      };
+      return;
+    }
+
+    const novaCredencial = crypto.randomBytes(24).toString('hex');
+    const credencialHash = hashQrCredencial(novaCredencial);
+    const versaoAtual = Number(mData.qrVersao) || 1;
+    const novaVersao = mesaSnap.exists && (mData.qrCredencialHash || mData.qrVersao) ? versaoAtual + 1 : 1;
+    const agoraServer = admin.firestore.FieldValue.serverTimestamp();
+    const payloadUpdate = mesaSnap.exists
+      ? {
+          qrCredencialHash: credencialHash,
+          qrVersao: novaVersao,
+          qrCredencial: admin.firestore.FieldValue.delete(),
+          atualizadoEm: agoraServer,
+        }
+      : {
+          numero: numMesaParsed,
+          ativa: true,
+          statusEstrutural: 'livre',
+          modoAtendimento: 'livre',
+          qrCredencialHash: credencialHash,
+          qrVersao: novaVersao,
+          criadoEm: agoraServer,
+          atualizadoEm: agoraServer,
+        };
+    t.set(mesaRef, payloadUpdate, { merge: true });
+
+    respostaCredencial = {
+      sucesso: true,
+      jaConfigurada: false,
+      restauranteId: restDoc.id,
+      mesa: numMesaParsed,
+      qrCredencial: novaCredencial,
+    };
+  });
+
+  return respostaCredencial;
+}
+
+/**
+ * Emite token HMAC de sessão vinculado a (restauranteId, mesa, authUid),
+ * exigindo existência real da mesa e validação da credencial física do QR Code.
+ */
+async function executarEmissaoSessaoMesa(firestoreDb, authUid, payload) {
+  const { restauranteId, mesa, qrCredencial } = payload || {};
+  if (!authUid) {
+    throw new functions.https.HttpsError('unauthenticated', 'Autenticação necessária para iniciar sessão na mesa.');
+  }
+  if (!restauranteId || mesa === undefined || mesa === null || String(mesa).trim() === '') {
+    throw new functions.https.HttpsError('invalid-argument', 'Campos restauranteId e mesa são obrigatórios.');
+  }
+  if (typeof qrCredencial !== 'string' || qrCredencial.trim().length < 16) {
+    throw new functions.https.HttpsError(
+      'permission-denied',
+      'Credencial do QR Code da mesa ausente ou inválida. Escaneie o QR Code físico da mesa.'
+    );
+  }
+
+  let restDoc = await firestoreDb.collection('restaurantes').doc(String(restauranteId)).get();
+  if (!restDoc.exists) {
+    const q = await firestoreDb.collection('restaurantes').where('slug', '==', String(restauranteId)).limit(1).get();
+    if (!q.empty) restDoc = q.docs[0];
+  }
+  if (!restDoc.exists) {
+    throw new functions.https.HttpsError('not-found', 'Restaurante não encontrado.');
+  }
+
+  const restData = restDoc.data() || {};
+  if (restData.suspenso === true || restData.configuracoes?.suspenso === true) {
+    throw new functions.https.HttpsError('failed-precondition', 'Este estabelecimento está suspenso no momento.');
+  }
+
+  const mesaStr = String(mesa).trim();
+  const numMesaParsed = Number(mesaStr);
+  if (!Number.isInteger(numMesaParsed) || numMesaParsed < 1) {
+    throw new functions.https.HttpsError('invalid-argument', 'Número de mesa inválido.');
+  }
+  const maxMesasRest = Number(restData.maxMesas || restData.licenca?.maxMesas || 0);
+  if (maxMesasRest > 0 && numMesaParsed > maxMesasRest) {
+    throw new functions.https.HttpsError('invalid-argument', 'Mesa fora da capacidade licenciada.');
+  }
+
+  const mesaSnap = await restDoc.ref.collection('mesas').doc(mesaStr).get();
+  if (!mesaSnap.exists) {
+    throw new functions.https.HttpsError(
+      'failed-precondition',
+      'Mesa não cadastrada ou não habilitada para atendimento.'
+    );
+  }
+
+  const mData = mesaSnap.data() || {};
+  if (mData.ativa === false || mData.statusEstrutural === 'bloqueada') {
+    throw new functions.https.HttpsError('failed-precondition', 'Esta mesa não está disponível para atendimento.');
+  }
+
+  const hashRecebido = hashQrCredencial(qrCredencial.trim());
+  if (typeof mData.qrCredencialHash !== 'string' || !compararSegredoConstante(hashRecebido, mData.qrCredencialHash)) {
+    throw new functions.https.HttpsError(
+      'permission-denied',
+      'Credencial do QR Code inválida para esta mesa. Escaneie o QR Code físico novamente.'
+    );
+  }
+
+  const expMillis = Date.now() + MESA_SESSION_TTL_MS;
+  const qrVersaoAtual = Number(mData.qrVersao) || 1;
+  const mesaToken = assinarMesaToken(restDoc.id, mesaStr, authUid, expMillis, qrVersaoAtual);
+  return {
+    sucesso: true,
+    restauranteId: restDoc.id,
+    mesa: numMesaParsed,
+    mesaToken,
+    expiraEm: expMillis,
+  };
+}
+
+/**
+ * Cria pedido do cliente e ticket KDS de forma atômica, validada financeiramente no servidor e idempotente.
+ * Garante que clientes comuns não escrevam diretamente em /kds_tickets (bloqueado nas Firestore Rules).
+ */
+async function executarCriacaoPedidoCliente(firestoreDb, authUid, payload) {
+  const {
+    restauranteId,
+    slug,
+    pedidoId,
+    mesa,
+    mesaToken,
+    nomeCliente,
+    itens,
+  } = payload || {};
+
+  if (!authUid) {
+    throw new functions.https.HttpsError('unauthenticated', 'Autenticação necessária para enviar pedidos.');
+  }
+
+  if (!restauranteId || !pedidoId || mesa === undefined || mesa === null || String(mesa).trim() === '') {
+    throw new functions.https.HttpsError('invalid-argument', 'Campos restauranteId, pedidoId e mesa são obrigatórios.');
+  }
+
+  const pedidoIdLimpo = String(pedidoId).trim();
+  if (!PEDIDO_ID_REGEX.test(pedidoIdLimpo)) {
+    throw new functions.https.HttpsError('invalid-argument', 'Formato de pedidoId inválido.');
+  }
+
+  const nomeLimpo = String(nomeCliente || '').trim();
+  if (!nomeLimpo || nomeLimpo.length > 80) {
+    throw new functions.https.HttpsError('invalid-argument', 'Informe um nome válido para identificar a comanda.');
+  }
+
+  if (!Array.isArray(itens) || itens.length === 0 || itens.length > 50) {
+    throw new functions.https.HttpsError('invalid-argument', 'O pedido deve conter entre 1 e 50 itens.');
+  }
+
+  for (const it of itens) {
+    const mId = String(it?.menuItemId || '').trim();
+    const qtd = it?.quantidade;
+    if (!mId || mId.includes('/')) {
+      throw new functions.https.HttpsError('invalid-argument', 'Item do cardápio inválido.');
+    }
+    if (typeof qtd !== 'number' || !Number.isInteger(qtd) || qtd < 1 || qtd > 99) {
+      throw new functions.https.HttpsError('invalid-argument', 'Quantidade de item inválida (permitido: inteiro de 1 a 99).');
+    }
+  }
+
+  let restDoc = await firestoreDb.collection('restaurantes').doc(String(restauranteId)).get();
+  if (!restDoc.exists) {
+    const q = await firestoreDb.collection('restaurantes').where('slug', '==', String(restauranteId)).limit(1).get();
+    if (!q.empty) restDoc = q.docs[0];
+  }
+  if (!restDoc.exists) {
+    throw new functions.https.HttpsError('not-found', 'Restaurante não encontrado.');
+  }
+
+  const restData = restDoc.data() || {};
+  if (restData.suspenso === true || restData.configuracoes?.suspenso === true) {
+    throw new functions.https.HttpsError('failed-precondition', 'Este estabelecimento está suspenso no momento.');
+  }
+
+  const realRestauranteId = restDoc.id;
+  const realSlug = String(restData.slug || realRestauranteId);
+  if (slug && String(slug).trim() !== realSlug && String(slug).trim() !== realRestauranteId) {
+    throw new functions.https.HttpsError('invalid-argument', 'Identificador slug incompatível com o restaurante.');
+  }
+
+  const mesaStr = String(mesa).trim();
+  const numMesaParsed = Number(mesaStr);
+  if (!Number.isInteger(numMesaParsed) || numMesaParsed < 1) {
+    throw new functions.https.HttpsError('invalid-argument', 'Número de mesa inválido.');
+  }
+  const maxMesasRest = Number(restData.maxMesas || restData.licenca?.maxMesas || 0);
+  if (maxMesasRest > 0 && numMesaParsed > maxMesasRest) {
+    throw new functions.https.HttpsError('invalid-argument', 'Mesa fora da capacidade licenciada do estabelecimento.');
+  }
+  const mesaNumero = numMesaParsed;
+
+  // Valida prova criptográfica de sessão vinculada ao restaurante, mesa e authUid
+  if (!verificarMesaToken(mesaToken, realRestauranteId, mesaStr, authUid)) {
+    throw new functions.https.HttpsError(
+      'permission-denied',
+      'Sessão da mesa inválida ou expirada. Escaneie o QR Code da mesa novamente.'
+    );
+  }
+
+  const mesaRef = restDoc.ref.collection('mesas').doc(mesaStr);
+  const comandaRef = mesaRef.collection('comandas_abertas').doc(authUid);
+  const pedidoRef = comandaRef.collection('pedidos').doc(pedidoIdLimpo);
+  const kdsRef = restDoc.ref.collection('kds_tickets').doc(pedidoIdLimpo);
+  const idempRef = restDoc.ref.collection('_pedido_idempotency').doc(pedidoIdLimpo);
+
+  // Hash da intenção original do cliente (independente de alterações futuras no cardápio)
+  const itensNormalizadosRequest = itens.map((it) => ({
+    menuItemId: String(it.menuItemId).trim(),
+    quantidade: it.quantidade,
+    modificadores: Array.isArray(it.modificadores)
+      ? it.modificadores.map((m) => ({
+          grupo: String(m?.grupo || '').trim(),
+          opcao: String(m?.opcao || '').trim(),
+        }))
+      : [],
+    observacoes: String(it.observacoes || '').slice(0, 250),
+  }));
+
+  const requestHash = gerarHashPayloadPedido({
+    restauranteId: realRestauranteId,
+    mesa: mesaStr,
+    clienteId: authUid,
+    nomeCliente: nomeLimpo,
+    itens: itensNormalizadosRequest,
+  });
+
+  const uniqueMenuIds = Array.from(new Set(itensNormalizadosRequest.map((it) => it.menuItemId)));
+  const menuRefs = uniqueMenuIds.map((mId) => restDoc.ref.collection('cardapio').doc(mId));
+
+  let resultadoTx = null;
+
+  await firestoreDb.runTransaction(async (t) => {
+    // Todas as leituras acontecem antes de qualquer escrita (isolamento serializable)
+    const [mesaSnap, comandaSnap, pedidoSnap, kdsSnap, idempSnap, ...menuSnaps] = await Promise.all([
+      t.get(mesaRef),
+      t.get(comandaRef),
+      t.get(pedidoRef),
+      t.get(kdsRef),
+      t.get(idempRef),
+      ...menuRefs.map((ref) => t.get(ref)),
+    ]);
+
+    // 1. Verifica idempotência pela intenção original ANTES de validar cardápio atual
+    //    (permite retorno idempotente após timeout mesmo se preço/disponibilidade mudar depois)
+    if (idempSnap.exists) {
+      const idempData = idempSnap.data() || {};
+      const mesmoContexto =
+        idempData.restauranteId === realRestauranteId &&
+        String(idempData.mesa) === mesaStr &&
+        idempData.clienteId === authUid;
+
+      if (!mesmoContexto || idempData.requestHash !== requestHash) {
+        throw new functions.https.HttpsError(
+          'already-exists',
+          'Este identificador de pedido já foi utilizado com outro conteúdo ou mesa.'
+        );
+      }
+
+      if (!pedidoSnap.exists || !kdsSnap.exists) {
+        throw new functions.https.HttpsError(
+          'failed-precondition',
+          'Inconsistência detectada entre pedido e ticket KDS para este pedidoId.'
+        );
+      }
+
+      resultadoTx = {
+        sucesso: true,
+        idempotente: true,
+        pedidoId: pedidoIdLimpo,
+        kdsTicketId: pedidoIdLimpo,
+        pedidoRefPath: pedidoRef.path,
+        subtotal: idempData.subtotal,
+      };
+      return;
+    }
+
+    // 2. Valida estado estrutural da mesa e vinculação à versão atual da credencial QR
+    if (!mesaSnap.exists) {
+      throw new functions.https.HttpsError(
+        'failed-precondition',
+        'Mesa não cadastrada ou não habilitada para atendimento.'
+      );
+    }
+    const mData = mesaSnap.data() || {};
+    if (!verificarMesaToken(mesaToken, realRestauranteId, mesaStr, authUid, Number(mData.qrVersao) || 1)) {
+      throw new functions.https.HttpsError(
+        'permission-denied',
+        'Sessão da mesa revogada ou expirada. Escaneie o QR Code atualizado da mesa.'
+      );
+    }
+    if (mData.ativa === false) {
+      throw new functions.https.HttpsError('failed-precondition', 'Esta mesa está inativa no momento.');
+    }
+    if (mData.statusEstrutural === 'bloqueada') {
+      throw new functions.https.HttpsError('failed-precondition', 'Esta mesa está bloqueada para atendimento.');
+    }
+    if (mData.statusEstrutural === 'reservada' && !comandaSnap.exists) {
+      throw new functions.https.HttpsError(
+        'failed-precondition',
+        'Esta mesa está reservada. Solicite liberação ao garçom.'
+      );
+    }
+
+    // 3. Valida existência e disponibilidade dos itens e calcula preços em centavos inteiros no servidor
+    const menuMap = new Map();
+    menuSnaps.forEach((snap) => {
+      if (snap.exists) {
+        menuMap.set(snap.id, snap.data() || {});
+      }
+    });
+
+    const itensValidados = [];
+    let subtotalCentavos = 0;
+
+    for (const it of itensNormalizadosRequest) {
+      const mId = it.menuItemId;
+      const menuData = menuMap.get(mId);
+      if (!menuData) {
+        throw new functions.https.HttpsError(
+          'not-found',
+          `Produto "${mId}" não encontrado no cardápio deste restaurante.`
+        );
+      }
+      if (menuData.ativo === false) {
+        throw new functions.https.HttpsError(
+          'failed-precondition',
+          `O produto "${menuData.nome || mId}" está indisponível no momento.`
+        );
+      }
+
+      const precoBaseCentavos = toCentavosSeguro(menuData.precoBase, 'Preço base');
+
+      const { modificadoresValidados, somaAdicionaisCentavos } = validarModificadoresServidor(
+        it.modificadores,
+        menuData.grupoModificadores
+      );
+
+      const quantidade = it.quantidade;
+      const unitarioCentavos = precoBaseCentavos + somaAdicionaisCentavos;
+      const itemTotalCentavos = unitarioCentavos * quantidade;
+      if (!Number.isSafeInteger(itemTotalCentavos) || itemTotalCentavos > MAX_SUBTOTAL_CENTAVOS) {
+        throw new functions.https.HttpsError('failed-precondition', 'Valor do item excede o limite operacional.');
+      }
+
+      subtotalCentavos += itemTotalCentavos;
+      if (!Number.isSafeInteger(subtotalCentavos) || subtotalCentavos > MAX_SUBTOTAL_CENTAVOS) {
+        throw new functions.https.HttpsError('failed-precondition', 'Subtotal do pedido excede o limite operacional.');
+      }
+
+      itensValidados.push({
+        menuItemId: mId,
+        nome: String(menuData.nome || 'Item'),
+        quantidade,
+        precoFinal: unitarioCentavos / 100,
+        tempoPreparoEstimado: menuData.tempoPreparoEstimado ?? null,
+        modificadores: modificadoresValidados,
+        observacoes: it.observacoes,
+      });
+    }
+
+    const subtotalServidor = subtotalCentavos / 100;
+
+    // 4. Calcula hash canônico dos dados validados e gravados pelo servidor
+    const payloadHash = gerarHashPayloadPedido({
+      restauranteId: realRestauranteId,
+      mesa: mesaStr,
+      clienteId: authUid,
+      nomeCliente: nomeLimpo,
+      itens: itensValidados.map((i) => ({
+        menuItemId: i.menuItemId,
+        quantidade: i.quantidade,
+        precoFinal: i.precoFinal,
+        modificadores: i.modificadores,
+        observacoes: i.observacoes,
+      })),
+    });
+
+    // Se kds_ticket já existe sem registro de idempotência compatível (ex: colisão em outra mesa/cliente)
+    if (kdsSnap.exists) {
+      const kdsData = kdsSnap.data() || {};
+      const mesmoDono = kdsData.clienteId === authUid && String(kdsData.mesa) === mesaStr;
+      if (mesmoDono && pedidoSnap.exists && (kdsData.requestHash === requestHash || kdsData.payloadHash === payloadHash)) {
+        resultadoTx = {
+          sucesso: true,
+          idempotente: true,
+          pedidoId: pedidoIdLimpo,
+          kdsTicketId: pedidoIdLimpo,
+          pedidoRefPath: pedidoRef.path,
+          subtotal: subtotalServidor,
+        };
+        return;
+      }
+      throw new functions.https.HttpsError(
+        'already-exists',
+        'Conflito de identificador: este pedidoId já está vinculado a outro ticket.'
+      );
+    }
+
+    if (pedidoSnap.exists) {
+      throw new functions.https.HttpsError(
+        'already-exists',
+        'Pedido já existente sem ticket KDS correspondente.'
+      );
+    }
+
+    // 5. Valida estado da comanda (somente estados abertos recebem novos pedidos)
+    if (comandaSnap.exists) {
+      const cData = comandaSnap.data() || {};
+      if (!STATUS_COMANDA_PERMITIDOS.has(cData.status)) {
+        throw new functions.https.HttpsError(
+          'failed-precondition',
+          'Esta comanda já solicitou fechamento ou foi encerrada no caixa.'
+        );
+      }
+      if (cData.restauranteId && cData.restauranteId !== realRestauranteId) {
+        throw new functions.https.HttpsError('permission-denied', 'Comanda pertence a outro restaurante.');
+      }
+    }
+
+    // 6. Gravação atômica (comanda + pedido + kds_ticket + registro de idempotência)
+    const agoraServer = admin.firestore.FieldValue.serverTimestamp();
+    const dadosComanda = {
+      id: authUid,
+      restauranteId: realRestauranteId,
+      slug: realSlug,
+      nomeCliente: nomeLimpo,
+      mesa: mesaNumero,
+      numeroMesa: mesaNumero,
+      atualizadoEm: agoraServer,
+      status: comandaSnap.exists ? comandaSnap.data().status : 'aguardando_pratos',
+    };
+    if (!comandaSnap.exists) {
+      dadosComanda.criadoEm = agoraServer;
+    }
+    t.set(comandaRef, dadosComanda, { merge: true });
+
+    t.set(pedidoRef, {
+      id: pedidoIdLimpo,
+      restauranteId: realRestauranteId,
+      slug: realSlug,
+      clienteId: authUid,
+      nomeCliente: nomeLimpo,
+      mesa: mesaNumero,
+      numeroMesa: mesaNumero,
+      itens: itensValidados,
+      subtotal: subtotalServidor,
+      requestHash,
+      payloadHash,
+      status: 'a_fazer',
+      criadoEm: agoraServer,
+    });
+
+    t.set(kdsRef, {
+      id: pedidoIdLimpo,
+      restauranteId: realRestauranteId,
+      mesa: mesaNumero,
+      numeroMesa: mesaNumero,
+      clienteId: authUid,
+      nomeCliente: nomeLimpo,
+      status: 'a_fazer',
+      pedidoRefPath: pedidoRef.path,
+      requestHash,
+      payloadHash,
+      itens: itensValidados.map((i) => ({
+        menuItemId: i.menuItemId,
+        nome: i.nome,
+        quantidade: i.quantidade,
+        tempoPreparoEstimado: i.tempoPreparoEstimado,
+        modificadores: i.modificadores,
+        observacoes: i.observacoes,
+      })),
+      criadoEm: agoraServer,
+    });
+
+    t.set(idempRef, {
+      pedidoId: pedidoIdLimpo,
+      restauranteId: realRestauranteId,
+      mesa: mesaStr,
+      clienteId: authUid,
+      requestHash,
+      payloadHash,
+      subtotal: subtotalServidor,
+      pedidoRefPath: pedidoRef.path,
+      criadoEm: agoraServer,
+    });
+
+    resultadoTx = {
+      sucesso: true,
+      idempotente: false,
+      pedidoId: pedidoIdLimpo,
+      kdsTicketId: pedidoIdLimpo,
+      pedidoRefPath: pedidoRef.path,
+      subtotal: subtotalServidor,
+    };
+  });
+
+  return resultadoTx;
+}
+
+/**
+ * Lança pedido operacional de garçom/dono de forma transacional, idempotente e validada por permissão real.
+ * Impede duplicação de subtotal em reenvios offline e bloqueia uso por usuários não autorizados.
+ */
+async function executarLancamentoPedidoGarcom(firestoreDb, authUid, authToken, payload) {
+  const {
+    restauranteId,
+    slug,
+    pedidoId,
+    mesa,
+    clienteId,
+    nomeCliente,
+    itens,
+  } = payload || {};
+
+  if (!authUid) {
+    throw new functions.https.HttpsError('unauthenticated', 'Autenticação necessária.');
+  }
+
+  if (!restauranteId || !pedidoId || mesa === undefined || mesa === null || String(mesa).trim() === '') {
+    throw new functions.https.HttpsError('invalid-argument', 'Campos restauranteId, pedidoId e mesa são obrigatórios.');
+  }
+
+  const pedidoIdLimpo = String(pedidoId).trim();
+  if (!PEDIDO_ID_REGEX.test(pedidoIdLimpo)) {
+    throw new functions.https.HttpsError('invalid-argument', 'Formato de pedidoId inválido.');
+  }
+
+  const clienteIdLimpo = String(clienteId || '').trim();
+  if (!clienteIdLimpo || clienteIdLimpo.includes('/')) {
+    throw new functions.https.HttpsError('invalid-argument', 'Identificador da comanda inválido.');
+  }
+
+  const nomeLimpo = String(nomeCliente || '').trim() || 'Mesa (Geral)';
+  if (!Array.isArray(itens) || itens.length === 0 || itens.length > 50) {
+    throw new functions.https.HttpsError('invalid-argument', 'O pedido deve conter entre 1 e 50 itens.');
+  }
+
+  for (const it of itens) {
+    const mId = String(it?.menuItemId || '').trim();
+    const qtd = it?.quantidade;
+    if (!mId || mId.includes('/')) {
+      throw new functions.https.HttpsError('invalid-argument', 'Item do cardápio inválido.');
+    }
+    if (typeof qtd !== 'number' || !Number.isInteger(qtd) || qtd < 1 || qtd > 99) {
+      throw new functions.https.HttpsError('invalid-argument', 'Quantidade de item inválida.');
+    }
+  }
+
+  let restDoc = await firestoreDb.collection('restaurantes').doc(String(restauranteId)).get();
+  if (!restDoc.exists) {
+    const q = await firestoreDb.collection('restaurantes').where('slug', '==', String(restauranteId)).limit(1).get();
+    if (!q.empty) restDoc = q.docs[0];
+  }
+  if (!restDoc.exists) {
+    throw new functions.https.HttpsError('not-found', 'Restaurante não encontrado.');
+  }
+
+  // Valida no backend que o usuário é realmente colaborador/dono autorizado a lançar pedidos (não confia no IndexedDB)
+  await verificarPermissaoOperacionalRestaurante(
+    firestoreDb,
+    restDoc,
+    authUid,
+    authToken,
+    ['owner', 'admin', 'garcom']
+  );
+
+  const restData = restDoc.data() || {};
+  const realRestauranteId = restDoc.id;
+  const realSlug = String(restData.slug || realRestauranteId);
+  if (slug && String(slug).trim() !== realSlug && String(slug).trim() !== realRestauranteId) {
+    throw new functions.https.HttpsError('invalid-argument', 'Identificador slug incompatível com o restaurante.');
+  }
+
+  const mesaStr = String(mesa).trim();
+  const numMesaParsed = Number(mesaStr);
+  if (!Number.isInteger(numMesaParsed) || numMesaParsed < 1) {
+    throw new functions.https.HttpsError('invalid-argument', 'Número de mesa inválido.');
+  }
+  const maxMesasRest = Number(restData.maxMesas || restData.licenca?.maxMesas || 0);
+  if (maxMesasRest > 0 && numMesaParsed > maxMesasRest) {
+    throw new functions.https.HttpsError('invalid-argument', 'Mesa fora da capacidade licenciada.');
+  }
+  const mesaNumero = numMesaParsed;
+
+  const mesaRef = restDoc.ref.collection('mesas').doc(mesaStr);
+  const comandaRef = mesaRef.collection('comandas_abertas').doc(clienteIdLimpo);
+  const pedidoRef = comandaRef.collection('pedidos').doc(pedidoIdLimpo);
+  const kdsRef = restDoc.ref.collection('kds_tickets').doc(pedidoIdLimpo);
+  const idempRef = restDoc.ref.collection('_pedido_idempotency').doc(pedidoIdLimpo);
+
+  const itensNormalizadosRequest = itens.map((it) => ({
+    menuItemId: String(it.menuItemId).trim(),
+    quantidade: it.quantidade,
+    modificadores: Array.isArray(it.modificadores)
+      ? it.modificadores.map((m) => ({
+          grupo: String(m?.grupo || '').trim(),
+          opcao: String(m?.opcao || '').trim(),
+        }))
+      : [],
+    observacoes: String(it.observacoes || '').slice(0, 250),
+  }));
+
+  const requestHash = gerarHashPayloadPedido({
+    origem: 'garcom',
+    restauranteId: realRestauranteId,
+    mesa: mesaStr,
+    clienteId: clienteIdLimpo,
+    nomeCliente: nomeLimpo,
+    itens: itensNormalizadosRequest,
+  });
+
+  const uniqueMenuIds = Array.from(new Set(itensNormalizadosRequest.map((it) => it.menuItemId)));
+  const menuRefs = uniqueMenuIds.map((mId) => restDoc.ref.collection('cardapio').doc(mId));
+
+  let resultadoTx = null;
+
+  await firestoreDb.runTransaction(async (t) => {
+    const [mesaSnap, comandaSnap, pedidoSnap, kdsSnap, idempSnap, ...menuSnaps] = await Promise.all([
+      t.get(mesaRef),
+      t.get(comandaRef),
+      t.get(pedidoRef),
+      t.get(kdsRef),
+      t.get(idempRef),
+      ...menuRefs.map((ref) => t.get(ref)),
+    ]);
+
+    if (idempSnap.exists) {
+      const idempData = idempSnap.data() || {};
+      const mesmoContexto =
+        idempData.restauranteId === realRestauranteId &&
+        String(idempData.mesa) === mesaStr &&
+        idempData.clienteId === clienteIdLimpo;
+
+      if (!mesmoContexto || idempData.requestHash !== requestHash) {
+        throw new functions.https.HttpsError(
+          'already-exists',
+          'Este identificador de pedido já foi utilizado com outro conteúdo ou mesa.'
+        );
+      }
+
+      resultadoTx = {
+        sucesso: true,
+        idempotente: true,
+        pedidoId: pedidoIdLimpo,
+        kdsTicketId: pedidoIdLimpo,
+        subtotal: idempData.subtotal,
+      };
+      return;
+    }
+
+    if (kdsSnap.exists || pedidoSnap.exists) {
+      throw new functions.https.HttpsError(
+        'already-exists',
+        'Conflito de identificador: este pedidoId já está vinculado a outro registro.'
+      );
+    }
+
+    if (mesaSnap.exists) {
+      const mData = mesaSnap.data() || {};
+      if (mData.ativa === false || mData.statusEstrutural === 'bloqueada') {
+        throw new functions.https.HttpsError('failed-precondition', 'Mesa inativa ou bloqueada para atendimento.');
+      }
+    }
+
+    if (comandaSnap.exists) {
+      const cData = comandaSnap.data() || {};
+      if (!STATUS_COMANDA_PERMITIDOS.has(cData.status)) {
+        throw new functions.https.HttpsError(
+          'failed-precondition',
+          'Esta comanda já solicitou fechamento ou foi encerrada no caixa.'
+        );
+      }
+      if (cData.restauranteId && cData.restauranteId !== realRestauranteId) {
+        throw new functions.https.HttpsError('permission-denied', 'Comanda pertence a outro restaurante.');
+      }
+    }
+
+    const menuMap = new Map();
+    menuSnaps.forEach((snap) => {
+      if (snap.exists) menuMap.set(snap.id, snap.data() || {});
+    });
+
+    const itensValidados = [];
+    let subtotalCentavos = 0;
+
+    for (const it of itensNormalizadosRequest) {
+      const mId = it.menuItemId;
+      const menuData = menuMap.get(mId);
+      if (!menuData) {
+        throw new functions.https.HttpsError(
+          'not-found',
+          `Produto "${mId}" não encontrado no cardápio deste restaurante.`
+        );
+      }
+      const precoBaseCentavos = toCentavosSeguro(menuData.precoBase, 'Preço base');
+      const { modificadoresValidados, somaAdicionaisCentavos } = validarModificadoresServidor(
+        it.modificadores,
+        menuData.grupoModificadores
+      );
+      const unitarioCentavos = precoBaseCentavos + somaAdicionaisCentavos;
+      const itemTotalCentavos = unitarioCentavos * it.quantidade;
+      subtotalCentavos += itemTotalCentavos;
+      if (!Number.isSafeInteger(subtotalCentavos) || subtotalCentavos > MAX_SUBTOTAL_CENTAVOS) {
+        throw new functions.https.HttpsError('failed-precondition', 'Subtotal do pedido excede o limite operacional.');
+      }
+
+      itensValidados.push({
+        menuItemId: mId,
+        nome: String(menuData.nome || 'Item'),
+        quantidade: it.quantidade,
+        precoFinal: unitarioCentavos / 100,
+        tempoPreparoEstimado: menuData.tempoPreparoEstimado ?? null,
+        modificadores: modificadoresValidados,
+        observacoes: it.observacoes,
+      });
+    }
+
+    const subtotalServidor = subtotalCentavos / 100;
+    const payloadHash = gerarHashPayloadPedido({
+      origem: 'garcom',
+      restauranteId: realRestauranteId,
+      mesa: mesaStr,
+      clienteId: clienteIdLimpo,
+      nomeCliente: nomeLimpo,
+      itens: itensValidados,
+    });
+
+    const agoraServer = admin.firestore.FieldValue.serverTimestamp();
+    if (!comandaSnap.exists) {
+      t.set(comandaRef, {
+        id: clienteIdLimpo,
+        restauranteId: realRestauranteId,
+        slug: realSlug,
+        nomeCliente: nomeLimpo,
+        mesa: mesaNumero,
+        numeroMesa: mesaNumero,
+        criadoEm: agoraServer,
+        atualizadoEm: agoraServer,
+        subtotal: subtotalServidor,
+        status: 'aguardando_pratos',
+      });
+    } else {
+      const cData = comandaSnap.data() || {};
+      const subtotalAtualCentavos = Math.round((Number(cData.subtotal) || 0) * 100);
+      t.update(comandaRef, {
+        restauranteId: realRestauranteId,
+        slug: realSlug,
+        nomeCliente: nomeLimpo,
+        mesa: mesaNumero,
+        numeroMesa: mesaNumero,
+        atualizadoEm: agoraServer,
+        subtotal: (subtotalAtualCentavos + subtotalCentavos) / 100,
+        status: 'aguardando_pratos',
+      });
+    }
+
+    t.set(pedidoRef, {
+      id: pedidoIdLimpo,
+      restauranteId: realRestauranteId,
+      slug: realSlug,
+      clienteId: clienteIdLimpo,
+      nomeCliente: nomeLimpo,
+      mesa: mesaNumero,
+      numeroMesa: mesaNumero,
+      itens: itensValidados,
+      subtotal: subtotalServidor,
+      origem: 'garcom',
+      lancadoPorUid: authUid,
+      requestHash,
+      payloadHash,
+      status: 'a_fazer',
+      criadoEm: agoraServer,
+    });
+
+    t.set(kdsRef, {
+      id: pedidoIdLimpo,
+      restauranteId: realRestauranteId,
+      mesa: mesaNumero,
+      numeroMesa: mesaNumero,
+      clienteId: clienteIdLimpo,
+      nomeCliente: nomeLimpo,
+      status: 'a_fazer',
+      pedidoRefPath: pedidoRef.path,
+      requestHash,
+      payloadHash,
+      itens: itensValidados.map((i) => ({
+        menuItemId: i.menuItemId,
+        nome: i.nome,
+        quantidade: i.quantidade,
+        tempoPreparoEstimado: i.tempoPreparoEstimado,
+        modificadores: i.modificadores,
+        observacoes: i.observacoes,
+      })),
+      criadoEm: agoraServer,
+    });
+
+    t.set(idempRef, {
+      pedidoId: pedidoIdLimpo,
+      origem: 'garcom',
+      lancadoPorUid: authUid,
+      restauranteId: realRestauranteId,
+      mesa: mesaStr,
+      clienteId: clienteIdLimpo,
+      requestHash,
+      payloadHash,
+      subtotal: subtotalServidor,
+      pedidoRefPath: pedidoRef.path,
+      criadoEm: agoraServer,
+    });
+
+    resultadoTx = {
+      sucesso: true,
+      idempotente: false,
+      pedidoId: pedidoIdLimpo,
+      kdsTicketId: pedidoIdLimpo,
+      subtotal: subtotalServidor,
+    };
+  });
+
+  return resultadoTx;
+}
+
+async function resolverRestDoc(firestoreDb, restauranteId) {
+  let restDoc = await firestoreDb.collection('restaurantes').doc(String(restauranteId)).get();
+  if (!restDoc.exists) {
+    const q = await firestoreDb.collection('restaurantes').where('slug', '==', String(restauranteId)).limit(1).get();
+    if (!q.empty) restDoc = q.docs[0];
+  }
+  if (!restDoc.exists) {
+    throw new functions.https.HttpsError('not-found', 'Restaurante não encontrado.');
+  }
+  return restDoc;
+}
+
+const MAX_COMANDAS_POR_OPERACAO = 50;
+const MAX_ESCRITAS_POR_TRANSACAO = 450;
+
+function normalizarIdsComanda(comandasIds) {
+  const ids = Array.from(
+    new Set(comandasIds.map((id) => String(id || '').trim()).filter(Boolean))
+  );
+  if (ids.length === 0 || ids.length > MAX_COMANDAS_POR_OPERACAO) {
+    throw new functions.https.HttpsError(
+      'invalid-argument',
+      `Informe entre 1 e ${MAX_COMANDAS_POR_OPERACAO} comandas.`
+    );
+  }
+  return ids;
+}
+
+/**
+ * Atualiza a taxa de serviço das comandas abertas de uma mesa (equipe ativa).
+ * Transacional: rejeita comanda inexistente, de outro restaurante ou já encerrada.
+ */
+async function executarDefinirTaxaServicoMesa(firestoreDb, authUid, authToken, payload) {
+  const { restauranteId, mesa, comandasIds, ativa } = payload || {};
+  if (!authUid) {
+    throw new functions.https.HttpsError('unauthenticated', 'Autenticação necessária.');
+  }
+  if (!restauranteId || mesa === undefined || mesa === null || !Array.isArray(comandasIds)) {
+    throw new functions.https.HttpsError('invalid-argument', 'Parâmetros inválidos para taxa de serviço.');
+  }
+  if (typeof ativa !== 'boolean') {
+    throw new functions.https.HttpsError('invalid-argument', 'O campo ativa deve ser booleano.');
+  }
+
+  const restDoc = await resolverRestDoc(firestoreDb, restauranteId);
+  await verificarPermissaoOperacionalRestaurante(
+    firestoreDb,
+    restDoc,
+    authUid,
+    authToken,
+    ['owner', 'admin', 'garcom']
+  );
+
+  const mesaStr = String(mesa).trim();
+  const ids = normalizarIdsComanda(comandasIds);
+  const refs = ids.map((cId) =>
+    restDoc.ref.collection('mesas').doc(mesaStr).collection('comandas_abertas').doc(cId)
+  );
+  const agoraServer = admin.firestore.FieldValue.serverTimestamp();
+
+  await firestoreDb.runTransaction(async (t) => {
+    const snaps = await t.getAll(...refs);
+    snaps.forEach((snap) => {
+      if (!snap.exists) {
+        throw new functions.https.HttpsError('not-found', 'Comanda não encontrada.');
+      }
+      const c = snap.data() || {};
+      if (c.restauranteId && c.restauranteId !== restDoc.id) {
+        throw new functions.https.HttpsError('permission-denied', 'Comanda não pertence a este restaurante.');
+      }
+      if (c.status === 'pago' || c.arquivada === true) {
+        throw new functions.https.HttpsError('failed-precondition', 'Comanda já encerrada.');
+      }
+    });
+    refs.forEach((ref) => {
+      t.update(ref, { taxaServicoAtiva: ativa, atualizadoEm: agoraServer });
+    });
+  });
+
+  return { sucesso: true, taxaServicoAtiva: ativa };
+}
+
+/**
+ * Fecha uma comanda individual: comanda, pedidos e tickets KDS são lidos e gravados
+ * na mesma transação. Idempotente: repetir a chamada em comanda já paga retorna sucesso sem reescrever.
+ */
+async function executarFecharComanda(firestoreDb, authUid, authToken, payload) {
+  const { restauranteId, mesa, clienteId } = payload || {};
+  if (!authUid) {
+    throw new functions.https.HttpsError('unauthenticated', 'Autenticação necessária.');
+  }
+  if (!restauranteId || mesa === undefined || mesa === null || !clienteId) {
+    throw new functions.https.HttpsError('invalid-argument', 'Campos restauranteId, mesa e clienteId são obrigatórios.');
+  }
+
+  const restDoc = await resolverRestDoc(firestoreDb, restauranteId);
+  await verificarPermissaoOperacionalRestaurante(
+    firestoreDb,
+    restDoc,
+    authUid,
+    authToken,
+    ['owner', 'admin', 'garcom']
+  );
+
+  const mesaStr = String(mesa).trim();
+  const cId = String(clienteId).trim();
+  const comandaRef = restDoc.ref.collection('mesas').doc(mesaStr).collection('comandas_abertas').doc(cId);
+  const agoraServer = admin.firestore.FieldValue.serverTimestamp();
+  const agoraIso = new Date().toISOString();
+  let resultado = null;
+
+  await firestoreDb.runTransaction(async (t) => {
+    const comandaSnap = await t.get(comandaRef);
+    if (!comandaSnap.exists) {
+      throw new functions.https.HttpsError('not-found', 'Comanda não encontrada.');
+    }
+    const c = comandaSnap.data() || {};
+    if (c.restauranteId && c.restauranteId !== restDoc.id) {
+      throw new functions.https.HttpsError('permission-denied', 'Comanda não pertence a este restaurante.');
+    }
+    if (c.status === 'pago') {
+      resultado = { sucesso: true, idempotente: true };
+      return;
+    }
+
+    const pedidosSnap = await t.get(comandaRef.collection('pedidos'));
+    const pedidosAtivos = pedidosSnap.docs.filter((d) => {
+      const s = (d.data() || {}).status;
+      return s !== 'cancelado' && s !== 'estornado';
+    });
+    if (pedidosAtivos.length * 2 + 1 > MAX_ESCRITAS_POR_TRANSACAO) {
+      throw new functions.https.HttpsError('failed-precondition', 'Comanda excede o limite operacional de pedidos.');
+    }
+    const kdsRefs = pedidosAtivos.map((d) => restDoc.ref.collection('kds_tickets').doc(d.id));
+    const kdsSnaps = kdsRefs.length > 0 ? await t.getAll(...kdsRefs) : [];
+
+    pedidosAtivos.forEach((pedDoc) => {
+      t.update(pedDoc.ref, { status: 'pago', fechadoEm: agoraIso, atualizadoEm: agoraServer });
+    });
+    kdsSnaps.forEach((kdsSnap) => {
+      if (kdsSnap.exists) {
+        t.update(kdsSnap.ref, { status: 'entregue', fechadoEm: agoraIso, atualizadoEm: agoraServer });
+      }
+    });
+
+    t.update(comandaRef, {
+      status: 'pago',
+      pagoEm: agoraServer,
+      encerradaEm: agoraServer,
+      encerradaPorUid: authUid,
+      arquivada: true,
+      atualizadoEm: agoraServer,
+    });
+    resultado = { sucesso: true, idempotente: false };
+  });
+
+  return resultado;
+}
+
+/**
+ * Libera a mesa: tudo em uma única transação (leituras antes das escritas).
+ * O subtotal do histórico é recalculado a partir dos pedidos reais. Idempotente: comandas já
+ * registradas (campo historicoSessaoId) não geram novo histórico nem nova métrica.
+ */
+async function executarLiberarMesa(firestoreDb, authUid, authToken, payload) {
+  const { restauranteId, mesa, comandasIds } = payload || {};
+  if (!authUid) {
+    throw new functions.https.HttpsError('unauthenticated', 'Autenticação necessária.');
+  }
+  if (!restauranteId || mesa === undefined || mesa === null || !Array.isArray(comandasIds)) {
+    throw new functions.https.HttpsError('invalid-argument', 'Parâmetros inválidos para liberação da mesa.');
+  }
+
+  const restDoc = await resolverRestDoc(firestoreDb, restauranteId);
+  await verificarPermissaoOperacionalRestaurante(
+    firestoreDb,
+    restDoc,
+    authUid,
+    authToken,
+    ['owner', 'admin', 'garcom']
+  );
+
+  const mesaStr = String(mesa).trim();
+  const ids = normalizarIdsComanda(comandasIds);
+  const comandaRefs = ids.map((cId) =>
+    restDoc.ref.collection('mesas').doc(mesaStr).collection('comandas_abertas').doc(cId)
+  );
+  const agoraServer = admin.firestore.FieldValue.serverTimestamp();
+  let resultado = null;
+
+  await firestoreDb.runTransaction(async (t) => {
+    const comandaSnaps = await t.getAll(...comandaRefs);
+
+    const pendentes = [];
+    let jaRegistradas = 0;
+    comandaSnaps.forEach((snap) => {
+      if (!snap.exists) return;
+      const c = snap.data() || {};
+      if (c.restauranteId && c.restauranteId !== restDoc.id) {
+        throw new functions.https.HttpsError('permission-denied', 'Comanda não pertence a este restaurante.');
+      }
+      if (c.historicoSessaoId) {
+        jaRegistradas++;
+        return;
+      }
+      pendentes.push({ ref: snap.ref, data: c });
+    });
+
+    if (pendentes.length === 0) {
+      if (jaRegistradas > 0) {
+        resultado = { sucesso: true, idempotente: true };
+        return;
+      }
+      throw new functions.https.HttpsError('not-found', 'Nenhuma comanda encontrada para liberar.');
+    }
+
+    let subtotalTotalCentavos = 0;
+    let abertaEm = null;
+    let pagaEm = null;
+    let totalEscritas = 3; // histórico + métrica (+ margem)
+    const operacoes = [];
+
+    for (const item of pendentes) {
+      const pedidosSnap = await t.get(item.ref.collection('pedidos'));
+      let subtotalComandaCentavos = 0;
+      const kdsRefs = [];
+      pedidosSnap.forEach((pDoc) => {
+        const pData = pDoc.data() || {};
+        if (pData.status !== 'cancelado' && pData.status !== 'estornado') {
+          subtotalComandaCentavos += Math.round((Number(pData.subtotal) || 0) * 100);
+        }
+        kdsRefs.push(restDoc.ref.collection('kds_tickets').doc(pDoc.id));
+      });
+      totalEscritas += 1 + pedidosSnap.size * 2;
+      if (totalEscritas > MAX_ESCRITAS_POR_TRANSACAO) {
+        throw new functions.https.HttpsError('failed-precondition', 'Volume de pedidos excede o limite operacional da liberação.');
+      }
+
+      subtotalTotalCentavos +=
+        subtotalComandaCentavos > 0
+          ? subtotalComandaCentavos
+          : Math.round((Number(item.data.subtotal) || 0) * 100);
+      if (item.data.criadoEm && !abertaEm) abertaEm = item.data.criadoEm;
+      if (item.data.pagoEm || item.data.atualizadoEm) pagaEm = item.data.pagoEm || item.data.atualizadoEm;
+
+      operacoes.push({ item, pedidosDocs: pedidosSnap.docs, kdsRefs });
+    }
+
+    const subtotalTotal = Number((subtotalTotalCentavos / 100).toFixed(2));
+    const historicoId = `sessao_${mesaStr}_${Date.now()}`;
+    const historicoRef = restDoc.ref.collection('historico_sessoes_mesas').doc(historicoId);
+    const agora = new Date();
+    const chaveMes = `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, '0')}`;
+    const resumoRef = restDoc.ref.collection('metricas_consolidadas').doc(chaveMes);
+    const quantidade = pendentes.length;
+
+    for (const op of operacoes) {
+      op.pedidosDocs.forEach((pDoc) => t.delete(pDoc.ref));
+      op.kdsRefs.forEach((kRef) => t.delete(kRef));
+      t.update(op.item.ref, {
+        status: 'pago',
+        pagoEm: op.item.data.pagoEm || agoraServer,
+        encerradaEm: agoraServer,
+        encerradaPorUid: authUid,
+        arquivada: true,
+        historicoSessaoId: historicoId,
+        atualizadoEm: agoraServer,
+      });
+    }
+
+    t.set(historicoRef, {
+      id: historicoId,
+      restauranteId: restDoc.id,
+      mesa: Number(mesaStr) || mesaStr,
+      subtotalTotal,
+      quantidadePagantes: quantidade,
+      comandasIds: pendentes.map((p) => p.ref.id),
+      abertaEm: abertaEm || agoraServer,
+      pagaEm: pagaEm || agoraServer,
+      liberadaEm: agoraServer,
+      liberadaPorUid: authUid,
+    });
+
+    t.set(
+      resumoRef,
+      {
+        anoMes: chaveMes,
+        restauranteId: restDoc.id,
+        totalFaturado: admin.firestore.FieldValue.increment(subtotalTotal),
+        totalSessoes: admin.firestore.FieldValue.increment(1),
+        totalClientes: admin.firestore.FieldValue.increment(quantidade),
+        atualizadoEm: agoraServer,
+      },
+      { merge: true }
+    );
+
+    resultado = { sucesso: true, idempotente: false, subtotalTotal, historicoId };
+  });
+
+  return resultado;
+}
+
+exports.garantirCredencialMesa = functions.https.onCall(async (data, context) => {
+  return executarGarantirCredencialMesa(getDb(), context.auth?.uid, context.auth?.token, data);
+});
+
+exports.emitirSessaoMesa = functions
+  .runWith({ secrets: ['MESA_SESSION_SECRET'] })
+  .https.onCall(async (data, context) => {
+    return executarEmissaoSessaoMesa(getDb(), context.auth?.uid, data);
+  });
+
+exports.criarPedidoCliente = functions
+  .runWith({ secrets: ['MESA_SESSION_SECRET'] })
+  .https.onCall(async (data, context) => {
+    return executarCriacaoPedidoCliente(getDb(), context.auth?.uid, data);
+  });
+
+exports.lancarPedidoGarcom = functions.https.onCall(async (data, context) => {
+  return executarLancamentoPedidoGarcom(getDb(), context.auth?.uid, context.auth?.token, data);
+});
+
+exports.definirTaxaServicoMesaBackend = functions.https.onCall(async (data, context) => {
+  return executarDefinirTaxaServicoMesa(getDb(), context.auth?.uid, context.auth?.token, data);
+});
+
+exports.fecharComandaBackend = functions.https.onCall(async (data, context) => {
+  return executarFecharComanda(getDb(), context.auth?.uid, context.auth?.token, data);
+});
+
+/**
+ * Desativa logicamente uma mesa física (sem exclusão física, preservando histórico e auditoria).
+ * Valida permissão (owner/admin), inexistência de comandas abertas ou tickets KDS ativos,
+ * e invalida/rotaciona a credencial QR da mesa dentro de uma única transação.
+ */
+async function executarDesativarMesa(firestoreDb, authUid, authToken, payload) {
+  const { restauranteId, mesa } = payload || {};
+  if (!authUid) {
+    throw new functions.https.HttpsError('unauthenticated', 'Autenticação necessária.');
+  }
+  if (!restauranteId || mesa === undefined || mesa === null || String(mesa).trim() === '') {
+    throw new functions.https.HttpsError('invalid-argument', 'Campos restauranteId e mesa são obrigatórios.');
+  }
+
+  const restDoc = await resolverRestDoc(firestoreDb, restauranteId);
+  await verificarPermissaoOperacionalRestaurante(
+    firestoreDb,
+    restDoc,
+    authUid,
+    authToken,
+    ['owner', 'admin']
+  );
+
+  const mesaStr = String(mesa).trim();
+  const numMesa = Number(mesaStr);
+  const mesaRef = restDoc.ref.collection('mesas').doc(mesaStr);
+  const agoraServer = admin.firestore.FieldValue.serverTimestamp();
+  let resultado = null;
+
+  await firestoreDb.runTransaction(async (t) => {
+    const mesaSnap = await t.get(mesaRef);
+    if (!mesaSnap.exists) {
+      throw new functions.https.HttpsError('not-found', 'Mesa não encontrada.');
+    }
+    const mData = mesaSnap.data() || {};
+
+    const comandasSnap = await t.get(mesaRef.collection('comandas_abertas'));
+    const temComandaAtiva = comandasSnap.docs.some((d) => {
+      const c = d.data() || {};
+      return c.status !== 'pago' && c.arquivada !== true;
+    });
+    if (temComandaAtiva) {
+      throw new functions.https.HttpsError(
+        'failed-precondition',
+        'Não é possível desativar a mesa enquanto houver comandas abertas ou não pagas.'
+      );
+    }
+
+    const kdsQuery = Number.isFinite(numMesa)
+      ? restDoc.ref.collection('kds_tickets').where('mesa', '==', numMesa)
+      : restDoc.ref.collection('kds_tickets').where('mesa', '==', mesaStr);
+    const kdsSnap = await t.get(kdsQuery);
+    const temTicketAtivo = kdsSnap.docs.some((d) => {
+      const s = (d.data() || {}).status;
+      return s === 'a_fazer' || s === 'em_preparo' || s === 'pronto';
+    });
+    if (temTicketAtivo) {
+      throw new functions.https.HttpsError(
+        'failed-precondition',
+        'Não é possível desativar a mesa enquanto houver tickets ativos na cozinha.'
+      );
+    }
+
+    if (mData.ativa === false && mData.statusEstrutural === 'inativa') {
+      resultado = { sucesso: true, idempotente: true };
+      return;
+    }
+
+    const versaoAtual = Number(mData.qrVersao) || 1;
+    t.update(mesaRef, {
+      ativa: false,
+      statusEstrutural: 'inativa',
+      qrCredencialHash: admin.firestore.FieldValue.delete(),
+      qrCredencial: admin.firestore.FieldValue.delete(),
+      qrVersao: versaoAtual + 1,
+      desativadaEm: agoraServer,
+      desativadaPorUid: authUid,
+      atualizadoEm: agoraServer,
+    });
+    resultado = { sucesso: true, idempotente: false };
+  });
+
+  return resultado;
+}
+
+exports.liberarMesaBackend = functions.https.onCall(async (data, context) => {
+  return executarLiberarMesa(getDb(), context.auth?.uid, context.auth?.token, data);
+});
+
+exports.desativarMesaBackend = functions.https.onCall(async (data, context) => {
+  return executarDesativarMesa(getDb(), context.auth?.uid, context.auth?.token, data);
+});
+
+exports._internal = {
+  getMesaTokenSecret,
+  verificarMesaToken,
+  validarModificadoresServidor,
+  executarGarantirCredencialMesa,
+  executarCriacaoPedidoCliente,
+  executarEmissaoSessaoMesa,
+  executarLancamentoPedidoGarcom,
+  executarDefinirTaxaServicoMesa,
+  executarFecharComanda,
+  executarLiberarMesa,
+  executarDesativarMesa,
+};
+
 /**
  * Webhook HTTPS legado para Pix (DESCONTINUADO por segurança).
  * Responde 410 Gone. O fluxo de pagamento ativo e seguro é processado via Mercado Pago Webhook oficial.

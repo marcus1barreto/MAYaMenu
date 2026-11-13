@@ -39,11 +39,15 @@ interface PinLockGuardProps {
   children: React.ReactNode;
 }
 
-// PINs padrão de contingência
-const PINS_CONFIG = {
-  cozinha: "1234",
-  garcom: "4321",
-};
+function resolverRestauranteExplicito(restauranteId?: string, slug?: string): string | null {
+  if (restauranteId) return restauranteId;
+  if (slug) return slug;
+  if (typeof window !== "undefined") {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("r") || params.get("restaurante") || null;
+  }
+  return null;
+}
 
 export function PinLockGuard({ role, restauranteId, slug, children }: PinLockGuardProps) {
   const [pinDigitado, setPinDigitado] = useState("");
@@ -56,35 +60,71 @@ export function PinLockGuard({ role, restauranteId, slug, children }: PinLockGua
   const [colaboradores, setColaboradores] = useState<ColaboradorItem[]>([]);
   const [carregandoColaboradores, setCarregandoColaboradores] = useState(true);
   const [colaboradorSelecionado, setColaboradorSelecionado] = useState<ColaboradorItem | null>(null);
-  const [modoEntradaDireta, setModoEntradaDireta] = useState(false);
 
-  // Recupera desbloqueio na sessão local
+  const targetRestId = resolverRestauranteExplicito(restauranteId, slug);
+
+  // Recupera desbloqueio na sessão local SOMENTE se vinculado ao restaurante e validado pelas claims do Firebase Auth
   useEffect(() => {
-    const salvo = sessionStorage.getItem(`mayamenu_pin_unlocked_${role}`);
-    if (salvo === "true") {
-      setDesbloqueado(true);
+    let ativo = true;
+    async function validarSessaoSalva() {
+      if (!targetRestId) {
+        if (ativo) setDesbloqueado(false);
+        return;
+      }
+      const salvo = sessionStorage.getItem(`mayamenu_pin_unlocked_${role}_${targetRestId}`);
+      if (salvo !== "true") {
+        if (ativo) setDesbloqueado(false);
+        return;
+      }
+
+      const currentUser = auth.currentUser;
+      if (!currentUser || currentUser.isAnonymous) {
+        sessionStorage.removeItem(`mayamenu_pin_unlocked_${role}_${targetRestId}`);
+        if (ativo) setDesbloqueado(false);
+        return;
+      }
+
+      try {
+        const tokenRes = await currentUser.getIdTokenResult();
+        const claims = tokenRes?.claims || {};
+        const claimRestId = claims.restauranteId as string | undefined;
+        const claimRole = claims.role as string | undefined;
+        const ehDonoOuSuper = claims.superadmin === true || claimRole === "owner";
+        const mesmoRestaurante =
+          !claimRestId || claimRestId === targetRestId || (slug && claimRestId === restauranteId);
+
+        if (ativo && (ehDonoOuSuper || (claimRole === role && mesmoRestaurante))) {
+          setDesbloqueado(true);
+        } else if (ativo) {
+          sessionStorage.removeItem(`mayamenu_pin_unlocked_${role}_${targetRestId}`);
+          setDesbloqueado(false);
+        }
+      } catch {
+        if (ativo) setDesbloqueado(false);
+      }
     }
-  }, [role]);
+
+    validarSessaoSalva();
+    return () => {
+      ativo = false;
+    };
+  }, [role, targetRestId, restauranteId, slug]);
 
   // Carrega lista pública de colaboradores do salão / cozinha
   useEffect(() => {
     let montado = true;
-    const targetRestId =
-      restauranteId ||
-      slug ||
-      (typeof window !== "undefined"
-        ? new URLSearchParams(window.location.search).get("r") ||
-          new URLSearchParams(window.location.search).get("restaurante") ||
-          localStorage.getItem("mayamenu_ultimo_restaurante")
-        : null) ||
-      "ratazanas";
+    if (!targetRestId) {
+      setColaboradores([]);
+      setCarregandoColaboradores(false);
+      return;
+    }
 
-    async function buscarEquipe() {
+    async function buscarEquipe(restId: string) {
       try {
         // 1. Tenta obter via Cloud Function listarEquipePublica
         try {
           const listarFn = httpsCallable(functions, "listarEquipePublica");
-          const res: any = await listarFn({ restauranteId: targetRestId, role });
+          const res: any = await listarFn({ restauranteId: restId, role });
           if (res?.data?.membros && Array.isArray(res.data.membros) && res.data.membros.length > 0) {
             if (montado) {
               setColaboradores(res.data.membros);
@@ -97,7 +137,7 @@ export function PinLockGuard({ role, restauranteId, slug, children }: PinLockGua
         }
 
         // 2. Fallback: Consulta Firestore se as regras permitirem
-        const equipeRef = collection(db, "restaurantes", targetRestId, "equipe");
+        const equipeRef = collection(db, "restaurantes", restId, "equipe");
         const q = query(equipeRef, where("role", "==", role));
         const snap = await getDocs(q);
 
@@ -126,28 +166,28 @@ export function PinLockGuard({ role, restauranteId, slug, children }: PinLockGua
       }
     }
 
-    buscarEquipe();
+    buscarEquipe(targetRestId);
     return () => {
       montado = false;
     };
-  }, [restauranteId, slug, role]);
+  }, [targetRestId, role]);
 
   // Autenticação segura via PIN numérico (suporta de 4 a 6 dígitos)
   const executarLoginPin = async (pinFinal: string) => {
+    if (!targetRestId) {
+      setErro("Estabelecimento não identificado. Use o link do restaurante ou escaneie seu crachá.");
+      return;
+    }
+
+    if (!colaboradorSelecionado) {
+      setErro("Selecione seu perfil de colaborador antes de digitar o PIN.");
+      return;
+    }
+
     if (!pinFinal || pinFinal.length < 4) {
       setErro("Digite pelo menos 4 números.");
       return;
     }
-
-    const targetRestId =
-      restauranteId ||
-      slug ||
-      (typeof window !== "undefined"
-        ? new URLSearchParams(window.location.search).get("r") ||
-          new URLSearchParams(window.location.search).get("restaurante") ||
-          localStorage.getItem("mayamenu_ultimo_restaurante")
-        : null) ||
-      "ratazanas";
 
     setAutenticando(true);
     setErro(null);
@@ -158,15 +198,15 @@ export function PinLockGuard({ role, restauranteId, slug, children }: PinLockGua
         restauranteId: targetRestId,
         pin: pinFinal,
         role,
-        colaboradorId: colaboradorSelecionado?.id || colaboradorSelecionado?.uid,
+        colaboradorId: colaboradorSelecionado.id || colaboradorSelecionado.uid,
       });
 
       const data = res.data as { sucesso: boolean; token: string; membro: any };
       if (data?.token) {
         await signInWithCustomToken(auth, data.token);
-        sessionStorage.setItem(`mayamenu_pin_unlocked_${role}`, "true");
+        sessionStorage.setItem(`mayamenu_pin_unlocked_${role}_${targetRestId}`, "true");
         if (data.membro) {
-          sessionStorage.setItem(`mayamenu_colaborador_${role}`, JSON.stringify(data.membro));
+          sessionStorage.setItem(`mayamenu_colaborador_${role}_${targetRestId}`, JSON.stringify(data.membro));
         }
         setDesbloqueado(true);
         return;
@@ -176,7 +216,9 @@ export function PinLockGuard({ role, restauranteId, slug, children }: PinLockGua
       const msg = err?.message?.includes("bloqueado temporariamente")
         ? err.message
         : err?.message?.includes("PIN incorreto")
-        ? `PIN incorreto para ${colaboradorSelecionado ? colaboradorSelecionado.nome : "este restaurante"}.`
+        ? `PIN incorreto para ${colaboradorSelecionado.nome}.`
+        : err?.code
+        ? `Falha na autenticação (${err.code}). Verifique o PIN e tente novamente.`
         : "PIN inválido. Verifique os números e tente novamente.";
       setErro(msg);
       setTimeout(() => setPinDigitado(""), 900);
@@ -187,12 +229,11 @@ export function PinLockGuard({ role, restauranteId, slug, children }: PinLockGua
 
   // Autenticação rápida via Crachá QR Code
   const handleCrachaLido = async (cracha: CrachaPayload) => {
-    const targetRestId =
-      cracha.restauranteId ||
-      restauranteId ||
-      slug ||
-      (typeof window !== "undefined" ? localStorage.getItem("mayamenu_ultimo_restaurante") : null) ||
-      "ratazanas";
+    const restIdCracha = cracha.restauranteId || targetRestId;
+    if (!restIdCracha) {
+      setErro("Crachá sem identificador do restaurante.");
+      return;
+    }
 
     setAutenticando(true);
     setErro(null);
@@ -200,16 +241,16 @@ export function PinLockGuard({ role, restauranteId, slug, children }: PinLockGua
     try {
       const loginCrachaFn = httpsCallable(functions, "loginComCracha");
       const res = await loginCrachaFn({
-        restauranteId: targetRestId,
+        restauranteId: restIdCracha,
         crachaToken: cracha.crachaToken,
       });
 
       const data = res.data as { sucesso: boolean; token: string; membro: any };
       if (data?.token) {
         await signInWithCustomToken(auth, data.token);
-        sessionStorage.setItem(`mayamenu_pin_unlocked_${role}`, "true");
+        sessionStorage.setItem(`mayamenu_pin_unlocked_${role}_${restIdCracha}`, "true");
         if (data.membro) {
-          sessionStorage.setItem(`mayamenu_colaborador_${role}`, JSON.stringify(data.membro));
+          sessionStorage.setItem(`mayamenu_colaborador_${role}_${restIdCracha}`, JSON.stringify(data.membro));
         }
         setDesbloqueado(true);
       }
@@ -247,11 +288,41 @@ export function PinLockGuard({ role, restauranteId, slug, children }: PinLockGua
   }
 
   const ehCozinha = role === "cozinha";
-  const pinDica = PINS_CONFIG[role];
 
-  // Mostra a grade de seleção de garçons se existirem colaboradores cadastrados e nenhum tiver sido selecionado
-  const exibirSelecaoColaboradores =
-    colaboradores.length > 0 && !colaboradorSelecionado && !modoEntradaDireta;
+  if (!targetRestId) {
+    return (
+      <div className="min-h-screen bg-neutral-50 flex flex-col items-center justify-center p-4 text-center">
+        <div className="w-full max-w-sm p-6 bg-white border border-neutral-200 rounded-3xl shadow-xl space-y-4">
+          <div className="w-14 h-14 mx-auto rounded-2xl bg-red-100 text-red-600 flex items-center justify-center">
+            <Lock className="w-7 h-7" />
+          </div>
+          <h2 className="text-lg font-black text-neutral-950">Estabelecimento não identificado</h2>
+          <p className="text-xs text-neutral-600 leading-relaxed">
+            Para sua segurança, acesse pelo link do painel do seu restaurante (<code className="font-mono">?r=ID</code>) ou escaneie seu Crachá QR Code.
+          </p>
+          <Button
+            type="button"
+            onClick={() => setScannerAberto(true)}
+            className="w-full h-11 rounded-xl font-bold text-xs bg-rose-600 hover:bg-rose-500 text-white flex items-center justify-center gap-2"
+          >
+            <QrCode className="w-4 h-4" />
+            <span>Escanear Crachá com Câmera</span>
+          </Button>
+          {erro && (
+            <p className="text-xs font-semibold text-red-600">{erro}</p>
+          )}
+        </div>
+        <CrachaScannerModal
+          isOpen={scannerAberto}
+          onClose={() => setScannerAberto(false)}
+          onCrachaLido={handleCrachaLido}
+        />
+      </div>
+    );
+  }
+
+  // Mostra a grade de seleção de colaboradores se nenhum tiver sido selecionado
+  const exibirSelecaoColaboradores = !colaboradorSelecionado;
 
   return (
     <div className="min-h-screen bg-neutral-50 flex flex-col items-center justify-center p-4 select-none relative overflow-hidden selection:bg-rose-600 selection:text-white">
@@ -320,22 +391,13 @@ export function PinLockGuard({ role, restauranteId, slug, children }: PinLockGua
               ))}
             </div>
 
-            {/* Opções Alternativas: Digitar PIN Geral ou Usar Crachá */}
+            {/* Opção Alternativa: Usar Crachá */}
             <div className="flex flex-col gap-2 w-full pt-2 border-t border-neutral-100">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setModoEntradaDireta(true);
-                  setColaboradorSelecionado(null);
-                  setPinDigitado("");
-                }}
-                className="w-full h-10 text-xs font-bold rounded-xl border-neutral-200 text-neutral-700 hover:text-neutral-950"
-              >
-                <KeyRound className="w-3.5 h-3.5 mr-1 text-neutral-500" />
-                <span>Digitar PIN Direto / Salão Geral</span>
-              </Button>
-
+              {!carregandoColaboradores && colaboradores.length === 0 && (
+                <p className="text-xs text-neutral-500 py-2">
+                  Nenhum colaborador com acesso de {ehCozinha ? "cozinha" : "garçom"} cadastrado neste restaurante.
+                </p>
+              )}
               <Button
                 type="button"
                 onClick={() => setScannerAberto(true)}
@@ -361,7 +423,6 @@ export function PinLockGuard({ role, restauranteId, slug, children }: PinLockGua
                 type="button"
                 onClick={() => {
                   setColaboradorSelecionado(null);
-                  setModoEntradaDireta(false);
                   setPinDigitado("");
                   setErro(null);
                 }}
@@ -449,11 +510,6 @@ export function PinLockGuard({ role, restauranteId, slug, children }: PinLockGua
                 <span>{erro}</span>
               </div>
             )}
-
-            {/* Dica discreta de contingência */}
-            <span className="text-[10px] font-mono text-neutral-500 mb-4 bg-neutral-100 px-3 py-1 rounded-full border border-neutral-200">
-              PIN padrão do salão: <strong className="text-neutral-800">{pinDica}</strong>
-            </span>
 
             {/* Teclado Numérico Fat-Finger Harmonizado com Botão de Confirmar */}
             <div className="grid grid-cols-3 gap-2.5 w-full max-w-[270px]">

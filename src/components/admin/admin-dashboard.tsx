@@ -17,7 +17,6 @@ import {
   alternarDisponibilidadePrato,
   salvarItemCardapio,
   excluirItemCardapio,
-  popularCardapioInicialSeVazio,
   atenderGarcomFirestore,
   lancarItemManualFirestore,
   trocarOrdemItens,
@@ -339,14 +338,7 @@ export function AdminDashboard() {
     if (!restaurante?.id) return;
 
     setCarregandoCardapio(true);
-    let jaSemeado = false;
     const unsub = escutarCardapio(restaurante.id, (novosItens) => {
-      if (novosItens.length === 0 && !jaSemeado) {
-        jaSemeado = true;
-        popularCardapioInicialSeVazio(restaurante.id).catch((err) =>
-          console.warn("Falha ao inicializar cardápio de testes:", err)
-        );
-      }
       setItensCardapio(novosItens);
       setCarregandoCardapio(false);
     });
@@ -1099,7 +1091,7 @@ export function AdminDashboard() {
             <span className="hidden sm:inline">Escanear Comanda</span>
           </Button>
 
-          <Link href="/garcom" target="_blank">
+          <Link href={restaurante?.id ? `/garcom?r=${encodeURIComponent(restaurante.id)}` : "/garcom"} target="_blank">
             <Button
               variant="outline"
               className="bg-card border-border hover:bg-muted text-emerald-600 dark:text-emerald-400 font-bold text-xs h-9 px-3 rounded-xl flex items-center gap-1.5 shadow-2xs hover:border-emerald-300 transition-all"
@@ -1111,7 +1103,7 @@ export function AdminDashboard() {
             </Button>
           </Link>
 
-          <Link href="/cozinha" target="_blank">
+          <Link href={restaurante?.id ? `/cozinha?r=${encodeURIComponent(restaurante.id)}` : "/cozinha"} target="_blank">
             <Button
               variant="outline"
               className="bg-card border-border hover:bg-muted text-amber-500 font-bold text-xs h-9 px-3 rounded-xl flex items-center gap-1.5"

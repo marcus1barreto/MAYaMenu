@@ -48,6 +48,7 @@ export interface MembroEquipe {
   nome: string;
   role: "garcom" | "cozinha";
   pin?: string;
+  pinHash?: string;
   fotoUrl?: string;
   crachaToken?: string;
   atualizadoEm?: any;
@@ -231,7 +232,7 @@ export function GestaoEquipe({ restauranteId, nomeRestaurante = "MAYaMenu" }: Ge
 
   const handleAbrirAlterarPin = (membro: MembroEquipe) => {
     setMembroEditandoPin(membro);
-    setNovoPinValor(membro.pin || "");
+    setNovoPinValor("");
   };
 
   const handleSalvarNovoPin = async (e: React.FormEvent) => {
@@ -250,7 +251,7 @@ export function GestaoEquipe({ restauranteId, nomeRestaurante = "MAYaMenu" }: Ge
       const atualizarPinFn = httpsCallable(functions, "atualizarPinColaborador");
       await atualizarPinFn({
         restauranteId,
-        membroUid: membroEditandoPin.uid,
+        membroUid: membroEditandoPin.uid || membroEditandoPin.id,
         novoPin: pinLimpo,
       });
 
@@ -259,7 +260,9 @@ export function GestaoEquipe({ restauranteId, nomeRestaurante = "MAYaMenu" }: Ge
       setNovoPinValor("");
     } catch (err: any) {
       console.error("Erro ao atualizar PIN:", err);
-      alert(err?.message || "Erro ao atualizar PIN do colaborador.");
+      const codigo = typeof err?.code === "string" && err.code ? `[${err.code}] ` : "";
+      const detalhe = err?.message || "Erro ao atualizar PIN do colaborador.";
+      alert(`${codigo}${detalhe}`);
     } finally {
       setSalvandoPin(false);
     }
@@ -286,7 +289,7 @@ export function GestaoEquipe({ restauranteId, nomeRestaurante = "MAYaMenu" }: Ge
 
           <div className="flex flex-wrap items-center gap-2">
             {/* BOTÃO ATALHO PARA O APP DO GARÇOM */}
-            <Link href="/garcom" target="_blank">
+            <Link href={restauranteId ? `/garcom?r=${encodeURIComponent(restauranteId)}` : "/garcom"} target="_blank">
               <Button
                 type="button"
                 variant="outline"
@@ -301,7 +304,7 @@ export function GestaoEquipe({ restauranteId, nomeRestaurante = "MAYaMenu" }: Ge
             </Link>
 
             {/* BOTÃO ATALHO PARA A COZINHA */}
-            <Link href="/cozinha" target="_blank">
+            <Link href={restauranteId ? `/cozinha?r=${encodeURIComponent(restauranteId)}` : "/cozinha"} target="_blank">
               <Button
                 type="button"
                 variant="outline"
@@ -452,7 +455,7 @@ export function GestaoEquipe({ restauranteId, nomeRestaurante = "MAYaMenu" }: Ge
                   maxLength={6}
                   value={pinNovo}
                   onChange={(e) => setPinNovo(e.target.value.replace(/\D/g, ""))}
-                  placeholder="ex: 1234 ou 123456"
+                  placeholder="4 a 6 dígitos"
                   className="h-10 text-xs font-mono font-bold tracking-widest rounded-xl"
                   disabled={processando}
                 />
@@ -547,8 +550,8 @@ export function GestaoEquipe({ restauranteId, nomeRestaurante = "MAYaMenu" }: Ge
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {equipe.map((membro) => {
               const isGarcom = membro.role === "garcom";
-              const pinVisivel = mostrarPinsGlobais || pinsVisiveisIndividuais[membro.id];
-              const pinCadastrado = membro.pin || "4321";
+              const pinConfigurado = Boolean(membro.pinHash || membro.pin);
+              const pinVisivel = Boolean(membro.pin) && (mostrarPinsGlobais || pinsVisiveisIndividuais[membro.id]);
 
               return (
                 <div
@@ -580,24 +583,30 @@ export function GestaoEquipe({ restauranteId, nomeRestaurante = "MAYaMenu" }: Ge
                         </Badge>
                       </div>
 
-                      {/* EXIBIÇÃO DO PIN COM BOTÃO DE REVELAR / ALTERAR */}
+                      {/* EXIBIÇÃO DO ESTADO DO PIN COM BOTÃO DE ALTERAR */}
                       <div className="flex items-center gap-2 mt-1">
                         <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-background border border-border text-[11px] font-mono font-bold text-foreground">
                           <KeyRound className="w-3 h-3 text-rose-500 shrink-0" />
                           <span>PIN:</span>
-                          <span className="tracking-widest">
-                            {pinVisivel ? pinCadastrado : "••••"}
+                          <span className="tracking-wide">
+                            {pinVisivel
+                              ? membro.pin
+                              : pinConfigurado
+                              ? "Configurado (hash)"
+                              : "Não configurado"}
                           </span>
                         </div>
 
-                        <button
-                          type="button"
-                          onClick={() => togglePinVisivel(membro.id)}
-                          className="text-muted-foreground hover:text-foreground text-xs p-0.5"
-                          title={pinVisivel ? "Ocultar PIN" : "Ver PIN"}
-                        >
-                          {pinVisivel ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                        </button>
+                        {membro.pin && (
+                          <button
+                            type="button"
+                            onClick={() => togglePinVisivel(membro.id)}
+                            className="text-muted-foreground hover:text-foreground text-xs p-0.5"
+                            title={pinVisivel ? "Ocultar PIN" : "Ver PIN"}
+                          >
+                            {pinVisivel ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                          </button>
+                        )}
 
                         <button
                           type="button"
@@ -784,9 +793,14 @@ export function GestaoEquipe({ restauranteId, nomeRestaurante = "MAYaMenu" }: Ge
                     {membroSelecionadoCracha.role === "garcom" ? "Garçom (Salão)" : "Cozinha (KDS)"}
                   </Badge>
 
-                  {/* Mostra o PIN de login no Crachá */}
+                  {/* Estado do PIN no Crachá (sem expor nem inventar credencial) */}
                   <div className="mt-2 text-xs font-mono font-bold text-neutral-700 bg-neutral-100 px-3 py-1 rounded-xl border border-neutral-200">
-                    PIN de Acesso: <strong className="text-neutral-950">{membroSelecionadoCracha.pin || "4321"}</strong>
+                    PIN Individual:{" "}
+                    <strong className="text-neutral-950">
+                      {membroSelecionadoCracha.pinHash || membroSelecionadoCracha.pin
+                        ? "Configurado (pessoal)"
+                        : "Não configurado"}
+                    </strong>
                   </div>
                 </div>
 

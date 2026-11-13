@@ -170,10 +170,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (email: string, pass: string) => {
     setCarregando(true);
     try {
-      // Credencial explícita apenas para teste demonstrativo
+      // Credencial explícita apenas para teste demonstrativo em desenvolvimento
       if (
-        (email.trim().toLowerCase() === "admin@mayamenu.com" && pass === "123456") ||
-        (email.trim().toLowerCase() === "demo@mayamenu.com" && pass === "123456")
+        process.env.NODE_ENV !== "production" &&
+        ((email.trim().toLowerCase() === "admin@mayamenu.com" && pass === "123456") ||
+          (email.trim().toLowerCase() === "demo@mayamenu.com" && pass === "123456"))
       ) {
         localStorage.setItem("mayamenu_mock_auth", "true");
         setUser({

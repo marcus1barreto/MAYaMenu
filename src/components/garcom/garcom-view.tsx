@@ -39,7 +39,8 @@ import {
   escutarGarconsEmServico,
   type StatusTurno,
 } from "@/lib/turno-service";
-import { escutarConfigsMesas, type ConfigMesa } from "@/lib/mesas-service";
+import { escutarConfigsMesas, salvarConfigMesa, type ConfigMesa } from "@/lib/mesas-service";
+import { deleteField } from "firebase/firestore";
 import { audioAlertService } from "@/lib/audio-alerts";
 import {
   Dialog,
@@ -1349,6 +1350,30 @@ export function GarcomView({
                         })}
                       </span>
                     </>
+                  ) : isReservada && isAtiva ? (
+                    <div className="space-y-1.5">
+                      <span className="text-[11px] text-purple-300 font-bold block truncate">
+                        {cfg?.reserva?.nomeCliente || "Mesa Reservada"}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          if (!restauranteId) return;
+                          try {
+                            await salvarConfigMesa(restauranteId, m.numero, {
+                              statusEstrutural: "livre",
+                              reserva: deleteField() as any,
+                            });
+                          } catch (err) {
+                            console.error("Falha ao liberar reserva:", err);
+                          }
+                        }}
+                        className="w-full py-1 px-2 rounded-lg bg-purple-600/30 hover:bg-purple-600/50 border border-purple-400/40 text-purple-100 text-[10px] font-black uppercase tracking-wide transition-colors cursor-pointer"
+                      >
+                        Liberar Reserva
+                      </button>
+                    </div>
                   ) : (
                     <span className="text-xs text-muted-foreground font-bold block">Mesa Livre</span>
                   )}

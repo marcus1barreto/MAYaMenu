@@ -7,8 +7,8 @@
  * automática assim que o dispositivo recuperar a rede.
  */
 
-import { db } from "@/lib/firebase";
-import { doc, getDoc, writeBatch, serverTimestamp, increment } from "firebase/firestore";
+import { functions, auth, ensureClienteAnonimo } from "@/lib/firebase";
+import { httpsCallable } from "firebase/functions";
 import type { MenuItem } from "@/types";
 
 export interface ItemPedidoOffline {
@@ -35,6 +35,39 @@ export interface PedidoFilaOffline {
   tentativas: number;
   status: "pendente" | "sincronizando" | "falha";
   ultimoErro?: string;
+  proximaTentativaEm?: number;
+  origem?: "cliente" | "garcom";
+  mesaToken?: string;
+  qrCredencial?: string;
+}
+
+const MAX_TENTATIVAS_OFFLINE = 10;
+const MAX_IDADE_OFFLINE_MS = 12 * 60 * 60 * 1000; // 12h (alinhado ao TTL máximo da sessão da mesa)
+
+function mesaTokenExpirado(token?: string): boolean {
+  if (!token || typeof token !== "string") return true;
+  const partes = token.split(".");
+  if (partes.length < 2) return true;
+  const expMillis = Number(partes[0]);
+  if (!Number.isFinite(expMillis)) return true;
+  return expMillis <= Date.now() + 30_000;
+}
+
+function calcularBackoffComJitter(tentativa: number): number {
+  const base = Math.min(60000, 1000 * Math.pow(2, Math.max(0, tentativa - 1)));
+  const jitter = Math.floor(Math.random() * 500);
+  return base + jitter;
+}
+
+function ehErroPermanentePedido(err: any): boolean {
+  const code = String(err?.code || "");
+  return (
+    code.includes("invalid-argument") ||
+    code.includes("not-found") ||
+    code.includes("permission-denied") ||
+    code.includes("failed-precondition") ||
+    code.includes("already-exists")
+  );
 }
 
 const DB_NAME = "mayamenu_offline_v1";
@@ -100,17 +133,43 @@ export async function enfileirarPedidoOffline(pedido: PedidoFilaOffline): Promis
       const store = tx.objectStore(STORE_NAME);
       const req = store.put(pedido);
 
-      req.onsuccess = () => {
+      tx.oncomplete = () => {
         notificarMudancas(pedido.restauranteId);
         resolve(true);
       };
 
+      tx.onabort = () => {
+        console.error("Transação abortada ao gravar pedido na fila IndexedDB:", tx.error);
+        resolve(false);
+      };
+
+      tx.onerror = () => {
+        console.error("Falha na transação ao gravar pedido na fila IndexedDB:", tx.error);
+        resolve(false);
+      };
+
       req.onerror = (err) => {
         console.error("Falha ao gravar pedido na fila IndexedDB:", err);
-        resolve(false);
       };
     } catch (err) {
       console.error("Exceção ao acessar Object Store offline:", err);
+      resolve(false);
+    }
+  });
+}
+
+async function atualizarPedidoOffline(pedido: PedidoFilaOffline): Promise<boolean> {
+  const idb = await obterDB();
+  if (!idb) return false;
+
+  return new Promise((resolve) => {
+    try {
+      const tx = idb.transaction(STORE_NAME, "readwrite");
+      tx.objectStore(STORE_NAME).put(pedido);
+      tx.oncomplete = () => resolve(true);
+      tx.onabort = () => resolve(false);
+      tx.onerror = () => resolve(false);
+    } catch {
       resolve(false);
     }
   });
@@ -160,11 +219,13 @@ export async function removerPedidoOffline(id: string, restauranteId?: string): 
       const store = tx.objectStore(STORE_NAME);
       const req = store.delete(id);
 
-      req.onsuccess = () => {
+      tx.oncomplete = () => {
         notificarMudancas(restauranteId);
         resolve(true);
       };
 
+      tx.onabort = () => resolve(false);
+      tx.onerror = () => resolve(false);
       req.onerror = () => resolve(false);
     } catch {
       resolve(false);
@@ -233,119 +294,107 @@ export async function drenarFilaOffline(restauranteId?: string): Promise<{ sincr
     }
 
     for (const pedido of pendentes) {
+      // Descarta registros expirados (> 12h) para evitar retenção prolongada de credenciais locais
+      if (pedido.criadoEmMillis && Date.now() - pedido.criadoEmMillis > MAX_IDADE_OFFLINE_MS) {
+        await removerPedidoOffline(pedido.id, pedido.restauranteId);
+        continue;
+      }
+
+      const tentativasAtuais = pedido.tentativas || 0;
+      if (tentativasAtuais >= MAX_TENTATIVAS_OFFLINE) {
+        continue;
+      }
+      if (pedido.proximaTentativaEm && Date.now() < pedido.proximaTentativaEm) {
+        continue;
+      }
+
       try {
         const idFinal = pedido.restauranteId;
         const cId = pedido.clienteId;
         const pedidoId = pedido.id;
         const subtotalItem = pedido.subtotal;
 
-        const comandaRef = doc(
-          db,
-          "restaurantes",
-          idFinal,
-          "mesas",
-          String(pedido.mesaNumero),
-          "comandas_abertas",
-          cId
-        );
-
-        const pedidoRef = doc(
-          db,
-          "restaurantes",
-          idFinal,
-          "mesas",
-          String(pedido.mesaNumero),
-          "comandas_abertas",
-          cId,
-          "pedidos",
-          pedidoId
-        );
-
-        const kdsRef = doc(db, "restaurantes", idFinal, "kds_tickets", pedidoId);
-
-        const dadosPedidoRodada = {
-          id: pedidoId,
-          restauranteId: idFinal,
-          slug: pedido.slug || idFinal,
-          clienteId: cId,
-          nomeCliente: pedido.clienteNome.trim(),
-          mesa: pedido.mesaNumero,
-          numeroMesa: Number(pedido.mesaNumero) || pedido.mesaNumero,
-          itens: pedido.itens,
-          subtotal: subtotalItem,
-          status: "a_fazer" as const,
-          criadoEm: serverTimestamp(),
-          sincronizadoOfflineEm: serverTimestamp(),
-        };
-
-        const payloadKds = {
-          id: pedidoId,
-          mesa: pedido.mesaNumero,
-          numeroMesa: Number(pedido.mesaNumero) || pedido.mesaNumero,
-          clienteId: cId,
-          nomeCliente: pedido.clienteNome.trim(),
-          status: "a_fazer" as const,
-          pedidoRefPath: pedidoRef.path,
-          itens: pedido.itens,
-          criadoEm: serverTimestamp(),
-        };
-
-        const comandaSnap = await getDoc(comandaRef);
-        const batch = writeBatch(db);
-
-        if (!comandaSnap.exists()) {
-          batch.set(comandaRef, {
-            id: cId,
+        // Origem explícita obrigatória: não infere fluxo de cliente a partir de isAnonymous
+        if (pedido.origem === "cliente") {
+          if (!auth.currentUser) {
+            await ensureClienteAnonimo();
+          }
+          let tokenParaEnvio = pedido.mesaToken;
+          if ((!tokenParaEnvio || mesaTokenExpirado(tokenParaEnvio)) && pedido.qrCredencial) {
+            const emitirFn = httpsCallable(functions, "emitirSessaoMesa");
+            const sessResp = (await emitirFn({
+              restauranteId: idFinal,
+              mesa: pedido.mesaNumero,
+              qrCredencial: pedido.qrCredencial,
+            })) as { data?: { mesaToken?: string } };
+            tokenParaEnvio = sessResp?.data?.mesaToken;
+          }
+          const criarPedidoFn = httpsCallable(functions, "criarPedidoCliente");
+          await criarPedidoFn({
             restauranteId: idFinal,
             slug: pedido.slug || idFinal,
-            nomeCliente: pedido.clienteNome.trim(),
+            pedidoId,
             mesa: pedido.mesaNumero,
-            numeroMesa: Number(pedido.mesaNumero) || pedido.mesaNumero,
-            criadoEm: serverTimestamp(),
-            atualizadoEm: serverTimestamp(),
+            mesaToken: tokenParaEnvio,
+            nomeCliente: pedido.clienteNome.trim(),
+            itens: pedido.itens,
             subtotal: subtotalItem,
-            status: "aguardando_pratos" as const,
           });
-        } else {
-          batch.update(comandaRef, {
-            restauranteId: idFinal,
-            slug: pedido.slug || idFinal,
-            nomeCliente: pedido.clienteNome.trim(),
-            mesa: pedido.mesaNumero,
-            numeroMesa: Number(pedido.mesaNumero) || pedido.mesaNumero,
-            atualizadoEm: serverTimestamp(),
-            subtotal: increment(subtotalItem),
-            status: "aguardando_pratos" as const,
-          });
+          await removerPedidoOffline(pedido.id, idFinal);
+          sincronizados++;
+          continue;
         }
 
-        // Gravações idempotentes com set (sobrescrevem sem duplicar caso já tenham batido no Firestore)
-        batch.set(pedidoRef, dadosPedidoRodada);
-        batch.set(kdsRef, payloadKds);
+        if (pedido.origem !== "garcom") {
+          // Registro legado sem origem explícita: não reclassificar silenciosamente
+          falhas++;
+          await atualizarPedidoOffline({
+            ...pedido,
+            qrCredencial: undefined,
+            mesaToken: undefined,
+            tentativas: MAX_TENTATIVAS_OFFLINE,
+            status: "falha",
+            ultimoErro: "Registro sem origem explícita (cliente/garcom). Reenvio automático bloqueado por segurança.",
+          });
+          continue;
+        }
 
-        await batch.commit();
+        // Fluxo de garçom: execução transacional e idempotente no backend (valida permissão real do colaborador)
+        const lancarGarcomFn = httpsCallable(functions, "lancarPedidoGarcom");
+        await lancarGarcomFn({
+          restauranteId: idFinal,
+          slug: pedido.slug || idFinal,
+          pedidoId,
+          mesa: pedido.mesaNumero,
+          clienteId: cId,
+          nomeCliente: pedido.clienteNome.trim(),
+          itens: pedido.itens,
+        });
 
-        // Sucesso: remove o item da fila local
+        // Sucesso confirmado pelo backend: remove o item da fila local
         await removerPedidoOffline(pedido.id, idFinal);
         sincronizados++;
       } catch (err: any) {
         console.warn(`Falha temporária ao sincronizar pedido ${pedido.id}:`, err);
         falhas++;
-        // Atualiza tentativas para não travar a fila
-        const idb = await obterDB();
-        if (idb) {
-          try {
-            const tx = idb.transaction(STORE_NAME, "readwrite");
-            tx.objectStore(STORE_NAME).put({
-              ...pedido,
-              tentativas: (pedido.tentativas || 0) + 1,
-              status: "falha",
-              ultimoErro: String(err?.message || err),
-            });
-          } catch {
-            // Ignora
-          }
-        }
+        const permanente = ehErroPermanentePedido(err);
+        const novasTentativas = permanente
+          ? MAX_TENTATIVAS_OFFLINE
+          : (pedido.tentativas || 0) + 1;
+        const atingiuLimite = novasTentativas >= MAX_TENTATIVAS_OFFLINE;
+        const encerrado = permanente || atingiuLimite;
+
+        // Nunca remove da fila em caso de erro temporário: marca falha permanente (sem credenciais) ou agenda backoff exponencial
+        await atualizarPedidoOffline({
+          ...pedido,
+          ...(encerrado ? { qrCredencial: undefined, mesaToken: undefined } : {}),
+          tentativas: novasTentativas,
+          status: encerrado ? "falha" : "pendente",
+          proximaTentativaEm: encerrado
+            ? undefined
+            : Date.now() + calcularBackoffComJitter(novasTentativas),
+          ultimoErro: String(err?.message || err),
+        });
       }
     }
 

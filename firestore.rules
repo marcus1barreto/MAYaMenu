@@ -18,15 +18,25 @@ service cloud.firestore {
     }
 
     // -----------------------------------------------------------------
-    // Papéis personalizados (custom claims) – usado nas regras abaixo
+    // Papéis personalizados (custom claims) + vínculo ativo em equipe/
     // -----------------------------------------------------------------
+    function isActiveStaffMember(restauranteId) {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/restaurantes/$(restauranteId)/equipe/$(request.auth.uid))
+        && get(/databases/$(database)/documents/restaurantes/$(restauranteId)/equipe/$(request.auth.uid)).data.ativo != false;
+    }
+
     function hasRole(restauranteId, role) {
       return isSignedIn() &&
         ('role' in request.auth.token) &&
         request.auth.token.role == role &&
         (
-          (('restauranteId' in request.auth.token) && request.auth.token.restauranteId == restauranteId) ||
-          get(/databases/$(database)/documents/restaurantes/$(restauranteId)).data.ownerId == request.auth.uid
+          get(/databases/$(database)/documents/restaurantes/$(restauranteId)).data.ownerId == request.auth.uid ||
+          (
+            ('restauranteId' in request.auth.token) &&
+            request.auth.token.restauranteId == restauranteId &&
+            isActiveStaffMember(restauranteId)
+          )
         );
     }
 
@@ -43,11 +53,13 @@ service cloud.firestore {
       return hasRole(restauranteId, "cozinha");
     }
 
-    // Transições de status permitidas para o Cliente na Comanda Pai
-    function isAllowedClientStatus(antes, depois) {
+    // Transições operacionais válidas para Pedidos e Tickets KDS
+    // 'entregue' e 'cancelado' são estados finais na regra do cliente/equipe.
+    function isValidOperationalTransition(antes, depois) {
       return depois == antes
-        || (antes in ['pedindo', 'conta_pedida'] && depois == 'aguardando_pratos')  // envia pedido ou nova rodada
-        || (antes in ['pedindo', 'aguardando_pratos'] && depois == 'conta_pedida'); // pede a conta
+        || (antes == 'a_fazer' && depois in ['em_preparo', 'pronto', 'cancelado'])
+        || (antes == 'em_preparo' && depois in ['pronto', 'cancelado'])
+        || (antes == 'pronto' && depois in ['entregue', 'cancelado']);
     }
 
     // ─────────────────────────── Coleções Raiz de Controle ───────────────────────────
@@ -58,33 +70,46 @@ service cloud.firestore {
       allow list: if isSuperAdmin(); // Apenas SuperAdmin lista todas as concessões
       allow create: if isSuperAdmin(); // Apenas SuperAdmin gera novas licenças
 
-      // Permite queima atômica pelo Lojista que está ativando OU gestão de status pelo SuperAdmin
-      allow update: if (
-        isNonAnonymous()
-        && resource.data.status == 'disponivel'
-        && request.resource.data.status == 'utilizada'
-        && request.resource.data.ownerId == request.auth.uid
-      ) || isSuperAdmin();
+      // Atualização direta de concessões restrita exclusivamente ao SuperAdmin
+      allow update: if isSuperAdmin();
 
-      // Permite exclusão apenas quando arquivada pelo SuperAdmin ou no momento da queima
+      // Exclusão: SuperAdmin, ou lojista somente na mesma operação em que o registro correspondente
+      // no arquivo morto passa a existir, em seu nome e com o mesmo identificador (queima atômica).
       allow delete: if isSuperAdmin() || (
         isNonAnonymous()
-        && resource.data.status == 'utilizada'
-        && resource.data.ownerId == request.auth.uid
+        && resource.data.status in ['disponivel', 'utilizada']
+        && existsAfter(/databases/$(database)/documents/arquivo_morto_licencas/$(licencaId))
+        && getAfter(/databases/$(database)/documents/arquivo_morto_licencas/$(licencaId)).data.ownerId == request.auth.uid
+        && getAfter(/databases/$(database)/documents/arquivo_morto_licencas/$(licencaId)).data.id == licencaId
       );
     }
 
     // Arquivo Morto de Licenças Utilizadas (Armazenamento em JSON de Auditoria)
     match /arquivo_morto_licencas/{licencaId} {
       allow read: if isSuperAdmin() || (isSignedIn() && resource.data.ownerId == request.auth.uid);
-      allow create: if isSuperAdmin() || (isNonAnonymous() && request.resource.data.ownerId == request.auth.uid);
+      // Criação: SuperAdmin, ou lojista somente na mesma transação que consome uma concessão existente,
+      // elegível, com mesmo id/codigo/plano e em nome próprio (fecha criação para códigos inexistentes).
+      allow create: if isSuperAdmin() || (
+        isNonAnonymous()
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.id == licencaId
+        && request.resource.data.codigo == licencaId
+        && exists(/databases/$(database)/documents/concessoes/$(licencaId))
+        && !existsAfter(/databases/$(database)/documents/concessoes/$(licencaId))
+        && get(/databases/$(database)/documents/concessoes/$(licencaId)).data.status in ['disponivel', 'utilizada']
+        && request.resource.data.dadosLicenca.plano == get(/databases/$(database)/documents/concessoes/$(licencaId)).data.get('plano', 'free')
+      );
       allow update, delete: if false; // Arquivo morto é estritamente imutável (WORM - Write Once, Read Many)
     }
 
     // Slugs (Trava de Unicidade)
     match /slugs/{slug} {
       allow read: if true; // Validação prévia
-      allow create, update, delete: if isNonAnonymous() && request.resource.data.ownerId == request.auth.uid;
+      allow create: if isNonAnonymous() && request.resource.data.ownerId == request.auth.uid;
+      allow update: if isNonAnonymous()
+        && resource.data.ownerId == request.auth.uid
+        && request.resource.data.ownerId == request.auth.uid;
+      allow delete: if isNonAnonymous() && resource.data.ownerId == request.auth.uid;
     }
 
     // ─────────────────────────── Módulo B2B & Patrocinadores ───────────────────────────
@@ -114,9 +139,9 @@ service cloud.firestore {
       }
     }
 
-    // Validação de lote de licença apenas por SuperAdmin ou Dono ativando voucher
+    // Leitura de lote de licença via collectionGroup restrita ao SuperAdmin ou ao próprio patrocinador
     match /{path=**}/lotes_licencas/{loteId} {
-      allow read: if isSuperAdmin() || isNonAnonymous();
+      allow read: if isSuperAdmin() || (isSignedIn() && resource.data.patrocinadorId == request.auth.uid);
     }
 
     // ─────────────────────────── Restaurantes e Operação ───────────────────────────
@@ -174,18 +199,34 @@ service cloud.firestore {
         allow read: if isOwner(restauranteId) || isGarcom(restauranteId) || isCozinha(restauranteId) || isSuperAdmin();
 
         // Criação de tickets no KDS:
-        // EXCLUSIVA da equipe operacional autenticada do restaurante (Garçom / Cozinha).
-        // Clientes NÃO criam tickets diretamente no KDS, eliminando o risco de inserção de itens arbitrários na cozinha.
-        // O fluxo do cliente opera exclusivamente via comanda aberta em /mesas/{mesa}/comandas_abertas/{clienteId}/pedidos.
-        allow create: if isGarcom(restauranteId) || isCozinha(restauranteId);
+        // EXCLUSIVA das Cloud Functions (Admin SDK) via criarPedidoCliente / lancarPedidoGarcom.
+        allow create: if false;
 
-        // Apenas a equipe (dono/tablet operacional) marcha, cancela ou remove tickets
-        allow update, delete: if isOwner(restauranteId) || isGarcom(restauranteId) || isCozinha(restauranteId) || isSuperAdmin();
+        // Equipe ativa só pode avançar o status operacional seguindo o ciclo válido
+        allow update: if (isOwner(restauranteId) || isGarcom(restauranteId) || isCozinha(restauranteId) || isSuperAdmin())
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'atualizadoEm'])
+          && isValidOperationalTransition(resource.data.status, request.resource.data.status);
+
+        // Exclusão exclusiva do backend (liberarMesaBackend, Admin SDK)
+        allow delete: if false;
       }
 
       // Mesas e Salão: Leitura restrita à equipe operacional ou SuperAdmin (elimina leitura pública desnecessária)
+      // Campos de credencial QR (qrCredencialHash, qrVersao, qrCredencial) são protegidos contra escrita direta
       match /mesas/{numeroMesa} {
-        allow read, write: if isOwner(restauranteId) || isGarcom(restauranteId) || isSuperAdmin();
+        allow read: if isOwner(restauranteId) || isGarcom(restauranteId) || isSuperAdmin();
+        allow create: if (isOwner(restauranteId) || isGarcom(restauranteId) || isSuperAdmin())
+          && !('qrCredencialHash' in request.resource.data)
+          && !('qrVersao' in request.resource.data)
+          && !('qrCredencial' in request.resource.data);
+        allow update: if (isOwner(restauranteId) || isGarcom(restauranteId) || isSuperAdmin())
+          && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+            'qrCredencialHash',
+            'qrVersao',
+            'qrCredencial'
+          ]);
+        // Exclusão física de mesas bloqueada no client (usar desativarMesaBackend para desativação lógica segura)
+        allow delete: if false;
 
         // NÓ PAI: Comanda da Sessão do Cliente (agrega o subtotal)
         match /comandas_abertas/{clienteId} {
@@ -195,40 +236,57 @@ service cloud.firestore {
             || isSuperAdmin()
             || (isSignedIn() && request.auth.uid == clienteId);
 
-          // Criação: exige titularidade e amarração estrita ao restauranteId do path
-          allow create: if (isSignedIn() && request.auth.uid == clienteId)
-            && request.resource.data.status in ['pedindo', 'aguardando_pratos']
-            && request.resource.data.restauranteId == restauranteId;
+          // Criação exclusiva via backend (Admin SDK em criarPedidoCliente / lancarPedidoGarcom)
+          allow create: if false;
 
           // Trava mestra: Se está pago, o cliente não toca mais!
-          // O campo restauranteId é estritamente IMUTÁVEL em qualquer atualização
+          // Campos financeiros (subtotal, total) e identidade (restauranteId, id, clienteId) são imutáveis no client/equipe.
           allow update: if (
             request.resource.data.restauranteId == resource.data.restauranteId
             || !request.resource.data.diff(resource.data).affectedKeys().hasAny(['restauranteId'])
           ) && (
-            (isSignedIn() && (
-              (request.auth.uid == clienteId 
-                && resource.data.status != 'pago'
-                && request.resource.data.status != 'pago'
-                && (
-                  request.resource.data.status == resource.data.status
-                  || isAllowedClientStatus(resource.data.status, request.resource.data.status)
-                ))
-              || isOwner(restauranteId)
-              || isGarcom(restauranteId)
-            )) || (
-              // Permite atualização de chamado do garçom pelo cliente daquela sessão
+            (
+              (isOwner(restauranteId) || isGarcom(restauranteId) || isSuperAdmin())
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                'chamadoGarcom',
+                'garcomResponsavel',
+                'atualizadoEm'
+              ])
+            )
+            || (
               isSignedIn()
               && request.auth.uid == clienteId
-              && request.resource.data.id == resource.data.id
               && resource.data.status != 'pago'
               && request.resource.data.status != 'pago'
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                'chamadoGarcom',
+                'status',
+                'metodoPagamento',
+                'pixPayload',
+                'solicitacaoPagamentoEm',
+                'atualizadoEm',
+                'slug'
+              ])
+              && (
+                !request.resource.data.diff(resource.data).affectedKeys().hasAny(['metodoPagamento'])
+                || request.resource.data.metodoPagamento in ['balcao', 'cartao', 'dinheiro', 'pix', 'maquininha']
+              )
+              && (
+                !request.resource.data.diff(resource.data).affectedKeys().hasAny(['pixPayload'])
+                || (request.resource.data.pixPayload is string && request.resource.data.pixPayload.size() <= 512)
+              )
+              && (
+                request.resource.data.status == resource.data.status
+                || (
+                  resource.data.status in ['pedindo', 'aguardando_pratos']
+                  && request.resource.data.status == 'conta_pedida'
+                )
+              )
             )
           );
 
-          // Apenas o Garçom/Dono do restaurante pode libertar e encerrar a mesa
-          // O cliente NÃO pode apagar a própria dívida ativa
-          allow delete: if isOwner(restauranteId) || isGarcom(restauranteId) || isSuperAdmin();
+          // Exclusão exclusiva do backend (liberarMesaBackend, Admin SDK): comanda ativa não some por escrita direta
+          allow delete: if false;
 
           // NÓ FILHO: Rodadas do Cliente (Vai para o KDS da Cozinha)
           match /pedidos/{pedidoId} {
@@ -238,44 +296,34 @@ service cloud.firestore {
               || isSuperAdmin()
               || (isSignedIn() && request.auth.uid == clienteId);
 
-            // Garante integridade multi-tenant: o pedido criado DEVE declarar restauranteId correspondente ao path
-            allow create: if isSignedIn()
-              && request.resource.data.restauranteId == restauranteId
-              && (
-                (
-                  request.auth.uid == clienteId 
-                  && request.resource.data.status == 'a_fazer'
-                  && get(/databases/$(database)/documents/restaurantes/$(restauranteId)/mesas/$(numeroMesa)/comandas_abertas/$(clienteId)).data.status != 'pago'
-                )
-                || isGarcom(restauranteId)
-                || isCozinha(restauranteId)
-              );
+            // Criação exclusiva via backend (Admin SDK em criarPedidoCliente / lancarPedidoGarcom)
+            allow create: if false;
 
-            // Apenas a equipe do restaurante pode alterar status ou cancelar pedidos
-            // restauranteId é estritamente imutável nas atualizações de pedidos
-            allow update: if (isGarcom(restauranteId) || isCozinha(restauranteId) || isSuperAdmin())
+            // Apenas a equipe ativa do restaurante pode avançar status operacional válido do pedido
+            allow update: if (isOwner(restauranteId) || isGarcom(restauranteId) || isCozinha(restauranteId) || isSuperAdmin())
               && (
                 request.resource.data.restauranteId == resource.data.restauranteId
                 || !request.resource.data.diff(resource.data).affectedKeys().hasAny(['restauranteId'])
-              );
+              )
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'atualizadoEm'])
+              && isValidOperationalTransition(resource.data.status, request.resource.data.status);
 
-            allow delete: if isGarcom(restauranteId) || isCozinha(restauranteId) || isSuperAdmin();
+            // Exclusão exclusiva do backend (liberarMesaBackend, Admin SDK)
+            allow delete: if false;
           }
         }
       }
 
-      // Histórico de Sessões de Mesas (WORM - Write Once, Read Many)
+      // Histórico de Sessões de Mesas: criado exclusivamente por liberarMesaBackend (Admin SDK)
       match /historico_sessoes_mesas/{historicoId} {
-        // Apenas Garçom, Dono ou SuperAdmin registram o recibo no encerramento da mesa
-        allow create: if isOwner(restauranteId) || isGarcom(restauranteId) || isSuperAdmin();
         allow read: if isOwner(restauranteId) || isGarcom(restauranteId) || isSuperAdmin();
-        allow update, delete: if false; // Recibos históricos são estritamente imutáveis
+        allow write: if false;
       }
 
-      // Métricas Consolidadas Econômicas (Resumo mensal para Free & PRO)
+      // Métricas Consolidadas Econômicas: gravação exclusiva do backend (liberarMesaBackend)
       match /metricas_consolidadas/{anoMes} {
         allow read: if isOwner(restauranteId) || isSuperAdmin();
-        allow write: if isOwner(restauranteId) || isSuperAdmin();
+        allow write: if false;
       }
     }
 
@@ -290,6 +338,10 @@ service cloud.firestore {
           && request.auth.token.role in ['owner', 'garcom', 'cozinha']
           && ('restauranteId' in request.auth.token)
           && resource.data.restauranteId == request.auth.token.restauranteId
+          && (
+            get(/databases/$(database)/documents/restaurantes/$(resource.data.restauranteId)).data.ownerId == request.auth.uid
+            || isActiveStaffMember(resource.data.restauranteId)
+          )
         )
       );
     }
@@ -306,6 +358,10 @@ service cloud.firestore {
           && request.auth.token.role in ['owner', 'garcom', 'cozinha']
           && ('restauranteId' in request.auth.token)
           && resource.data.restauranteId == request.auth.token.restauranteId
+          && (
+            get(/databases/$(database)/documents/restaurantes/$(resource.data.restauranteId)).data.ownerId == request.auth.uid
+            || isActiveStaffMember(resource.data.restauranteId)
+          )
         )
       );
     }

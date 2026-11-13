@@ -43,11 +43,59 @@ interface MenuViewProps {
   restaurante: Restaurante;
   cardapio: MenuItem[];
   numeroMesa?: number | string;
+  qrCredencial?: string;
 }
 
-export function MenuView({ restaurante: restauranteInicial, cardapio: cardapioInicial, numeroMesa: numeroMesaProp = 1 }: MenuViewProps) {
+export function MenuView({
+  restaurante: restauranteInicial,
+  cardapio: cardapioInicial,
+  numeroMesa: numeroMesaProp = 1,
+  qrCredencial: qrCredencialInicial,
+}: MenuViewProps) {
   const { totalItens, subtotal, nomeCliente, limparCarrinho, mesa, setMesa } = useCart();
   const numeroMesa = mesa || numeroMesaProp;
+  const [qrCredencialAtiva, setQrCredencialAtiva] = useState<string | undefined>(() => qrCredencialInicial);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const storageKey = `mayamenu_qr_${restauranteInicial.id}_mesa_${String(numeroMesa)}`;
+    let qrDetectada = qrCredencialInicial;
+    try {
+      const hashStr = window.location.hash || "";
+      if (hashStr.includes("qr=")) {
+        const hashParams = new URLSearchParams(hashStr.replace(/^#/, ""));
+        const qrDoHash = hashParams.get("qr");
+        if (qrDoHash) qrDetectada = qrDoHash;
+      }
+    } catch {
+      // Ignora
+    }
+
+    if (qrDetectada) {
+      setQrCredencialAtiva(qrDetectada);
+      try {
+        sessionStorage.setItem(storageKey, qrDetectada);
+        // Remove credencial bearer da barra de endereços (query ou fragmento) para evitar exposição
+        const urlAtual = new URL(window.location.href);
+        const tinhaQueryQr = urlAtual.searchParams.has("qr");
+        const tinhaHashQr = urlAtual.hash.includes("qr=");
+        if (tinhaQueryQr) urlAtual.searchParams.delete("qr");
+        if (tinhaHashQr) urlAtual.hash = "";
+        if (tinhaQueryQr || tinhaHashQr) {
+          window.history.replaceState(null, "", urlAtual.pathname + urlAtual.search);
+        }
+      } catch {
+        // Ignora
+      }
+      return;
+    }
+    try {
+      const salva = sessionStorage.getItem(storageKey);
+      if (salva) setQrCredencialAtiva(salva);
+    } catch {
+      // Ignora
+    }
+  }, [qrCredencialInicial, restauranteInicial.id, numeroMesa]);
   const [restaurante, setRestaurante] = useState<Restaurante>(restauranteInicial);
   const [cardapio, setCardapio] = useState<MenuItem[]>(cardapioInicial);
   const [itemSelecionado, setItemSelecionado] = useState<MenuItem | null>(null);
@@ -929,6 +977,7 @@ export function MenuView({ restaurante: restauranteInicial, cardapio: cardapioIn
         restauranteNome={restaurante.nome}
         corPrimaria={corPrimaria}
         taxaServicoPercentual={restaurante.configuracoes?.taxaServico ?? 10}
+        qrCredencial={qrCredencialAtiva}
       />
 
       {/* MODAL DE HISTÓRICO / COMPROVANTES DO CLIENTE */}
@@ -962,17 +1011,16 @@ export function MenuView({ restaurante: restauranteInicial, cardapio: cardapioIn
         isOpen={mesaScannerAberto}
         onClose={() => setMesaScannerAberto(false)}
         mesaAtual={numeroMesa}
-        onMesaDetectada={(novaMesa) => {
+        onMesaDetectada={(novaMesa, qrCredencialLida) => {
           setMesa(novaMesa);
+          setQrCredencialAtiva(qrCredencialLida);
           try {
-            // Atualiza table_id e persistência do carrinho no localStorage
             localStorage.setItem("table_id", String(novaMesa));
-            const cartKey = `mayamenu_cart_${restaurante.slug}`;
-            const cartExistente = localStorage.getItem(cartKey);
-            if (cartExistente) {
-              const parsed = JSON.parse(cartExistente);
-              parsed.mesa = novaMesa;
-              localStorage.setItem(cartKey, JSON.stringify(parsed));
+            const storageKey = `mayamenu_qr_${restaurante.id}_mesa_${String(novaMesa)}`;
+            if (qrCredencialLida) {
+              sessionStorage.setItem(storageKey, qrCredencialLida);
+            } else {
+              sessionStorage.removeItem(storageKey);
             }
           } catch {
             // Ignora erro de storage

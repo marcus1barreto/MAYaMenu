@@ -17,7 +17,7 @@ import {
   type ConfigMesa,
 } from "@/lib/mesas-service";
 import { db } from "@/lib/firebase";
-import { collection, onSnapshot, query, where } from "firebase/firestore";
+import { collection, onSnapshot, query, where, deleteField } from "firebase/firestore";
 import {
   Settings2,
   CalendarClock,
@@ -160,7 +160,7 @@ export function SetupMesas({ restauranteId, maxMesas }: SetupMesasProps) {
     try {
       await salvarConfigMesa(restauranteId, num, {
         statusEstrutural: "livre",
-        reserva: undefined,
+        reserva: deleteField() as any,
       });
     } catch (err) {
       console.error("Falha ao liberar mesa:", err);

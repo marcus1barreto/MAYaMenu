@@ -124,6 +124,35 @@ async function runTests() {
       status: "a_fazer",
       restauranteId: "rest_a",
     });
+
+    // Equipe ativa e inativa
+    await db.doc("restaurantes/rest_a/equipe/garcom_a").set({ role: "garcom", ativo: true });
+    await db.doc("restaurantes/rest_a/equipe/cozinha_a").set({ role: "cozinha", ativo: true });
+    await db.doc("restaurantes/rest_a/equipe/garcom_inativo").set({ role: "garcom", ativo: false });
+    await db.doc("restaurantes/rest_b/equipe/garcom_b").set({ role: "garcom", ativo: true });
+    await db.doc("restaurantes/rest_b/equipe/cozinha_b").set({ role: "cozinha", ativo: true });
+
+    // Lotes de licenças B2B por patrocinador
+    await db.doc("patrocinadores/pat_a/lotes_licencas/lote_a1").set({
+      patrocinadorId: "pat_a",
+      codigoCampanha: "CAMP_A",
+      ativo: true,
+    });
+    await db.doc("patrocinadores/pat_b/lotes_licencas/lote_b1").set({
+      patrocinadorId: "pat_b",
+      codigoCampanha: "CAMP_B",
+      ativo: true,
+    });
+
+    // Concessão disponível para teste de ativação controlada
+    await db.doc("concessoes/lic_1").set({
+      codigo: "LIC-TESTE-1",
+      plano: "free",
+      status: "disponivel",
+    });
+    await db.doc("concessoes/lic_2").set({ codigo: "LIC-TESTE-2", plano: "free", status: "disponivel" });
+    await db.doc("concessoes/lic_3").set({ codigo: "LIC-TESTE-3", plano: "free", status: "disponivel" });
+    await db.doc("concessoes/lic_4").set({ codigo: "LIC-TESTE-4", plano: "free", status: "suspensa" });
   });
 
   let passed = 0;
@@ -184,9 +213,9 @@ async function runTests() {
   });
 
   // 2. COMANDAS E CHECKOUT
-  await test("Cliente Titular PODE criar comanda aberta com restauranteId correto", async () => {
+  await test("Cliente Titular NÃO pode criar comanda aberta diretamente no Firestore (apenas Cloud Function)", async () => {
     const clientDb = testEnv.authenticatedContext("cliente_novo").firestore();
-    await assertSucceeds(
+    await assertFails(
       clientDb.doc("restaurantes/rest_a/mesas/1/comandas_abertas/cliente_novo").set({
         id: "cliente_novo",
         clienteId: "cliente_novo",
@@ -270,14 +299,60 @@ async function runTests() {
     );
   });
 
-  await test("Cliente Titular PODE criar pedido em comanda aberta informando o restauranteId correto", async () => {
+  await test("Cliente Titular NÃO pode criar pedido diretamente no Firestore (apenas Cloud Function)", async () => {
     const clientDb = testEnv.authenticatedContext("cliente_1").firestore();
-    await assertSucceeds(
+    await assertFails(
       clientDb.doc("restaurantes/rest_a/mesas/1/comandas_abertas/cliente_1/pedidos/ped_novo_valido").set({
         restauranteId: "rest_a",
         pratoNome: "Suco Natural",
         status: "a_fazer",
         quantidade: 1,
+      })
+    );
+  });
+
+  await test("Cliente NÃO pode manipular subtotal ou total da própria comanda aberta", async () => {
+    const clientDb = testEnv.authenticatedContext("cliente_1").firestore();
+    await assertFails(
+      clientDb.doc("restaurantes/rest_a/mesas/1/comandas_abertas/cliente_1").update({
+        subtotal: 0.01,
+      })
+    );
+  });
+
+  await test("Cliente PODE atualizar chamadoGarcom na própria comanda sem alterar campos financeiros", async () => {
+    const clientDb = testEnv.authenticatedContext("cliente_1").firestore();
+    await assertSucceeds(
+      clientDb.doc("restaurantes/rest_a/mesas/1/comandas_abertas/cliente_1").update({
+        chamadoGarcom: { ativo: true, motivo: "Água" },
+      })
+    );
+  });
+
+  await test("Garçom desativado (ativo: false) com claim obsoleta NÃO pode ler mesas, atualizar pedidos ou ler comandas", async () => {
+    const inactiveWaiterDb = testEnv.authenticatedContext("garcom_inativo", {
+      role: "garcom",
+      restauranteId: "rest_a",
+    }).firestore();
+    await assertFails(inactiveWaiterDb.doc("restaurantes/rest_a/mesas/1").get());
+    await assertFails(
+      inactiveWaiterDb.doc("restaurantes/rest_a/mesas/1/comandas_abertas/cliente_1/pedidos/ped_1").update({
+        status: "pronto",
+      })
+    );
+    await assertFails(
+      inactiveWaiterDb.collectionGroup("comandas_abertas").where("restauranteId", "==", "rest_a").get()
+    );
+  });
+
+  await test("Garçom ativo NÃO pode alterar subtotal de pedido existente (apenas status/atualizadoEm)", async () => {
+    const garcomADb = testEnv.authenticatedContext("garcom_a", {
+      role: "garcom",
+      restauranteId: "rest_a",
+    }).firestore();
+    await assertFails(
+      garcomADb.doc("restaurantes/rest_a/mesas/1/comandas_abertas/cliente_1/pedidos/ped_1").update({
+        subtotal: 0,
       })
     );
   });
@@ -363,12 +438,12 @@ async function runTests() {
     );
   });
 
-  await test("Garçom do Restaurante A PODE criar kds_ticket para a esteira", async () => {
+  await test("Garçom do Restaurante A NÃO pode criar kds_ticket diretamente no Firestore (apenas Cloud Function)", async () => {
     const garcomADb = testEnv.authenticatedContext("garcom_a", {
       role: "garcom",
       restauranteId: "rest_a",
     }).firestore();
-    await assertSucceeds(
+    await assertFails(
       garcomADb.doc("restaurantes/rest_a/kds_tickets/ticket_garcom_1").set({
         id: "ticket_garcom_1",
         mesa: 1,
@@ -376,6 +451,21 @@ async function runTests() {
         status: "a_fazer",
         itens: [{ menuItemId: "item1", nome: "Hambúrguer", quantidade: 1 }],
       })
+    );
+  });
+
+  await test("Patrocinador NÃO pode ler lotes_licencas de outro patrocinador via collectionGroup", async () => {
+    const patBDb = testEnv.authenticatedContext("pat_b", {
+      firebase: { sign_in_provider: "password" },
+    }).firestore();
+    await assertFails(
+      patBDb.collectionGroup("lotes_licencas").where("patrocinadorId", "==", "pat_a").get()
+    );
+    const patADb = testEnv.authenticatedContext("pat_a", {
+      firebase: { sign_in_provider: "password" },
+    }).firestore();
+    await assertSucceeds(
+      patADb.collectionGroup("lotes_licencas").where("patrocinadorId", "==", "pat_a").get()
     );
   });
 
@@ -409,6 +499,307 @@ async function runTests() {
       email: "admin@mayamenu.com",
     }).firestore();
     await assertFails(fakeAdminDb.doc("restaurantes/rest_a/mesas/1").get());
+  });
+
+  await test("Dono/Garçom consegue liberar mesa reservada removendo reserva com deleteField()", async () => {
+    const { deleteField } = require("firebase/firestore");
+    const garcomADb = testEnv.authenticatedContext("garcom_a", {
+      role: "garcom",
+      restauranteId: "rest_a",
+    }).firestore();
+
+    const mesaRef = garcomADb.doc("restaurantes/rest_a/mesas/7");
+    await assertSucceeds(
+      mesaRef.set(
+        {
+          numero: 7,
+          ativa: true,
+          statusEstrutural: "reservada",
+          reserva: { nomeCliente: "Ana", horario: "20:00", quantidadePessoas: 4 },
+        },
+        { merge: true }
+      )
+    );
+
+    await assertSucceeds(
+      mesaRef.set(
+        {
+          numero: 7,
+          statusEstrutural: "livre",
+          reserva: deleteField(),
+        },
+        { merge: true }
+      )
+    );
+
+    const snap = await mesaRef.get();
+    const mesaData = snap.data();
+    if (mesaData.statusEstrutural !== "livre" || mesaData.reserva !== undefined) {
+      throw new Error(`Reserva não foi removida corretamente: ${JSON.stringify(mesaData)}`);
+    }
+  });
+
+  await test("Garçom/Dono NÃO pode alterar subtotal/total de comanda aberta diretamente", async () => {
+    const garcomADb = testEnv.authenticatedContext("garcom_a", {
+      role: "garcom",
+      restauranteId: "rest_a",
+    }).firestore();
+    await assertFails(
+      garcomADb.doc("restaurantes/rest_a/mesas/1/comandas_abertas/cliente_1").update({
+        subtotal: 0,
+      })
+    );
+    const ownerADb = testEnv.authenticatedContext("owner_a", {
+      role: "owner",
+      restauranteId: "rest_a",
+    }).firestore();
+    await assertFails(
+      ownerADb.doc("restaurantes/rest_a/mesas/1/comandas_abertas/cliente_1").update({
+        subtotal: 0,
+      })
+    );
+  });
+
+  await test("Garçom/Dono NÃO pode alterar qrCredencialHash ou qrVersao da mesa diretamente", async () => {
+    const garcomADb = testEnv.authenticatedContext("garcom_a", {
+      role: "garcom",
+      restauranteId: "rest_a",
+    }).firestore();
+    await assertFails(
+      garcomADb.doc("restaurantes/rest_a/mesas/1").update({
+        qrCredencialHash: "forjado",
+      })
+    );
+    await assertFails(
+      garcomADb.doc("restaurantes/rest_a/mesas/1").update({
+        qrVersao: 99,
+      })
+    );
+  });
+
+  await test("Cozinha só pode atualizar status/atualizadoEm em kds_tickets e NÃO pode deletar tickets", async () => {
+    const cozinhaADb = testEnv.authenticatedContext("cozinha_a", {
+      role: "cozinha",
+      restauranteId: "rest_a",
+    }).firestore();
+    await assertSucceeds(
+      cozinhaADb.doc("restaurantes/rest_a/kds_tickets/ticket_1").update({
+        status: "pronto",
+      })
+    );
+    await assertFails(
+      cozinhaADb.doc("restaurantes/rest_a/kds_tickets/ticket_1").update({
+        pratoNome: "Alterado",
+      })
+    );
+    await assertFails(cozinhaADb.doc("restaurantes/rest_a/kds_tickets/ticket_1").delete());
+  });
+
+  await test("Cliente NÃO pode enviar metodoPagamento inválido na comanda", async () => {
+    const clientDb = testEnv.authenticatedContext("cliente_1").firestore();
+    await assertFails(
+      clientDb.doc("restaurantes/rest_a/mesas/1/comandas_abertas/cliente_1").update({
+        status: "conta_pedida",
+        metodoPagamento: "gratuito",
+      })
+    );
+  });
+
+  await test("Garçom/Dono NÃO pode marcar comanda como 'pago', forjar pagoEm ou alterar taxaServicoAtiva diretamente", async () => {
+    const garcomADb = testEnv.authenticatedContext("garcom_a", {
+      role: "garcom",
+      restauranteId: "rest_a",
+    }).firestore();
+    await assertFails(
+      garcomADb.doc("restaurantes/rest_a/mesas/1/comandas_abertas/cliente_1").update({
+        status: "pago",
+      })
+    );
+    await assertFails(
+      garcomADb.doc("restaurantes/rest_a/mesas/1/comandas_abertas/cliente_1").update({
+        pagoEm: "2026-01-01T00:00:00Z",
+      })
+    );
+    await assertFails(
+      garcomADb.doc("restaurantes/rest_a/mesas/1/comandas_abertas/cliente_1").update({
+        taxaServicoAtiva: false,
+      })
+    );
+  });
+
+  await test("Garçom PODE atualizar campos operacionais (chamadoGarcom e garcomResponsavel) na comanda", async () => {
+    const garcomADb = testEnv.authenticatedContext("garcom_a", {
+      role: "garcom",
+      restauranteId: "rest_a",
+    }).firestore();
+    await assertSucceeds(
+      garcomADb.doc("restaurantes/rest_a/mesas/1/comandas_abertas/cliente_1").update({
+        "chamadoGarcom.ativo": false,
+        garcomResponsavel: { uid: "garcom_a", nome: "Carlos" },
+      })
+    );
+  });
+
+  await test("Cozinha NÃO pode regredir ticket KDS ('pronto' -> 'a_fazer') nem escrever status inválido em pedido", async () => {
+    const cozinhaADb = testEnv.authenticatedContext("cozinha_a", {
+      role: "cozinha",
+      restauranteId: "rest_a",
+    }).firestore();
+    // ticket_1 foi movido para 'pronto' no teste anterior
+    await assertFails(
+      cozinhaADb.doc("restaurantes/rest_a/kds_tickets/ticket_1").update({
+        status: "a_fazer",
+      })
+    );
+    await assertSucceeds(
+      cozinhaADb.doc("restaurantes/rest_a/kds_tickets/ticket_1").update({
+        status: "entregue",
+      })
+    );
+    await assertFails(
+      cozinhaADb.doc("restaurantes/rest_a/kds_tickets/ticket_1").update({
+        status: "pronto",
+      })
+    );
+    await assertFails(
+      cozinhaADb.doc("restaurantes/rest_a/mesas/1/comandas_abertas/cliente_1/pedidos/ped_1").update({
+        status: "status_invalido",
+      })
+    );
+    await assertSucceeds(
+      cozinhaADb.doc("restaurantes/rest_a/mesas/1/comandas_abertas/cliente_1/pedidos/ped_1").update({
+        status: "em_preparo",
+      })
+    );
+  });
+
+  await test("Lojista NÃO pode atualizar concessão diretamente (somente SuperAdmin)", async () => {
+    const ownerDb = testEnv.authenticatedContext("owner_novo", {
+      firebase: { sign_in_provider: "password" },
+    }).firestore();
+    await assertFails(
+      ownerDb.doc("concessoes/lic_1").update({
+        status: "utilizada",
+        ownerId: "owner_novo",
+        plano: "pro",
+      })
+    );
+    await assertFails(
+      ownerDb.doc("concessoes/lic_1").update({
+        status: "utilizada",
+        ownerId: "owner_novo",
+      })
+    );
+    const adminDb = testEnv.authenticatedContext("admin_uid", { superadmin: true }).firestore();
+    await assertSucceeds(adminDb.doc("concessoes/lic_1").update({ observacao: "ok" }));
+  });
+
+  await test("Concessão: exclusão isolada é negada; queima atômica (delete + arquivo morto próprio) é permitida", async () => {
+    const authCtx = { firebase: { sign_in_provider: "password" } };
+    const ownerDb = testEnv.authenticatedContext("owner_queima", authCtx).firestore();
+
+    const arq = (id, ownerId, plano = "free") => ({ id, codigo: id, ownerId, dadosLicenca: { plano } });
+
+    // Exclusão sem arquivamento
+    await assertFails(ownerDb.doc("concessoes/lic_2").delete());
+
+    // Arquivo morto em nome de outro usuário não autoriza a exclusão
+    const batchOutro = ownerDb.batch();
+    batchOutro.set(ownerDb.doc("arquivo_morto_licencas/lic_2"), arq("lic_2", "outro_uid"));
+    batchOutro.delete(ownerDb.doc("concessoes/lic_2"));
+    await assertFails(batchOutro.commit());
+
+    // Arquivo morto criado sem excluir a concessão existente é negado (arquivo arbitrário/avulso)
+    await assertFails(ownerDb.doc("arquivo_morto_licencas/lic_2").set(arq("lic_2", "owner_queima")));
+
+    // Arquivo com plano divergente da concessão (ex.: promover free -> pro) é negado
+    const batchPlano = ownerDb.batch();
+    batchPlano.set(ownerDb.doc("arquivo_morto_licencas/lic_2"), arq("lic_2", "owner_queima", "pro"));
+    batchPlano.delete(ownerDb.doc("concessoes/lic_2"));
+    await assertFails(batchPlano.commit());
+
+    // Arquivo com id/codigo diferentes do documento é negado
+    await assertFails(
+      ownerDb.doc("arquivo_morto_licencas/lic_9").set({ id: "outro", codigo: "lic_9", ownerId: "owner_queima", dadosLicenca: { plano: "free" } })
+    );
+
+    // Arquivo morto para código INEXISTENTE é negado (fecha brecha para códigos inventados)
+    await assertFails(ownerDb.doc("arquivo_morto_licencas/cod_inventado").set(arq("cod_inventado", "owner_queima")));
+
+    // Arquivo de uma concessão que exclui OUTRA concessão não satisfaz a condição de exclusão
+    const batchCruzado = ownerDb.batch();
+    batchCruzado.set(ownerDb.doc("arquivo_morto_licencas/lic_9"), arq("lic_9", "owner_queima"));
+    batchCruzado.delete(ownerDb.doc("concessoes/lic_2"));
+    await assertFails(batchCruzado.commit());
+
+    // Licença suspensa não pode ser queimada
+    const batchSusp = ownerDb.batch();
+    batchSusp.set(ownerDb.doc("arquivo_morto_licencas/lic_4"), arq("lic_4", "owner_queima"));
+    batchSusp.delete(ownerDb.doc("concessoes/lic_4"));
+    await assertFails(batchSusp.commit());
+
+    // Fluxo legítimo
+    const batchOk = ownerDb.batch();
+    batchOk.set(ownerDb.doc("arquivo_morto_licencas/lic_2"), arq("lic_2", "owner_queima"));
+    batchOk.delete(ownerDb.doc("concessoes/lic_2"));
+    await assertSucceeds(batchOk.commit());
+  });
+
+  await test("Mesa: exclusão física direta negada para dono, garçom e SuperAdmin (usar desativarMesaBackend)", async () => {
+    const ctxs = [
+      testEnv.authenticatedContext("owner_a", { role: "owner", restauranteId: "rest_a" }).firestore(),
+      testEnv.authenticatedContext("garcom_a", { role: "garcom", restauranteId: "rest_a" }).firestore(),
+      testEnv.authenticatedContext("admin_uid", { superadmin: true }).firestore(),
+    ];
+    for (const db of ctxs) {
+      await assertFails(db.doc("restaurantes/rest_a/mesas/1").delete());
+    }
+  });
+
+  await test("Slug: lojista NÃO pode sobrescrever slug pertencente a outro restaurante", async () => {
+    const ownerA = testEnv.authenticatedContext("owner_a", { firebase: { sign_in_provider: "password" } }).firestore();
+    const ownerB = testEnv.authenticatedContext("owner_b", { firebase: { sign_in_provider: "password" } }).firestore();
+    await assertSucceeds(ownerA.doc("slugs/bistro-a").set({ slug: "bistro-a", ownerId: "owner_a" }));
+    await assertFails(ownerB.doc("slugs/bistro-a").set({ slug: "bistro-a", ownerId: "owner_b" }));
+    await assertFails(ownerB.doc("slugs/bistro-a").delete());
+  });
+
+  await test("Comanda aberta: exclusão direta negada para dono, garçom e cliente titular", async () => {
+    const ctxs = [
+      testEnv.authenticatedContext("owner_a", { role: "owner", restauranteId: "rest_a" }).firestore(),
+      testEnv.authenticatedContext("garcom_a", { role: "garcom", restauranteId: "rest_a" }).firestore(),
+      testEnv.authenticatedContext("cliente_1").firestore(),
+    ];
+    for (const db of ctxs) {
+      await assertFails(db.doc("restaurantes/rest_a/mesas/1/comandas_abertas/cliente_1").delete());
+    }
+  });
+
+  await test("Histórico de sessões e métricas consolidadas: escrita direta negada (inclusive dono)", async () => {
+    const ownerADb = testEnv.authenticatedContext("owner_a", { role: "owner", restauranteId: "rest_a" }).firestore();
+    const garcomADb = testEnv.authenticatedContext("garcom_a", { role: "garcom", restauranteId: "rest_a" }).firestore();
+    await assertFails(
+      garcomADb.doc("restaurantes/rest_a/historico_sessoes_mesas/h1").set({ subtotalTotal: 999, restauranteId: "rest_a" })
+    );
+    await assertFails(
+      ownerADb.doc("restaurantes/rest_a/historico_sessoes_mesas/h2").set({ subtotalTotal: 999, restauranteId: "rest_a" })
+    );
+    await assertFails(
+      ownerADb.doc("restaurantes/rest_a/metricas_consolidadas/2026-11").set({ totalFaturado: 1e6 })
+    );
+    await assertSucceeds(ownerADb.doc("restaurantes/rest_a/metricas_consolidadas/2026-11").get());
+  });
+
+  await test("Exclusão direta de pedidos e kds_tickets negada para dono, garçom e cozinha", async () => {
+    const ctxs = [
+      testEnv.authenticatedContext("owner_a", { role: "owner", restauranteId: "rest_a" }).firestore(),
+      testEnv.authenticatedContext("garcom_a", { role: "garcom", restauranteId: "rest_a" }).firestore(),
+      testEnv.authenticatedContext("cozinha_a", { role: "cozinha", restauranteId: "rest_a" }).firestore(),
+    ];
+    for (const db of ctxs) {
+      await assertFails(db.doc("restaurantes/rest_a/mesas/1/comandas_abertas/cliente_1/pedidos/ped_1").delete());
+      await assertFails(db.doc("restaurantes/rest_a/kds_tickets/ticket_1").delete());
+    }
   });
 
   console.log("\n=================================================");

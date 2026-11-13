@@ -9,7 +9,7 @@ import { QrCode, CheckCircle2, AlertTriangle, RefreshCw, MapPin } from "lucide-r
 interface MesaScannerModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onMesaDetectada: (numeroMesa: number | string) => void;
+  onMesaDetectada: (numeroMesa: number | string, qrCredencial?: string) => void;
   mesaAtual?: number | string;
 }
 
@@ -22,6 +22,7 @@ export function MesaScannerModal({
   const [iniciando, setIniciando] = useState(false);
   const [erroCamera, setErroCamera] = useState<string | null>(null);
   const [mesaLida, setMesaLida] = useState<string | number | null>(null);
+  const [qrCredencialLida, setQrCredencialLida] = useState<string | undefined>(undefined);
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const leitorId = "mesa-scanner-container";
 
@@ -37,6 +38,7 @@ export function MesaScannerModal({
           .catch(() => {});
       }
       setMesaLida(null);
+      setQrCredencialLida(undefined);
       setErroCamera(null);
       return;
     }
@@ -44,6 +46,7 @@ export function MesaScannerModal({
     setIniciando(true);
     setErroCamera(null);
     setMesaLida(null);
+    setQrCredencialLida(undefined);
 
     const timer = setTimeout(async () => {
       try {
@@ -62,10 +65,13 @@ export function MesaScannerModal({
           },
           (decodedText) => {
             let numeroMesa: string | null = null;
+            let qrCredencial: string | undefined;
 
             try {
               const url = new URL(decodedText);
               numeroMesa = url.searchParams.get("mesa");
+              const hashParams = new URLSearchParams(url.hash.replace(/^#/, ""));
+              qrCredencial = hashParams.get("qr") || url.searchParams.get("qr") || undefined;
             } catch {
               const match = decodedText.match(/mesa[=:_\s-]*([0-9a-zA-Z]+)/i);
               if (match) {
@@ -77,6 +83,7 @@ export function MesaScannerModal({
 
             if (numeroMesa) {
               setMesaLida(numeroMesa);
+              setQrCredencialLida(qrCredencial);
               if (scannerRef.current) {
                 scannerRef.current.stop().catch(() => {});
               }
@@ -110,7 +117,7 @@ export function MesaScannerModal({
 
   const handleConfirmar = () => {
     if (mesaLida) {
-      onMesaDetectada(mesaLida);
+      onMesaDetectada(mesaLida, qrCredencialLida);
       onClose();
     }
   };
