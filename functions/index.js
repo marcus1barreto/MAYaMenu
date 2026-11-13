@@ -410,6 +410,24 @@ exports.loginComPin = functions.https.onCall(async (data, context) => {
   const memDoc = await restDoc.ref.collection('equipe').doc(String(colaboradorId)).get();
   const mData = memDoc.exists ? (memDoc.data() || {}) : {};
   const membroElegivel = memDoc.exists && validarMembroEquipeParaLogin(mData, memDoc.id);
+
+  // 3. Pré-checagem transacional: rejeita IP/usuário/tenant bloqueados ANTES do scrypt,
+  // evitando custo criptográfico repetido em tentativas já bloqueadas.
+  await firestoreDb.runTransaction(async (t) => {
+    const [ipDoc, userDoc, globalDoc] = await Promise.all([
+      t.get(ipRateLimitRef), t.get(userRateLimitRef), t.get(globalRestRateLimitRef),
+    ]);
+    const bloqueio = verificarBloqueioAtivo({
+      ipData: ipDoc.exists ? ipDoc.data() : null,
+      userData: userDoc.exists ? userDoc.data() : null,
+      globalData: globalDoc.exists ? globalDoc.data() : null,
+      agora,
+    });
+    if (bloqueio.bloqueado) {
+      throw new functions.https.HttpsError('resource-exhausted', bloqueio.mensagem);
+    }
+  });
+
   const pinCorreto = Boolean(
     membroElegivel
     && typeof mData.pinHash === 'string'
@@ -417,31 +435,21 @@ exports.loginComPin = functions.https.onCall(async (data, context) => {
     && verifyPin(pinLimpo, mData.pinHash, mData.pinSalt)
   );
 
-  // 3. EXECUÇÃO ATÔMICA COORDENADA: Verificação de Admissão e Atualização de Bloqueio dentro da Transação
-  // Impede que rajadas simultâneas contornem o limite antes que o bloqueio seja percebido
+  // 4. Revalida e grava contadores na transação final para fechar a janela de concorrência.
   await firestoreDb.runTransaction(async (t) => {
-    // Leituras transacionais obrigatórias (garantem isolamento SERIALIZABLE do Firestore)
-    const curIpDoc = await t.get(ipRateLimitRef);
-    const curUserDoc = await t.get(userRateLimitRef);
-    const curGlobalDoc = await t.get(globalRestRateLimitRef);
-
+    const [curIpDoc, curUserDoc, curGlobalDoc] = await Promise.all([
+      t.get(ipRateLimitRef), t.get(userRateLimitRef), t.get(globalRestRateLimitRef),
+    ]);
     const curIpData = curIpDoc.exists ? curIpDoc.data() : null;
     const curUserData = curUserDoc.exists ? curUserDoc.data() : null;
     const curGlobalData = curGlobalDoc.exists ? curGlobalDoc.data() : null;
-
-    // A) Decisão de Admissão estritamente DENTRO da transação
     const bloqueioTransacional = verificarBloqueioAtivo({
-      ipData: curIpData,
-      userData: curUserData,
-      globalData: curGlobalData,
-      agora,
+      ipData: curIpData, userData: curUserData, globalData: curGlobalData, agora,
     });
-
     if (bloqueioTransacional.bloqueado) {
       throw new functions.https.HttpsError('resource-exhausted', bloqueioTransacional.mensagem);
     }
 
-    // B) Se o PIN estiver incorreto: incrementa e grava contadores/bloqueios na mesma transação atômica
     if (!pinCorreto) {
       const { ipPayload, userPayload, globalPayload } = calcularPayloadsFalha({
         curIpData: curIpData || {},
@@ -449,18 +457,16 @@ exports.loginComPin = functions.https.onCall(async (data, context) => {
         curGlobalData: curGlobalData || {},
         agora,
       });
-
       t.set(ipRateLimitRef, ipPayload, { merge: true });
       t.set(userRateLimitRef, userPayload, { merge: true });
       t.set(globalRestRateLimitRef, globalPayload, { merge: true });
     } else {
-      // C) Se o PIN estiver correto: limpa atômica do rate limiting individual
       t.delete(ipRateLimitRef);
       t.delete(userRateLimitRef);
     }
   });
 
-  // Se falhou na validação de PIN (após contadores atômicos serem devidamente persistidos)
+  // Se falhou na validação de PIN, contadores e bloqueios já foram persistidos atomicamente.
   if (!pinCorreto) {
     throw new functions.https.HttpsError('permission-denied', 'PIN incorreto para este colaborador.');
   }
