@@ -14,6 +14,8 @@ import {
   onSnapshot,
   serverTimestamp,
   writeBatch,
+  deleteDoc,
+  runTransaction,
   type Unsubscribe,
 } from "firebase/firestore";
 import type { Licenca, PlanoTipo, LimitesPlano, Restaurante } from "@/types";
@@ -87,20 +89,13 @@ export async function criarNovaLicenca(params: {
     notas: params.notas?.trim() || "",
   };
 
-  // 1. Salva imediatamente no cache local para nunca perder nem travar a UI
+  // A licença só entra no cache depois da confirmação do servidor.
+  await setDoc(licencaRef, {
+    ...novaLicenca,
+    criadaEm: serverTimestamp(),
+  });
   salvarLicencaLocal(novaLicenca);
-
-  // 2. Tenta persistir no Firestore em nuvem
-  try {
-    await setDoc(licencaRef, {
-      ...novaLicenca,
-      criadaEm: serverTimestamp(),
-    });
-  } catch (err) {
-    console.warn("Firestore bloqueado ou offline para concessões. Salvo localmente com sucesso:", err);
-  }
-
-    return novaLicenca;
+  return novaLicenca;
 }
 
 /**
@@ -153,28 +148,20 @@ export async function criarLoteLicencas(params: {
     });
   }
 
-  // 1. Salva localmente
-  salvarLoteLicencasLocal(loteCriado);
-
-  // 2. Persiste em batches atômicos no Firestore
-  try {
-    const CHUNK_SIZE = 400;
-    for (let i = 0; i < loteCriado.length; i += CHUNK_SIZE) {
-      const chunk = loteCriado.slice(i, i + CHUNK_SIZE);
-      const batch = writeBatch(db);
-      for (const lic of chunk) {
-        const ref = doc(db, "concessoes", lic.id);
-        batch.set(ref, {
-          ...lic,
-          criadaEm: serverTimestamp(),
-        });
-      }
-      await batch.commit();
+  // Persiste primeiro no servidor; em caso de falha, nenhum lote é apresentado como emitido.
+  const CHUNK_SIZE = 400;
+  for (let i = 0; i < loteCriado.length; i += CHUNK_SIZE) {
+    const chunk = loteCriado.slice(i, i + CHUNK_SIZE);
+    const batch = writeBatch(db);
+    for (const lic of chunk) {
+      batch.set(doc(db, "concessoes", lic.id), {
+        ...lic,
+        criadaEm: serverTimestamp(),
+      });
     }
-  } catch (err) {
-    console.warn("Falha ao salvar lote no Firestore, mantido em cache local:", err);
+    await batch.commit();
   }
-
+  salvarLoteLicencasLocal(loteCriado);
   return loteCriado;
 }
 
@@ -648,19 +635,11 @@ export async function alterarStatusLicenca(
 ): Promise<void> {
   const codigoFormatado = codigo.trim().toUpperCase();
 
-  // 1. Atualiza local
+  await updateDoc(doc(db, "concessoes", codigoFormatado), { status: novoStatus });
   const locais = obterLicencasLocais();
   const atualizadas = locais.map((l) => (l.id === codigoFormatado ? { ...l, status: novoStatus } : l));
   if (typeof window !== "undefined") {
     localStorage.setItem("mayamenu_concessoes_locais", JSON.stringify(atualizadas));
-  }
-
-  // 2. Atualiza Firestore
-  try {
-    const licencaRef = doc(db, "concessoes", codigoFormatado);
-    await updateDoc(licencaRef, { status: novoStatus });
-  } catch (err) {
-    console.warn("Alteração remota do status adiada (salva localmente):", err);
   }
 }
 
@@ -790,18 +769,13 @@ export async function renovarValidadeLicenca(
   const codigoFormatado = codigo.trim().toUpperCase();
   const novaExpiracao = new Date(Date.now() + horasAdicionais * 60 * 60 * 1000);
 
-  // 1. Atualiza no Firestore
-  try {
-    const licRef = doc(db, "concessoes", codigoFormatado);
-    await updateDoc(licRef, {
-      expiracaoEm: novaExpiracao,
-      status: "disponivel",
-    });
-  } catch (err) {
-    console.warn("Falha ao renovar expiração no Firestore (salvo local):", err);
-  }
+  // O servidor confirma a renovação antes de atualizar qualquer cache local.
+  await updateDoc(doc(db, "concessoes", codigoFormatado), {
+    expiracaoEm: novaExpiracao,
+    status: "disponivel",
+  });
 
-  // 2. Atualiza localmente
+  // Atualiza localmente
   const locais = obterLicencasLocais();
   const atualizadas = locais.map((l) =>
     l.id === codigoFormatado
@@ -821,16 +795,10 @@ export async function renovarValidadeLicenca(
 export async function revogarLicenca(codigo: string): Promise<void> {
   const codigoFormatado = codigo.trim().toUpperCase();
 
-  // 1. Remove do Firestore
-  try {
-    const { deleteDoc } = await import("firebase/firestore");
-    const licRef = doc(db, "concessoes", codigoFormatado);
-    await deleteDoc(licRef);
-  } catch (err) {
-    console.warn("Falha ao revogar licença no Firestore:", err);
-  }
+  // A revogação só é refletida localmente após a exclusão confirmada pelo servidor.
+  await deleteDoc(doc(db, "concessoes", codigoFormatado));
 
-  // 2. Remove do cache local
+  // Remove do cache local
   removerLicencaLocal(codigoFormatado);
 }
 
@@ -860,13 +828,32 @@ export async function arquivarLicencaExpirada(licenca: Licenca): Promise<void> {
     dadosLicenca: dadosConsolidados,
   };
 
-  try {
-    const { deleteDoc } = await import("firebase/firestore");
-    await setDoc(arquivoMortoRef, arquivoMortoDoc);
-    await deleteDoc(licencaRef);
-  } catch (err) {
-    console.warn("Falha ao arquivar licença expirada no Firestore:", err);
-  }
+  await runTransaction(db, async (tx) => {
+    const [licSnap, arquivoSnap] = await Promise.all([
+      tx.get(licencaRef),
+      tx.get(arquivoMortoRef),
+    ]);
+    if (!licSnap.exists()) {
+      if (arquivoSnap.exists()) return; // repetição idempotente já arquivada
+      throw new Error("Concessão não encontrada; arquivo morto não foi criado.");
+    }
+    if (arquivoSnap.exists()) {
+      throw new Error("Já existe arquivo morto para esta concessão; operação interrompida.");
+    }
+    const atual = licSnap.data() as Licenca;
+    if (!["disponivel", "utilizada"].includes(atual.status)) {
+      throw new Error("Somente concessões elegíveis podem ser arquivadas.");
+    }
+    if (atual.plano !== dadosConsolidados.plano) {
+      throw new Error("Plano divergente entre concessão e arquivo morto.");
+    }
+    tx.set(arquivoMortoRef, {
+      ...arquivoMortoDoc,
+      dadosLicenca: { ...atual, status: "revogada" },
+      snapshotJson: JSON.stringify({ ...atual, status: "revogada" }, null, 2),
+    });
+    tx.delete(licencaRef);
+  });
 
   salvarArquivoMortoLocal({
     ...arquivoMortoDoc,
