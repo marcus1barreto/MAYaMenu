@@ -2216,7 +2216,7 @@ export function AdminDashboard() {
                 P
               </div>
               <p className="leading-snug">
-                <strong className="text-foreground">Prefere pagar ou faturar via PayPal?</strong> Aceitamos faturamento internacional e contas multimoeda através do PayPal sob consulta via suporte.
+                <strong className="text-foreground">Precisa de condições institucionais?</strong> Entre em contato com nossa equipe comercial para avaliar opções de contratação.
               </p>
             </div>
           </div>
