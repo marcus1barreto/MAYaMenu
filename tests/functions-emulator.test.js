@@ -303,6 +303,21 @@ async function main() {
     assert.strictEqual((await db.doc("concessoes/lic_slug").get()).exists, true);
   });
 
+  await runTest("Emulador: voucher de lote B2B inativo não pode ser validado nem consumido", async () => {
+    const pat = db.doc("patrocinadores/spn_lote_inativo");
+    await pat.set({ nomeFantasia: "Marca Inativa", ativo: true });
+    await pat.collection("lotes_licencas").doc("lote-inativo").set({
+      id: "lote-inativo", patrocinadorId: pat.id, nome: "Lote Inativo",
+      codigoCampanha: "VOUCHER-LOTE-INATIVO", totalLicencas: 5,
+      licencasAtivadas: 0, validadeMeses: 6, ativo: false,
+      restaurantesVinculados: [],
+    });
+    await assert.rejects(
+      () => executarValidarCodigoAtivacao(db, { codigo: "VOUCHER-LOTE-INATIVO" }),
+      /lote de patrocínio está inativo/i
+    );
+  });
+
   await runTest("Emulador: voucher B2B ativa PRO, injeta catálogo e consome uma única cota", async () => {
     const patRef = db.doc("patrocinadores/spn_test_b2b");
     await patRef.set({ nomeFantasia: "Marca Teste", ativo: true, slug: "marca-teste" });
