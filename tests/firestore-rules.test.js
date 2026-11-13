@@ -18,8 +18,26 @@ const {
 } = require("@firebase/rules-unit-testing");
 const fs = require("fs");
 const path = require("path");
+const {
+  getFirestore,
+  connectFirestoreEmulator,
+} = require("firebase/firestore");
 
 const PROJECT_ID = "mayamenu-bd";
+const DATABASE_ID = "mayamenu-bd";
+
+function patchContextToNamedDatabase(context) {
+  // RulesTestContext cria um FirebaseApp isolado; reutilizamos seu Auth simulado,
+  // mas conectamos explicitamente o Firestore ao databaseId real do aplicativo.
+  const app = context.app;
+  if (!app) throw new Error("RulesTestContext sem FirebaseApp para banco nomeado.");
+  context.firestore = () => {
+    const db = getFirestore(app, DATABASE_ID);
+    connectFirestoreEmulator(db, "127.0.0.1", 8080);
+    return db;
+  };
+  return context;
+}
 let testEnv;
 
 async function setup() {
@@ -32,6 +50,17 @@ async function setup() {
       port: 8080,
     },
   });
+
+  // A API pública firestore() da RulesTestContext aponta para (default).
+  // O MAYaMenu usa o banco nomeado mayamenu-bd; sobrescrevemos os contextos
+  // para que os testes exercitem exatamente o banco que receberá as Rules.
+  const authContextOriginal = testEnv.authenticatedContext.bind(testEnv);
+  testEnv.authenticatedContext = (...args) => patchContextToNamedDatabase(authContextOriginal(...args));
+  const anonContextOriginal = testEnv.unauthenticatedContext.bind(testEnv);
+  testEnv.unauthenticatedContext = (...args) => patchContextToNamedDatabase(anonContextOriginal(...args));
+  const disabledOriginal = testEnv.withSecurityRulesDisabled.bind(testEnv);
+  testEnv.withSecurityRulesDisabled = (callback) =>
+    disabledOriginal((context) => callback(patchContextToNamedDatabase(context)));
 }
 
 async function runTests() {
