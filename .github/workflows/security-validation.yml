@@ -3,10 +3,12 @@ name: Security and integration validation
 on:
   push:
     branches:
-      - security/hardening-final-7-ajustes
-  pull_request:
-    branches:
       - main
+      - security/hardening-final-7-ajustes
+    paths-ignore:
+      - functions/package.json
+      - functions/package-lock.json
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -38,10 +40,16 @@ jobs:
           java-version: 21
 
       - name: Install application dependencies
-        run: npm ci
+        run: npm ci --no-audit --no-fund
+
+      - name: Audit application production dependencies
+        run: npm audit --omit=dev --audit-level=high
 
       - name: Install Cloud Functions dependencies
-        run: npm ci --prefix functions
+        run: npm ci --prefix functions --no-audit --no-fund
+
+      - name: Audit Cloud Functions production dependencies
+        run: npm audit --prefix functions --omit=dev --audit-level=high
 
       - name: Run unit, regression, Firestore Rules and Functions emulator tests
         run: npm test
