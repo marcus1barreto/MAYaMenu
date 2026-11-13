@@ -204,6 +204,9 @@ async function runTests() {
     await assertSucceeds(ownerDb.doc("restaurantes/rest_a").get());
     await assertFails(otherDb.doc("restaurantes/rest_a").get());
     await assertFails(ownerDb.doc("restaurantes/rest_a").update({ ownerId: "intruso" }));
+    await assertFails(ownerDb.doc("restaurantes/rest_c").set({
+      ownerId: "owner_a", slug: "rest-c", nome: "Tentativa de tenant direto",
+    }));
     await assertFails(ownerDb.doc("restaurantes/rest_a").update({ plano: "pro", patrocinio: { ativo: true } }));
     await assertFails(ownerDb.doc("restaurantes_publicos/rest_a").update({ nome: "perfil adulterado" }));
   });
