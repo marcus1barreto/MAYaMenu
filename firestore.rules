@@ -179,7 +179,7 @@ service cloud.firestore {
         && (
           !request.resource.data.diff(resource.data).affectedKeys().hasAny(['configuracoes'])
           || request.resource.data.configuracoes.diff(resource.data.configuracoes).affectedKeys().hasOnly([
-            'corPrimaria', 'tema', 'logoUrl', 'capaUrl', 'modoOperacao', 'modoFilaKds', 'taxaServico'
+            'corPrimaria', 'tema', 'logoUrl', 'capaUrl', 'modoOperacao', 'modoFilaKds', 'taxaServico', 'pixConfig'
           ])
         )
       );
