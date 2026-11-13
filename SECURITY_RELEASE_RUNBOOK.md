@@ -22,7 +22,7 @@ Durante a janela de publicação, remover o gatilho antigo e implantar a versão
 
 ```bash
 firebase functions:delete setRestaurantOwnerClaims --region us-central1 --project mayaranas-8ad9f
-firebase deploy --only functions,firestore:rules --project mayaranas-8ad9f
+firebase deploy --only functions,firestore --project mayaranas-8ad9f
 ```
 
 A implantação cria os gatilhos de 2ª geração `setRestaurantOwnerClaims`, `sincronizarPerfilPublicoRestaurante` e `processarSelloutOutbox`, todos vinculados explicitamente ao banco `mayamenu-bd`.
