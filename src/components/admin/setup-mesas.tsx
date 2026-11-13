@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import { QRCodeSVG } from "qrcode.react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
@@ -14,6 +15,7 @@ import {
   salvarConfigMesa,
   alternarStatusLoteMesas,
   escutarConfigsMesas,
+  reativarMesaFirestore,
   type ConfigMesa,
 } from "@/lib/mesas-service";
 import { desativarMesaFirestore } from "@/lib/restaurante-service";
@@ -51,6 +53,12 @@ export function SetupMesas({ restauranteId, maxMesas }: SetupMesasProps) {
   const [configs, setConfigs] = useState<Record<number, ConfigMesa>>({});
   const [garcons, setGarcons] = useState<MembroGarcom[]>([]);
   const [salvandoNum, setSalvandoNum] = useState<number | null>(null);
+  const [qrReativacao, setQrReativacao] = useState<{
+    mesa: number;
+    url: string;
+    qrCredencial: string;
+    qrVersao: number;
+  } | null>(null);
 
   // Modal de Reserva
   const [mesaParaReservar, setMesaParaReservar] = useState<number | null>(null);
@@ -108,7 +116,19 @@ export function SetupMesas({ restauranteId, maxMesas }: SetupMesasProps) {
         // Uma mesa desativada permanentemente só pode voltar por fluxo backend que emita
         // uma nova credencial QR. Não reativar alterando campos diretamente no cliente.
         if (statusEstrutural === "inativa") {
-          alert("Esta mesa foi desativada permanentemente. A reativação exige reemissão segura do QR Code pela administração.");
+          const resultado = await reativarMesaFirestore(restauranteId, num);
+          if (!resultado.qrCredencial || !resultado.slug || !resultado.qrVersao) {
+            throw new Error("Mesa reativada sem nova credencial disponível. Solicite rotação do QR à administração.");
+          }
+          const url = new URL(`/r/${encodeURIComponent(resultado.slug)}`, window.location.origin);
+          url.searchParams.set("mesa", String(num));
+          url.searchParams.set("qr", resultado.qrCredencial);
+          setQrReativacao({
+            mesa: num,
+            url: url.toString(),
+            qrCredencial: resultado.qrCredencial,
+            qrVersao: resultado.qrVersao,
+          });
           return;
         }
         await salvarConfigMesa(restauranteId, num, { ativa: true });
@@ -427,6 +447,47 @@ export function SetupMesas({ restauranteId, maxMesas }: SetupMesasProps) {
           );
         })}
       </div>
+
+      {/* QR novo é exibido uma única vez após reativação; não é persistido em texto claro. */}
+      <Dialog open={qrReativacao !== null} onOpenChange={(open) => !open && setQrReativacao(null)}>
+        <DialogContent className="max-w-sm p-6 bg-card border border-border rounded-3xl shadow-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-base font-black text-foreground">
+              Novo QR da Mesa {qrReativacao?.mesa}
+            </DialogTitle>
+          </DialogHeader>
+          {qrReativacao && (
+            <div className="space-y-3 text-center">
+              <p className="text-xs text-muted-foreground">
+                QR rotacionado para a versão {qrReativacao.qrVersao}. Substitua o código físico antigo.
+              </p>
+              <div className="mx-auto w-fit rounded-xl bg-white p-3">
+                <QRCodeSVG value={qrReativacao.url} size={224} level="H" />
+              </div>
+              <p className="break-all rounded-lg bg-muted p-2 text-[10px] text-muted-foreground">
+                {qrReativacao.url}
+              </p>
+              <Button
+                type="button"
+                className="w-full"
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(qrReativacao.url);
+                    alert("Link do novo QR copiado.");
+                  } catch {
+                    alert("Não foi possível copiar automaticamente. Copie o link exibido.");
+                  }
+                }}
+              >
+                Copiar link do novo QR
+              </Button>
+              <p className="text-[10px] text-amber-600">
+                A credencial só é exibida nesta confirmação. Feche o diálogo depois de salvar ou imprimir o novo QR.
+              </p>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* MODAL DE RESERVA DE MESA */}
       <Dialog open={mesaParaReservar !== null} onOpenChange={(open) => !open && setMesaParaReservar(null)}>
