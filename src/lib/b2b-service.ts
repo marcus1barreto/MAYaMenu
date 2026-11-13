@@ -367,7 +367,7 @@ export async function validarVoucherPatrocinio(
     };
   } catch (err: unknown) {
     const mensagem = err instanceof Error ? err.message : "Falha na validação do voucher.";
-    return { valido: false, mensagem: mensagem.replace(/^functions\\/[a-z-]+:\\s*/i, "") };
+    return { valido: false, mensagem: mensagem.replace(/^functions\/[a-z-]+:\s*/i, "") };
   }
 }
 
@@ -401,7 +401,7 @@ export async function ativarPatrocinioNoRestaurante(params: {
     };
   } catch (err: unknown) {
     const mensagem = err instanceof Error ? err.message : "Erro durante a ativação do patrocínio.";
-    return { sucesso: false, mensagem: mensagem.replace(/^functions\\/[a-z-]+:\\s*/i, "") };
+    return { sucesso: false, mensagem: mensagem.replace(/^functions\/[a-z-]+:\s*/i, "") };
   }
 }
 
