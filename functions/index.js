@@ -303,6 +303,15 @@ exports.removeStaffMember = functions.https.onCall(async (data, context) => {
   return { sucesso: true };
 });
 
+function validarMembroEquipeParaLogin(membroData, membroDocId) {
+  return Boolean(
+    membroData
+    && membroData.ativo !== false
+    && membroData.uid === membroDocId
+    && ['garcom', 'cozinha'].includes(membroData.role)
+  );
+}
+
 /**
  * Cloud Function HTTPS Callable para autenticação rápida via QR Code de Crachá
  */
@@ -331,9 +340,7 @@ exports.loginComCracha = functions.https.onCall(async (data, context) => {
 
   const membroDoc = equipeSnap.docs[0];
   const membroData = membroDoc.data();
-  if (membroData.ativo === false ||
-      membroData.uid !== membroDoc.id ||
-      !['garcom', 'cozinha'].includes(membroData.role)) {
+  if (!validarMembroEquipeParaLogin(membroData, membroDoc.id)) {
     throw new functions.https.HttpsError('permission-denied', 'Crachá revogado ou colaborador inativo.');
   }
 
@@ -397,10 +404,7 @@ exports.loginComPin = functions.https.onCall(async (data, context) => {
   // 2. Busca os dados do colaborador para validação do hash scrypt + salt
   const memDoc = await restDoc.ref.collection('equipe').doc(String(colaboradorId)).get();
   const mData = memDoc.exists ? (memDoc.data() || {}) : {};
-  const membroElegivel = memDoc.exists
-    && mData.ativo !== false
-    && mData.uid === memDoc.id
-    && ['garcom', 'cozinha'].includes(mData.role);
+  const membroElegivel = memDoc.exists && validarMembroEquipeParaLogin(mData, memDoc.id);
   const pinCorreto = Boolean(
     membroElegivel
     && typeof mData.pinHash === 'string'
