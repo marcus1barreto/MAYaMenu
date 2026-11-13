@@ -3,39 +3,27 @@
 import React, { useState, useEffect } from "react";
 import { B2BLogin } from "@/components/b2b/b2b-login";
 import { B2BPortal } from "@/components/b2b/b2b-portal";
-import { buscarPatrocinadorPorChave, sairPortalB2B } from "@/lib/b2b-service";
+import { validarSessaoPatrocinador, sairPortalB2B } from "@/lib/b2b-service";
 import type { PatrocinadorB2B } from "@/types/b2b";
 
 export default function ParceirosPage() {
   const [patrocinador, setPatrocinador] = useState<PatrocinadorB2B | null>(null);
   const [carregando, setCarregando] = useState(true);
 
-  // Recupera sessão ativa no sessionStorage
+  // Restaura apenas a sessão Firebase secundária; a chave bruta nunca é persistida.
   useEffect(() => {
-    const tokenSalvo = sessionStorage.getItem("mayamenu_b2b_token");
-
-    if (tokenSalvo) {
-      buscarPatrocinadorPorChave(tokenSalvo)
-        .then((pat) => {
-          if (pat) {
-            setPatrocinador(pat);
-            sessionStorage.setItem("mayamenu_b2b_patrocinador", JSON.stringify(pat));
-          } else {
-            sessionStorage.removeItem("mayamenu_b2b_token");
-            sessionStorage.removeItem("mayamenu_b2b_patrocinador");
-            setPatrocinador(null);
-          }
-        })
-        .finally(() => setCarregando(false));
-    } else {
-      sessionStorage.removeItem("mayamenu_b2b_patrocinador");
-      sairPortalB2B().catch(() => undefined).finally(() => setCarregando(false));
-    }
+    let ativo = true;
+    validarSessaoPatrocinador()
+      .then((pat) => {
+        if (ativo) setPatrocinador(pat);
+      })
+      .finally(() => {
+        if (ativo) setCarregando(false);
+      });
+    return () => { ativo = false; };
   }, []);
 
   const handleLogout = async () => {
-    sessionStorage.removeItem("mayamenu_b2b_token");
-    sessionStorage.removeItem("mayamenu_b2b_patrocinador");
     await sairPortalB2B().catch(() => undefined);
     setPatrocinador(null);
   };
