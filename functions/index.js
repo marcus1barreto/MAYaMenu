@@ -504,8 +504,9 @@ exports.loginComPin = functions.https.onCall(async (data, context) => {
  */
 exports.listarEquipePublica = functions.https.onCall(async (data, context) => {
   const { restauranteId, role } = data || {};
-  if (!restauranteId) {
-    throw new functions.https.HttpsError('invalid-argument', 'Campo restauranteId é obrigatório.');
+  if (typeof restauranteId !== 'string' || !restauranteId.trim() || restauranteId.length > 128 ||
+      !['garcom', 'cozinha'].includes(role)) {
+    throw new functions.https.HttpsError('invalid-argument', 'Restaurante e perfil operacional válidos são obrigatórios.');
   }
 
   const firestoreDb = getDb();
