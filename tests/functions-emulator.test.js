@@ -353,8 +353,13 @@ async function main() {
       id: "a1", nome: "Item A", categoriaSugerida: "Bebidas", precoSugerido: 5,
       obrigatorioNoCardapio: true,
     });
+    await patA.collection("catalogo_master").doc("a2").set({
+      id: "a2", nome: "Item A2", categoriaSugerida: "Alimentos", precoSugerido: 7,
+      obrigatorioNoCardapio: true,
+    });
+    // A segunda marca conflita com a categoria secundária da primeira, não com a principal.
     await patB.collection("catalogo_master").doc("b1").set({
-      id: "b1", nome: "Item B", categoriaSugerida: "bebidas", precoSugerido: 6,
+      id: "b1", nome: "Item B", categoriaSugerida: "alimentos", precoSugerido: 6,
       obrigatorioNoCardapio: true,
     });
     for (const [pat, lote, codigo] of [
