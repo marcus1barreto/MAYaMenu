@@ -3842,6 +3842,16 @@ async function executarAtivarInstancia(firestoreDb, authUid, authToken, payload,
   };
 }
 
+function normalizarCategoriaPatrocinio(valor) {
+  return String(valor || 'Especiais da Casa')
+    .normalize('NFD')
+    .replace(/[\\u0300-\\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .replace(/\\s+/g, ' ');
+}
+
 async function executarAtivarPatrocinio(firestoreDb, authUid, token, payload, rawRequest) {
   if (!authUid) throw new functions.https.HttpsError('unauthenticated', 'Autenticação necessária.');
   const restauranteId = String(payload?.restauranteId || '').trim();
@@ -3903,7 +3913,7 @@ async function executarAtivarPatrocinio(firestoreDb, authUid, token, payload, ra
       throw new functions.https.HttpsError('failed-precondition', 'Patrocinador sem produtos cadastrados no Catálogo Master.');
     }
     const categoriasNovas = new Set(itensMaster.map((i) =>
-      String(i.categoriaSugerida || 'Especiais da Casa').trim().toLowerCase()
+      normalizarCategoriaPatrocinio(i.categoriaSugerida)
     ).filter(Boolean));
     if (categoriasNovas.size === 0) categoriasNovas.add('especiais da casa');
     if (slots.some((slot) => slot.patrocinadorId === patrocinadorId)) {
@@ -3913,7 +3923,7 @@ async function executarAtivarPatrocinio(firestoreDb, authUid, token, payload, ra
       const categoriasSlot = Array.isArray(slot.categoriasSugeridas)
         ? slot.categoriasSugeridas
         : [slot.categoriaSugerida || 'Especiais da Casa'];
-      return categoriasSlot.map((categoria) => String(categoria || '').trim().toLowerCase()).filter(Boolean);
+      return categoriasSlot.map((categoria) => normalizarCategoriaPatrocinio(categoria)).filter(Boolean);
     }));
     if (Array.from(categoriasNovas).some((categoria) => categoriasExistentes.has(categoria))) {
       throw new functions.https.HttpsError('failed-precondition', 'Conflito de categoria com outro patrocinador já vinculado.');
@@ -4464,6 +4474,7 @@ exports._internal = {
   criarClaimsSessaoPatrocinador,
   executarAtivarInstancia,
   executarAtivarPatrocinio,
+  normalizarCategoriaPatrocinio,
   executarProcessarSelloutOutbox,
   executarSincronizarPerfilPublicoRestaurante,
   montarPerfilPublicoRestaurante,
