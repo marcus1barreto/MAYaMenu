@@ -215,7 +215,7 @@ async function main() {
     const oldToken = process.env.MERCADO_PAGO_ACCESS_TOKEN;
     const oldSecret = process.env.MERCADO_PAGO_WEBHOOK_SECRET;
     const attemptId = "123e4567-e89b-12d3-a456-426614174004";
-    const paymentId = "987654325";
+    const paymentId = "987654326";
     const requestId = "request-webhook-004";
     const ts = "1710000001";
     const secret = "segredo-webhook-integracao";
@@ -552,7 +552,7 @@ async function main() {
 
   await runTest("Emulador: pedido de garçom preserva origem patrocinada e rejeita produto inativo", async () => {
     const rest = db.doc("restaurantes/rest_e");
-    await rest.set({ nome: "Rest Emulador", slug: "rest-e", ownerId: "owner_e" }, { merge: true });
+    await rest.set({ nome: "Rest Emulador", slug: "rest-e", ownerId: "owner_e", maxMesas: 30 }, { merge: true });
     await rest.collection("equipe").doc("garcom_e").set({ role: "garcom", ativo: true });
     await rest.collection("mesas").doc("12").set({ ativa: true, statusEstrutural: "livre" });
     await rest.collection("cardapio").doc("spn-item").set({
@@ -693,6 +693,8 @@ async function main() {
       }),
       /dados cadastrais/i
     );
+    assert.strictEqual(_internal.validarCnpjBasico("12.345.678/0001-95"), true);
+    assert.strictEqual(_internal.validarCnpjBasico("11.111.111/1111-11"), false);
     const criado = await executarCadastrarPatrocinadorSuperadmin(
       db, "admin_b2b", { superadmin: true }, payload
     );
@@ -796,7 +798,7 @@ async function main() {
       }, {
         codigo: "MAYA-ANON-01", slug: "anon-rest-01", restauranteNome: "Restaurante Anônimo",
       }),
-      /conta permanente/i
+      /conta de proprietário permanente/i
     );
     await assert.rejects(
       () => executarAtivarInstancia(db, "uid_sponsor_01", {
@@ -872,19 +874,21 @@ async function main() {
     await db.doc("restaurantes_publicos/legacy_rest").set({
       restauranteId: "legacy_rest", slug: "slug-em-uso", nome: "Legado", configuracoes: {},
     });
-    await db.doc("concessoes/lic_slug").set({
-      id: "lic_slug", codigo: "lic_slug", status: "disponivel", plano: "free",
+    await db.doc("concessoes/MAYA-SLUG-01").set({
+      id: "MAYA-SLUG-01", codigo: "MAYA-SLUG-01", status: "disponivel", plano: "free",
       limites: { maxMesas: 10, maxPratos: 20 },
       expiracaoEm: new Date(Date.now() + 86400000).toISOString(),
     });
+    const validacaoSlug = await executarValidarCodigoAtivacao(db, { codigo: "MAYA-SLUG-01" });
+    assert.strictEqual(validacaoSlug.valida, true);
     await assert.rejects(
       () => executarAtivarInstancia(db, "owner_novo", { firebase: { sign_in_provider: "password" } }, {
-        codigo: "lic_slug", slug: "slug-em-uso", restauranteNome: "Novo",
-      }),
+        codigo: "MAYA-SLUG-01", slug: "slug-em-uso", restauranteNome: "Novo",
+      }, { ip: "198.51.100.77", headers: { "x-forwarded-for": "198.51.100.77" } }),
       /endereço público já está em uso/i
     );
     assert.strictEqual((await db.doc("restaurantes/owner_novo").get()).exists, false);
-    assert.strictEqual((await db.doc("concessoes/lic_slug").get()).exists, true);
+    assert.strictEqual((await db.doc("concessoes/MAYA-SLUG-01").get()).exists, true);
   });
 
   await runTest("Emulador: código de licença arquivado não pode ser reutilizado como voucher B2B", async () => {
