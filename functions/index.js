@@ -2768,8 +2768,10 @@ function validarPagamentoPro(attempt, payment) {
   if (typeof payment.live_mode !== 'boolean' || payment.live_mode !== (attempt.liveMode === true)) {
     return 'Ambiente do pagamento não corresponde ao ambiente do checkout.';
   }
-  if (attempt.collectorId &&
-      String(payment.collector_id || '') !== String(attempt.collectorId)) {
+  if (!attempt.collectorId) {
+    return 'Tentativa sem identificação da conta recebedora do checkout.';
+  }
+  if (String(payment.collector_id || '') !== String(attempt.collectorId)) {
     return 'Conta recebedora do pagamento não corresponde à preferência criada.';
   }
   if (!payment.date_approved || !Number.isFinite(Date.parse(payment.date_approved))) {
@@ -3340,19 +3342,23 @@ async function executarCriarPreferenciaProBackend(firestoreDb, auth, payload) {
     const initPoint = liveMode
       ? preference.init_point
       : (preference.sandbox_init_point || preference.init_point);
-    if (!preference.id || !initPoint) {
+    const collectorId = String(preference.collector_id ?? '').trim();
+    if (!preference.id || !initPoint || !collectorId) {
       await attemptRef.update({
         status: 'failed',
         falhaCodigo: 'invalid_preference_response',
         atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
       });
-      throw new functions.https.HttpsError('internal', 'Resposta inválida do Mercado Pago ao criar o checkout.');
+      throw new functions.https.HttpsError(
+        'internal',
+        'Resposta inválida do Mercado Pago: preferência, URL ou conta recebedora ausente.'
+      );
     }
 
     await attemptRef.update({
       status: 'pending',
       preferenceId: String(preference.id),
-      collectorId: preference.collector_id ? String(preference.collector_id) : null,
+      collectorId,
       initPoint,
       atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
     });
