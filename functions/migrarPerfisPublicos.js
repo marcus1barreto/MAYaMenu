@@ -5,9 +5,11 @@
  * Usa Application Default Credentials (firebase login:ci / GOOGLE_APPLICATION_CREDENTIALS).
  */
 const admin = require("firebase-admin");
+const { getFirestore } = require("firebase-admin/firestore");
 
 if (!admin.apps.length) admin.initializeApp();
-const db = admin.firestore();
+// O frontend e as Cloud Functions usam exclusivamente o banco nomeado mayamenu-bd.
+const db = getFirestore("mayamenu-bd");
 
 async function main() {
   let cursor = null;
