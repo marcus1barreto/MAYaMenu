@@ -70,11 +70,13 @@ function extrairIpConviavel(rawRequest) {
   // Não usar x-appengine-user-ip: Cloud Functions gen2 não documenta esse campo
   // como uma fonte autenticada para esta topologia. Fallback conservador ao peer direto.
   // 2. Fallback para conexão de socket direto (emulação local / Express)
-  if (rawRequest.ip) {
-    return rawRequest.ip;
-  }
   if (rawRequest.socket?.remoteAddress) {
     return rawRequest.socket.remoteAddress;
+  }
+  // req.ip pode refletir trust-proxy configurado pelo framework; o peer do socket
+  // é preferível quando não há uma cadeia XFF validável.
+  if (rawRequest.ip) {
+    return rawRequest.ip;
   }
 
   return 'unknown_ip';
