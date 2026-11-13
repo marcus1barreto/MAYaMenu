@@ -124,8 +124,9 @@ service cloud.firestore {
     // ─────────────────────────── Módulo B2B & Patrocinadores ───────────────────────────
 
     match /patrocinadores/{patrocinadorId} {
-      // Dados contratuais e chave B2B nunca são públicos.
-      allow read, write: if isSuperAdmin() || isSponsor(patrocinadorId);
+      // Dados contratuais e chave B2B nunca são públicos; perfil raiz é alterado pelo SuperAdmin.
+      allow read: if isSuperAdmin() || isSponsor(patrocinadorId);
+      allow write: if isSuperAdmin();
 
       // Subcoleção Catálogo Master da marca
       match /catalogo_master/{itemId} {
