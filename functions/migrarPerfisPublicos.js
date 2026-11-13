@@ -33,10 +33,14 @@ async function main() {
       for (const key of ["corPrimaria", "tema", "logoUrl", "capaUrl", "modoOperacao", "modoFilaKds", "taxaServico"]) {
         if (cfg[key] !== undefined) configuracoes[key] = cfg[key];
       }
-      if (cfg.pixConfig?.ativo === true && cfg.pixConfig.chave && cfg.pixConfig.tipoChave) {
+      const tipoChavePix = String(cfg.pixConfig?.tipoChave || "").toLowerCase();
+      const chavePix = String(cfg.pixConfig?.chave || "").trim();
+      if (cfg.pixConfig?.ativo === true
+          && ["cpf", "cnpj", "telefone", "email", "aleatoria"].includes(tipoChavePix)
+          && chavePix.length > 0 && chavePix.length <= 256) {
         configuracoes.pixConfig = {
-          chave: String(cfg.pixConfig.chave),
-          tipoChave: String(cfg.pixConfig.tipoChave),
+          chave: chavePix,
+          tipoChave: tipoChavePix,
           beneficiario: String(cfg.pixConfig.beneficiario || "").slice(0, 25),
           cidade: String(cfg.pixConfig.cidade || "").slice(0, 15),
           ativo: true,
