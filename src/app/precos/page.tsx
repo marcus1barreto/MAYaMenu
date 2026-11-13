@@ -258,7 +258,7 @@ export default function PrecosPage() {
 
                 {/* Subtexto Transparente */}
                 <p className="text-[11px] text-neutral-500 text-center mt-3 leading-relaxed">
-                  Cobrança mensal no cartão ou Pix via Mercado Pago. Cancele quando quiser, sem multas.
+                  Pagamento pré-pago de 1 mês via Mercado Pago (Pix ou cartão). Sem renovação automática: basta não contratar um novo período.
                 </p>
 
                 {/* Divisor */}
@@ -793,7 +793,7 @@ export default function PrecosPage() {
               {
                 pergunta: "Existe fidelidade ou multa por cancelamento?",
                 resposta:
-                  "Nenhuma fidelidade e zero multas rescisórias. No plano PRO Mensal você pode suspender ou cancelar a qualquer momento sem taxas. No plano Semestral, você garante a tarifa com 17% de desconto pelo período contratado.",
+                  "Os planos são pré-pagos e não renovam automaticamente. Ao fim da vigência, basta não contratar um novo período; não há multa de fidelidade. O plano semestral mantém o preço contratado durante os seis meses.",
               },
               {
                 pergunta: "Vocês emitem Nota Fiscal (NFS-e)?",
