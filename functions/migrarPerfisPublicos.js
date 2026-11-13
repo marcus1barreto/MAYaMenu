@@ -2,7 +2,8 @@
  * Migração pontual dos perfis públicos minimizados dos restaurantes já existentes.
  * Executar após deploy de sincronizarPerfilPublicoRestaurante:
  *   node functions/migrarPerfisPublicos.js
- * Usa Application Default Credentials (firebase login:ci / GOOGLE_APPLICATION_CREDENTIALS).
+ * Usa Application Default Credentials (gcloud auth application-default login)
+ * ou GOOGLE_APPLICATION_CREDENTIALS apontando para uma chave de serviço protegida.
  */
 const admin = require("firebase-admin");
 const { getFirestore } = require("firebase-admin/firestore");
