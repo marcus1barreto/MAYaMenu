@@ -1461,4 +1461,3 @@ main().catch((err) => {
   console.error("Erro fatal:", err);
   process.exit(1);
 });
-
