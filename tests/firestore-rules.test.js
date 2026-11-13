@@ -933,6 +933,30 @@ async function runTests() {
     }));
   });
 
+  await test("Equipe: mudança de cargo invalida imediatamente as claims antigas nas Rules", async () => {
+    const sessaoGarcomAntiga = testEnv.authenticatedContext("garcom_a", {
+      role: "garcom", restauranteId: "rest_a",
+    }).firestore();
+
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await context.firestore().doc("restaurantes/rest_a/equipe/garcom_a").update({
+        role: "cozinha",
+      });
+    });
+
+    // O token ainda declara garçom, mas o documento atual já declara cozinha.
+    await assertFails(
+      sessaoGarcomAntiga.doc("restaurantes/rest_a/kds_tickets/ticket_1").get()
+    );
+
+    const sessaoCozinhaAtual = testEnv.authenticatedContext("garcom_a", {
+      role: "cozinha", restauranteId: "rest_a",
+    }).firestore();
+    await assertSucceeds(
+      sessaoCozinhaAtual.doc("restaurantes/rest_a/kds_tickets/ticket_1").get()
+    );
+  });
+
   await test("Mesa: estado estrutural inativa só pode ser gravado pelo backend", async () => {
     const ownerDb = testEnv.authenticatedContext("owner_a", {
       role: "owner", restauranteId: "rest_a",
