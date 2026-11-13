@@ -29,10 +29,25 @@ function isMesaTokenCacheValido(cache, qrCredencial, agora = Date.now()) {
   );
 }
 
+function obterQrCredencialInicial(numeroMesa, numeroMesaInicial, qrCredencialInicial, hash = "") {
+  if (String(numeroMesa) !== String(numeroMesaInicial)) return undefined;
+  let credencial = qrCredencialInicial;
+  try {
+    if (String(hash).includes("qr=")) {
+      const params = new URLSearchParams(String(hash).replace(/^#/, ""));
+      credencial = params.get("qr") || credencial;
+    }
+  } catch {
+    // Hash inválido não substitui a credencial inicial recebida.
+  }
+  return credencial || undefined;
+}
+
 module.exports = {
   SESSAO_MESA_TIMEOUT_MS,
   getCartStorageKey,
   isCarrinhoExpirado,
   fingerprintQrCredencial,
   isMesaTokenCacheValido,
+  obterQrCredencialInicial,
 };
