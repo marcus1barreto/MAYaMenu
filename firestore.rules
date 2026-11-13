@@ -280,7 +280,11 @@ service cloud.firestore {
           && (!('statusEstrutural' in request.resource.data)
             || request.resource.data.statusEstrutural in ['livre', 'reservada', 'bloqueada'])
           && (!('ativa' in request.resource.data) || request.resource.data.ativa is bool);
-        allow update: if (isOwner(restauranteId) || isGarcom(restauranteId) || isSuperAdmin())
+        allow update: if (
+          isSuperAdmin()
+          || ((isOwner(restauranteId) || isGarcom(restauranteId))
+            && resource.data.statusEstrutural != 'inativa')
+        )
           && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
             'qrCredencialHash',
             'qrVersao',
