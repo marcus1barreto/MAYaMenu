@@ -2800,6 +2800,13 @@ async function executarProcessarPagamentoProAprovado(firestoreDb, attemptId, pay
       liveMode: attempt.liveMode === true,
       status: 'approved',
       novaDataExpiracao,
+      previousState: {
+        plano: restData.plano || 'free',
+        maxMesas: restData.maxMesas ?? null,
+        maxPratos: restData.maxPratos ?? null,
+        maxItensMenu: restData.maxItensMenu ?? null,
+        assinatura: restData.assinatura || null,
+      },
       processadoEm: admin.firestore.FieldValue.serverTimestamp(),
     });
     resultado = { sucesso: true, status: 'approved', idempotente: false, novaDataExpiracao };
@@ -2826,6 +2833,111 @@ async function limitarCriacaoPreferenciaPro(firestoreDb, authUid) {
       atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
     }, { merge: true });
   });
+}
+
+async function executarProcessarEstornoPagamentoPro(firestoreDb, attemptId, payment) {
+  const paymentId = String(payment?.id || '');
+  const statusGateway = String(payment?.status || '');
+  const valorEstornadoCentavos = Math.round(Number(payment?.transaction_amount_refunded || 0) * 100);
+  const statusEstorno = statusGateway === 'charged_back'
+    ? 'charged_back'
+    : (statusGateway === 'refunded' ? 'refunded' : 'partial_refund');
+
+  if (!/^[0-9]{1,30}$/.test(paymentId) ||
+      !/^[a-f0-9-]{36}$/i.test(String(attemptId || '')) ||
+      !['refunded', 'charged_back'].includes(statusGateway) && valorEstornadoCentavos <= 0) {
+    throw new functions.https.HttpsError('invalid-argument', 'Notificação de estorno inválida.');
+  }
+
+  const attemptRef = firestoreDb.collection('pagamentos_pro').doc(attemptId);
+  const ledgerRef = firestoreDb.collection('pagamentos_pro_processados').doc(paymentId);
+  let resultado = { processado: false, idempotente: false };
+
+  await firestoreDb.runTransaction(async (tx) => {
+    const [attemptSnap, ledgerSnap] = await Promise.all([
+      tx.get(attemptRef),
+      tx.get(ledgerRef),
+    ]);
+    if (!attemptSnap.exists) return;
+    const attempt = attemptSnap.data() || {};
+    if (String(attempt.attemptId || attemptSnap.id) !== attemptId) {
+      throw new functions.https.HttpsError('failed-precondition', 'Referência da tentativa não confere.');
+    }
+    if (ledgerSnap.exists && ledgerSnap.data()?.attemptId !== attemptId) {
+      throw new functions.https.HttpsError('already-exists', 'Pagamento associado a outra tentativa.');
+    }
+
+    const ledger = ledgerSnap.exists ? ledgerSnap.data() || {} : {};
+    if (ledger.status === statusEstorno && attempt.status === statusEstorno) {
+      resultado = { processado: true, idempotente: true };
+      return;
+    }
+
+    let restRef = null;
+    let restSnap = null;
+    if (ledgerSnap.exists && ledger.restauranteId) {
+      restRef = firestoreDb.collection('restaurantes').doc(String(ledger.restauranteId));
+      restSnap = await tx.get(restRef);
+    }
+
+    tx.update(attemptRef, {
+      status: statusEstorno,
+      estornadoEm: admin.firestore.FieldValue.serverTimestamp(),
+      valorEstornadoCentavos,
+      atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    if (ledgerSnap.exists) {
+      tx.update(ledgerRef, {
+        status: statusEstorno,
+        valorEstornadoCentavos,
+        estornadoEm: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    }
+
+    if (restRef && restSnap?.exists) {
+      const restData = restSnap.data() || {};
+      const assinaturaAtual = restData.assinatura || {};
+      const patch = {
+        atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
+        ultimoEstornoPagamentoId: paymentId,
+      };
+
+      if (String(assinaturaAtual.paymentId || '') === paymentId && ledger.previousState) {
+        const anterior = ledger.previousState;
+        patch.plano = anterior.plano || 'free';
+        patch.maxMesas = anterior.maxMesas ?? (patch.plano === 'pro' ? 30 : 10);
+        patch.maxPratos = anterior.maxPratos ?? (patch.plano === 'pro' ? 60 : 20);
+        patch.maxItensMenu = anterior.maxItensMenu ?? (patch.plano === 'pro' ? 60 : 20);
+        patch.assinatura = anterior.assinatura || admin.firestore.FieldValue.delete();
+      } else {
+        // Estorno de uma cobrança anterior à atual: falha fechada e revisão administrativa.
+        const temProPorLicenca = restData.licenca?.plano === 'pro';
+        const patrocinioExpira = restData.patrocinio?.dataExpiracao
+          ? new Date(restData.patrocinio.dataExpiracao)
+          : null;
+        const temProPorPatrocinio = restData.patrocinio?.ativo === true &&
+          patrocinioExpira && Number.isFinite(patrocinioExpira.getTime()) && patrocinioExpira > new Date();
+        const planoFallback = temProPorLicenca || temProPorPatrocinio ? 'pro' : 'free';
+        patch.plano = planoFallback;
+        patch.maxMesas = planoFallback === 'pro' ? 30 : 10;
+        patch.maxPratos = planoFallback === 'pro' ? 60 : 20;
+        patch.maxItensMenu = planoFallback === 'pro' ? 60 : 20;
+        patch.assinatura = admin.firestore.FieldValue.delete();
+        patch.revisaoFinanceira = {
+          status: 'revisao_financeira',
+          paymentId,
+          motivo: statusEstorno,
+          criadoEm: admin.firestore.FieldValue.serverTimestamp(),
+        };
+      }
+      tx.update(restRef, patch);
+    }
+
+    resultado = { processado: true, idempotente: false, status: statusEstorno };
+  });
+
+  return resultado;
 }
 
 async function executarCriarPreferenciaProBackend(firestoreDb, auth, payload) {
