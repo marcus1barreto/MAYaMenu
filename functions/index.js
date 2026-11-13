@@ -2077,6 +2077,45 @@ async function localizarLoteVoucher(firestoreDb, codigo, transaction) {
   return { loteDoc, lote, patrocinadorId };
 }
 
+async function executarAutenticarPatrocinador(firestoreDb, payload) {
+  const chave = String(payload?.chave || '').trim().toUpperCase();
+  if (!chave || chave.length > 120) {
+    throw new functions.https.HttpsError('invalid-argument', 'Chave B2B inválida.');
+  }
+  const snap = await firestoreDb.collection('patrocinadores')
+    .where('chaveAcessoB2B', '==', chave)
+    .limit(2)
+    .get();
+  if (snap.size !== 1) {
+    throw new functions.https.HttpsError('unauthenticated', 'Chave B2B inválida ou não autorizada.');
+  }
+  const docPatrocinador = snap.docs[0];
+  const dados = docPatrocinador.data() || {};
+  if (dados.ativo === false) {
+    throw new functions.https.HttpsError('permission-denied', 'Acesso B2B suspenso. Contate a administração.');
+  }
+  const customToken = await admin.auth().createCustomToken(docPatrocinador.id, {
+    role: 'sponsor',
+    patrocinadorId: docPatrocinador.id,
+  });
+  return {
+    customToken,
+    patrocinador: {
+      id: docPatrocinador.id,
+      cnpj: String(dados.cnpj || ''),
+      razaoSocial: String(dados.razaoSocial || ''),
+      nomeFantasia: String(dados.nomeFantasia || ''),
+      slug: String(dados.slug || ''),
+      chaveAcessoB2B: chave,
+      logoUrl: String(dados.logoUrl || ''),
+      bannerUrl: String(dados.bannerUrl || ''),
+      corMarca: String(dados.corMarca || ''),
+      contatoResponsavel: dados.contatoResponsavel || {},
+      ativo: true,
+    },
+  };
+}
+
 async function executarValidarCodigoAtivacao(firestoreDb, payload) {
   const codigo = normalizarCodigoAtivacao(payload?.codigo);
   if (!codigo || codigo.length > 100) {
@@ -2699,6 +2738,10 @@ async function executarDesativarMesa(firestoreDb, authUid, authToken, payload) {
   return resultado;
 }
 
+exports.autenticarPatrocinadorBackend = functions.https.onCall(async (data) => {
+  return executarAutenticarPatrocinador(getDb(), data);
+});
+
 exports.validarCodigoAtivacaoBackend = functions.https.onCall(async (data) => {
   return executarValidarCodigoAtivacao(getDb(), data);
 });
@@ -2777,6 +2820,7 @@ exports._internal = {
   executarDesativarMesa,
   executarChamarGarcom,
   executarValidarCodigoAtivacao,
+  executarAutenticarPatrocinador,
   executarAtivarInstancia,
   executarAtivarPatrocinio,
 };
