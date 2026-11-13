@@ -2304,12 +2304,44 @@ async function executarAutenticarPatrocinador(firestoreDb, payload, rawRequest) 
       razaoSocial: String(patrocinadorData.razaoSocial || ''),
       nomeFantasia: String(patrocinadorData.nomeFantasia || ''),
       slug: String(patrocinadorData.slug || ''),
-      chaveAcessoB2B: chave,
+      // A chave nunca retorna ao cliente depois da autenticação.
+      chaveAcessoB2B: '',
       logoUrl: String(patrocinadorData.logoUrl || ''),
       bannerUrl: String(patrocinadorData.bannerUrl || ''),
       corMarca: String(patrocinadorData.corMarca || ''),
       contatoResponsavel: patrocinadorData.contatoResponsavel || {},
       ativo: true,
+    },
+  };
+}
+
+async function executarValidarSessaoPatrocinador(firestoreDb, authContext) {
+  const uid = authContext?.uid;
+  const claims = authContext?.token || {};
+  if (!uid || claims.role !== 'sponsor' || claims.patrocinadorId !== uid) {
+    throw new functions.https.HttpsError('unauthenticated', 'Sessão B2B não autenticada.');
+  }
+  const snap = await firestoreDb.collection('patrocinadores').doc(uid).get();
+  if (!snap.exists) throw new functions.https.HttpsError('permission-denied', 'Patrocinador não encontrado.');
+  const dados = snap.data() || {};
+  const versaoAtual = Number(dados.authVersion || 0);
+  if (dados.ativo !== true || Number(claims.authVersion) !== versaoAtual) {
+    throw new functions.https.HttpsError('permission-denied', 'Sessão B2B revogada. Autentique-se novamente com uma chave válida.');
+  }
+  return {
+    patrocinador: {
+      id: uid,
+      cnpj: String(dados.cnpj || ''),
+      razaoSocial: String(dados.razaoSocial || ''),
+      nomeFantasia: String(dados.nomeFantasia || ''),
+      slug: String(dados.slug || ''),
+      chaveAcessoB2B: '',
+      logoUrl: String(dados.logoUrl || ''),
+      bannerUrl: String(dados.bannerUrl || ''),
+      corMarca: String(dados.corMarca || ''),
+      contatoResponsavel: dados.contatoResponsavel || {},
+      ativo: true,
+      authVersion: versaoAtual,
     },
   };
 }
@@ -3004,6 +3036,10 @@ async function executarDesativarMesa(firestoreDb, authUid, authToken, payload) {
 
   return resultado;
 }
+
+exports.validarSessaoPatrocinadorBackend = functions.https.onCall(async (data, context) => {
+  return executarValidarSessaoPatrocinador(getDb(), context.auth);
+});
 
 exports.autenticarPatrocinadorBackend = functions.https.onCall(async (data, context) => {
   return executarAutenticarPatrocinador(getDb(), data, context.rawRequest);
