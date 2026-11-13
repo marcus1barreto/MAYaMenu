@@ -8,7 +8,11 @@
 const admin = require("firebase-admin");
 const { getFirestore } = require("firebase-admin/firestore");
 
-if (!admin.apps.length) admin.initializeApp();
+const PROJECT_ID = process.env.MAYAMENU_PROJECT_ID || "mayaranas-8ad9f";
+if (PROJECT_ID !== "mayaranas-8ad9f") {
+  throw new Error(`Projeto inesperado para migração: ${PROJECT_ID}`);
+}
+if (!admin.apps.length) admin.initializeApp({ projectId: PROJECT_ID });
 // O frontend e as Cloud Functions usam exclusivamente o banco nomeado mayamenu-bd.
 const db = getFirestore("mayamenu-bd");
 
