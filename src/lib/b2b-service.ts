@@ -443,49 +443,23 @@ export async function cadastrarPatrocinadorSuperadmin(dados: {
   totalCotasContratadas: number;
   validadeMeses: number;
 }): Promise<{ id: string; chaveAcessoB2B: string; codigoVoucherInicial: string }> {
-  const slug = dados.nomeFantasia
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)+/g, "");
-
-  const id = `spn-${slug}-${gerarTokenB2BSeguro(8).toLowerCase()}`;
-  const chaveAcessoB2B = `SPN-${gerarTokenB2BSeguro(26)}`;
-  const codigoVoucherInicial = `MAYA-B2B-${gerarTokenB2BSeguro(20)}`;
-
-  // 1. Cria o registro do Patrocinador
-  const docRef = doc(db, "patrocinadores", id);
-  const patrocinadorPayload: PatrocinadorB2B = {
-    id,
-    cnpj: dados.cnpj,
-    razaoSocial: dados.razaoSocial,
-    nomeFantasia: dados.nomeFantasia,
-    slug,
-    chaveAcessoB2B,
-    logoUrl: "/images/demo/coquetel.webp",
-    contatoResponsavel: {
-      nome: dados.contatoNome,
-      email: dados.contatoEmail,
-      telefone: dados.contatoTelefone,
-      cargo: dados.contatoCargo || "Gestor de Trade Marketing",
-    },
-    ativo: true,
-    authVersion: 0,
-    criadoEm: serverTimestamp(),
+  // Cadastro do patrocinador e lote inicial são criados juntos no backend.
+  // Assim não existe patrocinador órfão se a gravação do lote falhar.
+  const cadastrarFn = httpsCallable(functions, "cadastrarPatrocinadorSuperadminBackend");
+  const resposta = await cadastrarFn(dados);
+  const resultado = resposta.data as {
+    id?: string;
+    chaveAcessoB2B?: string;
+    codigoVoucherInicial?: string;
   };
-
-  await setDoc(docRef, patrocinadorPayload);
-
-  // 2. Cria o lote inicial de cotas contratadas
-  await criarLoteLicencas(id, {
-    nome: `Lote Contratual - ${dados.nomeFantasia} ${new Date().getFullYear()}`,
-    codigoCampanha: codigoVoucherInicial,
-    totalLicencas: dados.totalCotasContratadas,
-    validadeMeses: dados.validadeMeses || 6,
-  });
-
-  return { id, chaveAcessoB2B, codigoVoucherInicial };
+  if (!resultado.id || !resultado.chaveAcessoB2B || !resultado.codigoVoucherInicial) {
+    throw new Error("O servidor não confirmou o cadastro completo do patrocinador e do lote inicial.");
+  }
+  return {
+    id: resultado.id,
+    chaveAcessoB2B: resultado.chaveAcessoB2B,
+    codigoVoucherInicial: resultado.codigoVoucherInicial,
+  };
 }
 
 /**
