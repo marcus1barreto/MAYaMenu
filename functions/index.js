@@ -1082,7 +1082,7 @@ async function executarEmissaoSessaoMesa(firestoreDb, authUid, payload) {
 
   const mData = mesaSnap.data() || {};
   if (mData.ativa === false || mData.statusEstrutural === 'inativa' || mData.statusEstrutural === 'bloqueada') {
-    throw new functions.https.HttpsError('failed-precondition', 'Esta mesa não está disponível para atendimento.');
+    throw new functions.https.HttpsError('failed-precondition', 'Esta mesa está inativa ou bloqueada e não está disponível para atendimento.');
   }
 
   const hashRecebido = hashQrCredencial(qrCredencial.trim());
