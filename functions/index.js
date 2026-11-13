@@ -178,7 +178,7 @@ exports.setStaffRole = functions.https.onCall(async (data, context) => {
 
   // Impede downgrade de titular/SuperAdmin e troca silenciosa de tenant de uma conta existente.
   if (targetUser.uid === callerUid || targetUser.customClaims?.superadmin === true ||
-      targetUser.customClaims?.role === 'owner') {
+      ['owner', 'admin'].includes(targetUser.customClaims?.role)) {
     throw new functions.https.HttpsError('permission-denied', 'Esta conta não pode ser convertida em colaborador.');
   }
   const restaurantesDoUsuario = await firestoreDb.collection('restaurantes')
