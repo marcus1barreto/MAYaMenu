@@ -760,13 +760,10 @@ export async function injetarTicketContingencia(
     nomeCliente: string;
     itens: {
       menuItemId: string;
-      nome?: string;
       quantidade: number;
-      precoFinal: number;
       modificadores?: { grupo: string; opcao: string }[];
       observacoes?: string;
     }[];
-    subtotal: number;
   }
 ): Promise<{ subtotal: number; pedidoId: string }> {
   // Mesmo em contingência, preços e itens são recalculados pelo servidor.
