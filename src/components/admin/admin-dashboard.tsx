@@ -493,21 +493,29 @@ export function AdminDashboard() {
     setModalMesaAberto(true);
   };
 
-  const handleMarcarComoPago = async (mesaNumero: number, clienteId: string) => {
+  const handleMarcarComoPago = async (mesaNumero: number, clienteId: string): Promise<boolean> => {
+    if (!restaurante?.id) return false;
+    try {
+      // O estado visual só muda depois da confirmação transacional do backend.
+      await marcarComandaPagaFirestore(restaurante.id, mesaNumero, clienteId);
+    } catch (err) {
+      console.error("Falha ao confirmar pagamento da comanda:", err);
+      alert(err instanceof Error ? err.message : "Não foi possível confirmar o pagamento.");
+      return false;
+    }
+
     setMesas((prev) =>
       prev.map((m) => {
-        if (m.numero === mesaNumero) {
-          const novasComandas = m.comandas.map((c) =>
-            c.id === clienteId ? { ...c, status: "pago" as const } : c
-          );
-          const todasPagas = novasComandas.every((c) => c.status === "pago");
-          return {
-            ...m,
-            status: todasPagas ? ("paga_ocupada" as const) : m.status,
-            comandas: novasComandas,
-          };
-        }
-        return m;
+        if (m.numero !== mesaNumero) return m;
+        const novasComandas = m.comandas.map((c) =>
+          c.id === clienteId ? { ...c, status: "pago" as const } : c
+        );
+        const todasPagas = novasComandas.every((c) => c.status === "pago");
+        return {
+          ...m,
+          status: todasPagas ? ("paga_ocupada" as const) : m.status,
+          comandas: novasComandas,
+        };
       })
     );
 
@@ -523,20 +531,28 @@ export function AdminDashboard() {
         comandas: novas,
       };
     });
-
-    if (restaurante?.id) {
-      try {
-        await marcarComandaPagaFirestore(restaurante.id, mesaNumero, clienteId);
-      } catch (err) {
-        console.warn("Falha ao marcar comanda como paga no Firestore:", err);
-      }
-    }
+    return true;
   };
 
-  const handleLiberarMesa = async (mesaNumero: number) => {
+  const handleLiberarMesa = async (mesaNumero: number): Promise<boolean> => {
+    if (!restaurante?.id) return false;
     const mesaAlvo = mesas.find((m) => m.numero === mesaNumero);
     const comandasIds = mesaAlvo ? mesaAlvo.comandas.map((c) => c.id) : [];
+    if (comandasIds.length === 0) {
+      alert("Não há comandas identificadas para liberar esta mesa.");
+      return false;
+    }
 
+    try {
+      const { liberarMesaFirestore } = await import("@/lib/restaurante-service");
+      await liberarMesaFirestore(restaurante.id, mesaNumero, comandasIds);
+    } catch (err) {
+      console.error("Falha ao liberar mesa no backend:", err);
+      alert(err instanceof Error ? err.message : "Não foi possível liberar a mesa.");
+      return false;
+    }
+
+    // Só limpa o estado local após o backend confirmar o arquivamento de todas as comandas.
     setMesas((prev) =>
       prev.map((m) =>
         m.numero === mesaNumero ? { ...m, status: "livre", comandas: [] } : m
@@ -544,40 +560,7 @@ export function AdminDashboard() {
     );
     setMesaSelecionada(null);
     setModalMesaAberto(false);
-
-    if (restaurante?.id && comandasIds.length > 0) {
-      try {
-        const { liberarMesaFirestore } = await import("@/lib/restaurante-service");
-        await liberarMesaFirestore(restaurante.id, mesaNumero, comandasIds);
-      } catch (err) {
-        console.warn("Falha ao liberar mesa no Firestore pelo Admin:", err);
-      }
-    }
-  };
-
-  // Dá baixa imediata na comanda do cliente escaneada no Balcão/Caixa
-  const handleConfirmarComandaBalcao = async (payload: {
-    mesaNumero: number | string;
-    clienteId: string;
-    nomeCliente: string;
-    total: number;
-    ticket: any;
-  }) => {
-    const numMesa = Number(payload.mesaNumero) || 1;
-    if (!restaurante?.id) return;
-
-    // 1. Marca a comanda como paga
-    await handleMarcarComoPago(numMesa, payload.clienteId);
-
-    // 2. Libera a mesa / fecha comanda se estiver no modo balcão
-    if (modoOperacao === "balcao") {
-      await handleLiberarMesa(numMesa);
-    }
-
-    setFeedbackBalcao(
-      `Pagamento confirmado e comanda da Mesa ${payload.mesaNumero} (${payload.nomeCliente}) baixada com sucesso!`
-    );
-    setTimeout(() => setFeedbackBalcao(null), 5000);
+    return true;
   };
 
   const handleAtenderGarcom = async (mesaNumero: number, clienteId: string) => {
