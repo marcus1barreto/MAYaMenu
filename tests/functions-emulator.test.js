@@ -19,7 +19,7 @@ const {
   executarValidarCodigoAtivacaoComRateLimit, executarValidarSessaoPatrocinador,
   validarAssinaturaMercadoPago, validarPagamentoPro, executarProcessarPagamentoProAprovado,
   executarProcessarEstornoPagamentoPro, limitarCriacaoPreferenciaPro,
-  executarCriarPreferenciaProBackend,
+  executarCriarPreferenciaProBackend, executarMercadoPagoWebhook,
 } = _internal;
 const crypto = require("crypto");
 
@@ -193,6 +193,103 @@ async function main() {
     assert.match(validarPagamentoPro(attempt, {
       ...payment, date_approved: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
     }), /expiração/i);
+  });
+
+  await runTest("Emulador: webhook assinado consulta o PSP e processa pagamento uma única vez", async () => {
+    const oldFetch = global.fetch;
+    const oldToken = process.env.MERCADO_PAGO_ACCESS_TOKEN;
+    const oldSecret = process.env.MERCADO_PAGO_WEBHOOK_SECRET;
+    const attemptId = "123e4567-e89b-12d3-a456-426614174004";
+    const paymentId = "987654325";
+    const requestId = "request-webhook-004";
+    const ts = "1710000001";
+    const secret = "segredo-webhook-integracao";
+    const dataId = paymentId;
+    const manifest = `id:${dataId};request-id:${requestId};ts:${ts};`;
+    const v1 = crypto.createHmac("sha256", secret).update(manifest).digest("hex");
+    const headers = {
+      "x-signature": `ts=${ts},v1=${v1}`,
+      "x-request-id": requestId,
+    };
+    const payment = {
+      id: paymentId,
+      status: "approved",
+      external_reference: attemptId,
+      currency_id: "BRL",
+      transaction_amount: 49.90,
+      live_mode: false,
+      collector_id: "12345",
+      date_approved: new Date().toISOString(),
+      payment_type_id: "pix",
+    };
+    const createResponse = () => ({
+      statusCode: 0,
+      body: null,
+      status(code) { this.statusCode = code; return this; },
+      json(body) { this.body = body; return this; },
+    });
+    const request = {
+      method: "POST",
+      query: { "data.id": dataId, type: "payment" },
+      body: { type: "payment", data: { id: dataId } },
+      headers,
+      get(name) { return headers[String(name).toLowerCase()]; },
+    };
+
+    try {
+      process.env.MERCADO_PAGO_ACCESS_TOKEN = "TEST-token-webhook";
+      process.env.MERCADO_PAGO_WEBHOOK_SECRET = secret;
+      global.fetch = async () => new Response(JSON.stringify(payment), {
+        status: 200, headers: { "content-type": "application/json" },
+      });
+
+      await db.doc("restaurantes/rest_mp_webhook").set({
+        ownerId: "owner_mp_webhook", plano: "free",
+      });
+      await db.doc(`pagamentos_pro/${attemptId}`).set({
+        attemptId,
+        ownerUid: "owner_mp_webhook",
+        restauranteId: "rest_mp_webhook",
+        planoId: "pro_mensal",
+        valorCentavos: 4990,
+        currency: "BRL",
+        liveMode: false,
+        collectorId: "12345",
+        status: "pending",
+        expiraEm: new Date(Date.now() + 60 * 60 * 1000),
+      });
+
+      const primeiraResposta = createResponse();
+      await executarMercadoPagoWebhook(db, request, primeiraResposta);
+      assert.strictEqual(primeiraResposta.statusCode, 200);
+      assert.strictEqual(primeiraResposta.body.status, "processed");
+
+      const segundaResposta = createResponse();
+      await executarMercadoPagoWebhook(db, request, segundaResposta);
+      assert.strictEqual(segundaResposta.statusCode, 200);
+      assert.strictEqual(segundaResposta.body.status, "already_processed");
+
+      const assinatura = await db.doc("restaurantes/rest_mp_webhook").get();
+      assert.strictEqual(assinatura.data().plano, "pro");
+      assert.strictEqual(assinatura.data().assinatura.paymentId, paymentId);
+
+      const requestAdulterado = {
+        ...request,
+        headers: { ...headers, "x-signature": "ts=1710000001,v1=" + "0".repeat(64) },
+        get(name) {
+          return this.headers[String(name).toLowerCase()];
+        },
+      };
+      const respostaInvalida = createResponse();
+      await executarMercadoPagoWebhook(db, requestAdulterado, respostaInvalida);
+      assert.strictEqual(respostaInvalida.statusCode, 401);
+    } finally {
+      global.fetch = oldFetch;
+      if (oldToken === undefined) delete process.env.MERCADO_PAGO_ACCESS_TOKEN;
+      else process.env.MERCADO_PAGO_ACCESS_TOKEN = oldToken;
+      if (oldSecret === undefined) delete process.env.MERCADO_PAGO_WEBHOOK_SECRET;
+      else process.env.MERCADO_PAGO_WEBHOOK_SECRET = oldSecret;
+    }
   });
 
   await runTest("Emulador: pagamento PRO é transacional e idempotente por paymentId", async () => {
