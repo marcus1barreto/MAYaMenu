@@ -1057,7 +1057,7 @@ async function executarEmissaoSessaoMesa(firestoreDb, authUid, payload) {
     throw new functions.https.HttpsError('failed-precondition', 'Este estabelecimento está suspenso no momento.');
   }
 
-  const mesaStr = String(mesa).trim();
+  const { mesaId: mesaStr } = normalizarMesaIdentificador(mesa);
   const numMesaParsed = Number(mesaStr);
   if (!Number.isInteger(numMesaParsed) || numMesaParsed < 1) {
     throw new functions.https.HttpsError('invalid-argument', 'Número de mesa inválido.');
@@ -1168,7 +1168,7 @@ async function executarCriacaoPedidoCliente(firestoreDb, authUid, payload) {
     throw new functions.https.HttpsError('invalid-argument', 'Identificador slug incompatível com o restaurante.');
   }
 
-  const mesaStr = String(mesa).trim();
+  const { mesaId: mesaStr } = normalizarMesaIdentificador(mesa);
   const numMesaParsed = Number(mesaStr);
   if (!Number.isInteger(numMesaParsed) || numMesaParsed < 1) {
     throw new functions.https.HttpsError('invalid-argument', 'Número de mesa inválido.');
@@ -1562,7 +1562,7 @@ async function executarLancamentoPedidoGarcom(firestoreDb, authUid, authToken, p
     throw new functions.https.HttpsError('invalid-argument', 'Identificador slug incompatível com o restaurante.');
   }
 
-  const mesaStr = String(mesa).trim();
+  const { mesaId: mesaStr } = normalizarMesaIdentificador(mesa);
   const numMesaParsed = Number(mesaStr);
   if (!Number.isInteger(numMesaParsed) || numMesaParsed < 1) {
     throw new functions.https.HttpsError('invalid-argument', 'Número de mesa inválido.');
@@ -1869,7 +1869,7 @@ async function executarDefinirTaxaServicoMesa(firestoreDb, authUid, authToken, p
     ['owner', 'admin', 'garcom']
   );
 
-  const mesaStr = String(mesa).trim();
+  const { mesaId: mesaStr } = normalizarMesaIdentificador(mesa);
   const ids = normalizarIdsComanda(comandasIds);
   const refs = ids.map((cId) =>
     restDoc.ref.collection('mesas').doc(mesaStr).collection('comandas_abertas').doc(cId)
@@ -1920,7 +1920,7 @@ async function executarFecharComanda(firestoreDb, authUid, authToken, payload) {
     ['owner', 'admin', 'garcom']
   );
 
-  const mesaStr = String(mesa).trim();
+  const { mesaId: mesaStr } = normalizarMesaIdentificador(mesa);
   const cId = String(clienteId).trim();
   const comandaRef = restDoc.ref.collection('mesas').doc(mesaStr).collection('comandas_abertas').doc(cId);
   // ID único por fechamento. Fica fora do callback transacional para permanecer estável
@@ -2123,7 +2123,7 @@ async function executarLiberarMesa(firestoreDb, authUid, authToken, payload) {
     ['owner', 'admin', 'garcom']
   );
 
-  const mesaStr = String(mesa).trim();
+  const { mesaId: mesaStr } = normalizarMesaIdentificador(mesa);
   const ids = normalizarIdsComanda(comandasIds);
   const comandaRefs = ids.map((cId) =>
     restDoc.ref.collection('mesas').doc(mesaStr).collection('comandas_abertas').doc(cId)
@@ -3067,8 +3067,10 @@ async function executarDesativarMesa(firestoreDb, authUid, authToken, payload) {
     ['owner', 'admin']
   );
 
-  const mesaStr = String(mesa).trim();
-  const numMesa = Number(mesaStr);
+  const mesaOriginal = String(mesa).trim();
+  const mesaNormalizada = normalizarMesaIdentificador(mesa);
+  const mesaStr = mesaNormalizada.mesaId;
+  const numMesa = mesaNormalizada.numero;
   const mesaRef = restDoc.ref.collection('mesas').doc(mesaStr);
   const agoraServer = admin.firestore.FieldValue.serverTimestamp();
   let resultado = null;
@@ -3094,7 +3096,7 @@ async function executarDesativarMesa(firestoreDb, authUid, authToken, payload) {
 
     // Consulta as duas representações legadas e ambos os campos usados pelos produtores KDS.
     // A união por ID evita depender de um único tipo numérico/string.
-    const valoresMesa = Number.isFinite(numMesa) ? [numMesa, mesaStr] : [mesaStr];
+    const valoresMesa = Array.from(new Set([numMesa, mesaStr, mesaOriginal]));
     const consultasKds = [];
     for (const campo of ['mesa', 'numeroMesa']) {
       for (const valor of valoresMesa) {
