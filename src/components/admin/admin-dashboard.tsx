@@ -563,6 +563,36 @@ export function AdminDashboard() {
     return true;
   };
 
+  const handleConfirmarComandaBalcao = async (payload: {
+    mesaNumero: number | string;
+    clienteId: string;
+    nomeCliente: string;
+    total: number;
+    ticket: any;
+  }) => {
+    const numMesa = Number(payload.mesaNumero) || 1;
+    if (!restaurante?.id) return;
+
+    const pagamentoConfirmado = await handleMarcarComoPago(numMesa, payload.clienteId);
+    if (!pagamentoConfirmado) return;
+
+    if (modoOperacao === "balcao") {
+      const mesaLiberada = await handleLiberarMesa(numMesa);
+      if (!mesaLiberada) {
+        setFeedbackBalcao(
+          `Pagamento confirmado para ${payload.nomeCliente}, mas a mesa permanece ocupada até regularizar as demais comandas.`
+        );
+        setTimeout(() => setFeedbackBalcao(null), 7000);
+        return;
+      }
+    }
+
+    setFeedbackBalcao(
+      `Pagamento confirmado e comanda da Mesa ${payload.mesaNumero} (${payload.nomeCliente}) baixada com sucesso!`
+    );
+    setTimeout(() => setFeedbackBalcao(null), 5000);
+  };
+
   const handleAtenderGarcom = async (mesaNumero: number, clienteId: string) => {
     setMesas((prev) =>
       prev.map((m) => {
