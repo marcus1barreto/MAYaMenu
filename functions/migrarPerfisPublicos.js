@@ -23,6 +23,8 @@ const db = getFirestore("mayamenu-bd");
 async function main() {
   let cursor = null;
   let total = 0;
+  let gravados = 0;
+  let preservados = 0;
   do {
     let q = db.collection("restaurantes").orderBy(FieldPath.documentId()).limit(400);
     if (cursor) q = q.startAfter(cursor);
@@ -71,12 +73,14 @@ async function main() {
         }, { merge: false });
         return true;
       });
-      if (gravou) total++;
+      total++;
+      if (gravou) gravados++;
+      else preservados++;
     }
     cursor = snap.docs[snap.docs.length - 1];
-    process.stdout.write(`Perfis sincronizados: ${total}\\n`);
+    process.stdout.write(`Perfis processados: ${total} (gravados: ${gravados}; versão mais nova preservada: ${preservados})\\n`);
   } while (cursor);
-  process.stdout.write(`Migração concluída: ${total} perfis gravados ou confirmados.\\n`);
+  process.stdout.write(`Migração concluída: ${total} perfis verificados; ${gravados} gravados e ${preservados} preservados.\\n`);
 }
 
 main().catch((err) => {
