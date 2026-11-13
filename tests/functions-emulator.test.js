@@ -214,6 +214,7 @@ async function main() {
       date_approved: new Date().toISOString(),
     };
     assert.strictEqual(validarPagamentoPro(attempt, payment), null);
+    assert.match(validarPagamentoPro({ ...attempt, collectorId: null }, payment), /conta recebedora/i);
     assert.match(validarPagamentoPro(attempt, { ...payment, transaction_amount: 1 }), /valor pago/i);
     assert.match(validarPagamentoPro(attempt, { ...payment, currency_id: "USD" }), /moeda/i);
     assert.match(validarPagamentoPro(attempt, { ...payment, live_mode: true }), /ambiente/i);
@@ -663,6 +664,7 @@ async function main() {
       valorCentavos: 4990,
       currency: "BRL",
       liveMode: false,
+      collectorId: "12345",
       status: "pending",
       expiraEm: new Date(Date.now() + 60 * 60 * 1000),
     });
@@ -674,6 +676,7 @@ async function main() {
         currency_id: "BRL",
         transaction_amount: 0.10,
         live_mode: false,
+        collector_id: "12345",
         date_approved: new Date().toISOString(),
       }),
       /valor pago/i
