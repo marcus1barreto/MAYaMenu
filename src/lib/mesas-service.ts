@@ -14,6 +14,8 @@ export interface ConfigMesa {
   modoAtendimento: "livre" | "garcom_fixo";
   garcomFixoId?: string;
   garcomFixoNome?: string;
+  qrConfigurado?: boolean;
+  qrVersao?: number;
   atualizadoEm?: any;
 }
 
