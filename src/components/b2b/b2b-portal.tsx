@@ -173,10 +173,7 @@ export function B2BPortal({ patrocinador, onLogout }: B2BPortalProps) {
 
         {/* RENDERIZAÇÃO DA ABA ATIVA */}
         {abaAtiva === "lotes" && (
-          <B2BLotesView
-            patrocinadorId={patrocinador.id}
-            lotes={lotes}
-          />
+          <B2BLotesView lotes={lotes} />
         )}
 
         {abaAtiva === "catalogo" && (
