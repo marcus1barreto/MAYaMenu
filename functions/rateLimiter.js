@@ -16,7 +16,7 @@
  *    - Tenant Global (20 tentativas distribuídas)
  */
 
-const crypto = require('crypto');
+const net = require('net');
 
 const JANELA_MS = 15 * 60 * 1000;
 const LIMITE_TENTATIVAS_IP = 5;
@@ -53,7 +53,8 @@ function extrairIpConviavel(rawRequest) {
     const ips = String(rawXff)
       .split(',')
       .map((s) => s.trim())
-      .filter((s) => s.length > 0 && /^[a-fA-F0-9:.]+$/.test(s));
+      // Não basta aceitar caracteres hexadecimais: valida IPv4/IPv6 de fato.
+      .filter((s) => net.isIP(s) !== 0);
 
     if (ips.length > 0) {
       if (ips.length >= 2) {
