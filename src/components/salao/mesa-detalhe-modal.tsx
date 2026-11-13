@@ -53,8 +53,8 @@ interface MesaDetalheModalProps {
   restauranteId?: string;
   modoSomenteLeitura?: boolean; // Se true, esconde ações operacionais (usado no Admin)
   pedidosOffline?: PedidoFilaOffline[];
-  onMarcarPago: (mesaNumero: number, clienteId: string) => void;
-  onLiberarMesa: (mesaNumero: number) => void;
+  onMarcarPago: (mesaNumero: number, clienteId: string) => Promise<boolean>;
+  onLiberarMesa: (mesaNumero: number) => Promise<boolean>;
   onAtenderGarcom?: (mesaNumero: number, clienteId: string) => void;
   onLancarItem: (
     mesaNumero: number,
@@ -273,16 +273,22 @@ export function MesaDetalheModal({
 
     try {
       setEncerrando(true);
-      await fecharContaMesa(idRestauranteFinal, mesa.numero, clienteId);
-      // Notifica o estado local / pai para atualizar a visualização
-      onMarcarPago(mesa.numero, clienteId);
-      alert("Conta fechada e pedidos baixados com sucesso!");
+      // O callback confirma o pagamento no backend e só então atualiza o estado local.
+      const pagamentoConfirmado = await onMarcarPago(mesa.numero, clienteId);
+      if (!pagamentoConfirmado) return;
 
-      // Se só havia essa comanda ou todas estão pagas agora, fecha o modal e libera a mesa
+      // Se todas as comandas estão pagas, tenta liberar. Falha de liberação não desfaz o pagamento.
       const outrasNaoPagas = comandasComItens.filter((c) => c.id !== clienteId && c.status !== "pago");
       if (outrasNaoPagas.length === 0) {
-        onClose();
-        onLiberarMesa(mesa.numero);
+        const mesaLiberada = await onLiberarMesa(mesa.numero);
+        if (mesaLiberada) {
+          alert("Pagamento confirmado, comanda encerrada e mesa liberada.");
+          onClose();
+        } else {
+          alert("Pagamento confirmado. A mesa permanece ocupada até concluir a liberação.");
+        }
+      } else {
+        alert("Pagamento confirmado e comanda encerrada com sucesso.");
       }
     } catch (error) {
       console.error("Erro ao fechar conta:", error);
@@ -300,10 +306,18 @@ export function MesaDetalheModal({
 
     try {
       setEncerrando(true);
-      // Delega a liberação para o pai (garcom-view ou admin-dashboard), que chama liberarMesaFirestore,
-      // apagando as comandas e os pedidos e gerando o registro histórico de faturamento atômico.
-      onLiberarMesa(mesa.numero);
-      alert("Conta fechada e mesa liberada com sucesso!");
+      if (!comandasComItens.length) {
+        alert("Não há comandas para liberar nesta mesa.");
+        return;
+      }
+      if (!todasPagas) {
+        alert("Confirme o pagamento de todas as comandas antes de liberar a mesa.");
+        return;
+      }
+      // O backend confirma os estados financeiros e grava o histórico atomicamente.
+      const mesaLiberada = await onLiberarMesa(mesa.numero);
+      if (!mesaLiberada) return;
+      alert("Mesa liberada com sucesso.");
       onClose();
     } catch (error) {
       console.error("Erro ao fechar conta da mesa:", error);
