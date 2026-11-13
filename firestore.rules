@@ -422,7 +422,10 @@ service cloud.firestore {
           && resource.data.restauranteId == request.auth.token.restauranteId
           && (
             get(/databases/$(database)/documents/restaurantes/$(resource.data.restauranteId)).data.ownerId == request.auth.uid
-            || isActiveStaffMember(resource.data.restauranteId)
+            || (
+              isActiveStaffMember(resource.data.restauranteId)
+              && get(/databases/$(database)/documents/restaurantes/$(resource.data.restauranteId)/equipe/$(request.auth.uid)).data.role == request.auth.token.role
+            )
           )
         )
       );
@@ -442,7 +445,10 @@ service cloud.firestore {
           && resource.data.restauranteId == request.auth.token.restauranteId
           && (
             get(/databases/$(database)/documents/restaurantes/$(resource.data.restauranteId)).data.ownerId == request.auth.uid
-            || isActiveStaffMember(resource.data.restauranteId)
+            || (
+              isActiveStaffMember(resource.data.restauranteId)
+              && get(/databases/$(database)/documents/restaurantes/$(resource.data.restauranteId)/equipe/$(request.auth.uid)).data.role == request.auth.token.role
+            )
           )
         )
       );
