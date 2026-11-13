@@ -10,7 +10,7 @@ import {
   onIdTokenChanged,
   type User,
 } from "firebase/auth";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, getDoc, updateDoc } from "firebase/firestore";
 import type { Restaurante } from "@/types";
 import { RESTAURANTE_DEMO } from "@/lib/mock-data";
 
@@ -75,7 +75,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (currentUser && !currentUser.isAnonymous) {
         try {
-          const { onSnapshot, collection, query, where, getDocs, doc } = await import("firebase/firestore");
+          const { onSnapshot } = await import("firebase/firestore");
           
           // Inspeciona claims do token (role e restauranteId para colaboradores da equipe)
           let targetRestId = currentUser.uid;
@@ -99,45 +99,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 setRestaurante({ id: snap.id, ...snap.data() } as Restaurante);
                 setCarregando(false);
               } else {
-                // Se não encontrar diretamente pelo doc(targetRestId), busca por ownerId
-                try {
-                  const q = query(collection(db, "restaurantes"), where("ownerId", "==", currentUser.uid));
-                  const querySnap = await getDocs(q);
-                  if (!querySnap.empty) {
-                    const firstDoc = querySnap.docs[0];
-                    setRestaurante({ id: firstDoc.id, ...firstDoc.data() } as Restaurante);
-                  } else {
-                    const restLocalSalvo = localStorage.getItem(`mayamenu_rest_${currentUser.uid}`);
-                    if (restLocalSalvo) {
-                      setRestaurante(JSON.parse(restLocalSalvo));
-                    } else {
-                      setRestaurante(null);
-                    }
-                  }
-                } catch {
-                  const restLocalSalvo = localStorage.getItem(`mayamenu_rest_${currentUser.uid}`);
-                  setRestaurante(restLocalSalvo ? JSON.parse(restLocalSalvo) : null);
-                }
+                // A Rules permite get do tenant vinculado, não listagem da coleção privada.
+                // Não tentar query por ownerId: falharia para owner/staff e incentivaria
+                // ampliar indevidamente a leitura da raiz privada.
+                const restLocalSalvo = localStorage.getItem(`mayamenu_rest_${currentUser.uid}`);
+                setRestaurante(restLocalSalvo ? JSON.parse(restLocalSalvo) : null);
                 setCarregando(false);
               }
             },
-            async (err) => {
-              console.warn("Falha no listener do restaurante (usando busca por ownerId ou cache):", err);
-              try {
-                const { collection, query, where, getDocs } = await import("firebase/firestore");
-                const q = query(collection(db, "restaurantes"), where("ownerId", "==", currentUser.uid));
-                const querySnap = await getDocs(q);
-                if (!querySnap.empty) {
-                  const firstDoc = querySnap.docs[0];
-                  setRestaurante({ id: firstDoc.id, ...firstDoc.data() } as Restaurante);
-                } else {
-                  const restLocalSalvo = localStorage.getItem(`mayamenu_rest_${currentUser.uid}`);
-                  setRestaurante(restLocalSalvo ? JSON.parse(restLocalSalvo) : null);
-                }
-              } catch {
-                const restLocalSalvo = localStorage.getItem(`mayamenu_rest_${currentUser.uid}`);
-                setRestaurante(restLocalSalvo ? JSON.parse(restLocalSalvo) : null);
-              }
+            (err) => {
+              console.warn("Falha no listener do restaurante (usando cache local):", err);
+              const restLocalSalvo = localStorage.getItem(`mayamenu_rest_${currentUser.uid}`);
+              setRestaurante(restLocalSalvo ? JSON.parse(restLocalSalvo) : null);
               setCarregando(false);
             }
           );
@@ -194,23 +167,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const cred = await signInWithEmailAndPassword(auth, email.trim(), pass);
       const uid = cred.user.uid;
 
-      // Busca instância do restaurante do usuário
+      // Resolve o tenant pelo claim emitido pelo backend (owner ou colaborador).
+      // A leitura é um get pontual autorizado pelas Rules, nunca uma listagem da raiz privada.
       try {
-        const restRef = doc(db, "restaurantes", uid);
-        const snap = await getDoc(restRef);
+        const tokenResult = await cred.user.getIdTokenResult();
+        const restauranteId = typeof tokenResult.claims.restauranteId === "string"
+          ? tokenResult.claims.restauranteId
+          : uid;
+        const snap = await getDoc(doc(db, "restaurantes", restauranteId));
         if (snap.exists()) {
           setRestaurante({ id: snap.id, ...snap.data() } as Restaurante);
         } else {
-          const { collection, query, where, getDocs } = await import("firebase/firestore");
-          const q = query(collection(db, "restaurantes"), where("ownerId", "==", uid));
-          const querySnap = await getDocs(q);
-          if (!querySnap.empty) {
-            const firstDoc = querySnap.docs[0];
-            setRestaurante({ id: firstDoc.id, ...firstDoc.data() } as Restaurante);
-          }
+          const cacheUid = localStorage.getItem(`mayamenu_rest_${uid}`);
+          setRestaurante(cacheUid ? JSON.parse(cacheUid) : null);
         }
       } catch (err) {
         console.warn("Consulta do restaurante falhou, checando cache local:", err);
+        const cacheUid = localStorage.getItem(`mayamenu_rest_${uid}`);
+        setRestaurante(cacheUid ? JSON.parse(cacheUid) : null);
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Erro ao efetuar login";
@@ -337,9 +311,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!restaurante) return;
     try {
       const restRef = doc(db, "restaurantes", restaurante.id);
-      await setDoc(restRef, dados, { merge: true });
-    } catch {
-      // Ignora se offline
+      await updateDoc(restRef, dados);
+    } catch (err) {
+      console.error("Falha ao atualizar dados do restaurante no servidor:", err);
+      throw err;
     }
     setRestaurante((prev) => (prev ? { ...prev, ...dados } : null));
   };
