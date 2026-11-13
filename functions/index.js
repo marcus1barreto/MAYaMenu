@@ -2887,14 +2887,17 @@ async function executarProcessarPagamentoProAprovado(firestoreDb, attemptId, pay
     }
 
     const agora = new Date();
-    let dataBase = agora;
-    const expiracaoAtualRaw = restData.assinatura?.dataExpiracao || restData.patrocinio?.dataExpiracao;
-    const expiracaoAtual = expiracaoAtualRaw
-      ? (typeof expiracaoAtualRaw.toDate === 'function' ? expiracaoAtualRaw.toDate() : new Date(expiracaoAtualRaw))
-      : null;
-    if (expiracaoAtual && Number.isFinite(expiracaoAtual.getTime()) && expiracaoAtual > agora) {
-      dataBase = expiracaoAtual;
-    }
+    const expiracoesProVigentes = [
+      restData.assinatura?.dataExpiracao,
+      restData.patrocinio?.dataExpiracao,
+    ]
+      .map(millisDataAtivacao)
+      .filter((timestamp) => timestamp !== null && timestamp > agora.getTime());
+    // Um novo pagamento estende a partir do maior direito PRO ainda vigente,
+    // independentemente de ele ter origem paga ou patrocinada.
+    const dataBase = expiracoesProVigentes.length
+      ? new Date(Math.max(...expiracoesProVigentes))
+      : agora;
     const novaDataExpiracao = adicionarMesesSemOverflow(dataBase, plano.mesesValidade).toISOString();
     const valorPago = Number(payment.transaction_amount);
     const metodoPagamento = String(payment.payment_type_id || payment.payment_method_id || 'mercadopago');
@@ -3225,7 +3228,14 @@ async function executarCriarPreferenciaProBackend(firestoreDb, auth, payload) {
   }
   await limitarCriacaoPreferenciaPro(firestoreDb, authUid);
 
-  const liveMode = process.env.MERCADO_PAGO_LIVE_MODE !== 'false';
+  const liveModeRaw = String(process.env.MERCADO_PAGO_LIVE_MODE || '').trim().toLowerCase();
+  if (liveModeRaw !== 'true' && liveModeRaw !== 'false') {
+    throw new functions.https.HttpsError(
+      'failed-precondition',
+      'MERCADO_PAGO_LIVE_MODE deve ser configurado explicitamente como true ou false.'
+    );
+  }
+  const liveMode = liveModeRaw === 'true';
   const appUrlConfigurada = process.env.MAYAMENU_APP_URL?.trim();
   if (!appUrlConfigurada) {
     throw new functions.https.HttpsError('failed-precondition', 'MAYAMENU_APP_URL precisa ser configurada nas variáveis do Functions.');
@@ -3937,10 +3947,20 @@ async function executarAtivarPatrocinio(firestoreDb, authUid, token, payload, ra
     }
     const meses = Math.max(1, Math.min(36, Number(lote.validadeMeses) || 6));
     const agora = new Date();
-    let dataBase = agora;
-    const expiracaoAtual = millisDataAtivacao(patrocinioExistente.dataExpiracao);
-    if (expiracaoAtual !== null && expiracaoAtual > agora.getTime()) dataBase = new Date(expiracaoAtual);
+    const expiracoesProVigentes = [
+      rest.assinatura?.dataExpiracao,
+      patrocinioExistente.dataExpiracao,
+    ]
+      .map(millisDataAtivacao)
+      .filter((timestamp) => timestamp !== null && timestamp > agora.getTime());
+    // A ativação B2B não pode encurtar nem apagar um período PRO pago vigente.
+    const dataBase = expiracoesProVigentes.length
+      ? new Date(Math.max(...expiracoesProVigentes))
+      : agora;
     const novaExpiracao = adicionarMesesSemOverflow(dataBase, meses).toISOString();
+    const assinaturaAnterior = patrocinioExistente.assinaturaAnterior || (
+      rest.assinatura?.planoId !== 'plan_b2b_patrocinado_v1' ? (rest.assinatura || null) : null
+    );
     const itens = itensMaster.map((i) => montarItemPatrocinado(i, patrocinadorId));
     if (itens.length > 450) throw new functions.https.HttpsError('failed-precondition', 'Catálogo excede o limite seguro por ativação.');
     const refs = itens.map((i) => restRef.collection('cardapio').doc(i.id));
@@ -3994,6 +4014,8 @@ async function executarAtivarPatrocinio(firestoreDb, authUid, token, payload, ra
         ativo: true, patrocinadorId, patrocinadorNome: String(pat.nomeFantasia || ''),
         loteId: loteDoc.id, dataExpiracao: novaExpiracao,
         itensInjetados: todosItens, slots: novosSlots,
+        // Preserva a referência da assinatura paga anterior para auditoria e reconciliação.
+        assinaturaAnterior,
       },
       atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
     });
