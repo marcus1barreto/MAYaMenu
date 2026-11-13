@@ -12,8 +12,6 @@ import {
   Phone,
   Mail,
   ShieldCheck,
-  Check,
-  Copy,
   TrendingUp,
 } from "lucide-react";
 import { escutarCatalogoMaster, escutarLotesLicencas, escutarMetricasSellout } from "@/lib/b2b-service";
