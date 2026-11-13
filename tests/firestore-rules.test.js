@@ -390,9 +390,9 @@ async function runTests() {
     );
   });
 
-  await test("Cliente PODE atualizar chamadoGarcom na própria comanda sem alterar campos financeiros", async () => {
+  await test("Cliente NÃO pode alterar chamadoGarcom diretamente; deve usar callable com QR e cooldown", async () => {
     const clientDb = testEnv.authenticatedContext("cliente_1").firestore();
-    await assertSucceeds(
+    await assertFails(
       clientDb.doc("restaurantes/rest_a/mesas/1/comandas_abertas/cliente_1").update({
         chamadoGarcom: { ativo: true, motivo: "Água" },
       })
