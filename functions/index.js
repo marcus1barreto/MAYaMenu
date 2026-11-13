@@ -316,7 +316,7 @@ exports.removeStaffMember = functions.https.onCall(async (data, context) => {
 function validarMembroEquipeParaLogin(membroData, membroDocId) {
   return Boolean(
     membroData
-    && membroData.ativo !== false
+    && membroData.ativo === true
     && membroData.uid === membroDocId
     && ['garcom', 'cozinha'].includes(membroData.role)
   );
@@ -533,7 +533,7 @@ exports.listarEquipePublica = functions.https.onCall(async (data, context) => {
 
   snap.forEach((d) => {
     const m = d.data() || {};
-    if (m.ativo === false || !['garcom', 'cozinha'].includes(m.role) || m.uid !== d.id) return;
+    if (m.ativo !== true || !['garcom', 'cozinha'].includes(m.role) || m.uid !== d.id) return;
     membros.push({
       id: d.id,
       uid: m.uid || d.id,
@@ -592,7 +592,7 @@ exports.atualizarPinColaborador = functions.https.onCall(async (data, context) =
   const membroSnap = await membroRef.get();
   const membroData = membroSnap.exists ? (membroSnap.data() || {}) : {};
   if (!membroSnap.exists || membroData.uid !== membroUid ||
-      membroData.ativo === false || !['garcom', 'cozinha'].includes(membroData.role)) {
+      membroData.ativo !== true || !['garcom', 'cozinha'].includes(membroData.role)) {
     throw new functions.https.HttpsError('not-found', 'Colaborador ativo não encontrado neste restaurante.');
   }
 
@@ -907,7 +907,7 @@ async function verificarPermissaoOperacionalRestaurante(
   if (membroSnap.exists) {
     const mData = membroSnap.data() || {};
     const roleEquipe = String(mData.role || '');
-    if (mData.ativo !== false && rolesPermitidos.includes(roleEquipe)) {
+    if (mData.ativo === true && rolesPermitidos.includes(roleEquipe)) {
       return true;
     }
     throw new functions.https.HttpsError(
