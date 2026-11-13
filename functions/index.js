@@ -2470,7 +2470,15 @@ async function executarValidarCodigoAtivacao(firestoreDb, payload) {
     throw new functions.https.HttpsError('invalid-argument', 'Código de ativação inválido.');
   }
 
-  const concessaoSnap = await firestoreDb.collection('concessoes').doc(codigo).get();
+  const concessaoRef = firestoreDb.collection('concessoes').doc(codigo);
+  const arquivoRef = firestoreDb.collection('arquivo_morto_licencas').doc(codigo);
+  const [concessaoSnap, arquivoSnap] = await Promise.all([
+    concessaoRef.get(),
+    arquivoRef.get(),
+  ]);
+  if (arquivoSnap.exists) {
+    throw new functions.https.HttpsError('failed-precondition', 'Este código já foi consumido e está arquivado; não pode ser reutilizado como voucher.');
+  }
   if (concessaoSnap.exists) {
     const dados = concessaoSnap.data() || {};
     validarDisponibilidadeAtivacao(dados, codigo);
@@ -3479,10 +3487,13 @@ async function executarAtivarInstancia(firestoreDb, authUid, authToken, payload,
   let resultado = null;
 
   await firestoreDb.runTransaction(async (tx) => {
-    const [restSnap, slugSnap, concessaoSnap, publicSlugSnap, legacySlugSnap] = await Promise.all([
-      tx.get(restRef), tx.get(slugRef), tx.get(concessaoRef),
+    const [restSnap, slugSnap, concessaoSnap, arquivoSnap, publicSlugSnap, legacySlugSnap] = await Promise.all([
+      tx.get(restRef), tx.get(slugRef), tx.get(concessaoRef), tx.get(arquivoRef),
       tx.get(publicSlugQuery), tx.get(legacySlugQuery),
     ]);
+    if (arquivoSnap.exists) {
+      throw new functions.https.HttpsError('failed-precondition', 'Este código já foi consumido e arquivado; não pode ser reutilizado.');
+    }
     if (restSnap.exists) {
       const atual = restSnap.data() || {};
       if (atual.ownerId === authUid && atual.licenca?.id === codigo) {
@@ -3675,9 +3686,13 @@ async function executarAtivarPatrocinio(firestoreDb, authUid, token, payload, ra
   await executarValidarCodigoAtivacaoComRateLimit(firestoreDb, { codigo }, rawRequest);
   let resultado = null;
 
+  const arquivoRef = firestoreDb.collection('arquivo_morto_licencas').doc(codigo);
   await firestoreDb.runTransaction(async (tx) => {
-    const restSnap = await tx.get(restRef);
+    const [restSnap, arquivoSnap] = await Promise.all([tx.get(restRef), tx.get(arquivoRef)]);
     if (!restSnap.exists) throw new functions.https.HttpsError('not-found', 'Restaurante não encontrado.');
+    if (arquivoSnap.exists) {
+      throw new functions.https.HttpsError('failed-precondition', 'Este código já foi consumido e arquivado; não pode ser reutilizado como voucher.');
+    }
     const rest = restSnap.data() || {};
     if (rest.suspenso === true || rest.configuracoes?.suspenso === true) {
       throw new functions.https.HttpsError('failed-precondition', 'Não é possível vincular patrocínio a um estabelecimento suspenso.');
