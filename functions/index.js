@@ -221,6 +221,7 @@ exports.setStaffRole = functions.https.onCall(async (data, context) => {
     email: targetUser.email,
     nome: nomeFormatado,
     role,
+    ativo: true,
     fotoUrl: fotoUrl || targetUser.photoURL || null,
     crachaToken,
     atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
