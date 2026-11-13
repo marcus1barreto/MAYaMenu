@@ -1,10 +1,10 @@
 import { db } from "@/lib/firebase";
-import { doc, setDoc, updateDoc, onSnapshot, collection, getDocs } from "firebase/firestore";
+import { doc, setDoc, updateDoc, onSnapshot, collection, getDocs, getDoc } from "firebase/firestore";
 
 export interface ConfigMesa {
   numero: number;
   ativa: boolean;
-  statusEstrutural: "livre" | "reservada" | "bloqueada";
+  statusEstrutural: "livre" | "reservada" | "bloqueada" | "inativa";
   reserva?: {
     nomeCliente: string;
     horario: string;
@@ -46,9 +46,15 @@ export async function alternarStatusLoteMesas(
   ativa: boolean
 ): Promise<void> {
   if (!restauranteId || numerosMesas.length === 0) return;
-  const promises = numerosMesas.map((num) =>
-    salvarConfigMesa(restauranteId, num, { ativa })
-  );
+  const promises = numerosMesas.map(async (num) => {
+    const mesaRef = doc(db, "restaurantes", restauranteId, "mesas", String(num));
+    const snap = await getDoc(mesaRef);
+    const statusAtual = snap.exists() ? snap.data().statusEstrutural : undefined;
+    await salvarConfigMesa(restauranteId, num, {
+      ativa,
+      ...(ativa && statusAtual === "inativa" ? { statusEstrutural: "livre" as const } : {}),
+    });
+  });
   await Promise.all(promises);
 }
 
