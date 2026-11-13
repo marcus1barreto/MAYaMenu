@@ -2122,6 +2122,21 @@ async function executarValidarCodigoAtivacao(firestoreDb, payload) {
   return {
     valida: true,
     tipo: 'patrocinio',
+    voucher: {
+      lote: {
+        id: loteDoc.id, patrocinadorId,
+        nome: String(lote.nome || ''), codigoCampanha: codigo,
+        totalLicencas: Number(lote.totalLicencas || 0),
+        licencasAtivadas: Number(lote.licencasAtivadas || 0),
+        validadeMeses: Number(lote.validadeMeses || 6),
+        dataExpiracao: lote.dataExpiracao || null, ativo: lote.ativo !== false,
+      },
+      patrocinador: {
+        id: patrocinadorId, nomeFantasia: String(pat.nomeFantasia || ''),
+        slug: String(pat.slug || ''), logoUrl: String(pat.logoUrl || ''),
+        ativo: pat.ativo !== false,
+      },
+    },
     licenca: {
       id: codigo,
       status: 'disponivel',
@@ -2193,7 +2208,7 @@ async function executarAtivarInstancia(firestoreDb, authUid, payload) {
     if (restSnap.exists) {
       const atual = restSnap.data() || {};
       if (atual.ownerId === authUid && atual.licenca?.id === codigo) {
-        resultado = { ...atual, id: restSnap.id, idempotente: true };
+        resultado = { ...atual, id: restSnap.id, _tipoAtivacao: atual.patrocinio?.ativo ? 'patrocinio' : 'licenca', idempotente: true };
         return;
       }
       throw new functions.https.HttpsError('already-exists', 'Este usuário já possui um estabelecimento cadastrado.');
@@ -2246,7 +2261,7 @@ async function executarAtivarInstancia(firestoreDb, authUid, payload) {
         dadosLicenca: dadosConsolidados,
       });
       tx.delete(concessaoRef);
-      resultado = restaurante;
+      resultado = { ...restaurante, _tipoAtivacao: 'licenca' };
       return;
     }
 
@@ -2336,10 +2351,14 @@ async function executarAtivarInstancia(firestoreDb, authUid, payload) {
       restaurantesVinculados: [...vinculados, vinculo],
       atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
     });
-    resultado = restaurante;
+    resultado = { ...restaurante, _tipoAtivacao: 'patrocinio' };
   });
 
-  return resultado;
+  return {
+    ...resultado,
+    criadoEm: resultado.criadoEm?.toDate ? resultado.criadoEm.toDate().toISOString() : new Date().toISOString(),
+    atualizadoEm: resultado.atualizadoEm?.toDate ? resultado.atualizadoEm.toDate().toISOString() : new Date().toISOString(),
+  };
 }
 
 async function executarAtivarPatrocinio(firestoreDb, authUid, token, payload) {
