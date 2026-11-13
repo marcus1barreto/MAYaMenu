@@ -2985,9 +2985,18 @@ async function executarConfirmarPagamentoProBackend(firestoreDb, auth, payload) 
   }
   const erroValidacao = validarPagamentoPro({ ...attempt, attemptId }, payment);
   if (erroValidacao) {
+    await marcarTentativaPagamentoRevisao(firestoreDb, attemptId, paymentId, erroValidacao);
     throw new functions.https.HttpsError('failed-precondition', erroValidacao);
   }
-  return executarProcessarPagamentoProAprovado(firestoreDb, attemptId, payment);
+  try {
+    return await executarProcessarPagamentoProAprovado(firestoreDb, attemptId, payment);
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError &&
+        ['failed-precondition', 'permission-denied', 'already-exists'].includes(error.code)) {
+      await marcarTentativaPagamentoRevisao(firestoreDb, attemptId, paymentId, error.message);
+    }
+    throw error;
+  }
 }
 
 async function executarMercadoPagoWebhook(firestoreDb, req, res) {
