@@ -554,11 +554,38 @@ export async function renovarValidadeLicenca(
  */
 export async function revogarLicenca(codigo: string): Promise<void> {
   const codigoFormatado = codigo.trim().toUpperCase();
+  const licencaRef = doc(db, "concessoes", codigoFormatado);
+  const arquivoRef = doc(db, "arquivo_morto_licencas", codigoFormatado);
 
-  // A revogação só é refletida localmente após a exclusão confirmada pelo servidor.
-  await deleteDoc(doc(db, "concessoes", codigoFormatado));
+  await runTransaction(db, async (tx) => {
+    const [licSnap, arquivoSnap] = await Promise.all([tx.get(licencaRef), tx.get(arquivoRef)]);
+    if (!licSnap.exists()) {
+      if (arquivoSnap.exists()) return; // Revogação já arquivada: idempotente.
+      throw new Error("Concessão não encontrada para revogação.");
+    }
+    if (arquivoSnap.exists()) throw new Error("Já existe um registro imutável para esta concessão.");
+    const licenca = licSnap.data() as Licenca;
+    if (licenca.status === "utilizada") {
+      throw new Error("Concessão já consumida; não pode ser revogada como disponível.");
+    }
+    const dadosLicenca: Licenca = { ...licenca, status: "revogada" };
+    const arquivo: LicencaArquivada = {
+      id: codigoFormatado,
+      codigo: codigoFormatado,
+      arquivadoEm: serverTimestamp(),
+      motivo: "revogada_manual",
+      restauranteId: licenca.restauranteId || "nao_ativada",
+      restauranteNome: licenca.restauranteNome || licenca.responsavel || "Licença revogada sem uso",
+      slug: licenca.slug || "",
+      ownerId: licenca.ownerId || "",
+      snapshotJson: JSON.stringify(dadosLicenca),
+      dadosLicenca,
+    };
+    tx.set(arquivoRef, arquivo);
+    tx.delete(licencaRef);
+  });
 
-  // Remove do cache local
+  // Remove do cache local somente após confirmação da transação no servidor.
   removerLicencaLocal(codigoFormatado);
 }
 
