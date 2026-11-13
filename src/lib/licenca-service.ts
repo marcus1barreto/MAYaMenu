@@ -593,15 +593,13 @@ export async function arquivarLicencaExpirada(licenca: Licenca): Promise<void> {
   const codigoFormatado = licenca.id.trim().toUpperCase();
   const arquivoMortoRef = doc(db, "arquivo_morto_licencas", codigoFormatado);
   const licencaRef = doc(db, "concessoes", codigoFormatado);
-  let arquivoFinal: LicencaArquivada | null = null;
-
-  await runTransaction(db, async (tx) => {
+  const arquivoFinal = await runTransaction(db, async (tx) => {
     const [licSnap, arquivoSnap] = await Promise.all([
       tx.get(licencaRef),
       tx.get(arquivoMortoRef),
     ]);
     if (!licSnap.exists()) {
-      if (arquivoSnap.exists()) return; // repetição idempotente já arquivada
+      if (arquivoSnap.exists()) return null; // repetição idempotente já arquivada
       throw new Error("Concessão não encontrada; arquivo morto não foi criado.");
     }
     if (arquivoSnap.exists()) {
@@ -616,7 +614,7 @@ export async function arquivarLicencaExpirada(licenca: Licenca): Promise<void> {
     }
 
     const dadosConsolidados: Licenca = { ...atual, status: "revogada" };
-    arquivoFinal = {
+    const arquivoCriado: LicencaArquivada = {
       id: codigoFormatado,
       codigo: codigoFormatado,
       arquivadoEm: serverTimestamp(),
@@ -629,8 +627,9 @@ export async function arquivarLicencaExpirada(licenca: Licenca): Promise<void> {
       dadosLicenca: dadosConsolidados,
     };
 
-    tx.set(arquivoMortoRef, arquivoFinal);
+    tx.set(arquivoMortoRef, arquivoCriado);
     tx.delete(licencaRef);
+    return arquivoCriado;
   });
 
   if (arquivoFinal) {
