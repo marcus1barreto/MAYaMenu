@@ -1848,7 +1848,9 @@ async function executarFecharComanda(firestoreDb, authUid, authToken, payload) {
   const mesaStr = String(mesa).trim();
   const cId = String(clienteId).trim();
   const comandaRef = restDoc.ref.collection('mesas').doc(mesaStr).collection('comandas_abertas').doc(cId);
-  const selloutEventId = crypto.createHash('sha256').update(`${restDoc.id}|${mesaStr}|${cId}`).digest('hex');
+  // ID único por fechamento. Fica fora do callback transacional para permanecer estável
+  // quando o Firestore reexecuta a transação por conflito.
+  const selloutEventId = crypto.randomBytes(32).toString('hex');
   const selloutOutboxRef = restDoc.ref.collection('_sellout_outbox').doc(selloutEventId);
   const agoraServer = admin.firestore.FieldValue.serverTimestamp();
   const agoraIso = new Date().toISOString();
