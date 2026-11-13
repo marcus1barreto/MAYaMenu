@@ -2066,6 +2066,73 @@ exports.fecharComandaBackend = functions.https.onCall(async (data, context) => {
 });
 
 /**
+ * Registra chamado do garçom com validação do QR físico no backend.
+ * Cria/atualiza a comanda atomicamente e aplica cooldown de 120 segundos no servidor.
+ */
+async function executarChamarGarcom(firestoreDb, authUid, payload) {
+  const { restauranteId, mesa, nomeCliente, motivo, qrCredencial } = payload || {};
+  if (!authUid) throw new functions.https.HttpsError('unauthenticated', 'Autenticação necessária.');
+  if (!restauranteId || mesa === undefined || mesa === null || typeof qrCredencial !== 'string' || qrCredencial.length < 16) {
+    throw new functions.https.HttpsError('invalid-argument', 'Dados do chamado ou credencial QR inválidos.');
+  }
+  let restDoc = await firestoreDb.collection('restaurantes').doc(String(restauranteId)).get();
+  if (!restDoc.exists) {
+    const q = await firestoreDb.collection('restaurantes').where('slug', '==', String(restauranteId)).limit(1).get();
+    if (!q.empty) restDoc = q.docs[0];
+  }
+  if (!restDoc.exists) throw new functions.https.HttpsError('not-found', 'Restaurante não encontrado.');
+  const restData = restDoc.data() || {};
+  if (restData.suspenso === true || restData.configuracoes?.suspenso === true) {
+    throw new functions.https.HttpsError('failed-precondition', 'Estabelecimento suspenso.');
+  }
+  const mesaStr = String(mesa).trim();
+  if (!/^\\d+$/.test(mesaStr) || Number(mesaStr) < 1) {
+    throw new functions.https.HttpsError('invalid-argument', 'Número de mesa inválido.');
+  }
+  const mesaRef = restDoc.ref.collection('mesas').doc(mesaStr);
+  const comandaRef = mesaRef.collection('comandas_abertas').doc(authUid);
+  const nome = String(nomeCliente || 'Cliente').trim().slice(0, 80) || 'Cliente';
+  const motivoSeguro = String(motivo || 'Atendimento').trim().slice(0, 80) || 'Atendimento';
+  await firestoreDb.runTransaction(async (t) => {
+    const [mesaSnap, comandaSnap] = await Promise.all([t.get(mesaRef), t.get(comandaRef)]);
+    if (!mesaSnap.exists) throw new functions.https.HttpsError('not-found', 'Mesa não cadastrada.');
+    const m = mesaSnap.data() || {};
+    if (m.ativa === false || m.statusEstrutural === 'inativa' || m.statusEstrutural === 'bloqueada') {
+      throw new functions.https.HttpsError('failed-precondition', 'Mesa indisponível.');
+    }
+    const recebido = hashQrCredencial(qrCredencial.trim());
+    if (typeof m.qrCredencialHash !== 'string' || !compararSegredoConstante(recebido, m.qrCredencialHash)) {
+      throw new functions.https.HttpsError('permission-denied', 'QR Code inválido ou revogado.');
+    }
+    if (comandaSnap.exists) {
+      const c = comandaSnap.data() || {};
+      if (c.status === 'pago' || c.arquivada === true) {
+        throw new functions.https.HttpsError('failed-precondition', 'A comanda já foi encerrada.');
+      }
+      const ultimo = c.chamadoGarcom?.solicitadoEm;
+      const ultimoMs = ultimo?.toMillis ? ultimo.toMillis() : (ultimo instanceof Date ? ultimo.getTime() : 0);
+      if (ultimoMs && Date.now() - ultimoMs < 120000) {
+        throw new functions.https.HttpsError('resource-exhausted', 'Aguarde antes de solicitar o garçom novamente.');
+      }
+      t.update(comandaRef, {
+        chamadoGarcom: { ativo: true, solicitadoEm: admin.firestore.FieldValue.serverTimestamp(), motivo: motivoSeguro },
+        atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    } else {
+      t.create(comandaRef, {
+        id: authUid, restauranteId: restDoc.id, slug: String(restData.slug || restDoc.id),
+        nomeCliente: nome, mesa: Number(mesaStr), numeroMesa: Number(mesaStr),
+        subtotal: 0, status: 'pedindo',
+        criadoEm: admin.firestore.FieldValue.serverTimestamp(),
+        atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
+        chamadoGarcom: { ativo: true, solicitadoEm: admin.firestore.FieldValue.serverTimestamp(), motivo: motivoSeguro },
+      });
+    }
+  });
+  return { sucesso: true };
+}
+
+/**
  * Desativa logicamente uma mesa física (sem exclusão física, preservando histórico e auditoria).
  * Valida permissão (owner/admin), inexistência de comandas abertas ou tickets KDS ativos,
  * e invalida/rotaciona a credencial QR da mesa dentro de uma única transação.
@@ -2158,6 +2225,10 @@ async function executarDesativarMesa(firestoreDb, authUid, authToken, payload) {
   return resultado;
 }
 
+exports.chamarGarcomBackend = functions.https.onCall(async (data, context) => {
+  return executarChamarGarcom(getDb(), context.auth?.uid, data);
+});
+
 exports.liberarMesaBackend = functions.https.onCall(async (data, context) => {
   return executarLiberarMesa(getDb(), context.auth?.uid, context.auth?.token, data);
 });
@@ -2207,6 +2278,7 @@ exports._internal = {
   executarFecharComanda,
   executarLiberarMesa,
   executarDesativarMesa,
+  executarChamarGarcom,
 };
 
 /**
