@@ -24,7 +24,7 @@ O checkout antigo por rotas Next.js foi desativado (HTTP 410). Antes de reativar
    - `firebase functions:secrets:set MERCADO_PAGO_ACCESS_TOKEN --project mayaranas-8ad9f`
 2. No painel do Mercado Pago, cadastrar o webhook de pagamentos para:
    `https://us-central1-mayaranas-8ad9f.cloudfunctions.net/mercadoPagoWebhook`
-   Salvar a configuração, habilitar o evento Pagamentos e revelar/copiar a chave secreta gerada pela aplicação.
+   Salvar a configuração, habilitar o evento Pagamentos e revelar/copiar a assinatura secreta gerada pelo próprio Mercado Pago no painel da aplicação.
 3. Configurar essa chave no Secret Manager:
    - `firebase functions:secrets:set MERCADO_PAGO_WEBHOOK_SECRET --project mayaranas-8ad9f`
 4. Configurar as variáveis de ambiente do Functions no arquivo local não versionado `functions/.env.mayaranas-8ad9f` (ou no mecanismo equivalente do runtime):
@@ -32,7 +32,7 @@ O checkout antigo por rotas Next.js foi desativado (HTTP 410). Antes de reativar
    - `MAYAMENU_APP_URL=https://<dominio-oficial>` (obrigatório; usar o domínio HTTPS efetivamente publicado no Firebase App Hosting ou domínio próprio).
    - Não commitar o arquivo `.env` nem incluir tokens nele; os tokens ficam exclusivamente no Secret Manager.
 5. Validar primeiro com credenciais sandbox e `MERCADO_PAGO_LIVE_MODE=false`. Não usar pagamentos reais para testar. O simulador de Webhooks do Mercado Pago deve confirmar o recebimento HTTP 200 e a validação de assinatura.
-6. Confirmar que o retorno do checkout contém `attempt` e que a assinatura só é ativada depois de o backend consultar a API oficial, validar valor, moeda, referência e ambiente, e registrar o pagamento de forma idempotente.
+6. Confirmar que o retorno do checkout contém `attempt` e que a assinatura só é ativada depois de o backend consultar a API oficial, validar valor, moeda, referência e ambiente, validar a assinatura HMAC e a tolerância temporal de 5 minutos do webhook, e registrar o pagamento de forma idempotente. Manter o relógio do runtime sincronizado.
 
 **Não reativar checkout nem publicar cobrança real enquanto os dois segredos e o webhook assinado não estiverem configurados.** Sem essas configurações, as Cloud Functions falham de forma fechada e não ativam o PRO.
 
