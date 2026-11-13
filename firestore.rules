@@ -176,8 +176,11 @@ service cloud.firestore {
     }
 
     match /restaurantes/{restauranteId} {
-      // Documento raiz é privado: titular/equipe ativa e SuperAdmin.
-      allow get: if isOwner(restauranteId) || isActiveStaffMember(restauranteId) || isSuperAdmin();
+      // Documento raiz é privado: o titular é conferido diretamente em resource.data
+      // (evita get() recursivo do próprio documento); equipe ativa e SuperAdmin também podem ler.
+      allow get: if (isSignedIn() && resource.data.ownerId == request.auth.uid)
+        || isActiveStaffMember(restauranteId)
+        || isSuperAdmin();
       allow list: if isSuperAdmin();
 
       // Criação de tenants exclusivamente pelo backend de ativação (Admin SDK).
@@ -186,15 +189,20 @@ service cloud.firestore {
       // Lojista só altera campos cadastrais não privilegiados. Plano, licença, titularidade,
       // suspensão e limites são governados exclusivamente pelo SuperAdmin/backend.
       allow update: if isSuperAdmin() || (
-        isOwner(restauranteId)
+        isSignedIn()
+        && resource.data.ownerId == request.auth.uid
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'nome', 'configuracoes', 'atualizadoEm'
         ])
         && (
           !request.resource.data.diff(resource.data).affectedKeys().hasAny(['configuracoes'])
-          || request.resource.data.configuracoes.diff(resource.data.configuracoes).affectedKeys().hasOnly([
-            'corPrimaria', 'tema', 'logoUrl', 'capaUrl', 'modoOperacao', 'modoFilaKds', 'taxaServico', 'pixConfig'
-          ])
+          || (
+            request.resource.data.configuracoes is map
+            && resource.data.configuracoes is map
+            && request.resource.data.configuracoes.diff(resource.data.configuracoes).affectedKeys().hasOnly([
+              'corPrimaria', 'tema', 'logoUrl', 'capaUrl', 'modoOperacao', 'modoFilaKds', 'taxaServico', 'pixConfig'
+            ])
+          )
         )
       );
 
