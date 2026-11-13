@@ -192,6 +192,11 @@ exports.setStaffRole = functions.https.onCall(async (data, context) => {
       restauranteAtual && restauranteAtual !== realRestauranteId) {
     throw new functions.https.HttpsError('failed-precondition', 'Este usuário já está vinculado a outro restaurante. Remova o vínculo anterior antes de transferi-lo.');
   }
+  // Contas de equipe legadas podem ter sido criadas com o PIN como senha. Ao atualizar
+  // um vínculo de equipe já existente, rotaciona também a senha Firebase para segredo aleatório.
+  if (['garcom', 'cozinha'].includes(roleAtual) && restauranteAtual === realRestauranteId) {
+    targetUser = await admin.auth().updateUser(targetUser.uid, { password: senhaInicialAleatoria });
+  }
 
   // 4. Gera token seguro para Crachá QR Code (para login rápido com câmera)
   const crachaToken = crypto.randomBytes(16).toString('hex');
