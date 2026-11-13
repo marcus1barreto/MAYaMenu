@@ -2868,8 +2868,9 @@ async function executarProcessarEstornoPagamentoPro(firestoreDb, attemptId, paym
     }
 
     const ledger = ledgerSnap.exists ? ledgerSnap.data() || {} : {};
-    if (ledger.status === statusEstorno && attempt.status === statusEstorno) {
-      resultado = { processado: true, idempotente: true };
+    if (ledger.status === statusEstorno && attempt.status === statusEstorno &&
+        Number(ledger.valorEstornadoCentavos || 0) >= valorEstornadoCentavos) {
+      resultado = { processado: true, idempotente: true, status: statusEstorno };
       return;
     }
 
@@ -3100,19 +3101,24 @@ async function executarConfirmarPagamentoProBackend(firestoreDb, auth, payload) 
   if (attempt.ownerUid !== authUid) {
     throw new functions.https.HttpsError('permission-denied', 'Esta tentativa de pagamento não pertence à sua conta.');
   }
-  if (attempt.status === 'approved') {
+  if (attempt.status === 'approved' && !payload?.paymentId) {
     return { sucesso: true, status: 'approved', idempotente: true, novaDataExpiracao: attempt.novaDataExpiracao };
   }
-  if (attempt.status !== 'pending') {
+  if (attempt.status !== 'pending' && attempt.status !== 'approved') {
     return { sucesso: false, status: String(attempt.status || 'unknown') };
   }
 
   const token = process.env.MERCADO_PAGO_ACCESS_TOKEN?.trim();
   if (!token) throw new functions.https.HttpsError('failed-precondition', 'Mercado Pago indisponível no servidor.');
-  const paymentId = String(payload?.paymentId || '');
+  const paymentId = String(payload?.paymentId || attempt.paymentId || '');
   if (!paymentId) return { sucesso: false, status: 'pending' };
   const payment = await consultarPagamentoMercadoPagoServidor(paymentId, token);
   if (!payment) return { sucesso: false, status: 'pending' };
+  const valorEstornadoCentavos = Math.round(Number(payment.transaction_amount_refunded || 0) * 100);
+  if (['refunded', 'charged_back'].includes(String(payment.status)) || valorEstornadoCentavos > 0) {
+    const estorno = await executarProcessarEstornoPagamentoPro(firestoreDb, attemptId, payment);
+    return { sucesso: false, status: estorno.status || String(payment.status || 'refunded'), idempotente: estorno.idempotente };
+  }
   if (payment.status !== 'approved') {
     return { sucesso: false, status: String(payment.status || 'pending') };
   }
@@ -3171,11 +3177,21 @@ async function executarMercadoPagoWebhook(firestoreDb, req, res) {
       res.status(200).json({ status: 'payment_not_found' });
       return;
     }
+      const attemptId = String(payment.external_reference || '');
+    const valorEstornadoCentavos = Math.round(Number(payment.transaction_amount_refunded || 0) * 100);
+    if (['refunded', 'charged_back'].includes(String(payment.status)) || valorEstornadoCentavos > 0) {
+      if (!/^[a-f0-9-]{36}$/i.test(attemptId)) {
+        res.status(200).json({ status: 'ignored_refund_reference' });
+        return;
+      }
+      const estorno = await executarProcessarEstornoPagamentoPro(firestoreDb, attemptId, payment);
+      res.status(200).json({ status: estorno.idempotente ? 'refund_already_processed' : 'refund_processed' });
+      return;
+    }
     if (payment.status !== 'approved') {
       res.status(200).json({ status: 'payment_not_approved' });
       return;
     }
-    const attemptId = String(payment.external_reference || '');
     if (!/^[a-f0-9-]{36}$/i.test(attemptId)) {
       res.status(200).json({ status: 'ignored_external_reference' });
       return;
@@ -4058,6 +4074,7 @@ exports._internal = {
   validarAssinaturaMercadoPago,
   validarPagamentoPro,
   executarProcessarPagamentoProAprovado,
+  executarProcessarEstornoPagamentoPro,
   executarCriarPreferenciaProBackend,
   executarConfirmarPagamentoProBackend,
   executarMercadoPagoWebhook,
