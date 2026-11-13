@@ -757,11 +757,11 @@ export async function injetarTicketContingencia(
     }[];
     subtotal: number;
   }
-): Promise<void> {
+): Promise<{ subtotal: number; pedidoId: string }> {
   // Mesmo em contingência, preços e itens são recalculados pelo servidor.
   // Nunca gravar comanda, pedido ou KDS diretamente do navegador.
   const lancarGarcomFn = httpsCallable(functions, "lancarPedidoGarcom");
-  await lancarGarcomFn({
+  const resposta = await lancarGarcomFn({
     restauranteId,
     pedidoId: ticket.id,
     mesa: ticket.mesa,
@@ -774,6 +774,11 @@ export async function injetarTicketContingencia(
       observacoes: item.observacoes || "",
     })),
   });
+  const dados = resposta.data as { subtotal?: number; pedidoId?: string };
+  if (typeof dados.subtotal !== "number" || typeof dados.pedidoId !== "string") {
+    throw new Error("O backend não confirmou o subtotal autoritativo do pedido.");
+  }
+  return { subtotal: dados.subtotal, pedidoId: dados.pedidoId };
 }
 
 /**
