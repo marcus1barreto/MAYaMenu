@@ -14,7 +14,7 @@ const {
   executarDesativarMesa, executarChamarGarcom, executarValidarCodigoAtivacao,
   executarAtivarInstancia, executarAtivarPatrocinio, executarProcessarSelloutOutbox,
   executarSincronizarPerfilPublicoRestaurante, executarLancamentoPedidoGarcom,
-  executarValidarCodigoAtivacaoComRateLimit,
+  executarValidarCodigoAtivacaoComRateLimit, executarValidarSessaoPatrocinador,
 } = _internal;
 const crypto = require("crypto");
 
@@ -154,6 +154,28 @@ async function main() {
     assert.strictEqual(validacao.licenca.id, "MAYA-TESTE-01");
     assert.strictEqual(validacao.licenca.plano, "pro");
     assert.strictEqual(validacao.licenca.ownerUid, undefined);
+  });
+
+  await runTest("Emulador: sessão B2B valida status/versão e nunca retorna a chave de acesso", async () => {
+    await db.doc("patrocinadores/pat_sessao").set({
+      ativo: true, authVersion: 4, chaveAcessoB2B: "SPN-SEGREDO-QUE-NAO-PODE-RETORNAR",
+      nomeFantasia: "Patrocinador Sessão",
+    });
+    const authContext = {
+      uid: "pat_sessao",
+      token: { role: "sponsor", patrocinadorId: "pat_sessao", authVersion: 4 },
+    };
+    const validacao = await executarValidarSessaoPatrocinador(db, authContext);
+    assert.strictEqual(validacao.patrocinador.id, "pat_sessao");
+    assert.strictEqual(validacao.patrocinador.chaveAcessoB2B, "");
+    await assert.rejects(
+      () => executarValidarSessaoPatrocinador(db, {
+        ...authContext, token: { ...authContext.token, authVersion: 3 },
+      }),
+      /revogada/i
+    );
+    await db.doc("patrocinadores/pat_sessao").update({ ativo: false, authVersion: 5 });
+    await assert.rejects(() => executarValidarSessaoPatrocinador(db, authContext), /revogada/i);
   });
 
   await runTest("Emulador: validação pública de voucher bloqueia enumeração após falhas por IP/código", async () => {
