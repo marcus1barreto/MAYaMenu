@@ -309,6 +309,11 @@ async function main() {
     assert.strictEqual(perfilPublico.data().nome, "Atomic Restaurante");
     assert.strictEqual(perfilPublico.data().ownerId, undefined);
     assert.strictEqual(perfilPublico.data().licenca, undefined);
+    const retry = await executarAtivarInstancia(db, "owner_atomic_01", { firebase: { sign_in_provider: "password" } }, {
+      codigo: "MAYA-ATOMIC-01", slug: "atomic-rest-01", restauranteNome: "Atomic Restaurante",
+      modoOperacao: "hibrido",
+    });
+    assert.strictEqual(retry.idempotente, true);
     await assert.rejects(() => executarAtivarInstancia(db, "owner_atomic_02", { firebase: { sign_in_provider: "password" } }, {
       codigo: "MAYA-ATOMIC-01", slug: "atomic-rest-02", restauranteNome: "Outro Restaurante",
     }));
