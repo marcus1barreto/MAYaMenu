@@ -948,12 +948,25 @@ async function runTests() {
     await assertFails(
       sessaoGarcomAntiga.doc("restaurantes/rest_a/kds_tickets/ticket_1").get()
     );
+    // As regras de collectionGroup também precisam rejeitar o cargo antigo.
+    await assertFails(
+      sessaoGarcomAntiga.doc("restaurantes/rest_a/mesas/1/comandas_abertas/cliente_1").get()
+    );
+    await assertFails(
+      sessaoGarcomAntiga.doc("restaurantes/rest_a/mesas/1/comandas_abertas/cliente_1/pedidos/ped_1").get()
+    );
 
     const sessaoCozinhaAtual = testEnv.authenticatedContext("garcom_a", {
       role: "cozinha", restauranteId: "rest_a",
     }).firestore();
     await assertSucceeds(
       sessaoCozinhaAtual.doc("restaurantes/rest_a/kds_tickets/ticket_1").get()
+    );
+    await assertSucceeds(
+      sessaoCozinhaAtual.doc("restaurantes/rest_a/mesas/1/comandas_abertas/cliente_1").get()
+    );
+    await assertSucceeds(
+      sessaoCozinhaAtual.doc("restaurantes/rest_a/mesas/1/comandas_abertas/cliente_1/pedidos/ped_1").get()
     );
   });
 
