@@ -266,6 +266,29 @@ async function main() {
     assert.strictEqual((await db.doc("restaurantes/uid_sponsor_01").get()).exists, false);
   });
 
+  await runTest("Emulador: callable de ativação não permite contornar rate limit por chamada direta", async () => {
+    const authToken = { firebase: { sign_in_provider: "password" } };
+    const rawRequest = { headers: { "x-forwarded-for": "198.51.100.88" } };
+    for (let tentativa = 0; tentativa < 5; tentativa++) {
+      await assert.rejects(
+        () => executarAtivarInstancia(db, "owner_brute_force", authToken, {
+          codigo: "MAYA-CODIGO-INEXISTENTE-99",
+          slug: `slug-inexistente-${tentativa}`,
+          restauranteNome: "Teste Rate Limit",
+        }, rawRequest),
+        /inválido|inexistente|não encontrada/i
+      );
+    }
+    await assert.rejects(
+      () => executarAtivarInstancia(db, "owner_brute_force", authToken, {
+        codigo: "MAYA-CODIGO-INEXISTENTE-99",
+        slug: "slug-inexistente-final",
+        restauranteNome: "Teste Rate Limit",
+      }, rawRequest),
+      /muitas tentativas|bloqueado temporariamente/i
+    );
+  });
+
   await runTest("Emulador: ativação de licença comum consome concessão e cria restaurante/slug/arquivo morto atomicamente", async () => {
     await db.doc("concessoes/MAYA-ATOMIC-01").set({
       status: "disponivel", plano: "free",
