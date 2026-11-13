@@ -14,6 +14,12 @@ function hashQr(cred) {
 
 const { _internal } = require("../functions/index.js");
 const {
+  getCartStorageKey,
+  isCarrinhoExpirado,
+  fingerprintQrCredencial,
+  isMesaTokenCacheValido,
+} = require("../src/lib/cart-storage.cjs");
+const {
   getMesaTokenSecret,
   verificarMesaToken,
   validarModificadoresServidor,
@@ -229,22 +235,35 @@ async function main() {
 
   const FOUR_HOURS_MS = 4 * 60 * 60 * 1000;
 
-  await runTest("Carrinho: Mesa 3 não recupera itens da Mesa 5 (chaves isoladas)", async () => {
+  await runTest("Carrinho: chave real de armazenamento isola restaurante e mesa", async () => {
     const storage = new Map();
-    const keyMesa3 = "mayamenu_cart_bistro_mesa_3";
-    const keyMesa5 = "mayamenu_cart_bistro_mesa_5";
+    const keyMesa3 = getCartStorageKey("bistro", 3);
+    const keyMesa5 = getCartStorageKey("bistro", 5);
+    const keyOutroRestaurante = getCartStorageKey("outro", 3);
     storage.set(keyMesa3, JSON.stringify({ itens: [{ menuItemId: "burger-1" }], mesa: 3, atualizadoEm: Date.now() }));
+    assert.notStrictEqual(keyMesa3, keyMesa5);
+    assert.notStrictEqual(keyMesa3, keyOutroRestaurante);
     assert.strictEqual(storage.get(keyMesa5), undefined);
+    assert.strictEqual(storage.get(keyOutroRestaurante), undefined);
   });
 
-  await runTest("Expiração: Carrinho com mais de 4h é descartado", async () => {
+  await runTest("Expiração: helper real descarta carrinho após 4h e rejeita timestamp inválido", async () => {
     const agora = Date.now();
-    assert.strictEqual(agora - (agora - FOUR_HOURS_MS - 1000) > FOUR_HOURS_MS, true);
+    assert.strictEqual(isCarrinhoExpirado(agora - FOUR_HOURS_MS - 1000, agora), true);
+    assert.strictEqual(isCarrinhoExpirado(agora - 30 * 60 * 1000, agora), false);
+    assert.strictEqual(isCarrinhoExpirado("timestamp-inválido", agora), true);
+    assert.strictEqual(isCarrinhoExpirado(undefined, agora), true);
   });
 
-  await runTest("Carrinho: Carrinho recente (< 4h) da mesma mesa é recuperado", async () => {
-    const agora = Date.now();
-    assert.strictEqual(agora - (agora - 30 * 60 * 1000) > FOUR_HOURS_MS, false);
+  await runTest("QR: cache de sessão não reutiliza token após rotação da credencial", async () => {
+    const cache = {
+      token: "mesa-token-antigo",
+      expiraEm: Date.now() + 10 * 60 * 1000,
+      qrFingerprint: fingerprintQrCredencial("qr-antigo-credencial-123456"),
+    };
+    assert.strictEqual(isMesaTokenCacheValido(cache, "qr-antigo-credencial-123456"), true);
+    assert.strictEqual(isMesaTokenCacheValido(cache, "qr-novo-credencial-654321"), false);
+    assert.strictEqual(isMesaTokenCacheValido({ ...cache, expiraEm: Date.now() }, "qr-antigo-credencial-123456"), false);
   });
 
   await runTest("Financeiro: Cliente altera preço no navegador -> Servidor ignora e calcula em centavos inteiros", async () => {
