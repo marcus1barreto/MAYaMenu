@@ -89,11 +89,13 @@ export function PinLockGuard({ role, restauranteId, slug, children }: PinLockGua
         const claims = tokenRes?.claims || {};
         const claimRestId = claims.restauranteId as string | undefined;
         const claimRole = claims.role as string | undefined;
-        const ehDonoOuSuper = claims.superadmin === true || claimRole === "owner";
-        const mesmoRestaurante =
-          !claimRestId || claimRestId === targetRestId || (slug && claimRestId === restauranteId);
+        const ehSuperadmin = claims.superadmin === true;
+        const mesmoRestaurante = Boolean(
+          claimRestId && (claimRestId === targetRestId || (slug && claimRestId === restauranteId))
+        );
+        const papelAutorizado = claimRole === role || claimRole === "owner";
 
-        if (ativo && (ehDonoOuSuper || (claimRole === role && mesmoRestaurante))) {
+        if (ativo && (ehSuperadmin || (papelAutorizado && mesmoRestaurante))) {
           setDesbloqueado(true);
         } else if (ativo) {
           sessionStorage.removeItem(`mayamenu_pin_unlocked_${role}_${targetRestId}`);
