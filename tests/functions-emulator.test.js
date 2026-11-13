@@ -380,6 +380,46 @@ async function main() {
     );
   });
 
+  await runTest("Emulador: validação correta não zera rate limit de IP contra enumeração", async () => {
+    await db.doc("concessoes/MAYA-RATE-VALID-01").set({
+      status: "disponivel", plano: "free",
+      limites: { maxMesas: 10, maxPratos: 20 },
+    });
+    const authToken = { firebase: { sign_in_provider: "password" } };
+    const rawRequest = { headers: { "x-forwarded-for": "198.51.100.90" } };
+    for (let tentativa = 1; tentativa <= 4; tentativa++) {
+      await assert.rejects(
+        () => executarAtivarInstancia(db, "owner_rate_valid", authToken, {
+          codigo: `MAYA-ERRO-RATE-${String(tentativa).padStart(2, "0")}`,
+          slug: `slug-rate-erro-${tentativa}`,
+          restauranteNome: "Teste Rate Limit",
+        }, rawRequest),
+        /inválido|inexistente|não encontrada/i
+      );
+    }
+    await executarAtivarInstancia(db, "owner_rate_valid", authToken, {
+      codigo: "MAYA-RATE-VALID-01",
+      slug: "slug-rate-valid",
+      restauranteNome: "Teste Rate Limit",
+    }, rawRequest);
+    await assert.rejects(
+      () => executarAtivarInstancia(db, "owner_rate_valid_2", authToken, {
+        codigo: "MAYA-ERRO-RATE-05",
+        slug: "slug-rate-erro-5",
+        restauranteNome: "Teste Rate Limit",
+      }, rawRequest),
+      /inválido|inexistente|não encontrada/i
+    );
+    await assert.rejects(
+      () => executarAtivarInstancia(db, "owner_rate_valid_3", authToken, {
+        codigo: "MAYA-ERRO-RATE-06",
+        slug: "slug-rate-erro-6",
+        restauranteNome: "Teste Rate Limit",
+      }, rawRequest),
+      /muitas tentativas|bloqueado temporariamente/i
+    );
+  });
+
   await runTest("Emulador: voucher B2B ativa PRO, injeta catálogo e consome uma única cota", async () => {
     const patRef = db.doc("patrocinadores/spn_test_b2b");
     await patRef.set({ nomeFantasia: "Marca Teste", ativo: true, slug: "marca-teste" });
