@@ -139,14 +139,18 @@ export function B2BLotesView({ patrocinadorId, lotes }: B2BLotesViewProps) {
           </p>
         </div>
 
-        <Button
-          type="button"
-          onClick={() => setModalNovoLoteAberto(true)}
-          className="h-10 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-black text-xs flex items-center gap-2 shadow-xs transition-all active:scale-95"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Contratar / Emitir Novo Lote</span>
-        </Button>
+        <div className="text-right">
+          <Button
+            type="button"
+            disabled
+            title="A emissão de cotas exige aprovação contratual da MAYaMenu."
+            className="h-10 px-4 rounded-xl bg-neutral-100 text-neutral-500 font-black text-xs flex items-center gap-2"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Novos lotes sob aprovação</span>
+          </Button>
+          <p className="text-[10px] text-neutral-400 mt-1">Cotas adicionais são liberadas após validação contratual.</p>
+        </div>
       </div>
 
       {/* LISTA DE LOTES / CAMPANHAS */}
@@ -157,7 +161,7 @@ export function B2BLotesView({ patrocinadorId, lotes }: B2BLotesViewProps) {
           </div>
           <h4 className="text-base font-bold text-neutral-800">Nenhum lote de licenças cadastrado</h4>
           <p className="text-xs text-neutral-500 max-w-sm mt-1">
-            Emita seu primeiro lote corporativo para gerar vouchers de ativação para seus estabelecimentos parceiros.
+            Solicite à administração MAYaMenu a emissão do lote contratado e a liberação das cotas de ativação.
           </p>
         </div>
       ) : (
