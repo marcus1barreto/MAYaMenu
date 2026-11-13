@@ -2247,20 +2247,18 @@ async function executarAutenticarPatrocinador(firestoreDb, payload, rawRequest) 
   const rateCollection = firestoreDb.collection('_b2b_auth_rate_limits');
   const ipRateRef = rateCollection.doc('ip_' + ipKey);
   const keyRateRef = rateCollection.doc('key_' + chaveHash);
-  const globalRateRef = rateCollection.doc('global');
   let patrocinadorData = null;
 
   await firestoreDb.runTransaction(async (tx) => {
-    const [ipSnap, keySnap, globalSnap, sponsorSnap] = await Promise.all([
+    const [ipSnap, keySnap, sponsorSnap] = await Promise.all([
       tx.get(ipRateRef),
       tx.get(keyRateRef),
-      tx.get(globalRateRef),
       patrocinadorRef ? tx.get(patrocinadorRef) : Promise.resolve(null),
     ]);
     const bloqueio = verificarBloqueioAtivo({
       ipData: ipSnap.exists ? ipSnap.data() : null,
       userData: keySnap.exists ? keySnap.data() : null,
-      globalData: globalSnap.exists ? globalSnap.data() : null,
+      globalData: null,
       agora,
     });
     if (bloqueio.bloqueado) {
@@ -2273,12 +2271,11 @@ async function executarAutenticarPatrocinador(firestoreDb, payload, rawRequest) 
       const payloads = calcularPayloadsFalha({
         curIpData: ipSnap.exists ? ipSnap.data() : {},
         curUserData: keySnap.exists ? keySnap.data() : {},
-        curGlobalData: globalSnap.exists ? globalSnap.data() : {},
+        curGlobalData: {},
         agora,
       });
       tx.set(ipRateRef, payloads.ipPayload, { merge: true });
       tx.set(keyRateRef, payloads.userPayload, { merge: true });
-      tx.set(globalRateRef, payloads.globalPayload, { merge: true });
       return;
     }
 
