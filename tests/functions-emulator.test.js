@@ -252,8 +252,18 @@ async function main() {
       }),
       /conta permanente/i
     );
+    await assert.rejects(
+      () => executarAtivarInstancia(db, "uid_sponsor_01", {
+        role: "sponsor", patrocinadorId: "uid_sponsor_01",
+        firebase: { sign_in_provider: "custom" },
+      }, {
+        codigo: "MAYA-ANON-01", slug: "sponsor-rest-01", restauranteNome: "Restaurante Sponsor",
+      }),
+      /sessões anônimas ou B2B/i
+    );
     assert.strictEqual((await db.doc("concessoes/MAYA-ANON-01").get()).exists, true);
     assert.strictEqual((await db.doc("restaurantes/uid_anon_01").get()).exists, false);
+    assert.strictEqual((await db.doc("restaurantes/uid_sponsor_01").get()).exists, false);
   });
 
   await runTest("Emulador: ativação de licença comum consome concessão e cria restaurante/slug/arquivo morto atomicamente", async () => {
