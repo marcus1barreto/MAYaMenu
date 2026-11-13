@@ -140,8 +140,7 @@ exports.setStaffRole = functions.https.onCall(async (data, context) => {
   const restData = restDoc.data();
   const isSuperadmin = context.auth.token?.superadmin === true;
   // Blindagem contra vazamento horizontal: claims role=='owner' só valem para o restauranteId vinculado
-  const isOwner = restData?.ownerId === callerUid || 
-    (context.auth.token?.role === 'owner' && context.auth.token?.restauranteId === realRestauranteId);
+  const isOwner = restData?.ownerId === callerUid;
 
   if (!isOwner && !isSuperadmin) {
     throw new functions.https.HttpsError(
@@ -185,14 +184,33 @@ exports.setStaffRole = functions.https.onCall(async (data, context) => {
     }
   }
 
+  // Impede downgrade de titular/SuperAdmin e troca silenciosa de tenant de uma conta existente.
+  if (targetUser.uid === callerUid || targetUser.customClaims?.superadmin === true ||
+      targetUser.customClaims?.role === 'owner') {
+    throw new functions.https.HttpsError('permission-denied', 'Esta conta não pode ser convertida em colaborador.');
+  }
+  const restaurantesDoUsuario = await firestoreDb.collection('restaurantes')
+    .where('ownerId', '==', targetUser.uid).limit(1).get();
+  if (!restaurantesDoUsuario.empty) {
+    throw new functions.https.HttpsError('permission-denied', 'O e-mail informado já é titular de um estabelecimento.');
+  }
+  const roleAtual = targetUser.customClaims?.role;
+  const restauranteAtual = targetUser.customClaims?.restauranteId;
+  if (['owner', 'admin', 'garcom', 'cozinha'].includes(roleAtual) &&
+      restauranteAtual && restauranteAtual !== realRestauranteId) {
+    throw new functions.https.HttpsError('failed-precondition', 'Este usuário já está vinculado a outro restaurante. Remova o vínculo anterior antes de transferi-lo.');
+  }
+
   // 4. Gera token seguro para Crachá QR Code (para login rápido com câmera)
   const crachaToken = crypto.randomBytes(16).toString('hex');
 
-  // 5. Define os custom claims do colaborador
+  // 5. Define os custom claims preservando apenas claims não conflitantes.
   const newClaims = {
+    ...(targetUser.customClaims || {}),
     role,
     restauranteId: realRestauranteId,
   };
+  delete newClaims.superadmin;
 
   await admin.auth().setCustomUserClaims(targetUser.uid, newClaims);
 
@@ -267,19 +285,32 @@ exports.removeStaffMember = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError('permission-denied', 'Permissão negada.');
   }
 
-  // Remove claims e revoga tokens imediatamente para deslogar sessões ativas
-  try {
-    await admin.auth().setCustomUserClaims(uid, { role: null, restauranteId: null });
-    await admin.auth().revokeRefreshTokens(uid);
-  } catch (err) {
-    console.warn(`Aviso ao revogar tokens e claims do UID ${uid}:`, err);
+  const membroRef = restDoc.ref.collection('equipe').doc(String(uid));
+  const membroSnap = await membroRef.get();
+  if (!membroSnap.exists) {
+    throw new functions.https.HttpsError('not-found', 'Colaborador não encontrado neste restaurante.');
   }
 
-  // Remove do Firestore
-  await restDoc.ref
-    .collection('equipe')
-    .doc(uid)
-    .delete();
+  const targetUser = await admin.auth().getUser(String(uid));
+  if (targetUser.customClaims?.superadmin === true) {
+    throw new functions.https.HttpsError('permission-denied', 'Uma conta SuperAdmin não pode ser removida como colaborador.');
+  }
+  const restaurantesDoUsuario = await firestoreDb.collection('restaurantes')
+    .where('ownerId', '==', String(uid)).limit(1).get();
+  if (!restaurantesDoUsuario.empty) {
+    throw new functions.https.HttpsError('permission-denied', 'A conta é titular de um estabelecimento e não pode ser removida como colaborador.');
+  }
+
+  // Só revoga claims quando elas pertencem ao tenant deste vínculo.
+  if (targetUser.customClaims?.restauranteId === restDoc.id) {
+    const claimsRestantes = { ...(targetUser.customClaims || {}) };
+    delete claimsRestantes.role;
+    delete claimsRestantes.restauranteId;
+    await admin.auth().setCustomUserClaims(String(uid), claimsRestantes);
+    await admin.auth().revokeRefreshTokens(String(uid));
+  }
+
+  await membroRef.delete();
 
   return { sucesso: true };
 });
