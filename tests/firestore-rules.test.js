@@ -36,7 +36,7 @@ function patchContextToNamedDatabase(context) {
   if (!app) throw new Error("RulesTestContext sem FirebaseApp para banco nomeado.");
   let db = namedFirestoreByApp.get(app);
   if (!db) {
-    const namedDb = getFirestore(app, DATABASE_ID);
+    const namedDb = initializeFirestore(app, {}, DATABASE_ID);
     connectFirestoreEmulator(namedDb, "127.0.0.1", 8080, {
       mockUserToken: context.authToken,
     });
