@@ -2347,6 +2347,68 @@ async function localizarLoteVoucher(firestoreDb, codigo, transaction) {
   return { loteDoc, lote, patrocinadorId };
 }
 
+async function executarCadastrarPatrocinadorSuperadmin(firestoreDb, authUid, authToken, payload) {
+  if (!authUid || authToken?.superadmin !== true) {
+    throw new functions.https.HttpsError('permission-denied', 'Somente SuperAdmin pode cadastrar patrocinadores.');
+  }
+
+  const dados = payload || {};
+  const nomeFantasia = String(dados.nomeFantasia || '').trim().slice(0, 120);
+  const razaoSocial = String(dados.razaoSocial || '').trim().slice(0, 160);
+  const cnpj = String(dados.cnpj || '').replace(/\\D/g, '');
+  const contatoNome = String(dados.contatoNome || '').trim().slice(0, 100);
+  const contatoEmail = String(dados.contatoEmail || '').trim().toLowerCase().slice(0, 160);
+  const contatoTelefone = String(dados.contatoTelefone || '').trim().slice(0, 40);
+  const contatoCargo = String(dados.contatoCargo || 'Gestor de Trade Marketing').trim().slice(0, 100);
+  const totalCotas = Number(dados.totalCotasContratadas);
+  const validadeMeses = Number(dados.validadeMeses || 6);
+
+  if (!nomeFantasia || !razaoSocial || !/^\\d{14}$/.test(cnpj) ||
+      !contatoNome || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(contatoEmail) ||
+      !contatoTelefone || !Number.isSafeInteger(totalCotas) || totalCotas < 1 || totalCotas > 10000 ||
+      !Number.isSafeInteger(validadeMeses) || validadeMeses < 1 || validadeMeses > 36) {
+    throw new functions.https.HttpsError('invalid-argument', 'Dados cadastrais, CNPJ, cotas ou validade do patrocinador são inválidos.');
+  }
+
+  const slug = nomeFantasia.toLowerCase().normalize('NFD')
+    .replace(/[\\u0300-\\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '').slice(0, 60);
+  if (!slug) throw new functions.https.HttpsError('invalid-argument', 'Nome fantasia não gera um identificador válido.');
+
+  const alfabeto = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const gerarToken = (tamanho) => Array.from(crypto.randomBytes(tamanho), (byte) => alfabeto[byte & 31]).join('');
+  const id = `spn-${slug}-${crypto.randomBytes(5).toString('hex')}`;
+  const chaveAcessoB2B = `SPN-${gerarToken(26)}`;
+  const codigoVoucherInicial = `MAYA-B2B-${crypto.randomBytes(12).toString('hex').toUpperCase()}`;
+  const patrocinadorRef = firestoreDb.collection('patrocinadores').doc(id);
+  const loteId = `lote-${codigoVoucherInicial.toLowerCase()}`;
+  const loteRef = patrocinadorRef.collection('lotes_licencas').doc(loteId);
+  const expiracao = adicionarMesesSemOverflow(new Date(), validadeMeses).toISOString();
+
+  await firestoreDb.runTransaction(async (tx) => {
+    tx.create(patrocinadorRef, {
+      id, cnpj, razaoSocial, nomeFantasia, slug, chaveAcessoB2B,
+      logoUrl: '/images/demo/coquetel.webp',
+      contatoResponsavel: { nome: contatoNome, email: contatoEmail, telefone: contatoTelefone, cargo: contatoCargo },
+      ativo: true, authVersion: 0,
+      criadoEm: admin.firestore.FieldValue.serverTimestamp(),
+      atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    tx.create(loteRef, {
+      id: loteId, patrocinadorId: id,
+      nome: `Lote Contratual - ${nomeFantasia} ${new Date().getFullYear()}`,
+      codigoCampanha: codigoVoucherInicial,
+      totalLicencas: totalCotas, licencasAtivadas: 0,
+      validadeMeses, dataExpiracao: expiracao,
+      ativo: true, restaurantesVinculados: [],
+      criadoEm: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  });
+
+  // A chave B2B e o voucher são devolvidos uma única vez nesta resposta administrativa.
+  return { id, chaveAcessoB2B, codigoVoucherInicial };
+}
+
 function criarClaimsSessaoPatrocinador(patrocinadorId, patrocinadorData) {
   const versao = Number(patrocinadorData?.authVersion || 0);
   if (!Number.isSafeInteger(versao) || versao < 0) {
@@ -4084,6 +4146,10 @@ async function executarDesativarMesa(firestoreDb, authUid, authToken, payload) {
   return resultado;
 }
 
+exports.cadastrarPatrocinadorSuperadminBackend = functions.https.onCall(async (data, context) => {
+  return executarCadastrarPatrocinadorSuperadmin(getDb(), context.auth?.uid, context.auth?.token, data);
+});
+
 exports.validarSessaoPatrocinadorBackend = functions.https.onCall(async (data, context) => {
   return executarValidarSessaoPatrocinador(getDb(), context.auth);
 });
@@ -4327,6 +4393,7 @@ exports._internal = {
   executarValidarCodigoAtivacao,
   executarValidarCodigoAtivacaoComRateLimit,
   executarAutenticarPatrocinador,
+  executarCadastrarPatrocinadorSuperadmin,
   criarClaimsSessaoPatrocinador,
   executarAtivarInstancia,
   executarAtivarPatrocinio,
