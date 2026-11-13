@@ -2878,11 +2878,13 @@ async function executarAtivarInstancia(firestoreDb, authUid, authToken, payload,
   };
 }
 
-async function executarAtivarPatrocinio(firestoreDb, authUid, token, payload) {
+async function executarAtivarPatrocinio(firestoreDb, authUid, token, payload, rawRequest) {
   if (!authUid) throw new functions.https.HttpsError('unauthenticated', 'Autenticação necessária.');
   const restauranteId = String(payload?.restauranteId || '').trim();
   const codigo = normalizarCodigoAtivacao(payload?.codigoVoucher);
   if (!restauranteId || !/^[A-Z0-9_-]{4,100}$/.test(codigo)) throw new functions.https.HttpsError('invalid-argument', 'Restaurante e voucher são obrigatórios.');
+  // A ativação direta do voucher também passa pelo mesmo limitador da validação pública.
+  await executarValidarCodigoAtivacaoComRateLimit(firestoreDb, { codigo }, rawRequest);
   const superadmin = token?.superadmin === true;
   const restRef = firestoreDb.collection('restaurantes').doc(restauranteId);
   let resultado = null;
@@ -3252,7 +3254,7 @@ exports.ativarInstanciaBackend = functions.https.onCall(async (data, context) =>
 });
 
 exports.ativarPatrocinioBackend = functions.https.onCall(async (data, context) => {
-  return executarAtivarPatrocinio(getDb(), context.auth?.uid, context.auth?.token, data);
+  return executarAtivarPatrocinio(getDb(), context.auth?.uid, context.auth?.token, data, context.rawRequest);
 });
 
 exports.chamarGarcomBackend = functions.https.onCall(async (data, context) => {
