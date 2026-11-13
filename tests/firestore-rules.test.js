@@ -820,6 +820,28 @@ async function runTests() {
     await assertFails(adminDb.doc("arquivo_morto_licencas/lic_2").delete());
   });
 
+  await test("Equipe: lojista não altera diretamente papel, PIN, crachá ou vínculo", async () => {
+    const ownerDb = testEnv.authenticatedContext("owner_a", {
+      role: "owner", restauranteId: "rest_a",
+    }).firestore();
+    const staffDb = testEnv.authenticatedContext("garcom_a", {
+      role: "garcom", restauranteId: "rest_a",
+    }).firestore();
+    const membro = ownerDb.doc("restaurantes/rest_a/equipe/garcom_a");
+    await assertFails(ownerDb.doc("restaurantes/rest_a/equipe/novo_uid").set({
+      uid: "novo_uid", role: "garcom", ativo: true, pinHash: "hash", pinSalt: "salt",
+    }));
+    await assertFails(membro.update({ role: "owner" }));
+    await assertFails(membro.update({ pinHash: "hash_falso", pinSalt: "salt_falso" }));
+    await assertFails(membro.delete());
+    await assertSucceeds(membro.update({
+      statusTurno: "pausa", turnoPausadoEm: Date.now(), atualizadoEm: Date.now(),
+    }));
+    await assertSucceeds(staffDb.doc("restaurantes/rest_a/equipe/garcom_a").update({
+      statusTurno: "em_servico", turnoIniciadoEm: Date.now(), atualizadoEm: Date.now(),
+    }));
+  });
+
   await test("Mesa: estado estrutural inativa só pode ser gravado pelo backend", async () => {
     const ownerDb = testEnv.authenticatedContext("owner_a", {
       role: "owner", restauranteId: "rest_a",
