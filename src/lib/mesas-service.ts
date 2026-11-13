@@ -1,5 +1,5 @@
 import { db, functions } from "@/lib/firebase";
-import { doc, setDoc, updateDoc, onSnapshot, collection, getDoc } from "firebase/firestore";
+import { doc, setDoc, onSnapshot, collection, getDoc } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 
 export interface ConfigMesa {
