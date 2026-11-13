@@ -167,13 +167,25 @@ async function main() {
     const secret = "segredo-webhook-teste";
     const dataId = "123456789";
     const requestId = "request-teste-001";
-    const ts = "1710000000";
+    const ts = String(Math.floor(Date.now() / 1000));
     const manifest = `id:${dataId};request-id:${requestId};ts:${ts};`;
     const v1 = crypto.createHmac("sha256", secret).update(manifest).digest("hex");
     const xSignature = `ts=${ts},v1=${v1}`;
     assert.strictEqual(validarAssinaturaMercadoPago({
       xSignature, xRequestId: requestId, dataId, secret,
     }), true);
+    const tsMs = String(Date.now());
+    const manifestMs = `id:${dataId};request-id:${requestId};ts:${tsMs};`;
+    const v1Ms = crypto.createHmac("sha256", secret).update(manifestMs).digest("hex");
+    assert.strictEqual(validarAssinaturaMercadoPago({
+      xSignature: `ts=${tsMs},v1=${v1Ms}`, xRequestId: requestId, dataId, secret,
+    }), true);
+    const tsAntigo = String(Math.floor(Date.now() / 1000) - 301);
+    const manifestAntigo = `id:${dataId};request-id:${requestId};ts:${tsAntigo};`;
+    const v1Antigo = crypto.createHmac("sha256", secret).update(manifestAntigo).digest("hex");
+    assert.strictEqual(validarAssinaturaMercadoPago({
+      xSignature: `ts=${tsAntigo},v1=${v1Antigo}`, xRequestId: requestId, dataId, secret,
+    }), false, "Assinatura válida criptograficamente, mas fora da tolerância temporal, deve ser rejeitada");
     assert.strictEqual(validarAssinaturaMercadoPago({
       xSignature, xRequestId: requestId, dataId: "987654321", secret,
     }), false);
@@ -218,7 +230,7 @@ async function main() {
     const attemptId = "123e4567-e89b-12d3-a456-426614174004";
     const paymentId = "987654326";
     const requestId = "request-webhook-004";
-    const ts = "1710000001";
+    const ts = String(Math.floor(Date.now() / 1000));
     const secret = "segredo-webhook-integracao";
     const dataId = paymentId;
     const manifest = `id:${dataId};request-id:${requestId};ts:${ts};`;
