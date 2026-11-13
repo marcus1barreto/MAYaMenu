@@ -1,0 +1,49 @@
+/**
+ * Migração pontual dos perfis públicos minimizados dos restaurantes já existentes.
+ * Executar após deploy de sincronizarPerfilPublicoRestaurante:
+ *   node functions/migrarPerfisPublicos.js
+ * Usa Application Default Credentials (firebase login:ci / GOOGLE_APPLICATION_CREDENTIALS).
+ */
+const admin = require("firebase-admin");
+
+if (!admin.apps.length) admin.initializeApp();
+const db = admin.firestore();
+
+async function main() {
+  let cursor = null;
+  let total = 0;
+  do {
+    let q = db.collection("restaurantes").orderBy(admin.firestore.FieldPath.documentId()).limit(400);
+    if (cursor) q = q.startAfter(cursor);
+    const snap = await q.get();
+    if (snap.empty) break;
+
+    const batch = db.batch();
+    for (const docSnap of snap.docs) {
+      const data = docSnap.data() || {};
+      const cfg = data.configuracoes || {};
+      const configuracoes = {};
+      for (const key of ["corPrimaria", "tema", "logoUrl", "capaUrl", "modoOperacao", "modoFilaKds", "taxaServico"]) {
+        if (cfg[key] !== undefined) configuracoes[key] = cfg[key];
+      }
+      batch.set(db.collection("restaurantes_publicos").doc(docSnap.id), {
+        restauranteId: docSnap.id,
+        slug: String(data.slug || docSnap.id),
+        nome: String(data.nome || "Restaurante"),
+        suspenso: data.suspenso === true || cfg.suspenso === true,
+        configuracoes,
+        atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    }
+    await batch.commit();
+    total += snap.size;
+    cursor = snap.docs[snap.docs.length - 1];
+    process.stdout.write(`Perfis sincronizados: ${total}\\n`);
+  } while (cursor);
+  process.stdout.write(`Migração concluída: ${total} restaurantes.\\n`);
+}
+
+main().catch((err) => {
+  console.error("Falha na migração de perfis públicos:", err);
+  process.exitCode = 1;
+});
