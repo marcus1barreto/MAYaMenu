@@ -29,10 +29,13 @@ export async function salvarConfigMesa(
 ): Promise<void> {
   if (!restauranteId || !numeroMesa) return;
   const mesaRef = doc(db, "restaurantes", restauranteId, "mesas", String(numeroMesa));
+  const atual = await getDoc(mesaRef);
+  const defaults = atual.exists() ? {} : { ativa: true, statusEstrutural: "livre" as const };
   await setDoc(
     mesaRef,
     {
       numero: numeroMesa,
+      ...defaults,
       ...dados,
       atualizadoEm: new Date().toISOString(),
     },
@@ -114,7 +117,8 @@ export async function alternarStatusLoteMesas(
     throw new Error("Uma ou mais mesas foram desativadas permanentemente. Reative-as individualmente pelo fluxo seguro de reemissão do QR Code.");
   }
   const atualizaveis = snapshots.filter(({ snap }) =>
-    !(snap.exists() && snap.data().statusEstrutural === "inativa")
+    !(snap.exists() && snap.data().statusEstrutural === "inativa") &&
+    (ativa || snap.exists())
   );
   await Promise.all(atualizaveis.map(({ num }) =>
     salvarConfigMesa(restauranteId, num, { ativa })
