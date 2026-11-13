@@ -14,7 +14,6 @@ import {
   onSnapshot,
   serverTimestamp,
   writeBatch,
-  deleteDoc,
   runTransaction,
   type Unsubscribe,
 } from "firebase/firestore";
