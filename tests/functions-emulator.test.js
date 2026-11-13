@@ -86,11 +86,14 @@ async function main() {
         quantidade: 2, precoFinal: 10, origemPatrocinadorId: "spn_bierhaus",
       }],
     });
-    const eventId = crypto.createHash("sha256").update("rest_e|13|cli_sellout").digest("hex");
     await executarFecharComanda(db, "garcom_e", {}, {
       ...base, mesa: 13, clienteId: "cli_sellout",
     });
-    const outbox = await rest.collection("_sellout_outbox").doc(eventId).get();
+    const outboxes = await rest.collection("_sellout_outbox")
+      .where("comandaId", "==", "cli_sellout").get();
+    assert.strictEqual(outboxes.size, 1);
+    const outbox = outboxes.docs[0];
+    const eventId = outbox.id;
     assert.strictEqual(outbox.exists, true);
     assert.strictEqual(outbox.data().itens[0].quantidade, 2);
     await executarProcessarSelloutOutbox(db, "rest_e", eventId);
