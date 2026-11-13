@@ -311,7 +311,13 @@ async function main() {
     const attemptId = "123e4567-e89b-12d3-a456-426614174001";
     const paymentId = "987654322";
     const restRef = db.doc("restaurantes/rest_mp_idempotente");
-    await restRef.set({ ownerId: "owner_mp_idempotente", plano: "free" });
+    const validadePatrocinio = new Date(Date.now() + 120 * 24 * 60 * 60 * 1000).toISOString();
+    await restRef.set({
+      ownerId: "owner_mp_idempotente",
+      plano: "pro",
+      assinatura: { planoId: "pro_mensal", dataExpiracao: new Date(Date.now() - 86400000).toISOString() },
+      patrocinio: { ativo: true, dataExpiracao: validadePatrocinio },
+    });
     await db.doc(`pagamentos_pro/${attemptId}`).set({
       attemptId,
       ownerUid: "owner_mp_idempotente",
@@ -348,6 +354,10 @@ async function main() {
     const ledger = await db.doc(`pagamentos_pro_processados/${paymentId}`).get();
     assert.strictEqual(rest.data().plano, "pro");
     assert.strictEqual(rest.data().assinatura.paymentId, paymentId);
+    assert.ok(
+      Date.parse(rest.data().assinatura.dataExpiracao) > Date.parse(validadePatrocinio),
+      "Pagamento PRO deve estender a partir da validade patrocinada ainda vigente"
+    );
     assert.strictEqual(attempt.data().status, "approved");
     assert.strictEqual(ledger.exists, true);
   });
@@ -1081,7 +1091,16 @@ async function main() {
 
   await runTest("Emulador: patrocínios adicionais respeitam titularidade, quota e bloqueio de categoria", async () => {
     const restRef = db.doc("restaurantes/owner_multi_b2b");
-    await restRef.set({ ownerId: "owner_multi_b2b", nome: "Restaurante Multi", slug: "multi-b2b", plano: "free" });
+    const validadePagaAnterior = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString();
+    const validadePatrocinioAnterior = new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString();
+    await restRef.set({
+      ownerId: "owner_multi_b2b", nome: "Restaurante Multi", slug: "multi-b2b", plano: "pro",
+      assinatura: {
+        planoId: "pro_semestral", paymentId: "payment_paid_before_b2b",
+        dataExpiracao: validadePagaAnterior,
+      },
+      patrocinio: { ativo: true, dataExpiracao: validadePatrocinioAnterior, slots: [] },
+    });
     const patA = db.doc("patrocinadores/spn_multi_a");
     const patB = db.doc("patrocinadores/spn_multi_b");
     await patA.set({ nomeFantasia: "Marca A", ativo: true });
@@ -1117,6 +1136,16 @@ async function main() {
       restauranteId: restRef.id, codigoVoucher: "VOUCHER-MULTI-A",
     });
     assert.strictEqual(primeiro.sucesso, true);
+    const restauranteAposB2B = (await restRef.get()).data();
+    assert.ok(
+      Date.parse(restauranteAposB2B.assinatura.dataExpiracao) > Date.parse(validadePagaAnterior),
+      "Ativação B2B deve estender a partir da maior validade PRO paga ainda vigente"
+    );
+    assert.strictEqual(
+      restauranteAposB2B.patrocinio.assinaturaAnterior.paymentId,
+      "payment_paid_before_b2b",
+      "A assinatura paga anterior deve ser preservada para auditoria"
+    );
     assert.strictEqual(_internal.normalizarCategoriaPatrocinio(" ÁLIMENTOS  "), "alimentos");
     await assert.rejects(() => executarAtivarPatrocinio(db, "owner_multi_b2b", {}, {
       restauranteId: restRef.id, codigoVoucher: "VOUCHER-MULTI-B",
