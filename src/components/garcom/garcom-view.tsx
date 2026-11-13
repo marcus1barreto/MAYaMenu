@@ -838,24 +838,6 @@ export function GarcomView({
         })),
       });
 
-      const novaComanda: ComandaGarcom = {
-        id: ticket.c.id,
-        nomeCliente: ticket.c.n,
-        subtotal: pedidoConfirmado.subtotal,
-        status: "aguardando_pratos",
-        itens: ticket.i.map((it) => ({
-          nome: `Item (${it.id})`,
-          quantidade: it.q,
-          precoFinal: ticket.tot !== undefined ? ticket.tot / (ticket.i.length || 1) : 0,
-          modificadores: it.m?.map(([g, o]) => ({ grupo: g, opcao: o })),
-        })),
-      };
-      setMesas((prev) =>
-        prev.map((m) => m.numero === mesaNum
-          ? { ...m, status: "ocupada", comandas: [...m.comandas.filter((c) => c.id !== novaComanda.id), novaComanda] }
-          : m
-        )
-      );
       setFeedbackInjecao(`Pedido de ${ticket.c.n} registrado na Mesa ${mesaNum}. Total validado: ${pedidoConfirmado.subtotal.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}.`);
     } catch (err) {
       console.error("Falha ao registrar pedido de contingência no backend:", err);
