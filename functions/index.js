@@ -2317,7 +2317,9 @@ function validarDisponibilidadeAtivacao(dados, codigo) {
 async function localizarLoteVoucher(firestoreDb, codigo, transaction) {
   const queryLotes = firestoreDb.collectionGroup('lotes_licencas').where('codigoCampanha', '==', codigo);
   const snap = transaction ? await transaction.get(queryLotes) : await queryLotes.get();
-  const candidatos = snap.docs.filter((d) => d.data()?.ativo !== false);
+  // Inclui lotes inativos na checagem de unicidade: um código duplicado não pode
+  // ser reutilizado por outro lote apenas porque o registro original foi desativado.
+  const candidatos = snap.docs;
   if (candidatos.length === 0) return null;
   if (candidatos.length !== 1) {
     throw new functions.https.HttpsError('failed-precondition', 'Código de campanha ambíguo. Contate a administração.');
