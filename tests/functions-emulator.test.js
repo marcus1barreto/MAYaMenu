@@ -1037,7 +1037,7 @@ async function main() {
     });
     // A segunda marca conflita com a categoria secundária da primeira, não com a principal.
     await patB.collection("catalogo_master").doc("b1").set({
-      id: "b1", nome: "Item B", categoriaSugerida: "alimentos", precoSugerido: 6,
+      id: "b1", nome: "Item B", categoriaSugerida: "Álimentos", precoSugerido: 6,
       obrigatorioNoCardapio: true,
     });
     for (const [pat, lote, codigo] of [
@@ -1058,6 +1058,7 @@ async function main() {
       restauranteId: restRef.id, codigoVoucher: "VOUCHER-MULTI-A",
     });
     assert.strictEqual(primeiro.sucesso, true);
+    assert.strictEqual(_internal.normalizarCategoriaPatrocinio(" ÁLIMENTOS  "), "alimentos");
     await assert.rejects(() => executarAtivarPatrocinio(db, "owner_multi_b2b", {}, {
       restauranteId: restRef.id, codigoVoucher: "VOUCHER-MULTI-B",
     }), /categoria/i);
