@@ -4,11 +4,15 @@
  * Executado via `firebase emulators:exec` (ver script "test" do package.json).
  */
 const assert = require("assert");
+const { createRequire } = require("module");
+
+// Resolve os módulos a partir de functions/ respeitando os exports públicos do pacote.
+const requireFunctions = createRequire(require.resolve("../functions/package.json"));
 
 process.env.MESA_SESSION_SECRET = "segredo-super-forte-de-teste-mayamenu-32bytes-ok";
 
-const admin = require("../functions/node_modules/firebase-admin");
-const { getFirestore } = require("../functions/node_modules/firebase-admin/firestore");
+const admin = requireFunctions("firebase-admin");
+const { getFirestore } = requireFunctions("firebase-admin/firestore");
 const { _internal } = require("../functions/index.js");
 const {
   executarFecharComanda, executarLiberarMesa, executarDefinirTaxaServicoMesa,
