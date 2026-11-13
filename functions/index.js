@@ -2270,7 +2270,7 @@ async function executarAutenticarPatrocinador(firestoreDb, payload, rawRequest) 
     }
 
     const atual = sponsorSnap?.exists ? (sponsorSnap.data() || {}) : null;
-    const chaveValida = Boolean(atual && atual.ativo !== false && atual.chaveAcessoB2B === chave);
+    const chaveValida = Boolean(atual && atual.ativo === true && atual.chaveAcessoB2B === chave);
     if (!chaveValida) {
       const payloads = calcularPayloadsFalha({
         curIpData: ipSnap.exists ? ipSnap.data() : {},
