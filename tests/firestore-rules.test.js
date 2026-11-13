@@ -192,8 +192,8 @@ async function runTests() {
     await db.doc("restaurantes/rest_a/cardapio/item_normal").set({
       id: "item_normal", nome: "Item normal", precoBase: 10, ativo: true,
     });
-    await db.doc("restaurantes/rest_a/cardapio/spn_item").set({
-      id: "spn_item", nome: "Produto patrocinado", precoBase: 12, ativo: true,
+    await db.doc("restaurantes/rest_a/cardapio/spn-item").set({
+      id: "spn-item", nome: "Produto patrocinado", precoBase: 12, ativo: true,
       origemPatrocinadorId: "pat_a", patrocinioId: "lote_a", idMaster: "master_1",
       bloqueadoParaExclusao: true, posicaoFixaTopo: true, seloPatrocinador: "Parceiro Oficial",
     });
@@ -320,16 +320,16 @@ async function runTests() {
       id: "item_falso", nome: "Falso patrocinado", precoBase: 1,
       origemPatrocinadorId: "pat_a", bloqueadoParaExclusao: true,
     }));
-    await assertFails(ownerDb.doc("restaurantes/rest_a/cardapio/spn_falso").set({
-      id: "spn_falso", nome: "Produto com prefixo reservado", precoBase: 1,
+    await assertFails(ownerDb.doc("restaurantes/rest_a/cardapio/spn-falso").set({
+      id: "spn-falso", nome: "Produto com prefixo reservado", precoBase: 1,
     }));
-    await assertFails(ownerDb.doc("restaurantes/rest_a/cardapio/spn_item").update({
+    await assertFails(ownerDb.doc("restaurantes/rest_a/cardapio/spn-item").update({
       origemPatrocinadorId: "pat_b",
     }));
-    await assertFails(ownerDb.doc("restaurantes/rest_a/cardapio/spn_item").update({
+    await assertFails(ownerDb.doc("restaurantes/rest_a/cardapio/spn-item").update({
       bloqueadoParaExclusao: false,
     }));
-    await assertFails(ownerDb.doc("restaurantes/rest_a/cardapio/spn_item").delete());
+    await assertFails(ownerDb.doc("restaurantes/rest_a/cardapio/spn-item").delete());
   });
 
   await test("B2B: documentos contratuais são privados e a sessão sponsor acessa somente seu tenant", async () => {
