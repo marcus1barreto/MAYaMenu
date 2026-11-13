@@ -1100,6 +1100,32 @@ async function main() {
     assert.strictEqual(perfilFinal.data().nome, "Nome novo");
   });
 
+  await runTest("Emulador: emissão inicial e rotação de QR só retornam segredo uma vez", async () => {
+    const { rest } = await seed(db, 11, "cli_qr_setup");
+    await rest.collection("mesas").doc("11").set({
+      numero: 11, ativa: true, statusEstrutural: "livre", qrVersao: 0,
+    }, { merge: true });
+    const primeira = await executarGarantirCredencialMesa(db, "owner_e", {}, { ...base, mesa: 11 });
+    assert.strictEqual(primeira.jaConfigurada, false);
+    assert.strictEqual(primeira.qrCredencial.length, 48);
+    assert.strictEqual(primeira.qrVersao, 1);
+    const mesa = await rest.collection("mesas").doc("11").get();
+    assert.strictEqual(mesa.data().qrCredencial, undefined);
+    assert.strictEqual(
+      mesa.data().qrCredencialHash,
+      crypto.createHash("sha256").update(primeira.qrCredencial).digest("hex")
+    );
+    const repetida = await executarGarantirCredencialMesa(db, "owner_e", {}, { ...base, mesa: 11 });
+    assert.strictEqual(repetida.jaConfigurada, true);
+    assert.strictEqual(repetida.qrCredencial, undefined);
+    const rotacionada = await executarGarantirCredencialMesa(db, "owner_e", {}, {
+      ...base, mesa: 11, rotacionar: true,
+    });
+    assert.strictEqual(rotacionada.jaConfigurada, false);
+    assert.strictEqual(rotacionada.qrVersao, 2);
+    assert.notStrictEqual(rotacionada.qrCredencial, primeira.qrCredencial);
+  });
+
   await runTest("Emulador: mesa estruturalmente inativa não emite QR nem inicia sessão", async () => {
     const { rest } = await seed(db, 10, "cli_mesa_inativa");
     const qr = "qr-credencial-mesa-inativa-123456";
