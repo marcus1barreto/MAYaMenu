@@ -811,10 +811,6 @@ export function GarcomView({
   // Injetar pedido resgatado pelo leitor de QR de contingência diretamente no Firestore (MAYa Sync-QR)
   const handleTicketLido = async (ticket: TicketPayload) => {
     const mesaNum = Number(ticket.t) || 1;
-    // Se o ticket já possuir o total consolidado (MAYa Sync-QR), utiliza o valor exato
-    const subtotalCalculado =
-      ticket.tot !== undefined ? ticket.tot : ticket.i.reduce((acc, it) => acc + it.q * 30, 0);
-
     if (!restauranteId) {
       setFeedbackInjecao("Não foi possível identificar o restaurante para registrar o pedido.");
       return;
@@ -828,11 +824,9 @@ export function GarcomView({
         mesa: mesaNum,
         clienteId: ticket.c.id,
         nomeCliente: ticket.c.n,
-        subtotal: subtotalCalculado,
         itens: ticket.i.map((it) => ({
           menuItemId: it.id,
           quantidade: it.q,
-          precoFinal: 0, // Ignorado pelo backend; preços são recalculados do cardápio.
           modificadores: it.m?.map(([g, o]) => ({ grupo: g, opcao: o })),
           observacoes: it.o,
         })),
