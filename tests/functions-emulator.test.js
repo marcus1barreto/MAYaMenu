@@ -316,6 +316,16 @@ async function main() {
       () => executarValidarCodigoAtivacao(db, { codigo: "VOUCHER-LOTE-INATIVO" }),
       /lote de patrocínio está inativo/i
     );
+    await pat.collection("lotes_licencas").doc("lote-duplicado").set({
+      id: "lote-duplicado", patrocinadorId: pat.id, nome: "Lote Duplicado",
+      codigoCampanha: "VOUCHER-LOTE-INATIVO", totalLicencas: 5,
+      licencasAtivadas: 0, validadeMeses: 6, ativo: true,
+      restaurantesVinculados: [],
+    });
+    await assert.rejects(
+      () => executarValidarCodigoAtivacao(db, { codigo: "VOUCHER-LOTE-INATIVO" }),
+      /código de campanha ambíguo/i
+    );
   });
 
   await runTest("Emulador: voucher B2B ativa PRO, injeta catálogo e consome uma única cota", async () => {
