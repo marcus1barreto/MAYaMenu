@@ -3108,7 +3108,10 @@ async function executarDesativarMesa(firestoreDb, authUid, authToken, payload) {
     }
     const mData = mesaSnap.data() || {};
 
-    const comandasSnap = await t.get(mesaRef.collection('comandas_abertas'));
+    const comandasSnap = await t.get(mesaRef.collection('comandas_abertas').limit(501));
+    if (comandasSnap.size > 500) {
+      throw new functions.https.HttpsError('failed-precondition', 'Mesa excede o limite seguro de comandas para desativação; regularize o histórico primeiro.');
+    }
     const temComandaAtiva = comandasSnap.docs.some((d) => {
       const c = d.data() || {};
       return c.status !== 'pago' && c.arquivada !== true;
@@ -3126,15 +3129,22 @@ async function executarDesativarMesa(firestoreDb, authUid, authToken, payload) {
     const consultasKds = [];
     for (const campo of ['mesa', 'numeroMesa']) {
       for (const valor of valoresMesa) {
-        consultasKds.push(t.get(restDoc.ref.collection('kds_tickets').where(campo, '==', valor)));
+        consultasKds.push(t.get(
+          restDoc.ref.collection('kds_tickets').where(campo, '==', valor).limit(501)
+        ));
       }
     }
     const resultadosKds = await Promise.all(consultasKds);
+    if (resultadosKds.some((snap) => snap.size > 500)) {
+      throw new functions.https.HttpsError('failed-precondition', 'Mesa excede o limite seguro de tickets KDS para desativação; regularize o histórico primeiro.');
+    }
     const ticketsUnicos = new Map();
     resultadosKds.forEach((snap) => snap.docs.forEach((d) => ticketsUnicos.set(d.id, d)));
     const temTicketAtivo = Array.from(ticketsUnicos.values()).some((d) => {
-      const statusTicket = (d.data() || {}).status;
-      return ['a_fazer', 'em_preparo', 'pronto'].includes(statusTicket);
+      const statusTicket = String((d.data() || {}).status || '').toLowerCase();
+      // Só estados terminais conhecidos são ignorados. Status ausente/desconhecido bloqueia
+      // a desativação por segurança, evitando deixar ticket órfão na cozinha.
+      return !['entregue', 'cancelado', 'estornado'].includes(statusTicket);
     });
     if (temTicketAtivo) {
       throw new functions.https.HttpsError(
