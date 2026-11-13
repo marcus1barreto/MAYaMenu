@@ -185,7 +185,7 @@ export function B2BLotesView({ lotes }: B2BLotesViewProps) {
                   <div className="truncate">
                     <span className="text-[10px] uppercase font-bold text-neutral-400 block">Link de Convite Direto</span>
                     <span className="text-xs font-mono text-neutral-700 truncate block font-semibold">
-                      ?voucher={lote.codigoCampanha}
+                      /ativar/{lote.codigoCampanha}
                     </span>
                   </div>
 
