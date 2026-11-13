@@ -550,7 +550,8 @@ async function main() {
 
     // Rotação de credencial QR revoga imediatamente sessões emitidas na versão anterior
     const tokenAntigo = await emitirToken(db, "anon_rot", "rest_1", 4);
-    await executarGarantirCredencialMesa(db, "garcom_1", {}, {
+    // Emissão/rotação de QR é ação privilegiada: somente titular ou admin.
+    await executarGarantirCredencialMesa(db, "owner_1", {}, {
       restauranteId: "rest_1",
       mesa: 4,
       rotacionar: true,
@@ -701,7 +702,7 @@ async function main() {
     assert.strictEqual(comanda.subtotal, 25.8);
 
     // Garante que garantirCredencialMesa não devolve texto claro após já configurada sem rotacionar
-    const jaCfg = await executarGarantirCredencialMesa(db, "garcom_1", {}, { restauranteId: "rest_1", mesa: 3 });
+    const jaCfg = await executarGarantirCredencialMesa(db, "owner_1", {}, { restauranteId: "rest_1", mesa: 3 });
     assert.strictEqual(jaCfg.jaConfigurada, true);
     assert.strictEqual(jaCfg.qrCredencial, undefined);
   });
