@@ -125,14 +125,6 @@ exports.setStaffRole = functions.https.onCall(async (data, context) => {
   }
 
   if (!restDoc.exists) {
-    const defaultDb = admin.firestore();
-    const tryDefault = await defaultDb.collection('restaurantes').doc(restauranteId).get();
-    if (tryDefault.exists) {
-      restDoc = tryDefault;
-    }
-  }
-
-  if (!restDoc.exists) {
     throw new functions.https.HttpsError('not-found', 'Restaurante não encontrado.');
   }
 
@@ -269,10 +261,6 @@ exports.removeStaffMember = functions.https.onCall(async (data, context) => {
     if (!q.empty) {
       restDoc = q.docs[0];
     }
-  }
-  if (!restDoc.exists) {
-    const tryDefault = await admin.firestore().collection('restaurantes').doc(restauranteId).get();
-    if (tryDefault.exists) restDoc = tryDefault;
   }
   if (!restDoc.exists) {
     throw new functions.https.HttpsError('not-found', 'Restaurante não encontrado.');
