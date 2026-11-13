@@ -419,6 +419,31 @@ async function main() {
     assert.strictEqual(snap.data().pagoEm, undefined);
   });
 
+  await runTest("Emulador: espelho público ignora eventos antigos e filtra dados Pix", async () => {
+    const restauranteId = "rest_public_version";
+    const perfilAntigo = {
+      slug: "public-version", nome: "Nome antigo",
+      configuracoes: { pixConfig: { ativo: true, tipoChave: "api_token", chave: "segredo-interno" } },
+    };
+    const perfilNovo = {
+      slug: "public-version", nome: "Nome novo",
+      configuracoes: { pixConfig: { ativo: true, tipoChave: "cpf", chave: "12345678900" } },
+    };
+    const montar = _internal.montarPerfilPublicoRestaurante;
+    const publicoInvalido = montar(restauranteId, perfilAntigo);
+    assert.strictEqual(publicoInvalido.configuracoes.pixConfig, undefined);
+    const publicoValido = montar(restauranteId, perfilNovo);
+    assert.strictEqual(publicoValido.configuracoes.pixConfig.tipoChave, "cpf");
+    assert.strictEqual(publicoValido.configuracoes.pixConfig.chave, "12345678900");
+
+    await _internal.executarSincronizarPerfilPublicoRestaurante(db, restauranteId, perfilAntigo, "2026-11-01T00:00:00.000Z");
+    await _internal.executarSincronizarPerfilPublicoRestaurante(db, restauranteId, perfilNovo, "2026-11-02T00:00:00.000Z");
+    await _internal.executarSincronizarPerfilPublicoRestaurante(db, restauranteId, perfilAntigo, "2026-11-01T00:00:00.000Z");
+    await _internal.executarSincronizarPerfilPublicoRestaurante(db, restauranteId, null, "2026-11-01T12:00:00.000Z");
+    const perfilFinal = await db.doc(`restaurantes_publicos/${restauranteId}`).get();
+    assert.strictEqual(perfilFinal.data().nome, "Nome novo");
+  });
+
   await runTest("Emulador: mesa estruturalmente inativa não emite QR nem inicia sessão", async () => {
     const { rest } = await seed(db, 10, "cli_mesa_inativa");
     const qr = "qr-credencial-mesa-inativa-123456";
