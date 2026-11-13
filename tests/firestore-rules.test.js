@@ -112,6 +112,12 @@ async function runTests() {
       ativa: true,
       statusEstrutural: "livre",
     });
+    await db.doc("restaurantes/rest_a/mesas/99").set({
+      numero: 99,
+      ativa: false,
+      statusEstrutural: "inativa",
+      qrVersao: 2,
+    });
 
     // Comanda aberta no Restaurante A para cliente_1
     await db.doc("restaurantes/rest_a/mesas/1/comandas_abertas/cliente_1").set({
@@ -254,6 +260,20 @@ async function runTests() {
     await assertFails(ownerDb.doc("pagamentos_pro/tentativa_privada").set({ status: "approved" }));
     await assertFails(ownerDb.doc("pagamentos_pro_processados/123456789").get());
     await assertFails(ownerDb.doc("pagamentos_pro_rate_limits/owner_a").set({ tentativas: 0 }));
+  });
+
+  await test("Mesas: equipe não pode reativar diretamente uma mesa desativada", async () => {
+    const ownerDb = testEnv.authenticatedContext("owner_a", {
+      role: "owner", restauranteId: "rest_a",
+    }).firestore();
+    const garcomDb = testEnv.authenticatedContext("garcom_a", {
+      role: "garcom", restauranteId: "rest_a",
+    }).firestore();
+    const superadminDb = testEnv.authenticatedContext("admin_uid", { superadmin: true }).firestore();
+    const mesaRef = "restaurantes/rest_a/mesas/99";
+    await assertFails(ownerDb.doc(mesaRef).update({ ativa: true, statusEstrutural: "livre" }));
+    await assertFails(garcomDb.doc(mesaRef).update({ ativa: true, statusEstrutural: "livre" }));
+    await assertSucceeds(superadminDb.doc(mesaRef).update({ ativa: true, statusEstrutural: "livre" }));
   });
 
   await test("Cardápio: lojista não pode forjar, editar ou excluir itens patrocinados", async () => {
