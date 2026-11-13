@@ -2371,8 +2371,8 @@ async function executarValidarCodigoAtivacao(firestoreDb, payload) {
         status: dados.status || 'disponivel',
         plano: dados.plano || 'free',
         limites: dados.limites || null,
-        responsavel: dados.responsavel || '',
-        notas: dados.notas || '',
+        // "notas" é campo administrativo interno e nunca integra a resposta pública.
+        responsavel: String(dados.responsavel || '').slice(0, 120),
         expiracaoEm: millisDataAtivacao(dados.expiracaoEm || dados.dataExpiracao) !== null
           ? new Date(millisDataAtivacao(dados.expiracaoEm || dados.dataExpiracao)).toISOString()
           : null,
