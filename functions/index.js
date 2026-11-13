@@ -556,7 +556,9 @@ exports.atualizarPinColaborador = functions.https.onCall(async (data, context) =
   }
 
   const { restauranteId, membroUid, novoPin } = data || {};
-  if (!restauranteId || !membroUid || !novoPin) {
+  if (typeof restauranteId !== 'string' || !restauranteId.trim() || restauranteId.length > 128 ||
+      typeof membroUid !== 'string' || !membroUid.trim() || membroUid.length > 128 || membroUid.includes('/') ||
+      typeof novoPin !== 'string') {
     throw new functions.https.HttpsError('invalid-argument', 'Campos restauranteId, membroUid e novoPin são obrigatórios.');
   }
 
@@ -586,18 +588,22 @@ exports.atualizarPinColaborador = functions.https.onCall(async (data, context) =
     throw new functions.https.HttpsError('permission-denied', 'Apenas o dono deste restaurante ou superadmin pode alterar o PIN.');
   }
 
-  // Gera hash e salt criptográfico seguro (elimina texto puro)
-  const { hash: pinHash, salt: pinSalt } = hashPin(pinLimpo);
+  const membroRef = restDoc.ref.collection('equipe').doc(membroUid);
+  const membroSnap = await membroRef.get();
+  const membroData = membroSnap.exists ? (membroSnap.data() || {}) : {};
+  if (!membroSnap.exists || membroData.uid !== membroUid ||
+      membroData.ativo === false || !['garcom', 'cozinha'].includes(membroData.role)) {
+    throw new functions.https.HttpsError('not-found', 'Colaborador ativo não encontrado neste restaurante.');
+  }
 
-  await restDoc.ref.collection('equipe').doc(membroUid).set(
-    {
-      pinHash,
-      pinSalt,
-      pin: admin.firestore.FieldValue.delete(), // remove campo legado em texto puro se existir
-      atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
-    },
-    { merge: true }
-  );
+  // Gera hash e salt criptográfico seguro (elimina texto puro).
+  const { hash: pinHash, salt: pinSalt } = hashPin(pinLimpo);
+  await membroRef.update({
+    pinHash,
+    pinSalt,
+    pin: admin.firestore.FieldValue.delete(), // remove campo legado em texto puro se existir
+    atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
+  });
 
   // Retorna status sem refletir o PIN em texto claro na resposta
   return { sucesso: true };
