@@ -330,9 +330,14 @@ exports.loginComCracha = functions.https.onCall(async (data, context) => {
 
   const membroDoc = equipeSnap.docs[0];
   const membroData = membroDoc.data();
+  if (membroData.ativo === false ||
+      membroData.uid !== membroDoc.id ||
+      !['garcom', 'cozinha'].includes(membroData.role)) {
+    throw new functions.https.HttpsError('permission-denied', 'Crachá revogado ou colaborador inativo.');
+  }
 
-  // Gera um custom token do Firebase Auth para o cliente logar instantaneamente
-  const customToken = await admin.auth().createCustomToken(membroData.uid, {
+  // Gera um custom token somente com papel persistido e validado no tenant.
+  const customToken = await admin.auth().createCustomToken(membroDoc.id, {
     role: membroData.role,
     restauranteId: restDoc.id,
   });
@@ -355,7 +360,7 @@ exports.loginComCracha = functions.https.onCall(async (data, context) => {
  * e validação estrita exclusiva de hash scrypt + salt (rejeita texto puro).
  */
 exports.loginComPin = functions.https.onCall(async (data, context) => {
-  const { restauranteId, pin, role, colaboradorId } = data || {};
+  const { restauranteId, pin, colaboradorId } = data || {};
   if (!restauranteId || !pin || !colaboradorId) {
     throw new functions.https.HttpsError(
       'invalid-argument',
@@ -387,9 +392,18 @@ exports.loginComPin = functions.https.onCall(async (data, context) => {
   const globalRestRateLimitRef = restDoc.ref.collection('_pin_rate_limits').doc('tenant_global');
 
   // 2. Busca os dados do colaborador para validação do hash scrypt + salt
-  const memDoc = await restDoc.ref.collection('equipe').doc(colaboradorId).get();
+  const memDoc = await restDoc.ref.collection('equipe').doc(String(colaboradorId)).get();
   const mData = memDoc.exists ? (memDoc.data() || {}) : {};
-  const pinCorreto = Boolean(mData.pinHash && mData.pinSalt && verifyPin(pinLimpo, mData.pinHash, mData.pinSalt));
+  const membroElegivel = memDoc.exists
+    && mData.ativo !== false
+    && mData.uid === memDoc.id
+    && ['garcom', 'cozinha'].includes(mData.role);
+  const pinCorreto = Boolean(
+    membroElegivel
+    && typeof mData.pinHash === 'string'
+    && typeof mData.pinSalt === 'string'
+    && verifyPin(pinLimpo, mData.pinHash, mData.pinSalt)
+  );
 
   // 3. EXECUÇÃO ATÔMICA COORDENADA: Verificação de Admissão e Atualização de Bloqueio dentro da Transação
   // Impede que rajadas simultâneas contornem o limite antes que o bloqueio seja percebido
@@ -440,8 +454,8 @@ exports.loginComPin = functions.https.onCall(async (data, context) => {
   }
 
   // 4. Se o login foi bem-sucedido: extrai dados e emite token
-  const targetUid = mData.uid || memDoc.id;
-  const targetRole = mData.role || (role || 'garcom');
+  const targetUid = memDoc.id;
+  const targetRole = mData.role;
   const targetNome = mData.nome || 'Colaborador';
   const targetFoto = mData.fotoUrl || null;
 
@@ -493,6 +507,7 @@ exports.listarEquipePublica = functions.https.onCall(async (data, context) => {
 
   snap.forEach((d) => {
     const m = d.data() || {};
+    if (m.ativo === false || !['garcom', 'cozinha'].includes(m.role) || m.uid !== d.id) return;
     membros.push({
       id: d.id,
       uid: m.uid || d.id,
