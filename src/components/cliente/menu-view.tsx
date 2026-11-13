@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import type { MenuItem, Restaurante, ComandaCliente } from "@/types";
 import { useCart } from "@/context/cart-context";
@@ -38,16 +38,71 @@ import { doc, updateDoc, serverTimestamp, onSnapshot } from "firebase/firestore"
 import { escutarCardapio, escutarRestaurante, chamarGarcomFirestore, escutarPedidosCliente } from "@/lib/restaurante-service";
 import { marcarVisitaAtualComoPaga, limparSessaoClienteLocal } from "@/lib/historico-cliente";
 import { MesaScannerModal } from "./mesa-scanner-modal";
+import cartStorage from "@/lib/cart-storage.cjs";
+
+const { obterQrCredencialInicial } = cartStorage;
 
 interface MenuViewProps {
   restaurante: Restaurante;
   cardapio: MenuItem[];
   numeroMesa?: number | string;
+  qrCredencial?: string;
 }
 
-export function MenuView({ restaurante: restauranteInicial, cardapio: cardapioInicial, numeroMesa: numeroMesaProp = 1 }: MenuViewProps) {
+export function MenuView({
+  restaurante: restauranteInicial,
+  cardapio: cardapioInicial,
+  numeroMesa: numeroMesaProp = 1,
+  qrCredencial: qrCredencialInicial,
+}: MenuViewProps) {
   const { totalItens, subtotal, nomeCliente, limparCarrinho, mesa, setMesa } = useCart();
   const numeroMesa = mesa || numeroMesaProp;
+  const [qrCredencialAtiva, setQrCredencialAtiva] = useState<string | undefined>(() => qrCredencialInicial);
+  const qrInicialConsumidaRef = useRef(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const storageKey = `mayamenu_qr_${restauranteInicial.id}_mesa_${String(numeroMesa)}`;
+    // A credencial inicial da URL só pode ser aplicada à mesa inicial.
+    // Trocas internas usam a credencial persistida para a mesa recém-escaneada.
+    // A credencial da URL é consumida uma única vez; voltar à mesa inicial
+    // não pode reaplicar um QR antigo sobre uma credencial recém-escaneada.
+    const permitirQrInicial = !qrInicialConsumidaRef.current;
+    qrInicialConsumidaRef.current = true;
+    const qrDetectada = obterQrCredencialInicial(
+      numeroMesa,
+      numeroMesaProp,
+      qrCredencialInicial,
+      window.location.hash || "",
+      permitirQrInicial
+    );
+
+    if (qrDetectada) {
+      setQrCredencialAtiva(qrDetectada);
+      try {
+        sessionStorage.setItem(storageKey, qrDetectada);
+        // Remove credencial bearer da barra de endereços (query ou fragmento) para evitar exposição
+        const urlAtual = new URL(window.location.href);
+        const tinhaQueryQr = urlAtual.searchParams.has("qr");
+        const tinhaHashQr = urlAtual.hash.includes("qr=");
+        if (tinhaQueryQr) urlAtual.searchParams.delete("qr");
+        if (tinhaHashQr) urlAtual.hash = "";
+        if (tinhaQueryQr || tinhaHashQr) {
+          window.history.replaceState(null, "", urlAtual.pathname + urlAtual.search);
+        }
+      } catch {
+        // Ignora
+      }
+      return;
+    }
+    try {
+      const salva = sessionStorage.getItem(storageKey);
+      // Não manter a credencial da mesa anterior quando a nova mesa não tem QR salvo.
+      setQrCredencialAtiva(salva || undefined);
+    } catch {
+      setQrCredencialAtiva(undefined);
+    }
+  }, [qrCredencialInicial, restauranteInicial.id, numeroMesa]);
   const [restaurante, setRestaurante] = useState<Restaurante>(restauranteInicial);
   const [cardapio, setCardapio] = useState<MenuItem[]>(cardapioInicial);
   const [itemSelecionado, setItemSelecionado] = useState<MenuItem | null>(null);
@@ -284,14 +339,15 @@ export function MenuView({ restaurante: restauranteInicial, cardapio: cardapioIn
         clienteId: finalUid,
         nomeCliente: nomeCliente || "Cliente",
         motivo: "Atendimento no Salão",
+        qrCredencial: qrCredencialAtiva || "",
       });
 
       setGarcomChamadoSucesso(true);
       setSegundosCooldown(120); // 2 minutos de cooldown anti-flooding
     } catch (err) {
-      console.warn("Falha ao registrar chamado do garçom online, ativando cooldown local:", err);
-      setGarcomChamadoSucesso(true);
-      setSegundosCooldown(120);
+      console.warn("Falha ao registrar chamado do garçom:", err);
+      setGarcomChamadoSucesso(false);
+      setSegundosCooldown(0);
     } finally {
       setChamandoGarcom(false);
     }
@@ -336,9 +392,10 @@ export function MenuView({ restaurante: restauranteInicial, cardapio: cardapioIn
       await updateDoc(comandaRef, dadosUpdate);
       setContaPedidaSucesso(true);
     } catch (e) {
-      console.warn("Conta pedida localmente ou offline:", e);
-      // Mesmo com fallback de rede, registra feedback de sucesso visual ao cliente
-      setContaPedidaSucesso(true);
+      console.warn("Falha ao enviar solicitação de conta:", e);
+      // Não sinaliza sucesso quando o Firestore rejeita a solicitação.
+      setContaPedidaSucesso(false);
+      window.alert("Não foi possível enviar sua solicitação. Verifique a conexão e tente novamente.");
     } finally {
       setPedindoConta(false);
     }
@@ -929,6 +986,7 @@ export function MenuView({ restaurante: restauranteInicial, cardapio: cardapioIn
         restauranteNome={restaurante.nome}
         corPrimaria={corPrimaria}
         taxaServicoPercentual={restaurante.configuracoes?.taxaServico ?? 10}
+        qrCredencial={qrCredencialAtiva}
       />
 
       {/* MODAL DE HISTÓRICO / COMPROVANTES DO CLIENTE */}
@@ -962,17 +1020,16 @@ export function MenuView({ restaurante: restauranteInicial, cardapio: cardapioIn
         isOpen={mesaScannerAberto}
         onClose={() => setMesaScannerAberto(false)}
         mesaAtual={numeroMesa}
-        onMesaDetectada={(novaMesa) => {
+        onMesaDetectada={(novaMesa, qrCredencialLida) => {
           setMesa(novaMesa);
+          setQrCredencialAtiva(qrCredencialLida);
           try {
-            // Atualiza table_id e persistência do carrinho no localStorage
             localStorage.setItem("table_id", String(novaMesa));
-            const cartKey = `mayamenu_cart_${restaurante.slug}`;
-            const cartExistente = localStorage.getItem(cartKey);
-            if (cartExistente) {
-              const parsed = JSON.parse(cartExistente);
-              parsed.mesa = novaMesa;
-              localStorage.setItem(cartKey, JSON.stringify(parsed));
+            const storageKey = `mayamenu_qr_${restaurante.id}_mesa_${String(novaMesa)}`;
+            if (qrCredencialLida) {
+              sessionStorage.setItem(storageKey, qrCredencialLida);
+            } else {
+              sessionStorage.removeItem(storageKey);
             }
           } catch {
             // Ignora erro de storage

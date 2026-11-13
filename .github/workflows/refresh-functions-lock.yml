@@ -1,0 +1,59 @@
+name: Refresh Cloud Functions dependency lockfile
+
+on:
+  push:
+    branches:
+      - security/hardening-final-7-ajustes
+    paths:
+      - package.json
+      - functions/package.json
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Refresh application lockfile and remediate compatible advisories
+        run: |
+          npm install --package-lock-only --no-audit --no-fund
+          npm audit fix --package-lock-only --no-fund || true
+
+      - name: Resolve and refresh Functions lockfile
+        run: npm install --prefix functions --package-lock-only --no-audit --no-fund
+
+      - name: Commit refreshed lockfile when changed
+        shell: bash
+        run: |
+          if ! git diff --quiet -- package-lock.json functions/package-lock.json; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add package-lock.json functions/package-lock.json
+            git commit -m "chore: refresh application and Cloud Functions dependency lockfiles"
+            git fetch origin "${GITHUB_REF_NAME}"
+            git rebase "origin/${GITHUB_REF_NAME}"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
+
+      - name: Dispatch security validation against the updated branch head
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: "security-validation.yml",
+              ref: process.env.GITHUB_REF_NAME
+            });

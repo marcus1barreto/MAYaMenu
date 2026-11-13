@@ -17,10 +17,10 @@ async function MenuContent({
   searchParamsPromise,
 }: {
   paramsPromise: Promise<{ slug: string }>;
-  searchParamsPromise: Promise<{ mesa?: string }>;
+  searchParamsPromise: Promise<{ mesa?: string; qr?: string }>;
 }) {
   const { slug } = await paramsPromise;
-  const { mesa } = await searchParamsPromise;
+  const { mesa, qr } = await searchParamsPromise;
   const numeroMesa = mesa ? Number(mesa) || mesa : 1;
 
   // Tenant Existence Guard: bloqueia renderização de apps fantasmas se o restaurante não existir
@@ -84,6 +84,7 @@ async function MenuContent({
           restaurante={restaurante}
           cardapio={cardapio}
           numeroMesa={numeroMesa}
+          qrCredencial={qr}
         />
       </CartProvider>
     </div>
@@ -95,7 +96,7 @@ export default function PublicMenuPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ mesa?: string }>;
+  searchParams: Promise<{ mesa?: string; qr?: string }>;
 }) {
   return (
     <Suspense

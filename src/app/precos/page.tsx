@@ -258,7 +258,7 @@ export default function PrecosPage() {
 
                 {/* Subtexto Transparente */}
                 <p className="text-[11px] text-neutral-500 text-center mt-3 leading-relaxed">
-                  Cobrança mensal no cartão ou Pix via Mercado Pago. Cancele quando quiser, sem multas.
+                  Pagamento pré-pago de 1 mês via Mercado Pago (Pix ou cartão). Sem renovação automática: basta não contratar um novo período.
                 </p>
 
                 {/* Divisor */}
@@ -316,7 +316,7 @@ export default function PrecosPage() {
                 <div className="flex items-center justify-between mb-4">
                   <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full bg-gradient-to-r from-rose-500 to-amber-500 text-white shadow-md shadow-rose-500/30">
                     <Sparkles className="w-3 h-3" />
-                    Oferta especial · 17% OFF
+                    R$ 100 abaixo do preço de tabela
                   </span>
                   <span className="text-[10px] font-bold text-amber-300">
                     MAIS VENDIDO
@@ -329,7 +329,7 @@ export default function PrecosPage() {
                   <Award className="w-5 h-5 text-amber-400" />
                 </h3>
                 <p className="text-xs text-neutral-300 mt-2 min-h-[48px] leading-relaxed">
-                  O plano mais vantajoso. Máxima economia, relatórios analíticos e suporte prioritário no WhatsApp.
+                  O plano mais vantajoso. Máxima economia, relatórios analíticos e suporte prioritário por e-mail.
                 </p>
 
                 {/* Preços */}
@@ -384,7 +384,7 @@ export default function PrecosPage() {
                   </div>
                   <div className="flex items-start gap-2.5">
                     <Check className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
-                    <span><strong>Suporte Prioritário</strong> direto pelo WhatsApp</span>
+                    <span><strong>Suporte Prioritário</strong> por e-mail</span>
                   </div>
                   <div className="flex items-start gap-2.5">
                     <Check className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
@@ -535,7 +535,7 @@ export default function PrecosPage() {
                 </div>
 
                 <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-neutral-100 border border-neutral-200 text-neutral-700 font-semibold">
-                  <span>Opção PayPal</span>
+                  <span>Condições institucionais sob consulta</span>
                 </div>
               </div>
             </div>
@@ -746,10 +746,10 @@ export default function PrecosPage() {
                       Central & Comunidade
                     </td>
                     <td className="py-3.5 px-3 sm:px-4 text-center text-neutral-800 text-xs font-semibold">
-                      E-mail e Ticket
+                      E-mail
                     </td>
                     <td className="py-3.5 px-3 sm:px-4 text-center text-rose-700 bg-rose-50/30 text-xs font-bold">
-                      WhatsApp Prioritário
+                      E-mail prioritário
                     </td>
                     <td className="py-3.5 px-3 sm:px-4 text-center text-neutral-800 text-xs font-semibold">
                       Parceiro & Suporte
@@ -788,12 +788,12 @@ export default function PrecosPage() {
               {
                 pergunta: "Quais são as formas de pagamento disponíveis no PRO?",
                 resposta:
-                  "Processamos todos os pagamentos com a segurança do Mercado Pago. Você pode pagar via PIX com aprovação e liberação imediata da licença em segundos, ou no cartão de crédito com parcelamento em até 12 vezes. Para casos institucionais especiais, também temos suporte a PayPal.",
+                  "Processamos os pagamentos online pelo Mercado Pago. Você pode pagar via Pix ou cartão de crédito com parcelamento em até 12 vezes. Para condições institucionais especiais, entre em contato com nossa equipe comercial.",
               },
               {
                 pergunta: "Existe fidelidade ou multa por cancelamento?",
                 resposta:
-                  "Nenhuma fidelidade e zero multas rescisórias. No plano PRO Mensal você pode suspender ou cancelar a qualquer momento sem taxas. No plano Semestral, você garante a tarifa com 17% de desconto pelo período contratado.",
+                  "Os planos são pré-pagos e não renovam automaticamente. Ao fim da vigência, basta não contratar um novo período; não há multa de fidelidade. O plano semestral mantém o preço contratado durante os seis meses.",
               },
               {
                 pergunta: "Vocês emitem Nota Fiscal (NFS-e)?",

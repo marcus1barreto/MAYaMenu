@@ -281,13 +281,16 @@ export function SuperAdminView() {
     setTimeout(() => setCopiadoLoteTexto(false), 2500);
   };
 
-  const handleAlterarStatus = async (codigo: string, novoStatus: "ativa" | "suspensa" | "revogada") => {
-    // Atualização otimista imediata na UI
-    setLicencas((prev) =>
-      prev.map((lic) => (lic.id === codigo ? { ...lic, status: novoStatus } : lic))
-    );
+  const handleAlterarStatus = async (codigo: string, novoStatus: "disponivel" | "suspensa" | "revogada") => {
     try {
       await alterarStatusLicenca(codigo, novoStatus);
+      if (novoStatus === "revogada") {
+        setLicencas((prev) => prev.filter((lic) => lic.id !== codigo));
+      } else {
+        setLicencas((prev) =>
+          prev.map((lic) => (lic.id === codigo ? { ...lic, status: novoStatus } : lic))
+        );
+      }
       setAlertaSucesso(`Status da licença ${codigo} alterado para ${novoStatus.toUpperCase()}.`);
     } catch (err: unknown) {
       console.warn("Falha ao alterar status remoto da licença:", err);
@@ -470,36 +473,41 @@ export function SuperAdminView() {
   };
 
   const handleRenovarLicenca = async (codigo: string) => {
-    const novaData = new Date(Date.now() + 48 * 60 * 60 * 1000);
-    setLicencas((prev) =>
-      prev.map((l) =>
-        l.id === codigo
-          ? { ...l, expiracaoEm: novaData, status: "disponivel" as const }
-          : l
-      )
-    );
     try {
-      await renovarValidadeLicenca(codigo, 48);
+      const novaData = await renovarValidadeLicenca(codigo, 48);
+      setLicencas((prev) =>
+        prev.map((l) =>
+          l.id === codigo
+            ? { ...l, expiracaoEm: novaData, status: "disponivel" as const }
+            : l
+        )
+      );
+      setAlertaSucesso(`Concessão ${codigo} renovada com confirmação do servidor.`);
     } catch (err) {
-      console.error("Erro ao renovar validade da licença:", err);
+      const msg = err instanceof Error ? err.message : String(err);
+      setAlertaErro(`Não foi possível renovar a concessão: ${msg}`);
     }
   };
 
   const handleRevogarLicenca = async (codigo: string) => {
-    setLicencas((prev) => prev.filter((l) => l.id !== codigo));
     try {
       await revogarLicenca(codigo);
+      setLicencas((prev) => prev.filter((l) => l.id !== codigo));
+      setAlertaSucesso(`Concessão ${codigo} arquivada e revogada.`);
     } catch (err) {
-      console.error("Erro ao revogar licença:", err);
+      const msg = err instanceof Error ? err.message : String(err);
+      setAlertaErro(`Não foi possível revogar a concessão: ${msg}`);
     }
   };
 
   const handleArquivarExpirada = async (lic: Licenca) => {
-    setLicencas((prev) => prev.filter((l) => l.id !== lic.id));
     try {
       await arquivarLicencaExpirada(lic);
+      setLicencas((prev) => prev.filter((l) => l.id !== lic.id));
+      setAlertaSucesso(`Concessão expirada ${lic.id} arquivada com confirmação do servidor.`);
     } catch (err) {
-      console.error("Erro ao arquivar licença expirada:", err);
+      const msg = err instanceof Error ? err.message : String(err);
+      setAlertaErro(`Não foi possível arquivar a concessão: ${msg}`);
     }
   };
 
@@ -1659,7 +1667,7 @@ export function SuperAdminView() {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => handleAlterarStatus(lic.id, "ativa")}
+                            onClick={() => handleAlterarStatus(lic.id, "disponivel")}
                             className="w-full bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-xl text-[10px] font-bold uppercase tracking-wider h-8 shadow-xs"
                           >
                             <RotateCcw className="w-3.5 h-3.5 mr-1" />

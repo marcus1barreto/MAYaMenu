@@ -236,7 +236,7 @@ export default function PoliticaPrivacidadePage() {
                   <strong>Infraestrutura de Nuvem e Banco de Dados:</strong> Google Cloud Platform e Firebase (com infraestrutura certificada ISO 27001, SOC 2 e em conformidade com a LGPD);
                 </li>
                 <li>
-                  <strong>Gateways de Processamento de Pagamento:</strong> Mercado Pago e PayPal, estritamente para o processamento da assinatura do Plano Pro entre o restaurante e a MAYARANAS SISTEMAS;
+                  <strong>Gateway de Processamento de Pagamento:</strong> Mercado Pago, estritamente para o processamento da contratação pré-paga do Plano Pro entre o estabelecimento e a MAYARANAS SISTEMAS;
                 </li>
                 <li>
                   <strong>Órgãos Públicos e Fiscais:</strong> Secretaria de Finanças e Receita Federal para emissão de notas fiscais e obrigações tributárias, ou cumprimento de ordem judicial específica.

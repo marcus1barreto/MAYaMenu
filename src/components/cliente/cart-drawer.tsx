@@ -7,8 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { QRCodeSVG } from "qrcode.react";
 import { buildTicketPayload, encodeTicket } from "@/lib/ticket";
-import { ensureClienteAnonimo, db } from "@/lib/firebase";
-import { doc, getDoc, setDoc, updateDoc, serverTimestamp, increment, collection, writeBatch } from "firebase/firestore";
+import { ensureClienteAnonimo, auth, functions } from "@/lib/firebase";
+import { httpsCallable } from "firebase/functions";
 import {
   Trash2,
   Plus,
@@ -22,6 +22,10 @@ import {
 } from "lucide-react";
 import confetti from "canvas-confetti";
 import { salvarVisitaLocal, gerarComprovanteHash } from "@/lib/historico-cliente";
+import { enfileirarPedidoOffline } from "@/lib/offline-queue";
+import cartStorage from "@/lib/cart-storage.cjs";
+
+const { fingerprintQrCredencial, isMesaTokenCacheValido } = cartStorage;
 
 function gerarIdempotencyKey(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -29,6 +33,7 @@ function gerarIdempotencyKey(): string {
   }
   return `ped-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
 }
+
 
 interface CartDrawerProps {
   isOpen: boolean;
@@ -38,6 +43,7 @@ interface CartDrawerProps {
   restauranteNome?: string;
   corPrimaria?: string;
   taxaServicoPercentual?: number;
+  qrCredencial?: string;
 }
 
 export function CartDrawer({
@@ -48,6 +54,7 @@ export function CartDrawer({
   restauranteNome = "MAYaMenu",
   corPrimaria = "#E11D48",
   taxaServicoPercentual,
+  qrCredencial,
 }: CartDrawerProps) {
   const {
     itens,
@@ -121,10 +128,58 @@ export function CartDrawer({
       const qrString = encodeTicket(ticket);
       setTicketPayloadRaw(qrString);
 
-      // 3. Monta as Referências e Payloads
+      // 3. Monta os Payloads e garante token de sessão da mesa
       const idRestauranteFinal = (restauranteId || slug || "demo").trim();
 
+      const obterOuEmitirMesaToken = async (): Promise<string | undefined> => {
+        const cacheKey = `mayamenu_mesa_token_${idRestauranteFinal}_${String(mesa)}_${uid}`;
+        const qrFingerprint = fingerprintQrCredencial(qrCredencial);
+        try {
+          const cached = sessionStorage.getItem(cacheKey);
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            if (isMesaTokenCacheValido(parsed, qrCredencial)) {
+              return parsed.token;
+            }
+            // Token emitido com outro QR (por exemplo, antes de uma rotação) não pode ser reutilizado.
+            sessionStorage.removeItem(cacheKey);
+          }
+        } catch {
+          // Ignora
+        }
 
+        if (typeof navigator !== "undefined" && !navigator.onLine) {
+          return undefined;
+        }
+        if (!auth.currentUser) {
+          return undefined;
+        }
+
+        if (!qrCredencial) {
+          throw new Error("Sessão da mesa não autenticada. Escaneie o QR Code físico da mesa novamente.");
+        }
+
+        const emitirFn = httpsCallable(functions, "emitirSessaoMesa");
+        const resp = (await emitirFn({ restauranteId: idRestauranteFinal, mesa, qrCredencial })) as {
+          data?: { mesaToken?: string; expiraEm?: number };
+        };
+        const token = resp?.data?.mesaToken;
+        if (token) {
+          try {
+            sessionStorage.setItem(
+              cacheKey,
+              JSON.stringify({
+                token,
+                expiraEm: resp?.data?.expiraEm || Date.now() + 3600_000,
+                qrFingerprint,
+              })
+            );
+          } catch {
+            // Ignora
+          }
+        }
+        return token;
+      };
 
       // Mapeamento limpo dos itens para a cozinha
       const itensMapeados = itens.map((it) => ({
@@ -137,93 +192,94 @@ export function CartDrawer({
         observacoes: it.observacoes || "",
       }));
 
-      // Payload da Rodada
-      const dadosPedidoRodada = {
-        id: pedidoId,
-        restauranteId: idRestauranteFinal,
-        slug: slug || idRestauranteFinal,
-        clienteId: uid,
-        nomeCliente: nomeCliente.trim(),
-        mesa,
-        numeroMesa: Number(mesa) || mesa,
-        itens: itensMapeados,
-        subtotal, // O subtotal DESSA rodada específica
-        status: "a_fazer" as const,
-        criadoEm: serverTimestamp(),
+      const enfileirarContingenciaOffline = async (tokenMesa?: string): Promise<boolean> => {
+        return enfileirarPedidoOffline({
+          id: pedidoId,
+          restauranteId: idRestauranteFinal,
+          slug: slug || idRestauranteFinal,
+          mesaNumero: Number(mesa) || mesa,
+          clienteNome: nomeCliente.trim(),
+          clienteId: uid,
+          itens: itensMapeados,
+          subtotal,
+          criadoEmMillis: Date.now(),
+          tentativas: 0,
+          status: "pendente",
+          origem: "cliente",
+          mesaToken: tokenMesa,
+          qrCredencial,
+        });
       };
 
-      // Payload da Comanda Pai
-      // ATENÇÃO: Removemos o increment(subtotal)
-      // O status é meramente descritivo. O valor real da conta será a soma aritmética
-      // dos documentos da subcoleção "pedidos".
-      const dadosComanda = {
-        id: uid,
-        restauranteId: idRestauranteFinal,
-        slug: slug || idRestauranteFinal,
-        nomeCliente: nomeCliente.trim(),
-        mesa,
-        numeroMesa: Number(mesa) || mesa,
-        criadoEm: serverTimestamp(),
-        atualizadoEm: serverTimestamp(),
-        status: "aguardando_pratos" as const,
-      };
+      const estaSemRede = typeof navigator !== "undefined" && !navigator.onLine;
+      const semAuthReal = !auth.currentUser;
 
-      // 1. Instancia o Lote de Escrita Atômica
-      const batch = writeBatch(db);
+      let mesaTokenAtual: string | undefined;
+      if (!estaSemRede && !semAuthReal) {
+        try {
+          mesaTokenAtual = await obterOuEmitirMesaToken();
+        } catch (sessErr: any) {
+          console.warn("Aviso ao emitir sessão da mesa:", sessErr);
+        }
+      }
 
-      // 2. Define as 3 referências apontando para o mesmo momento
-      const comandaRef = doc(
-        db,
-        "restaurantes",
-        idRestauranteFinal,
-        "mesas",
-        String(mesa),
-        "comandas_abertas",
-        uid
-      );
-      const pedidoRef = doc(comandaRef, "pedidos", pedidoId);
-      const kdsRef = doc(db, "restaurantes", idRestauranteFinal, "kds_tickets", pedidoId); // Isolado da mesa
-
-      // 3. Monta o Payload específico e leve para o KDS (sem subtotal financeiro)
-      const payloadKds = {
-        id: pedidoId, // Mesmo ID do pedido para rastreabilidade
-        mesa,
-        numeroMesa: Number(mesa) || mesa,
-        clienteId: uid,
-        nomeCliente: nomeCliente.trim(),
-        status: "a_fazer" as const, // A query do KDS vai filtrar estritamente por isso
-        pedidoRefPath: pedidoRef.path,
-        itens: itensMapeados.map((i) => ({
-          menuItemId: i.menuItemId,
-          nome: i.nome,
-          quantidade: i.quantidade,
-          tempoPreparoEstimado: i.tempoPreparoEstimado,
-          modificadores: i.modificadores || [],
-          observacoes: i.observacoes || "",
-        })),
-        criadoEm: serverTimestamp(),
-      };
-
-      // 4. Empilha as operações (Merge na comanda pai, criação no pedido, criação no KDS)
-      batch.set(comandaRef, dadosComanda, { merge: true });
-      batch.set(pedidoRef, dadosPedidoRodada);
-      batch.set(kdsRef, payloadKds);
-
-      try {
-        // 5. Executa tudo de uma vez. Ou grava tudo, ou falha tudo.
-        await batch.commit();
-
-        // Chegou aqui? Está salvo (ou na nuvem, ou no cache local)
-        const isOffline = typeof navigator !== "undefined" && !navigator.onLine;
-        setUsouOffline(isOffline);
-      } catch (firestoreErr: any) {
-        if (firestoreErr?.code === "permission-denied") {
-          alert("Esta comanda já foi encerrada e paga no caixa. Não é possível lançar novos pedidos.");
+      if (estaSemRede || semAuthReal) {
+        const salvoNaFila = await enfileirarContingenciaOffline(mesaTokenAtual);
+        if (!salvoNaFila) {
+          setErro("Sem conexão com a internet e não foi possível salvar o pedido na fila local. Tente novamente.");
           setEnviando(false);
           return;
         }
-        console.error("Falha na gravação atômica:", firestoreErr);
         setUsouOffline(true);
+      } else {
+        try {
+          // 4. Envia via Cloud Function autorizada (grava comanda, pedido e kds_ticket atomicamente e com idempotência)
+          const criarPedidoFn = httpsCallable(functions, "criarPedidoCliente");
+          await criarPedidoFn({
+            restauranteId: idRestauranteFinal,
+            slug: slug || idRestauranteFinal,
+            pedidoId,
+            mesa,
+            mesaToken: mesaTokenAtual,
+            nomeCliente: nomeCliente.trim(),
+            itens: itensMapeados,
+            subtotal,
+          });
+          setUsouOffline(false);
+        } catch (backendErr: any) {
+          const code = String(backendErr?.code || "");
+          if (code.includes("permission-denied") || code.includes("failed-precondition")) {
+            alert(
+              backendErr?.message ||
+                "Esta comanda já foi encerrada e paga no caixa. Não é possível lançar novos pedidos."
+            );
+            setEnviando(false);
+            return;
+          }
+
+          const erroDeRede =
+            code.includes("unavailable") ||
+            code.includes("deadline-exceeded") ||
+            (typeof navigator !== "undefined" && !navigator.onLine);
+
+          if (erroDeRede) {
+            const salvoNaFila = await enfileirarContingenciaOffline(mesaTokenAtual);
+            if (salvoNaFila) {
+              setUsouOffline(true);
+            } else {
+              console.error("Falha ao enfileirar pedido offline:", backendErr);
+              setErro("Conexão instável e falha ao gravar na fila local. Tente enviar novamente.");
+              setEnviando(false);
+              return;
+            }
+          } else {
+            console.error("Falha ao registrar pedido no backend:", backendErr);
+            const detalhe = code ? ` (${code})` : "";
+            setErro(`Não foi possível enviar o pedido ao servidor${detalhe}. Seus itens continuam no carrinho; tente novamente.`);
+            setEnviando(false);
+            return;
+          }
+        }
       }
 
       // 5. Salva Visita Local (Histórico do Cliente)
@@ -270,12 +326,9 @@ export function CartDrawer({
       limparCarrinho();
     } catch (error) {
       console.error("Falha ao gravar pedido:", error);
-      // EM CASO DE ERRO (ex: timeout), NÃO renovamos a idempotencyKey.
-      // Se o cliente clicar em enviar de novo, o Firestore usará o mesmo `pedidoId`.
-      // Como estamos usando set no batch, a operação será sobrescrita e não duplicada (Idempotente).
-      setErro("Ocorreu um erro ao processar seu pedido. Tente novamente ou mostre o QR Code ao garçom.");
-      setUsouOffline(true);
-      setPedidoConcluido(true);
+      // EM CASO DE ERRO (ex: timeout), NÃO renovamos a idempotencyKey e NÃO fingimos conclusão.
+      // Se o cliente clicar em enviar de novo, o Firestore usará o mesmo `pedidoId` (Idempotente).
+      setErro("Não foi possível confirmar o envio do pedido. Seus itens foram mantidos no carrinho para tentar novamente.");
     } finally {
       setEnviando(false);
     }

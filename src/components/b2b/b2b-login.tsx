@@ -14,7 +14,7 @@ import {
   Store,
   Layers,
 } from "lucide-react";
-import { buscarPatrocinadorPorChave, salvarPatrocinador, salvarItemCatalogoMaster, criarLoteLicencas } from "@/lib/b2b-service";
+import { buscarPatrocinadorPorChave } from "@/lib/b2b-service";
 import type { PatrocinadorB2B } from "@/types/b2b";
 
 interface B2BLoginProps {
@@ -41,12 +41,11 @@ export function B2BLogin({ onAutenticado }: B2BLoginProps) {
       const patrocinador = await buscarPatrocinadorPorChave(chaveLimpa);
 
       if (!patrocinador) {
-        setErro("Chave B2B não encontrada. Verifique o código com o suporte da plataforma ou utilize a demonstração.");
+        setErro("Chave inválida, desatualizada ou sem autorização. Solicite uma credencial atualizada à administração MAYaMenu.");
         return;
       }
 
-      sessionStorage.setItem("mayamenu_b2b_token", patrocinador.chaveAcessoB2B);
-      sessionStorage.setItem("mayamenu_b2b_patrocinador", JSON.stringify(patrocinador));
+      // A sessão custom-token é mantida pelo Firebase Auth isolado; não persistir a chave bruta.
       onAutenticado(patrocinador);
     } catch (err: any) {
       console.error("Erro no login B2B:", err);
@@ -101,7 +100,7 @@ export function B2BLogin({ onAutenticado }: B2BLoginProps) {
             type="text"
             value={chave}
             onChange={(e) => setChave(e.target.value)}
-            placeholder="Ex: SPN-AMBEV-2026-X9"
+            placeholder="SPN-XXXXXXXXXXXXXXXXXXXXXXXXXX"
             required
             className="bg-neutral-50 border-neutral-200 text-neutral-900 placeholder:text-neutral-400 focus:bg-white focus:border-rose-500 focus:ring-1 focus:ring-rose-500 rounded-xl h-12 uppercase tracking-wider font-mono text-sm"
           />

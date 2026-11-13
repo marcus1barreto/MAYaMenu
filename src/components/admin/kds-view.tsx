@@ -173,7 +173,9 @@ export function KdsView({
     const pedidoAlvo = pedidos.find((p) => p.id === id);
     if (!pedidoAlvo) return;
 
-    const novoStatus = pedidoAlvo.status === "a_fazer" ? "pronto" : "a_fazer";
+    // A transição é unidirecional: "pronto" não pode voltar para "a_fazer".
+    if (pedidoAlvo.status !== "a_fazer") return;
+    const novoStatus = "pronto";
 
     // Atualização otimista imediata na UI
     setPedidos((prev) =>
@@ -196,6 +198,9 @@ export function KdsView({
         });
       } catch (err) {
         console.warn("Falha ao atualizar status do pedido no Firestore:", err);
+        setPedidos((prev) =>
+          prev.map((p) => p.id === id ? { ...p, status: pedidoAlvo.status } : p)
+        );
       }
     }
   };
@@ -506,6 +511,7 @@ export function KdsView({
                     <Button
                       type="button"
                       onClick={() => handleMarchar(ped.id)}
+                      disabled={!ehAFazer}
                       className={`flex-1 h-14 rounded-2xl font-black text-base shadow-md transition-all active:scale-[0.98] flex items-center justify-center gap-2 ${
                         ehAFazer
                           ? "bg-rose-600 hover:bg-rose-500 text-white shadow-rose-600/25"
@@ -520,7 +526,7 @@ export function KdsView({
                       ) : (
                         <>
                           <CheckCircle className="w-5 h-5 text-emerald-600" />
-                          <span>Pronto (Desfazer)</span>
+                          <span>Pronto</span>
                         </>
                       )}
                     </Button>

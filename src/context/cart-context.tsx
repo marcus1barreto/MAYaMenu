@@ -4,6 +4,9 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import type { MenuItem } from "@/types";
 
 import { obterUltimoNomeCliente } from "@/lib/historico-cliente";
+import cartStorage from "@/lib/cart-storage.cjs";
+
+const { getCartStorageKey, isCarrinhoExpirado } = cartStorage;
 
 export interface ItemCarrinho {
   idUnico: string; // identificador único do item configurado
@@ -42,57 +45,89 @@ export function CartProvider({
   slug: string;
   mesaInicial?: number | string;
 }) {
+  const mesaAtiva = mesaInicial ?? 1;
   const [itens, setItens] = useState<ItemCarrinho[]>([]);
   const [nomeCliente, setNomeClienteState] = useState<string>("");
-  const [mesa, setMesaState] = useState<number | string>(mesaInicial || 1);
+  const [mesa, setMesaState] = useState<number | string>(mesaAtiva);
+  const [hidratado, setHidratado] = useState(false);
 
-  // Carrega do localStorage para persistência offline
+  // Carrega do localStorage isolado por restaurante + mesa (impede contaminação entre mesas e expira após 4h)
   useEffect(() => {
+    setHidratado(false);
+    const mesaDestino = mesaInicial ?? mesa;
+    if (mesaInicial !== undefined && mesaInicial !== null) {
+      setMesaState(mesaInicial);
+    }
+
     try {
-      const salvo = localStorage.getItem(`mayamenu_cart_${slug}`);
+      const chaveMesa = getCartStorageKey(slug, mesaDestino);
+      const salvo = localStorage.getItem(chaveMesa);
       if (salvo) {
         const parsed = JSON.parse(salvo);
-        if (Array.isArray(parsed.itens)) setItens(parsed.itens);
-        if (parsed.nomeCliente) {
-          setNomeClienteState(parsed.nomeCliente);
-        } else {
+        if (isCarrinhoExpirado(parsed.atualizadoEm)) {
+          localStorage.removeItem(chaveMesa);
+          setItens([]);
           const ultimoNome = obterUltimoNomeCliente();
           if (ultimoNome) setNomeClienteState(ultimoNome);
-        }
-        // Se a URL do QR Code forneceu uma mesa explícita, respeita a mesa escaneada
-        if (mesaInicial) {
-          setMesaState(mesaInicial);
-        } else if (parsed.mesa) {
-          setMesaState(parsed.mesa);
+        } else {
+          setItens(Array.isArray(parsed.itens) ? parsed.itens : []);
+          if (parsed.nomeCliente) {
+            setNomeClienteState(parsed.nomeCliente);
+          } else {
+            const ultimoNome = obterUltimoNomeCliente();
+            if (ultimoNome) setNomeClienteState(ultimoNome);
+          }
         }
       } else {
-        if (mesaInicial) setMesaState(mesaInicial);
+        // Nova mesa ou sem carrinho salvo: começa limpo para não herdar itens de outra mesa
+        setItens([]);
         const ultimoNome = obterUltimoNomeCliente();
         if (ultimoNome) setNomeClienteState(ultimoNome);
       }
     } catch {
-      // Ignora erro de storage
+      setItens([]);
+    } finally {
+      setHidratado(true);
     }
   }, [slug, mesaInicial]);
 
-  // Salva no localStorage quando mudar
+  // Salva no localStorage isolado por restaurante + mesa com timestamp atualizadoEm
   useEffect(() => {
+    if (!hidratado) return;
     try {
       localStorage.setItem(
-        `mayamenu_cart_${slug}`,
-        JSON.stringify({ itens, nomeCliente, mesa })
+        getCartStorageKey(slug, mesa),
+        JSON.stringify({ itens, nomeCliente, mesa, atualizadoEm: Date.now() })
       );
     } catch {
       // Ignora
     }
-  }, [itens, nomeCliente, mesa, slug]);
+  }, [itens, nomeCliente, mesa, slug, hidratado]);
 
   const setNomeCliente = (nome: string) => {
     setNomeClienteState(nome);
   };
 
-  const setMesa = (m: number | string) => {
-    setMesaState(m);
+  const setMesa = (novaMesa: number | string) => {
+    if (String(novaMesa) === String(mesa)) return;
+    setMesaState(novaMesa);
+    try {
+      const chaveMesa = getCartStorageKey(slug, novaMesa);
+      const salvo = localStorage.getItem(chaveMesa);
+      if (salvo) {
+        const parsed = JSON.parse(salvo);
+        if (isCarrinhoExpirado(parsed.atualizadoEm)) {
+          localStorage.removeItem(chaveMesa);
+          setItens([]);
+        } else {
+          setItens(Array.isArray(parsed.itens) ? parsed.itens : []);
+        }
+      } else {
+        setItens([]);
+      }
+    } catch {
+      setItens([]);
+    }
   };
 
   const adicionarItem = (novo: Omit<ItemCarrinho, "idUnico">) => {

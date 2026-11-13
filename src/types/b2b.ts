@@ -18,6 +18,7 @@ export interface PatrocinadorB2B {
     cargo: string;
   };
   ativo: boolean;
+  authVersion?: number; // Invalida sessões do portal após suspensão ou rotação de credencial.
   criadoEm: any;
   atualizadoEm?: any;
 }

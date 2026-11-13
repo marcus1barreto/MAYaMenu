@@ -1,10 +1,11 @@
-import { db } from "@/lib/firebase";
-import { doc, setDoc, updateDoc, onSnapshot, collection, getDocs } from "firebase/firestore";
+import { db, functions } from "@/lib/firebase";
+import { doc, setDoc, onSnapshot, collection, getDoc } from "firebase/firestore";
+import { httpsCallable } from "firebase/functions";
 
 export interface ConfigMesa {
   numero: number;
   ativa: boolean;
-  statusEstrutural: "livre" | "reservada" | "bloqueada";
+  statusEstrutural: "livre" | "reservada" | "bloqueada" | "inativa";
   reserva?: {
     nomeCliente: string;
     horario: string;
@@ -13,6 +14,8 @@ export interface ConfigMesa {
   modoAtendimento: "livre" | "garcom_fixo";
   garcomFixoId?: string;
   garcomFixoNome?: string;
+  qrConfigurado?: boolean;
+  qrVersao?: number;
   atualizadoEm?: any;
 }
 
@@ -26,15 +29,72 @@ export async function salvarConfigMesa(
 ): Promise<void> {
   if (!restauranteId || !numeroMesa) return;
   const mesaRef = doc(db, "restaurantes", restauranteId, "mesas", String(numeroMesa));
+  const atual = await getDoc(mesaRef);
+  const defaults = atual.exists() ? {} : { ativa: true, statusEstrutural: "livre" as const };
   await setDoc(
     mesaRef,
     {
       numero: numeroMesa,
+      ...defaults,
       ...dados,
       atualizadoEm: new Date().toISOString(),
     },
     { merge: true }
   );
+}
+
+/**
+ * Reativa uma mesa permanentemente desativada por callable privilegiada e rotaciona o QR.
+ * A credencial em texto claro é retornada uma única vez e nunca persiste no Firestore.
+ */
+export async function reativarMesaFirestore(
+  restauranteId: string,
+  numeroMesa: number
+): Promise<{
+  sucesso: boolean;
+  idempotente?: boolean;
+  slug?: string;
+  mesa: number;
+  qrVersao?: number;
+  qrCredencial?: string;
+}> {
+  const reativarFn = httpsCallable(functions, "reativarMesaBackend");
+  const resultado = await reativarFn({ restauranteId, mesa: numeroMesa });
+  return resultado.data as {
+    sucesso: boolean;
+    idempotente?: boolean;
+    slug?: string;
+    mesa: number;
+    qrVersao?: number;
+    qrCredencial?: string;
+  };
+}
+
+/**
+ * Emite ou rotaciona a credencial QR de uma mesa. O segredo só é devolvido no momento da emissão.
+ */
+export async function emitirCredencialMesaFirestore(
+  restauranteId: string,
+  numeroMesa: number,
+  rotacionar = false
+): Promise<{
+  sucesso: boolean;
+  jaConfigurada?: boolean;
+  slug?: string;
+  mesa: number;
+  qrVersao?: number;
+  qrCredencial?: string;
+}> {
+  const emitirFn = httpsCallable(functions, "garantirCredencialMesa");
+  const resultado = await emitirFn({ restauranteId, mesa: numeroMesa, rotacionar });
+  return resultado.data as {
+    sucesso: boolean;
+    jaConfigurada?: boolean;
+    slug?: string;
+    mesa: number;
+    qrVersao?: number;
+    qrCredencial?: string;
+  };
 }
 
 /**
@@ -46,10 +106,23 @@ export async function alternarStatusLoteMesas(
   ativa: boolean
 ): Promise<void> {
   if (!restauranteId || numerosMesas.length === 0) return;
-  const promises = numerosMesas.map((num) =>
-    salvarConfigMesa(restauranteId, num, { ativa })
+  const snapshots = await Promise.all(numerosMesas.map(async (num) => {
+    const mesaRef = doc(db, "restaurantes", restauranteId, "mesas", String(num));
+    return { num, snap: await getDoc(mesaRef) };
+  }));
+  const permanentementeInativas = snapshots.filter(
+    ({ snap }) => snap.exists() && snap.data().statusEstrutural === "inativa"
   );
-  await Promise.all(promises);
+  if (ativa && permanentementeInativas.length > 0) {
+    throw new Error("Uma ou mais mesas foram desativadas permanentemente. Reative-as individualmente pelo fluxo seguro de reemissão do QR Code.");
+  }
+  const atualizaveis = snapshots.filter(({ snap }) =>
+    !(snap.exists() && snap.data().statusEstrutural === "inativa") &&
+    (ativa || snap.exists())
+  );
+  await Promise.all(atualizaveis.map(({ num }) =>
+    salvarConfigMesa(restauranteId, num, { ativa })
+  ));
 }
 
 /**
@@ -78,6 +151,8 @@ export function escutarConfigsMesas(
             modoAtendimento: data.modoAtendimento || "livre",
             garcomFixoId: data.garcomFixoId,
             garcomFixoNome: data.garcomFixoNome,
+            qrConfigurado: typeof data.qrCredencialHash === "string" && data.qrCredencialHash.length === 64,
+            qrVersao: Number(data.qrVersao) || 0,
             atualizadoEm: data.atualizadoEm,
           };
         }

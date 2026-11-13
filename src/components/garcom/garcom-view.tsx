@@ -39,7 +39,8 @@ import {
   escutarGarconsEmServico,
   type StatusTurno,
 } from "@/lib/turno-service";
-import { escutarConfigsMesas, type ConfigMesa } from "@/lib/mesas-service";
+import { escutarConfigsMesas, salvarConfigMesa, type ConfigMesa } from "@/lib/mesas-service";
+import { deleteField } from "firebase/firestore";
 import { audioAlertService } from "@/lib/audio-alerts";
 import {
   Dialog,
@@ -631,68 +632,62 @@ export function GarcomView({
     }
   };
 
-  // Fechar/Marcar Comanda Individual como Paga (exclusivo do lojista/garçom)
-  const handleMarcarComoPago = async (mesaNumero: number, clienteId: string) => {
-    // Atualização otimista
+  // Confirma o pagamento no backend antes de atualizar a interface.
+  const handleMarcarComoPago = async (mesaNumero: number, clienteId: string): Promise<boolean> => {
+    const idRestauranteFinal = restauranteId || restaurante?.id;
+    if (!idRestauranteFinal) return false;
+    try {
+      await marcarComandaPagaFirestore(idRestauranteFinal, mesaNumero, clienteId);
+    } catch (err) {
+      console.error("Falha ao confirmar pagamento da comanda no backend:", err);
+      alert(err instanceof Error ? err.message : "Não foi possível confirmar o pagamento.");
+      return false;
+    }
+
     setMesas((prev) =>
       prev.map((m) => {
-        if (m.numero === mesaNumero) {
-          const novasComandas = m.comandas.map((c) =>
-            c.id === clienteId ? { ...c, status: "pago" as const } : c
-          );
-          const todasPagas = novasComandas.every((c) => c.status === "pago");
-          return {
-            ...m,
-            status: todasPagas ? ("paga_ocupada" as const) : m.status,
-            comandas: novasComandas,
-          };
-        }
-        return m;
+        if (m.numero !== mesaNumero) return m;
+        const comandas = m.comandas.map((c) =>
+          c.id === clienteId ? { ...c, status: "pago" as const } : c
+        );
+        const todasPagas = comandas.every((c) => c.status === "pago");
+        return { ...m, status: todasPagas ? ("paga_ocupada" as const) : m.status, comandas };
       })
     );
-
     setMesaSelecionada((prev) => {
       if (!prev || prev.numero !== mesaNumero) return prev;
-      const novas = prev.comandas.map((c) =>
+      const comandas = prev.comandas.map((c) =>
         c.id === clienteId ? { ...c, status: "pago" as const } : c
       );
-      const todasPagas = novas.every((c) => c.status === "pago");
-      return {
-        ...prev,
-        status: todasPagas ? ("paga_ocupada" as const) : prev.status,
-        comandas: novas,
-      };
+      const todasPagas = comandas.every((c) => c.status === "pago");
+      return { ...prev, status: todasPagas ? ("paga_ocupada" as const) : prev.status, comandas };
     });
-
-    // Persistência no Firestore
-    if (restauranteId) {
-      try {
-        await marcarComandaPagaFirestore(restauranteId, mesaNumero, clienteId);
-      } catch (err) {
-        console.warn("Falha ao marcar comanda como paga no Firestore:", err);
-      }
-    }
+    return true;
   };
 
-  // Liberar mesa no Firestore
-  const handleLiberarMesa = async (mesaNumero: number) => {
+  // Libera somente após confirmação do backend; nunca limpa estado otimista antes do commit.
+  const handleLiberarMesa = async (mesaNumero: number): Promise<boolean> => {
     const mesaAlvo = mesas.find((m) => m.numero === mesaNumero);
     const comandasIds = mesaAlvo ? mesaAlvo.comandas.map((c) => c.id) : [];
     const idRestauranteFinal = restauranteId || restaurante?.id;
+    if (!idRestauranteFinal || comandasIds.length === 0) {
+      alert("Não há comandas identificadas para liberar esta mesa.");
+      return false;
+    }
+    // O backend é a autoridade sobre o estado pago; não usar snapshot React possivelmente defasado.
+    try {
+      await liberarMesaFirestore(idRestauranteFinal, mesaNumero, comandasIds);
+    } catch (err: any) {
+      console.warn("Falha ao liberar mesa no Firestore:", err);
+      alert("Erro ao liberar: " + (err?.message || "Falha na comunicação com o servidor"));
+      return false;
+    }
 
     setMesas((prev) =>
       prev.map((m) => (m.numero === mesaNumero ? { ...m, status: "livre", comandas: [] } : m))
     );
     setMesaSelecionada(null);
-
-    if (idRestauranteFinal && comandasIds.length > 0) {
-      try {
-        await liberarMesaFirestore(idRestauranteFinal, mesaNumero, comandasIds);
-      } catch (err: any) {
-        console.warn("Falha ao liberar mesa no Firestore:", err);
-        alert("Erro ao libertar: " + (err?.message || "Falha na comunicação com o servidor"));
-      }
-    }
+    return true;
   };
 
   // Garçom assume o atendimento das comandas ativas de uma mesa
@@ -810,61 +805,33 @@ export function GarcomView({
   // Injetar pedido resgatado pelo leitor de QR de contingência diretamente no Firestore (MAYa Sync-QR)
   const handleTicketLido = async (ticket: TicketPayload) => {
     const mesaNum = Number(ticket.t) || 1;
-    // Se o ticket já possuir o total consolidado (MAYa Sync-QR), utiliza o valor exato
-    const subtotalCalculado =
-      ticket.tot !== undefined ? ticket.tot : ticket.i.reduce((acc, it) => acc + it.q * 30, 0);
-
-    const novaComanda: ComandaGarcom = {
-      id: ticket.c.id,
-      nomeCliente: ticket.c.n,
-      subtotal: subtotalCalculado,
-      status: ticket.tot !== undefined ? "conta_pedida" : "aguardando_pratos",
-      itens: ticket.i.map((it) => ({
-        nome: `Item (${it.id})`,
-        quantidade: it.q,
-        precoFinal: ticket.tot !== undefined ? ticket.tot / (ticket.i.length || 1) : 30,
-        modificadores: it.m?.map(([g, o]) => ({ grupo: g, opcao: o })),
-      })),
-    };
-
-    setMesas((prev) =>
-      prev.map((m) => {
-        if (m.numero === mesaNum) {
-          return {
-            ...m,
-            status: "ocupada",
-            comandas: [...m.comandas, novaComanda],
-          };
-        }
-        return m;
-      })
-    );
-
-    // Persiste no Firestore para que a Cozinha veja instantaneamente no KDS!
-    if (restauranteId) {
-      try {
-        await injetarTicketContingencia(restauranteId, {
-          id: ticket.id,
-          mesa: mesaNum,
-          clienteId: ticket.c.id,
-          nomeCliente: ticket.c.n,
-          subtotal: subtotalCalculado,
-          itens: ticket.i.map((it) => ({
-            menuItemId: it.id,
-            nome: `Item (${it.id})`,
-            quantidade: it.q,
-            precoFinal: 30,
-            modificadores: it.m?.map(([g, o]) => ({ grupo: g, opcao: o })),
-            observacoes: it.o,
-          })),
-        });
-      } catch (err) {
-        console.warn("Falha ao injetar pedido de contingência no Firestore:", err);
-      }
+    if (!restauranteId) {
+      setFeedbackInjecao("Não foi possível identificar o restaurante para registrar o pedido.");
+      return;
     }
 
-    setFeedbackInjecao(`Pedido de ${ticket.c.n} injetado na Mesa ${mesaNum}!`);
-    setTimeout(() => setFeedbackInjecao(null), 4000);
+    try {
+      // O backend valida permissão, mesa, disponibilidade dos itens e recalcula os preços.
+      // Só refletimos sucesso na interface depois da confirmação da transação.
+      const pedidoConfirmado = await injetarTicketContingencia(restauranteId, {
+        id: ticket.id,
+        mesa: mesaNum,
+        clienteId: ticket.c.id,
+        nomeCliente: ticket.c.n,
+        itens: ticket.i.map((it) => ({
+          menuItemId: it.id,
+          quantidade: it.q,
+          modificadores: it.m?.map(([g, o]) => ({ grupo: g, opcao: o })),
+          observacoes: it.o,
+        })),
+      });
+
+      setFeedbackInjecao(`Pedido de ${ticket.c.n} registrado na Mesa ${mesaNum}. Total validado: ${pedidoConfirmado.subtotal.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}.`);
+    } catch (err) {
+      console.error("Falha ao registrar pedido de contingência no backend:", err);
+      setFeedbackInjecao("Pedido não registrado. Verifique a mesa, os itens e a conexão antes de tentar novamente.");
+    }
+    setTimeout(() => setFeedbackInjecao(null), 5000);
   };
 
   const mesasComContaPedida = mesas.filter((m) => m.status === "conta_pedida").length;
@@ -1349,6 +1316,30 @@ export function GarcomView({
                         })}
                       </span>
                     </>
+                  ) : isReservada && isAtiva ? (
+                    <div className="space-y-1.5">
+                      <span className="text-[11px] text-purple-300 font-bold block truncate">
+                        {cfg?.reserva?.nomeCliente || "Mesa Reservada"}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          if (!restauranteId) return;
+                          try {
+                            await salvarConfigMesa(restauranteId, m.numero, {
+                              statusEstrutural: "livre",
+                              reserva: deleteField() as any,
+                            });
+                          } catch (err) {
+                            console.error("Falha ao liberar reserva:", err);
+                          }
+                        }}
+                        className="w-full py-1 px-2 rounded-lg bg-purple-600/30 hover:bg-purple-600/50 border border-purple-400/40 text-purple-100 text-[10px] font-black uppercase tracking-wide transition-colors cursor-pointer"
+                      >
+                        Liberar Reserva
+                      </button>
+                    </div>
                   ) : (
                     <span className="text-xs text-muted-foreground font-bold block">Mesa Livre</span>
                   )}

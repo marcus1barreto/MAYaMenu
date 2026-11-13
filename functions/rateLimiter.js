@@ -3,19 +3,18 @@
  * Compartilhado entre Cloud Functions e suíte de testes automatizados.
  * 
  * Regras:
- * 1. Extração segura de IP contra spoofing de X-Forwarded-For:
- *    No Google Cloud Functions / Cloud Run (Google Frontend Proxy GFE),
- *    o GFE appenda o IP de conexão direta do cliente ao FINAL do cabeçalho X-Forwarded-For.
- *    Qualquer IP pré-existente enviado pelo atacante fica nos primeiros elementos (spoofable).
- *    Portanto, o IP confiável e validado pela infraestrutura Google é ips[ips.length - 1],
- *    ou o cabeçalho 'fastly-client-ip' / socket.remoteAddress.
+ * 1. Prioridade à cadeia X-Forwarded-For recebida pela borda gerenciada Google Cloud (GFE):
+ *    valores à esquerda podem ter sido enviados pelo cliente; o último nó é o salto
+ *    confiável acrescentado pela borda e é a identidade de rede adotada pelo rate limiter.
+ *    Não confiar em fastly-client-ip nem x-appengine-user-ip, pois não há garantia de
+ *    que esses cabeçalhos sejam removidos/substituídos antes de chegar à Function.
  * 2. Janelas deslizantes de 15 minutos com reset automático e contenção atômica de 3 camadas:
  *    - IP (5 tentativas)
  *    - Colaborador (5 tentativas)
  *    - Tenant Global (20 tentativas distribuídas)
  */
 
-const crypto = require('crypto');
+const net = require('net');
 
 const JANELA_MS = 15 * 60 * 1000;
 const LIMITE_TENTATIVAS_IP = 5;
@@ -23,60 +22,32 @@ const LIMITE_TENTATIVAS_USER = 5;
 const LIMITE_TENTATIVAS_GLOBAL = 20;
 
 /**
- * Extrai o IP real do cliente com validação rigorosa da cadeia de proxies reversos do Google Cloud / Cloud Run / GFE
- * 
- * Topologia de Infraestrutura Google Cloud Functions & External Application Load Balancers:
- * Conforme a documentação oficial da Google Cloud (docs.cloud.google.com/load-balancing/docs/https):
- * 1. Ao receber tráfego através de Google Cloud External Application Load Balancers (GFE),
- *    a infraestrutura anexa DOIS endereços IP ao cabeçalho 'X-Forwarded-For':
- *      X-Forwarded-For: <CLIENT_IP>, <FORWARDING_RULE_IP>
- *    onde:
- *      - Penúltimo nó (ips[ips.length - 2]): É o IP real do CLIENTE que se conectou ao balanceador.
- *      - Último nó (ips[ips.length - 1]): É o IP da Regra de Encaminhamento (Forwarding Rule) do balanceador Google.
- * 2. Se a requisição chega via Cloud Run Functions direto (sem balanceador extra à frente) com apenas 1 IP
- *    ou invocação direta local, ips[0] é o próprio cliente.
- * 3. Se um atacante tentar forjar cabeçalhos injetando IPs à esquerda:
- *      X-Forwarded-For: <ip_falso_1>, <ip_falso_2>, <CLIENT_IP_REAL>, <FORWARDING_RULE_IP>
- *    Ao descartar os nós forjados e o nó de infraestrutura do balanceador (último nó),
- *    o IP legítimo do cliente é estritamente o penúltimo elemento: ips[ips.length - 2].
- * 4. Para máxima robustez defensiva em qualquer topologia Google Cloud:
- *    - Se a cadeia tiver 2 ou mais IPs: o IP do cliente é ips[ips.length - 2] (descartando o forwarding rule IP).
- *    - Se a cadeia tiver exatamente 1 IP: o IP do cliente é ips[0].
+ * Extrai o último nó confiável da cadeia X-Forwarded-For definida pela borda GFE.
+ * O valor é validado como IPv4/IPv6; cabeçalhos alternativos enviados pelo cliente
+ * não são considerados fontes de identidade.
  */
 function extrairIpConviavel(rawRequest) {
   if (!rawRequest) return 'unknown_ip';
 
-  // 1. Análise da cadeia X-Forwarded-For segundo a especificação GFE / Google Cloud Load Balancing:
   const rawXff = rawRequest.headers?.['x-forwarded-for'];
   if (rawXff) {
     const ips = String(rawXff)
       .split(',')
       .map((s) => s.trim())
-      .filter((s) => s.length > 0 && /^[a-fA-F0-9:.]+$/.test(s));
+      .filter((s) => net.isIP(s) !== 0);
 
     if (ips.length > 0) {
-      if (ips.length >= 2) {
-        // Topologia Google Cloud Load Balancer: [..., CLIENT_IP, FORWARDING_RULE_IP]
-        // O penúltimo IP é o endereço real do cliente validado pelo balanceador
-        return ips[ips.length - 2];
-      }
-      // Topologia de salto único ou Cloud Run direto: [CLIENT_IP]
-      return ips[0];
+      // A borda GFE acrescenta o nó confiável à direita da cadeia encaminhada.
+      return ips[ips.length - 1];
     }
   }
 
-  // 2. Cabeçalho de usuário AppEngine/GCP caso injetado pela infraestrutura gerenciada
-  const gcpUserIp = rawRequest.headers?.['x-appengine-user-ip'];
-  if (gcpUserIp && /^[a-fA-F0-9:.]+$/.test(String(gcpUserIp).trim())) {
-    return String(gcpUserIp).trim();
-  }
-
-  // 3. Fallback para conexão de socket direto (emulação local / Express)
-  if (rawRequest.ip) {
-    return rawRequest.ip;
-  }
+  // Sem cadeia encaminhada válida, usar o peer direto do socket.
   if (rawRequest.socket?.remoteAddress) {
     return rawRequest.socket.remoteAddress;
+  }
+  if (rawRequest.ip) {
+    return rawRequest.ip;
   }
 
   return 'unknown_ip';

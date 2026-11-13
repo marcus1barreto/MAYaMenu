@@ -10,24 +10,25 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node tests/rate-limiting.test.js && npx firebase emulators:exec --only firestore \"node tests/firestore-rules.test.js\"",
-    "test:unit": "node tests/rate-limiting.test.js",
-    "test:rules": "npx firebase emulators:exec --only firestore \"node tests/firestore-rules.test.js\"",
-    "test:e2e": "../agentes_teste_python/venv/bin/python tests/e2e/test_novidades_superadmin_caixa.py"
+    "test": "node tests/rate-limiting.test.js && node tests/regressions.test.js && npx firebase emulators:exec --project mayamenu-bd --only firestore,storage \"node tests/firestore-rules.test.js && node tests/storage-rules.test.js && node tests/functions-emulator.test.js\"",
+    "test:unit": "node tests/rate-limiting.test.js && node tests/regressions.test.js",
+    "test:rules": "npx firebase emulators:exec --project mayamenu-bd --only firestore,storage \"node tests/firestore-rules.test.js && node tests/storage-rules.test.js && node tests/functions-emulator.test.js\"",
+    "test:e2e": "../agentes_teste_python/venv/bin/python tests/e2e/test_novidades_superadmin_caixa.py",
+    "migrate:public-profiles": "node functions/migrarPerfisPublicos.js",
+    "test:storage": "npx firebase emulators:exec --project mayamenu-bd --only storage \"node tests/storage-rules.test.js\""
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",
     "canvas-confetti": "^1.9.4",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.4.0",
-    "firebase": "^13.0.0",
+    "firebase": "^13.3.0",
     "html5-qrcode": "^2.3.8",
     "lucide-react": "^1.56.0",
     "next": "^16.4.3",
     "qrcode.react": "^4.2.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
-    "shadcn": "^4.21.4",
     "tw-animate-css": "^1.4.0"
   },
   "devDependencies": {
@@ -44,6 +45,10 @@
     "firebase-tools": "^15.36.0",
     "serwist": "^9.5.13",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "shadcn": "^4.21.4"
+  },
+  "overrides": {
+    "@grpc/grpc-js": "^1.14.7"
   }
 }

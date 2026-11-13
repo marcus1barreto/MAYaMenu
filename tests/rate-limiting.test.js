@@ -52,25 +52,24 @@ async function runUnitTests() {
 
   let passed = 0;
 
-  // 1. EXTRAÇÃO SEGURA DE IP E ANTI-SPOOFING DE X-FORWARDED-FOR (GOOGLE CLOUD GFE SPEC)
-  // Cenário 1: Topologia Google Cloud External Load Balancer:
-  // O GFE anexa DOIS IPs: o client IP real e o forwarding rule IP do balanceador.
-  // X-Forwarded-For: <ips_spoofados_pelo_atacante>, <CLIENT_IP_REAL>, <FORWARDING_RULE_IP>
+  // 1. EXTRAÇÃO SEGURA DE IP E ANTI-SPOOFING DE X-FORWARDED-FOR (GOOGLE CLOUD GFE)
+  // Valores à esquerda podem ter sido enviados pelo cliente; a borda gerenciada
+  // acrescenta o nó confiável à direita da cadeia.
   const mockReqGoogleLb = {
     headers: {
       'x-forwarded-for': '1.2.3.4, 187.45.10.22, 34.100.200.10',
-      // 1.2.3.4 = forjado pelo atacante à esquerda
-      // 187.45.10.22 = CLIENT_IP real validado pelo Google Load Balancer (penúltimo)
-      // 34.100.200.10 = FORWARDING_RULE_IP do Google Cloud (último nó)
+      // 1.2.3.4 = valor forjado pelo atacante à esquerda
+      // 187.45.10.22 = nó intermediário encaminhado
+      // 34.100.200.10 = nó mais à direita acrescentado pela borda GFE
     },
   };
   const ipExtraidoLb = extrairIpConviavel(mockReqGoogleLb);
   assert.strictEqual(
     ipExtraidoLb,
-    '187.45.10.22',
-    'Deve extrair o penúltimo nó (CLIENT_IP) e descartar tanto os nós forjados quanto o Forwarding Rule IP do balanceador'
+    '34.100.200.10',
+    'Deve selecionar exclusivamente o último nó confiável acrescentado pela borda GFE'
   );
-  console.log("[PASSOU] Extração correta do CLIENT_IP sob topologia Google Cloud Load Balancer (penúltimo nó)");
+  console.log("[PASSOU] Extração do último nó confiável da cadeia GFE");
   passed++;
 
   // Cenário 2: Atacante tenta falsificar 'fastly-client-ip' em Cloud Run Functions sem VCL garantido
@@ -82,10 +81,37 @@ async function runUnitTests() {
   };
   assert.strictEqual(
     extrairIpConviavel(mockReqSpoofingFastly),
-    '187.45.10.22',
-    'Não deve confiar cegamente em fastly-client-ip forjado pelo cliente'
+    '34.100.200.10',
+    'Não deve confiar em fastly-client-ip; deve selecionar o último nó GFE da cadeia XFF'
   );
   console.log("[PASSOU] Rejeição de cabeçalho arbitrário fastly-client-ip não autenticado");
+  passed++;
+
+  // Cabeçalho AppEngine não documentado como confiável em Cloud Functions gen2.
+  const mockReqSpoofingAppEngine = {
+    headers: { "x-appengine-user-ip": "1.2.3.4" },
+    socket: { remoteAddress: "35.191.0.20" },
+  };
+  assert.strictEqual(
+    extrairIpConviavel(mockReqSpoofingAppEngine),
+    "35.191.0.20",
+    "Não deve confiar em x-appengine-user-ip enviado pelo cliente"
+  );
+  console.log("[PASSOU] Rejeição de x-appengine-user-ip não autenticado; usa peer de socket");
+  passed++;
+
+  // Cabeçalhos com valores que parecem hexadecimais, mas não são IPs válidos, não podem alterar a seleção.
+  const mockReqIpMalformado = {
+    headers: { 'x-forwarded-for': '999.999.999.999, deadbeef' },
+    ip: '1.2.3.4', // valor que pode refletir trust-proxy e não deve prevalecer
+    socket: { remoteAddress: '35.191.0.20' },
+  };
+  assert.strictEqual(
+    extrairIpConviavel(mockReqIpMalformado),
+    '35.191.0.20',
+    'X-Forwarded-For malformado deve ser descartado e usar o peer confiável'
+  );
+  console.log("[PASSOU] Rejeição de endereços IPv4/IPv6 malformados");
   passed++;
 
   // Cenário 3: Requisição direta de salto único (apenas o IP do cliente no header)

@@ -17,7 +17,6 @@ import {
   alternarDisponibilidadePrato,
   salvarItemCardapio,
   excluirItemCardapio,
-  popularCardapioInicialSeVazio,
   atenderGarcomFirestore,
   lancarItemManualFirestore,
   trocarOrdemItens,
@@ -30,6 +29,10 @@ import { GestaoEquipe } from "./gestao-equipe";
 import { SetupMesas } from "./setup-mesas";
 import { MAYA_MEDIA_LIBRARY } from "@/lib/maya-media-library";
 import { validarVoucherPatrocinio, ativarPatrocinioNoRestaurante } from "@/lib/b2b-service";
+import {
+  criarPreferenciaMercadoPago,
+  confirmarPagamentoProBackend,
+} from "@/lib/mercadopago-service";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -212,103 +215,109 @@ export function AdminDashboard() {
     }
   };
 
-  // Processa retorno de pagamento do Mercado Pago (via URL query params)
+  // O retorno do checkout é apenas uma indicação; a confirmação real vem do backend/PSP.
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined" || !user?.uid || !restaurante?.id) return;
 
     const params = new URLSearchParams(window.location.search);
     const statusPagamento = params.get("status_pagamento");
-    const planoId = (params.get("plano") as "pro_mensal" | "pro_semestral") || "pro_mensal";
+    if (!statusPagamento) return;
+
+    const attemptId = params.get("attempt") || "";
     const paymentId = params.get("payment_id") || params.get("collection_id") || undefined;
-    const restParam = params.get("rest");
+    const limparRetorno = () => {
+      window.history.replaceState({}, "", window.location.pathname);
+    };
 
-    if (statusPagamento === "sucesso") {
-      try {
-        confetti({
-          particleCount: 90,
-          spread: 60,
-          origin: { y: 0.6 },
-        });
-      } catch (e) {
-        // ignora se canvas falhar
-      }
-
-      setAvisoCheckout({
-        tipo: "sucesso",
-        msg: "Parabéns! Sua assinatura MAYaMenu PRO foi confirmada. Seus limites foram atualizados para 30 mesas e 60 itens de menu!",
-      });
-
-      // Confirmação no backend para sincronização imediata
-      const targetRestId = restaurante?.id || restParam;
-      if (targetRestId) {
-        fetch("/api/pagamentos/mercadopago/confirmar-retorno", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            restauranteId: targetRestId,
-            planoId,
-            paymentId,
-          }),
-        }).catch((err) => console.error("Erro ao sincronizar retorno de pagamento:", err));
-      }
-
-      const novaUrl = window.location.pathname;
-      window.history.replaceState({}, "", novaUrl);
-    } else if (statusPagamento === "pendente") {
-      setAvisoCheckout({
-        tipo: "info",
-        msg: "Seu pagamento está em processamento pelo Mercado Pago. Se pagou por Pix ou boleto, a ativação ocorrerá assim que compensado.",
-      });
-      const novaUrl = window.location.pathname;
-      window.history.replaceState({}, "", novaUrl);
-    } else if (statusPagamento === "falha") {
+    if (statusPagamento === "falha") {
       setAvisoCheckout({
         tipo: "erro",
-        msg: "O checkout não foi finalizado. Nenhuma cobrança foi realizada. Você pode tentar novamente a qualquer momento.",
+        msg: "O checkout não foi finalizado. Nenhuma assinatura foi ativada. Você pode tentar novamente.",
       });
-      const novaUrl = window.location.pathname;
-      window.history.replaceState({}, "", novaUrl);
+      limparRetorno();
+      return;
     }
-  }, [restaurante?.id]);
 
-  // Inicia o Checkout Oficial do Mercado Pago
+    if (statusPagamento !== "sucesso" && statusPagamento !== "pendente") {
+      limparRetorno();
+      return;
+    }
+
+    if (!attemptId) {
+      setAvisoCheckout({
+        tipo: "erro",
+        msg: "Não foi possível identificar a tentativa de pagamento. Nenhuma alteração foi feita na assinatura.",
+      });
+      limparRetorno();
+      return;
+    }
+
+    let cancelado = false;
+    (async () => {
+      try {
+        const resultado = await confirmarPagamentoProBackend({ attemptId, paymentId });
+        if (cancelado) return;
+
+        if (resultado.sucesso && resultado.status === "approved") {
+          try {
+            confetti({ particleCount: 90, spread: 60, origin: { y: 0.6 } });
+          } catch {
+            // A animação é opcional; não interfere na confirmação financeira.
+          }
+          setAvisoCheckout({
+            tipo: "sucesso",
+            msg: "Pagamento confirmado pelo Mercado Pago. Sua assinatura MAYaMenu PRO está ativa, com 30 mesas e 60 itens de menu.",
+          });
+        } else if (["pending", "in_process", "authorized"].includes(resultado.status)) {
+          setAvisoCheckout({
+            tipo: "info",
+            msg: "O Mercado Pago ainda não confirmou a compensação. A assinatura será ativada automaticamente após a aprovação.",
+          });
+        } else {
+          setAvisoCheckout({
+            tipo: "erro",
+            msg: "O pagamento não foi aprovado. Nenhuma assinatura foi ativada.",
+          });
+        }
+      } catch (err: any) {
+        if (cancelado) return;
+        console.error("Falha ao confirmar pagamento no backend:", err);
+        setAvisoCheckout({
+          tipo: "erro",
+          msg: err?.message || "Não foi possível confirmar o pagamento. Nenhuma ativação foi realizada.",
+        });
+      } finally {
+        if (!cancelado) limparRetorno();
+      }
+    })();
+
+    return () => {
+      cancelado = true;
+    };
+  }, [restaurante?.id, user?.uid]);
+
+  // Inicia o Checkout Oficial do Mercado Pago. O servidor define preço, titular,
+  // referência externa, URLs de retorno e URL do webhook.
   const handleIniciarCheckoutMercadoPago = async () => {
     if (!restaurante?.id) return;
     setIniciandoCheckout(true);
     setAvisoCheckout(null);
 
     try {
-      const res = await fetch("/api/pagamentos/mercadopago/criar-preferencia", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          restauranteId: restaurante.id,
-          planoId: planoCheckoutSelecionado,
-          userEmail: user?.email || "lojista@mayamenu.com.br",
-          userName: restaurante.nome || "Restaurante MAYaMenu",
-        }),
+      const data = await criarPreferenciaMercadoPago({
+        restauranteId: restaurante.id,
+        planoId: planoCheckoutSelecionado,
       });
 
-      const data = await res.json();
-
-      if (!res.ok || !data.sucesso) {
-        if (data.modoDemo) {
-          setAvisoCheckout({
-            tipo: "info",
-            msg: "Modo Demonstração: Configure o MERCADO_PAGO_ACCESS_TOKEN no arquivo .env.local para processar cobranças reais.",
-          });
-        } else {
-          setAvisoCheckout({
-            tipo: "erro",
-            msg: data.erro || "Não foi possível criar a sessão de pagamento no Mercado Pago.",
-          });
-        }
+      if (!data.sucesso || !data.initPoint) {
+        setAvisoCheckout({
+          tipo: "erro",
+          msg: "Não foi possível criar a sessão de pagamento no Mercado Pago.",
+        });
         return;
       }
 
-      if (data.initPoint) {
-        window.location.href = data.initPoint;
-      }
+      window.location.assign(data.initPoint);
     } catch (err: any) {
       setAvisoCheckout({
         tipo: "erro",
@@ -339,14 +348,7 @@ export function AdminDashboard() {
     if (!restaurante?.id) return;
 
     setCarregandoCardapio(true);
-    let jaSemeado = false;
     const unsub = escutarCardapio(restaurante.id, (novosItens) => {
-      if (novosItens.length === 0 && !jaSemeado) {
-        jaSemeado = true;
-        popularCardapioInicialSeVazio(restaurante.id).catch((err) =>
-          console.warn("Falha ao inicializar cardápio de testes:", err)
-        );
-      }
       setItensCardapio(novosItens);
       setCarregandoCardapio(false);
     });
@@ -501,21 +503,29 @@ export function AdminDashboard() {
     setModalMesaAberto(true);
   };
 
-  const handleMarcarComoPago = async (mesaNumero: number, clienteId: string) => {
+  const handleMarcarComoPago = async (mesaNumero: number, clienteId: string): Promise<boolean> => {
+    if (!restaurante?.id) return false;
+    try {
+      // O estado visual só muda depois da confirmação transacional do backend.
+      await marcarComandaPagaFirestore(restaurante.id, mesaNumero, clienteId);
+    } catch (err) {
+      console.error("Falha ao confirmar pagamento da comanda:", err);
+      alert(err instanceof Error ? err.message : "Não foi possível confirmar o pagamento.");
+      return false;
+    }
+
     setMesas((prev) =>
       prev.map((m) => {
-        if (m.numero === mesaNumero) {
-          const novasComandas = m.comandas.map((c) =>
-            c.id === clienteId ? { ...c, status: "pago" as const } : c
-          );
-          const todasPagas = novasComandas.every((c) => c.status === "pago");
-          return {
-            ...m,
-            status: todasPagas ? ("paga_ocupada" as const) : m.status,
-            comandas: novasComandas,
-          };
-        }
-        return m;
+        if (m.numero !== mesaNumero) return m;
+        const novasComandas = m.comandas.map((c) =>
+          c.id === clienteId ? { ...c, status: "pago" as const } : c
+        );
+        const todasPagas = novasComandas.every((c) => c.status === "pago");
+        return {
+          ...m,
+          status: todasPagas ? ("paga_ocupada" as const) : m.status,
+          comandas: novasComandas,
+        };
       })
     );
 
@@ -531,20 +541,28 @@ export function AdminDashboard() {
         comandas: novas,
       };
     });
-
-    if (restaurante?.id) {
-      try {
-        await marcarComandaPagaFirestore(restaurante.id, mesaNumero, clienteId);
-      } catch (err) {
-        console.warn("Falha ao marcar comanda como paga no Firestore:", err);
-      }
-    }
+    return true;
   };
 
-  const handleLiberarMesa = async (mesaNumero: number) => {
+  const handleLiberarMesa = async (mesaNumero: number): Promise<boolean> => {
+    if (!restaurante?.id) return false;
     const mesaAlvo = mesas.find((m) => m.numero === mesaNumero);
     const comandasIds = mesaAlvo ? mesaAlvo.comandas.map((c) => c.id) : [];
+    if (comandasIds.length === 0) {
+      alert("Não há comandas identificadas para liberar esta mesa.");
+      return false;
+    }
 
+    try {
+      const { liberarMesaFirestore } = await import("@/lib/restaurante-service");
+      await liberarMesaFirestore(restaurante.id, mesaNumero, comandasIds);
+    } catch (err) {
+      console.error("Falha ao liberar mesa no backend:", err);
+      alert(err instanceof Error ? err.message : "Não foi possível liberar a mesa.");
+      return false;
+    }
+
+    // Só limpa o estado local após o backend confirmar o arquivamento de todas as comandas.
     setMesas((prev) =>
       prev.map((m) =>
         m.numero === mesaNumero ? { ...m, status: "livre", comandas: [] } : m
@@ -552,18 +570,9 @@ export function AdminDashboard() {
     );
     setMesaSelecionada(null);
     setModalMesaAberto(false);
-
-    if (restaurante?.id && comandasIds.length > 0) {
-      try {
-        const { liberarMesaFirestore } = await import("@/lib/restaurante-service");
-        await liberarMesaFirestore(restaurante.id, mesaNumero, comandasIds);
-      } catch (err) {
-        console.warn("Falha ao liberar mesa no Firestore pelo Admin:", err);
-      }
-    }
+    return true;
   };
 
-  // Dá baixa imediata na comanda do cliente escaneada no Balcão/Caixa
   const handleConfirmarComandaBalcao = async (payload: {
     mesaNumero: number | string;
     clienteId: string;
@@ -574,12 +583,18 @@ export function AdminDashboard() {
     const numMesa = Number(payload.mesaNumero) || 1;
     if (!restaurante?.id) return;
 
-    // 1. Marca a comanda como paga
-    await handleMarcarComoPago(numMesa, payload.clienteId);
+    const pagamentoConfirmado = await handleMarcarComoPago(numMesa, payload.clienteId);
+    if (!pagamentoConfirmado) return;
 
-    // 2. Libera a mesa / fecha comanda se estiver no modo balcão
     if (modoOperacao === "balcao") {
-      await handleLiberarMesa(numMesa);
+      const mesaLiberada = await handleLiberarMesa(numMesa);
+      if (!mesaLiberada) {
+        setFeedbackBalcao(
+          `Pagamento confirmado para ${payload.nomeCliente}, mas a mesa permanece ocupada até regularizar as demais comandas.`
+        );
+        setTimeout(() => setFeedbackBalcao(null), 7000);
+        return;
+      }
     }
 
     setFeedbackBalcao(
@@ -589,22 +604,25 @@ export function AdminDashboard() {
   };
 
   const handleAtenderGarcom = async (mesaNumero: number, clienteId: string) => {
+    if (!restaurante?.id) return;
+    try {
+      await atenderGarcomFirestore(restaurante.id, mesaNumero, clienteId);
+    } catch (err) {
+      console.error("Falha ao desarmar chamado no Firestore:", err);
+      alert(err instanceof Error ? err.message : "Não foi possível encerrar o chamado.");
+      return;
+    }
+
     setMesas((prev) =>
       prev.map((m) => {
-        if (m.numero === mesaNumero) {
-          const novasComandas = m.comandas.map((c) =>
-            c.id === clienteId && c.chamadoGarcom
-              ? { ...c, chamadoGarcom: { ...c.chamadoGarcom, ativo: false } }
-              : c
-          );
-          const aindaTemChamado = novasComandas.some((c) => c.chamadoGarcom?.ativo);
-          return {
-            ...m,
-            chamandoGarcom: aindaTemChamado,
-            comandas: novasComandas,
-          };
-        }
-        return m;
+        if (m.numero !== mesaNumero) return m;
+        const novasComandas = m.comandas.map((c) =>
+          c.id === clienteId && c.chamadoGarcom
+            ? { ...c, chamadoGarcom: { ...c.chamadoGarcom, ativo: false } }
+            : c
+        );
+        const aindaTemChamado = novasComandas.some((c) => c.chamadoGarcom?.ativo);
+        return { ...m, chamandoGarcom: aindaTemChamado, comandas: novasComandas };
       })
     );
 
@@ -616,20 +634,8 @@ export function AdminDashboard() {
           : c
       );
       const aindaTemChamado = novasComandas.some((c) => c.chamadoGarcom?.ativo);
-      return {
-        ...prev,
-        chamandoGarcom: aindaTemChamado,
-        comandas: novasComandas,
-      };
+      return { ...prev, chamandoGarcom: aindaTemChamado, comandas: novasComandas };
     });
-
-    if (restaurante?.id) {
-      try {
-        await atenderGarcomFirestore(restaurante.id, mesaNumero, clienteId);
-      } catch (err) {
-        console.warn("Falha ao desarmar chamado no Firestore pelo Admin:", err);
-      }
-    }
   };
 
   const handleLancarItemManual = (
@@ -1099,7 +1105,7 @@ export function AdminDashboard() {
             <span className="hidden sm:inline">Escanear Comanda</span>
           </Button>
 
-          <Link href="/garcom" target="_blank">
+          <Link href={restaurante?.id ? `/garcom?r=${encodeURIComponent(restaurante.id)}` : "/garcom"} target="_blank">
             <Button
               variant="outline"
               className="bg-card border-border hover:bg-muted text-emerald-600 dark:text-emerald-400 font-bold text-xs h-9 px-3 rounded-xl flex items-center gap-1.5 shadow-2xs hover:border-emerald-300 transition-all"
@@ -1111,7 +1117,7 @@ export function AdminDashboard() {
             </Button>
           </Link>
 
-          <Link href="/cozinha" target="_blank">
+          <Link href={restaurante?.id ? `/cozinha?r=${encodeURIComponent(restaurante.id)}` : "/cozinha"} target="_blank">
             <Button
               variant="outline"
               className="bg-card border-border hover:bg-muted text-amber-500 font-bold text-xs h-9 px-3 rounded-xl flex items-center gap-1.5"
@@ -2078,7 +2084,7 @@ export function AdminDashboard() {
                   <span className="text-[11px] text-muted-foreground">/mês</span>
                 </div>
                 <p className="text-[11px] text-muted-foreground leading-snug">
-                  Cobrança mensal com cancelamento a qualquer momento.
+                  Pagamento pré-pago de 1 mês, sem renovação automática.
                 </p>
               </div>
               <div className="mt-3 pt-2 border-t border-border/60 text-[10px] font-semibold text-muted-foreground">
@@ -2204,13 +2210,13 @@ export function AdminDashboard() {
               </div>
             </div>
 
-            {/* AVISO TRANSPARENTE SOBRE PAYPAL */}
+            {/* AVISO SOBRE CONDIÇÕES INSTITUCIONAIS */}
             <div className="mt-2 pt-2 border-t border-border flex items-start gap-2 text-[10px] text-muted-foreground">
-              <div className="w-4 h-4 rounded bg-[#003087] text-white flex items-center justify-center font-black text-[8px] shrink-0 mt-0.5">
-                P
+              <div className="w-4 h-4 rounded bg-muted text-muted-foreground flex items-center justify-center font-black text-[8px] shrink-0 mt-0.5">
+                i
               </div>
               <p className="leading-snug">
-                <strong className="text-foreground">Prefere pagar ou faturar via PayPal?</strong> Aceitamos faturamento internacional e contas multimoeda através do PayPal sob consulta via suporte.
+                <strong className="text-foreground">Precisa de condições institucionais?</strong> Entre em contato com nossa equipe comercial para avaliar opções de contratação.
               </p>
             </div>
           </div>

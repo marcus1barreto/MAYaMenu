@@ -376,7 +376,8 @@ export function SuperadminPatrocinadoresTab({
       ) : (
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
           {patrocinadoresFiltrados.map((pat) => {
-            const linkPortal = `/parceiros?chave=${encodeURIComponent(pat.chaveAcessoB2B || pat.id)}`;
+            // A chave é credencial secreta: nunca colocá-la na URL, histórico ou referrer.
+            const linkPortal = "/parceiros";
 
             return (
               <div

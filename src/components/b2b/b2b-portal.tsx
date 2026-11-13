@@ -12,8 +12,6 @@ import {
   Phone,
   Mail,
   ShieldCheck,
-  Check,
-  Copy,
   TrendingUp,
 } from "lucide-react";
 import { escutarCatalogoMaster, escutarLotesLicencas, escutarMetricasSellout } from "@/lib/b2b-service";
@@ -34,7 +32,6 @@ export function B2BPortal({ patrocinador, onLogout }: B2BPortalProps) {
   const [lotes, setLotes] = useState<LoteLicencasB2B[]>([]);
   const [metricasSellout, setMetricasSellout] = useState<MetricasSelloutItem[]>([]);
   const [carregando, setCarregando] = useState(true);
-  const [chaveCopiada, setChaveCopiada] = useState(false);
 
   // Escuta dados em tempo real no Firestore
   useEffect(() => {
@@ -61,13 +58,6 @@ export function B2BPortal({ patrocinador, onLogout }: B2BPortalProps) {
     };
   }, [patrocinador?.id]);
 
-  const copiarChave = () => {
-    if (typeof navigator !== "undefined" && navigator.clipboard) {
-      navigator.clipboard.writeText(patrocinador.chaveAcessoB2B);
-      setChaveCopiada(true);
-      setTimeout(() => setChaveCopiada(false), 2000);
-    }
-  };
 
   return (
     <div className="min-h-screen bg-neutral-50 text-neutral-900 flex flex-col font-sans selection:bg-rose-600 selection:text-white">
@@ -105,23 +95,11 @@ export function B2BPortal({ patrocinador, onLogout }: B2BPortalProps) {
             </div>
           </div>
 
-          {/* Chave de Acesso & Logout */}
+          {/* Sessão autenticada sem exposição da credencial */}
           <div className="flex items-center gap-2.5">
-            <button
-              type="button"
-              onClick={copiarChave}
-              className="px-3 py-1.5 rounded-xl bg-neutral-100 border border-neutral-200 hover:border-neutral-300 text-xs font-mono text-neutral-700 flex items-center gap-2 transition-all shadow-2xs"
-              title="Copiar Chave de Acesso B2B"
-            >
-              <span className="text-[10px] uppercase font-bold text-neutral-500">Chave:</span>
-              <span className="font-bold text-neutral-900">{patrocinador.chaveAcessoB2B}</span>
-              {chaveCopiada ? (
-                <Check className="w-3.5 h-3.5 text-emerald-600" />
-              ) : (
-                <Copy className="w-3.5 h-3.5 text-neutral-400" />
-              )}
-            </button>
-
+            <span className="px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-[10px] font-bold uppercase tracking-wider text-emerald-800">
+              Sessão segura
+            </span>
             <Button
               type="button"
               variant="ghost"
@@ -195,10 +173,7 @@ export function B2BPortal({ patrocinador, onLogout }: B2BPortalProps) {
 
         {/* RENDERIZAÇÃO DA ABA ATIVA */}
         {abaAtiva === "lotes" && (
-          <B2BLotesView
-            patrocinadorId={patrocinador.id}
-            lotes={lotes}
-          />
+          <B2BLotesView lotes={lotes} />
         )}
 
         {abaAtiva === "catalogo" && (

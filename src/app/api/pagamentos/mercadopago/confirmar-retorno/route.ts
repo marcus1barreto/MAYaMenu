@@ -1,46 +1,13 @@
-// src/app/api/pagamentos/mercadopago/confirmar-retorno/route.ts
-import { NextRequest, NextResponse } from "next/server";
-import { consultarPagamentoMercadoPago, ativarPlanoProPorPagamento } from "@/lib/mercadopago-service";
+import { NextResponse } from "next/server";
 
-export async function POST(req: NextRequest) {
-  try {
-    const body = await req.json();
-    const { restauranteId, planoId, paymentId } = body;
-
-    if (!restauranteId || !planoId) {
-      return NextResponse.json({ erro: "Parâmetros inválidos." }, { status: 400 });
-    }
-
-    // Se houver um paymentId do retorno, consulta no Mercado Pago
-    let valorPago: number | undefined;
-    let metodo: string | undefined;
-
-    if (paymentId) {
-      const dados = await consultarPagamentoMercadoPago(paymentId);
-      if (dados && dados.status !== "approved") {
-        return NextResponse.json({ erro: "Pagamento ainda não aprovado pelo Mercado Pago." }, { status: 400 });
-      }
-      if (dados) {
-        valorPago = dados.transaction_amount;
-        metodo = dados.payment_type_id;
-      }
-    }
-
-    const res = await ativarPlanoProPorPagamento({
-      restauranteId,
-      planoId: planoId as "pro_mensal" | "pro_semestral",
-      paymentId,
-      metodoPagamento: metodo,
-      valorPago,
-    });
-
-    if (!res.sucesso) {
-      return NextResponse.json({ erro: res.mensagem || "Erro ao ativar." }, { status: 500 });
-    }
-
-    return NextResponse.json({ sucesso: true, novaDataExpiracao: res.novaDataExpiracao });
-  } catch (err: any) {
-    return NextResponse.json({ erro: err?.message || "Erro no servidor." }, { status: 500 });
-  }
+// Endpoint legado desativado: pagamentos agora são criados/confirmados exclusivamente
+// pelas Cloud Functions autenticadas e pelo webhook Mercado Pago com assinatura HMAC.
+export async function POST() {
+  return NextResponse.json(
+    {
+      sucesso: false,
+      erro: "Endpoint legado desativado. Utilize a integração segura do backend.",
+    },
+    { status: 410 }
+  );
 }
-
