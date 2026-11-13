@@ -18,7 +18,7 @@ import {
   runTransaction,
   type Unsubscribe,
 } from "firebase/firestore";
-import type { Licenca, PlanoTipo, LimitesPlano, Restaurante } from "@/types";
+import type { Licenca, LicencaArquivada, PlanoTipo, LimitesPlano, Restaurante } from "@/types";
 import { millisOu } from "@/lib/datas";
 import { httpsCallable } from "firebase/functions";
 
