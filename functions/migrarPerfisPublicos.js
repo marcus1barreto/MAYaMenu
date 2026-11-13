@@ -26,6 +26,15 @@ async function main() {
       for (const key of ["corPrimaria", "tema", "logoUrl", "capaUrl", "modoOperacao", "modoFilaKds", "taxaServico"]) {
         if (cfg[key] !== undefined) configuracoes[key] = cfg[key];
       }
+      if (cfg.pixConfig?.ativo === true && cfg.pixConfig.chave && cfg.pixConfig.tipoChave) {
+        configuracoes.pixConfig = {
+          chave: String(cfg.pixConfig.chave),
+          tipoChave: String(cfg.pixConfig.tipoChave),
+          beneficiario: String(cfg.pixConfig.beneficiario || "").slice(0, 25),
+          cidade: String(cfg.pixConfig.cidade || "").slice(0, 15),
+          ativo: true,
+        };
+      }
       batch.set(db.collection("restaurantes_publicos").doc(docSnap.id), {
         restauranteId: docSnap.id,
         slug: String(data.slug || docSnap.id),
