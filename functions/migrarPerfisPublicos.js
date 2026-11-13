@@ -20,7 +20,7 @@ async function main() {
   let cursor = null;
   let total = 0;
   do {
-    let q = db.collection("restaurantes").orderBy(admin.firestore.FieldPath.documentId()).limit(400);
+    let q = db.collection("restaurantes").orderBy(FieldPath.documentId()).limit(400);
     if (cursor) q = q.startAfter(cursor);
     const snap = await q.get();
     if (snap.empty) break;
@@ -48,7 +48,7 @@ async function main() {
         nome: String(data.nome || "Restaurante"),
         suspenso: data.suspenso === true || cfg.suspenso === true,
         configuracoes,
-        atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
+        atualizadoEm: FieldValue.serverTimestamp(),
       });
     }
     await batch.commit();
