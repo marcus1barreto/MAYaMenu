@@ -307,6 +307,26 @@ async function main() {
     }
   });
 
+  await runTest("Emulador: checkout PRO exige modo Mercado Pago explicitamente configurado", async () => {
+    const restRef = db.doc("restaurantes/rest_mp_mode_required");
+    await restRef.set({ ownerId: "owner_mp_mode_required", plano: "free" });
+    const anterior = process.env.MERCADO_PAGO_LIVE_MODE;
+    delete process.env.MERCADO_PAGO_LIVE_MODE;
+    try {
+      await assert.rejects(
+        () => executarCriarPreferenciaProBackend(
+          db,
+          { uid: "owner_mp_mode_required", token: { firebase: { sign_in_provider: "password" } } },
+          { restauranteId: restRef.id, planoId: "pro_mensal" }
+        ),
+        /MERCADO_PAGO_LIVE_MODE deve ser configurado explicitamente/i
+      );
+    } finally {
+      if (anterior === undefined) delete process.env.MERCADO_PAGO_LIVE_MODE;
+      else process.env.MERCADO_PAGO_LIVE_MODE = anterior;
+    }
+  });
+
   await runTest("Emulador: pagamento PRO é transacional e idempotente por paymentId", async () => {
     const attemptId = "123e4567-e89b-12d3-a456-426614174001";
     const paymentId = "987654322";
