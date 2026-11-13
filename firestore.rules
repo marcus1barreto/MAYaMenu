@@ -180,17 +180,8 @@ service cloud.firestore {
       allow get: if isOwner(restauranteId) || isActiveStaffMember(restauranteId) || isSuperAdmin();
       allow list: if isSuperAdmin();
 
-      // Criação somente no fluxo de ativação: consome uma licença e trava o slug atomicamente.
-      allow create: if isNonAnonymous()
-        && request.resource.data.ownerId == request.auth.uid
-        && request.resource.data.slug is string
-        && request.resource.data.licenca.id is string
-        && existsAfter(/databases/$(database)/documents/slugs/$(request.resource.data.slug))
-        && getAfter(/databases/$(database)/documents/slugs/$(request.resource.data.slug)).data.ownerId == request.auth.uid
-        && existsAfter(/databases/$(database)/documents/arquivo_morto_licencas/$(request.resource.data.licenca.id))
-        && !existsAfter(/databases/$(database)/documents/concessoes/$(request.resource.data.licenca.id))
-        && getAfter(/databases/$(database)/documents/arquivo_morto_licencas/$(request.resource.data.licenca.id)).data.ownerId == request.auth.uid
-        && getAfter(/databases/$(database)/documents/arquivo_morto_licencas/$(request.resource.data.licenca.id)).data.dadosLicenca.plano == request.resource.data.plano;
+      // Criação de tenants exclusivamente pelo backend de ativação (Admin SDK).
+      allow create: if false;
 
       // Lojista só altera campos cadastrais não privilegiados. Plano, licença, titularidade,
       // suspensão e limites são governados exclusivamente pelo SuperAdmin/backend.
