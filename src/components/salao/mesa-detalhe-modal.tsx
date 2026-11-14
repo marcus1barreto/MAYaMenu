@@ -730,7 +730,7 @@ export function MesaDetalheModal({
                                   : "Solicitou atendimento na mesa"}
                               </span>
                             </div>
-                            {!modoSomenteLeitura && onAtenderGarcom && (
+                            {onAtenderGarcom && (
                               <Button
                                 type="button"
                                 size="sm"
@@ -751,7 +751,7 @@ export function MesaDetalheModal({
                             className="h-10 text-xs px-3"
                             label="Imprimir (USB)"
                           />
-                          {!jaPago && (
+                          {!jaPago && comanda.subtotal > 0 && (
                             <Button
                               type="button"
                               disabled={encerrando}
