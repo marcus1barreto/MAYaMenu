@@ -417,7 +417,7 @@ service cloud.firestore {
         || request.auth.uid == clienteId
         || (
           ('role' in request.auth.token)
-          && request.auth.token.role in ['owner', 'garcom', 'cozinha']
+          && request.auth.token.role in ['owner', 'admin', 'garcom', 'cozinha']
           && ('restauranteId' in request.auth.token)
           && resource.data.restauranteId == request.auth.token.restauranteId
           && (
@@ -440,7 +440,7 @@ service cloud.firestore {
         )
         || (
           ('role' in request.auth.token)
-          && request.auth.token.role in ['owner', 'garcom', 'cozinha']
+          && request.auth.token.role in ['owner', 'admin', 'garcom', 'cozinha']
           && ('restauranteId' in request.auth.token)
           && resource.data.restauranteId == request.auth.token.restauranteId
           && (

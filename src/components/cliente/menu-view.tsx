@@ -345,10 +345,12 @@ export function MenuView({
 
       setGarcomChamadoSucesso(true);
       setSegundosCooldown(120); // 2 minutos de cooldown anti-flooding
-    } catch (err) {
+    } catch (err: any) {
       console.warn("Falha ao registrar chamado do garçom:", err);
       setGarcomChamadoSucesso(false);
       setSegundosCooldown(0);
+      const msg = err?.message || "Não foi possível chamar o atendimento. Verifique se o QR Code da mesa foi escaneado.";
+      alert(msg);
     } finally {
       setChamandoGarcom(false);
     }
