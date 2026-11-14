@@ -134,8 +134,14 @@ export default function LandingPage() {
 
               {/* Subtítulo M3 Body Large */}
               <p className="mt-4 sm:mt-5 text-base sm:text-lg lg:text-xl text-neutral-600 max-w-2xl font-normal leading-relaxed">
-                Por apenas <strong className="text-neutral-950 font-bold">R$ 0,26 diários por mesa</strong>,
-                organize a sua cozinha, acabe com a confusão nos pedidos e aumente o faturamento. Tecnologia limpa feita para quem vive a realidade do salão.
+                {moduloAtivo("mod.vendas_assinaturas") ? (
+                  <>
+                    Por apenas <strong className="text-neutral-950 font-bold">R$ 0,26 diários por mesa</strong>,
+                    organize a sua cozinha, acabe com a confusão nos pedidos e aumente o faturamento. Tecnologia limpa feita para quem vive a realidade do salão.
+                  </>
+                ) : (
+                  "Organize a sua cozinha, acabe com a confusão nos pedidos e aumente o faturamento. Tecnologia limpa feita para quem vive a realidade do salão."
+                )}
               </p>
 
               {/* CTAs de Conversão (Áreas de toque mínimas de 44px) */}
