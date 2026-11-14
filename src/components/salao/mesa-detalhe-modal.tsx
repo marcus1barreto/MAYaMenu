@@ -855,15 +855,17 @@ export function MesaDetalheModal({
                       className="w-full h-11 border-border bg-card hover:bg-muted text-foreground font-bold rounded-xl text-sm"
                       label="Imprimir Conferência da Mesa (USB)"
                     />
-                    <button
-                      type="button"
-                      onClick={handleEncerrarMesa}
-                      disabled={encerrando}
-                      className="w-full h-14 bg-emerald-600 hover:bg-emerald-500 disabled:bg-muted disabled:text-muted-foreground text-white font-black rounded-xl text-lg transition-colors flex items-center justify-center gap-2 shadow-xs cursor-pointer disabled:cursor-not-allowed"
-                    >
-                      <CheckCircle2 className="w-5 h-5" />
-                      <span>{encerrando ? "Processando..." : "Encerrar e Liberar Mesa"}</span>
-                    </button>
+                    {(mesa.status !== "livre" || (mesa.comandas?.length ?? 0) > 0) && (
+                      <button
+                        type="button"
+                        onClick={handleEncerrarMesa}
+                        disabled={encerrando}
+                        className="w-full h-14 bg-emerald-600 hover:bg-emerald-500 disabled:bg-muted disabled:text-muted-foreground text-white font-black rounded-xl text-lg transition-colors flex items-center justify-center gap-2 shadow-xs cursor-pointer disabled:cursor-not-allowed"
+                      >
+                        <CheckCircle2 className="w-5 h-5" />
+                        <span>{encerrando ? "Processando..." : "Encerrar e Liberar Mesa"}</span>
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
