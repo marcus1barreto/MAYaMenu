@@ -394,7 +394,25 @@ export function MenuView({
 
       await updateDoc(comandaRef, dadosUpdate);
       setContaPedidaSucesso(true);
-    } catch (e) {
+    } catch (e: any) {
+      if (e?.code === "not-found") {
+        try {
+          const finalUid = uid || (await ensureClienteAnonimo()).uid;
+          await chamarGarcomFirestore({
+            restauranteId: restaurante.id,
+            slug: restaurante.slug,
+            mesaNumero: numeroMesa,
+            clienteId: finalUid,
+            nomeCliente: nomeCliente || "Cliente",
+            motivo: metodo === "pix" ? "Pagamento Pix" : "Pedir a Conta",
+            qrCredencial: qrCredencialAtiva || "",
+          });
+          setContaPedidaSucesso(true);
+          return;
+        } catch (fallbackErr) {
+          console.warn("Falha ao enviar solicitação de conta via chamado:", fallbackErr);
+        }
+      }
       console.warn("Falha ao enviar solicitação de conta:", e);
       // Não sinaliza sucesso quando o Firestore rejeita a solicitação.
       setContaPedidaSucesso(false);

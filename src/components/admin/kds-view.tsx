@@ -235,6 +235,29 @@ export function KdsView({
     }
   };
 
+  // Ação de entrega na mesa: "SERVIR" (Muda de Pronto -> Entregue)
+  const handleServir = async (id: string) => {
+    const pedidoAlvo = pedidos.find((p) => p.id === id);
+    if (!pedidoAlvo || pedidoAlvo.status !== "pronto") return;
+
+    setPedidos((prev) =>
+      prev.map((p) => (p.id === id ? { ...p, status: "entregue" } : p))
+    );
+
+    if (pedidoAlvo.refPath) {
+      try {
+        await atualizarStatusPedido(pedidoAlvo.refPath, "entregue", {
+          pedidoRefPath: (pedidoAlvo as any).pedidoRefPath,
+        });
+      } catch (err) {
+        console.warn("Falha ao marcar pedido como servido:", err);
+        setPedidos((prev) =>
+          prev.map((p) => (p.id === id ? { ...p, status: "pronto" } : p))
+        );
+      }
+    }
+  };
+
   const pedidosAFazer = pedidos.filter((p) => p.status === "a_fazer");
   const pedidosProntos = pedidos.filter((p) => p.status === "pronto");
 
@@ -570,12 +593,11 @@ export function KdsView({
 
                     <Button
                       type="button"
-                      onClick={() => handleMarchar(ped.id)}
-                      disabled={!ehAFazer}
+                      onClick={() => (ehAFazer ? handleMarchar(ped.id) : handleServir(ped.id))}
                       className={`flex-1 h-14 rounded-2xl font-black text-base shadow-md transition-all active:scale-[0.98] flex items-center justify-center gap-2 ${
                         ehAFazer
                           ? "bg-rose-600 hover:bg-rose-500 text-white shadow-rose-600/25"
-                          : "bg-neutral-200 hover:bg-neutral-300 text-neutral-800 border border-neutral-300"
+                          : "bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/25"
                       }`}
                     >
                       {ehAFazer ? (
@@ -585,8 +607,8 @@ export function KdsView({
                         </>
                       ) : (
                         <>
-                          <CheckCircle className="w-5 h-5 text-emerald-600" />
-                          <span>Pronto</span>
+                          <CheckCircle className="w-5 h-5" />
+                          <span>Servir (Entregue)</span>
                         </>
                       )}
                     </Button>
