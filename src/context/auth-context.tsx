@@ -242,27 +242,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             (authErr as { code?: string }).code === "auth/email-already-in-use");
 
         if (isEmailInUse) {
-          // Recuperação automática de falha parcial: tenta logar para concluir ativação pendente
-          try {
-            const loginRes = await signInWithEmailAndPassword(auth, email.trim(), pass);
-            uid = loginRes.user.uid;
-
-            // Verifica se o restaurante já foi criado anteriormente
-            const restExistenteSnap = await getDoc(doc(db, "restaurantes", uid));
-            if (restExistenteSnap.exists()) {
-              const existente = restExistenteSnap.data() || {};
-              if (existente.ownerId !== uid || existente.licenca?.id !== codigoLicenca.trim().toUpperCase()) {
-                throw new Error("Este e-mail já possui um estabelecimento ativo. Acesse o painel de login.");
-              }
-              // Se a resposta da ativação anterior se perdeu após o commit, o backend
-              // reconhece a mesma licença/UID como repetição idempotente.
-            }
-          } catch (loginErr: unknown) {
-            if (loginErr instanceof Error && loginErr.message.includes("estabelecimento ativo")) {
-              throw loginErr;
-            }
-            throw new Error("Este e-mail já foi cadastrado no sistema, mas a senha informada não confere. Use a senha correta para concluir a ativação.");
-          }
+          throw new Error(
+            "Não foi possível concluir o cadastro com este e-mail. Caso já tenha acesso, utilize a aba Entrar ou 'Esqueci minha senha'."
+          );
         } else {
           console.warn("Falha no Firebase Auth:", authErr);
           throw authErr;
