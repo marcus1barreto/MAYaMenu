@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { moduloAtivo } from "@/lib/modules";
 import Image from "next/image";
 import type { Metadata } from "next";
 import {
@@ -82,9 +83,15 @@ export default function LandingPage() {
                 NOVO
               </span>
             </a>
-            <Link href="/precos" className="hover:text-rose-600 transition-colors">
-              Planos & Preços
-            </Link>
+            {moduloAtivo("mod.vendas_assinaturas") ? (
+              <Link href="/precos" className="hover:text-rose-600 transition-colors">
+                Planos & Preços
+              </Link>
+            ) : (
+              <a href="#precos" className="hover:text-rose-600 transition-colors">
+                Pré-lançamento Grátis
+              </a>
+            )}
             <a href="#perguntas" className="hover:text-rose-600 transition-colors">
               Dúvidas
             </a>
@@ -381,7 +388,41 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* 4. SEÇÃO PREÇOS (TRANSPARÊNCIA RADICAL) */}
+        {/* 4. SEÇÃO PREÇOS / PRÉ-LANÇAMENTO */}
+        {!moduloAtivo("mod.vendas_assinaturas") ? (
+          <section id="precos" className="py-16 md:py-24 border-t border-neutral-200 bg-neutral-50/60">
+            <div className="max-w-4xl mx-auto px-4 sm:px-6">
+              <div className="text-center mb-10 sm:mb-12">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-xs font-bold text-emerald-700 mb-3.5">
+                  Pré-lançamento Gratuito
+                </span>
+                <h2 className="text-3xl sm:text-5xl font-black text-neutral-950 tracking-tight">
+                  Organize a sua cozinha, acabe com a confusão nos pedidos.
+                </h2>
+                <p className="mt-4 text-neutral-600 text-base sm:text-lg max-w-xl mx-auto">
+                  Tecnologia limpa feita para quem vive a realidade do salão. Versão gratuita de pré-lançamento para até 5 mesas, com QR Code, Cozinha ao vivo, Atendimento e Pix.
+                </p>
+              </div>
+              <div className="rounded-3xl border border-neutral-200 bg-white p-6 sm:p-10 shadow-xl text-center space-y-4">
+                <div className="text-3xl sm:text-5xl font-black text-neutral-950">Grátis</div>
+                <p className="text-sm sm:text-base text-neutral-600 max-w-lg mx-auto">
+                  Até <strong>5 mesas</strong> com QR Code, <strong>KDS da Cozinha</strong>, botão de <strong>Solicitar atendimento</strong> e recebimento por <strong>Pix</strong>.
+                </p>
+                <p className="text-xs text-neutral-500">
+                  Em breve: módulo Garçom, Relatórios Inteligentes e Planos PRO.
+                </p>
+                <div className="pt-2">
+                  <Link
+                    href="/admin"
+                    className="inline-flex items-center justify-center rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold px-6 py-3 text-sm transition-colors"
+                  >
+                    Começar Grátis Agora
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </section>
+        ) : (
         <section id="precos" className="py-16 md:py-24 border-t border-neutral-200 bg-neutral-50/60">
           <div className="max-w-4xl mx-auto px-4 sm:px-6">
             <div className="text-center mb-10 sm:mb-12">
@@ -496,6 +537,7 @@ export default function LandingPage() {
             </div>
           </div>
         </section>
+        )}
 
         {/* 5. SEÇÃO PERGUNTAS FREQUENTES (FAQ) */}
         <section id="perguntas" className="py-16 md:py-24 max-w-4xl mx-auto px-4 sm:px-6">
@@ -568,9 +610,15 @@ export default function LandingPage() {
             <Link href="/manual" className="hover:text-rose-600 transition-colors">
               Manual & FAQ
             </Link>
-            <Link href="/precos" className="hover:text-rose-600 transition-colors">
-              Planos & Preços
-            </Link>
+            {moduloAtivo("mod.vendas_assinaturas") ? (
+              <Link href="/precos" className="hover:text-rose-600 transition-colors">
+                Planos & Preços
+              </Link>
+            ) : (
+              <a href="#precos" className="hover:text-rose-600 transition-colors">
+                Pré-lançamento Grátis
+              </a>
+            )}
             <Link href="/termos-de-uso" className="hover:text-rose-600 transition-colors">
               Termos de Uso
             </Link>
