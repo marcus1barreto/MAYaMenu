@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Clock, CheckCircle, ChefHat, Sparkles, AlertTriangle, ArrowRight, Printer, Check, Volume2, VolumeX } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { collectionGroup, query, where, onSnapshot } from "firebase/firestore";
-import { escutarPedidosKds, atualizarStatusPedido } from "@/lib/restaurante-service";
+import { escutarPedidosKds, atualizarStatusPedido, atenderChamadoGarcom } from "@/lib/restaurante-service";
 import { imprimirComandaKds } from "@/lib/kds-printer";
 import { obterImpressoraSalva, esquecerImpressoraUSB } from "@/lib/web-serial";
 import { audioAlertService } from "@/lib/audio-alerts";
@@ -422,11 +422,22 @@ export function KdsView({
             {chamadosAtendimento.map((ch) => (
               <span
                 key={ch.id}
-                className="inline-flex items-center rounded-full bg-amber-200/80 px-3 py-0.5 text-xs font-extrabold text-amber-950"
+                className="inline-flex items-center gap-2 rounded-full bg-amber-200/80 pl-3 pr-1.5 py-0.5 text-xs font-extrabold text-amber-950"
               >
-                {ch.nomeCliente
-                  ? `${ch.nomeCliente}, da Mesa ${ch.mesa}, solicita atendimento`
-                  : `Mesa ${ch.mesa} solicita atendimento`}
+                <span>
+                  {ch.nomeCliente
+                    ? `${ch.nomeCliente}, da Mesa ${ch.mesa}, solicita atendimento`
+                    : `Mesa ${ch.mesa} solicita atendimento`}
+                </span>
+                {restauranteId && (
+                  <button
+                    type="button"
+                    onClick={() => atenderChamadoGarcom(restauranteId, ch.mesa, ch.id)}
+                    className="rounded-full bg-amber-900 hover:bg-amber-950 text-white px-2 py-0.5 text-[10px] font-bold transition-colors cursor-pointer"
+                  >
+                    Atender
+                  </button>
+                )}
               </span>
             ))}
           </div>
