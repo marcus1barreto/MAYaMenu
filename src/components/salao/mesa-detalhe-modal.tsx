@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { moduloAtivo } from "@/lib/modules";
 import type { MesaOperacional, ComandaGarcom, ItemComandaGarcom } from "@/components/garcom/garcom-view";
 import type { MenuItem, PedidoComRef } from "@/types";
 import { CARDAPIO_DEMO } from "@/lib/mock-data";
@@ -720,10 +721,14 @@ export function MesaDetalheModal({
 
                         {/* Alerta de Chamado do Garçom */}
                         {comanda.chamadoGarcom?.ativo && (
-                          <div className="mb-3 p-2 bg-amber-500/20 border border-amber-500/40 rounded-xl flex items-center justify-between text-xs text-amber-200">
+                          <div className="mb-3 p-2 bg-amber-500/20 border border-amber-500/40 rounded-xl flex items-center justify-between text-xs text-amber-900 dark:text-amber-200">
                             <div className="flex items-center gap-1.5 font-bold">
-                              <Bell className="w-3.5 h-3.5 text-amber-400 animate-bounce" />
-                              <span>Solicitou garçom na mesa</span>
+                              <Bell className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 animate-bounce" />
+                              <span>
+                                {moduloAtivo("mod.garcom_salao")
+                                  ? "Solicitou garçom na mesa"
+                                  : "Solicitou atendimento na mesa"}
+                              </span>
                             </div>
                             {!modoSomenteLeitura && onAtenderGarcom && (
                               <Button
