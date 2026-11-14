@@ -36,6 +36,7 @@ import { ensureClienteAnonimo, auth, db } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { doc, updateDoc, serverTimestamp, onSnapshot } from "firebase/firestore";
 import { escutarCardapio, escutarRestaurante, chamarGarcomFirestore, escutarPedidosCliente } from "@/lib/restaurante-service";
+import { moduloAtivo } from "@/lib/modules";
 import { marcarVisitaAtualComoPaga, limparSessaoClienteLocal } from "@/lib/historico-cliente";
 import { MesaScannerModal } from "./mesa-scanner-modal";
 import cartStorage from "@/lib/cart-storage.cjs";
@@ -773,7 +774,13 @@ export function MenuView({
                     <div className="p-2 bg-emerald-500/10 text-emerald-500 rounded-lg">
                       <Bell className="w-4 h-4" />
                     </div>
-                    <span>{chamandoGarcom ? "Chamando..." : "Chamar Garçom na Mesa"}</span>
+                    <span>
+                      {chamandoGarcom
+                        ? "Solicitando..."
+                        : moduloAtivo("mod.garcom_salao")
+                          ? "Chamar Garçom na Mesa"
+                          : "Solicitar atendimento"}
+                    </span>
                   </div>
                   {segundosCooldown > 0 && (
                     <span className="text-[10px] text-amber-500 font-mono">{segundosCooldown}s</span>

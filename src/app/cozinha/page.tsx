@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from "@/context/auth-context";
 import { KdsView } from "@/components/admin/kds-view";
 import { AdminLoginForm } from "@/components/admin/admin-login-form";
 import { PinLockGuard } from "@/components/salao/pin-lock-guard";
+import { moduloAtivo } from "@/lib/modules";
 import { EstabelecimentoSuspensoView } from "@/components/admin/estabelecimento-suspenso-view";
 import { TemaUsuarioProvider } from "@/context/tema-context";
 import { Button } from "@/components/ui/button";
@@ -53,20 +54,32 @@ function CozinhaPageContent() {
     return <EstabelecimentoSuspensoView restaurante={restaurante} />;
   }
 
+  const kdsElement = (
+    <KdsView
+      restauranteId={restaurante?.id}
+      slug={restaurante?.slug}
+      nomeRestaurante={restaurante?.nome || "MAYaMenu"}
+      modoFilaKds={restaurante?.configuracoes?.modoFilaKds || "sequencial"}
+    />
+  );
+
+  const permitirProprietarioDireto =
+    !moduloAtivo("mod.garcom_salao") &&
+    Boolean(user && !user.isAnonymous && !user.uid.startsWith("pin_") && restaurante);
+
   return (
     <TemaUsuarioProvider scope="cozinha" fallbackTemaRestaurante={restaurante?.configuracoes?.tema}>
-      <PinLockGuard
-        role="cozinha"
-        restauranteId={restaurante?.id}
-        slug={restaurante?.slug}
-      >
-        <KdsView
+      {permitirProprietarioDireto ? (
+        kdsElement
+      ) : (
+        <PinLockGuard
+          role="cozinha"
           restauranteId={restaurante?.id}
           slug={restaurante?.slug}
-          nomeRestaurante={restaurante?.nome || "MAYaMenu"}
-          modoFilaKds={restaurante?.configuracoes?.modoFilaKds || "sequencial"}
-        />
-      </PinLockGuard>
+        >
+          {kdsElement}
+        </PinLockGuard>
+      )}
     </TemaUsuarioProvider>
   );
 }

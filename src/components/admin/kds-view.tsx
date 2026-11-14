@@ -168,6 +168,36 @@ export function KdsView({
     return () => unsub();
   }, [restauranteId, slug, isSandbox]);
 
+  const [chamadosAtendimento, setChamadosAtendimento] = useState<
+    { id: string; mesa: number | string; nomeCliente?: string }[]
+  >([]);
+
+  useEffect(() => {
+    if (!restauranteId || isSandbox) return;
+    const q = query(
+      collectionGroup(db, "comandas_abertas"),
+      where("restauranteId", "==", restauranteId)
+    );
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        const ativos = snap.docs
+          .map((d) => ({ id: d.id, ...(d.data() as Partial<ComandaCliente>) }))
+          .filter((c) => c.chamadoGarcom?.ativo === true)
+          .map((c) => ({
+            id: c.id,
+            mesa: c.mesa ?? "?",
+            nomeCliente: c.nomeCliente?.trim() || undefined,
+          }));
+        setChamadosAtendimento(ativos);
+      },
+      () => {
+        // Silencia erro de listener caso sessão ainda esteja autenticando
+      }
+    );
+    return () => unsub();
+  }, [restauranteId, isSandbox]);
+
   // Ação essencial da cozinha: "MARCHAR" (Muda de A Fazer -> Pronto)
   const handleMarchar = async (id: string) => {
     const pedidoAlvo = pedidos.find((p) => p.id === id);
@@ -383,6 +413,25 @@ export function KdsView({
           </div>
         </div>
       </header>
+
+      {chamadosAtendimento.length > 0 && (
+        <div className="mb-5 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 shadow-xs">
+          <div className="flex flex-wrap items-center gap-2 text-sm font-bold text-amber-900">
+            <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+            <span>Atendimento solicitado:</span>
+            {chamadosAtendimento.map((ch) => (
+              <span
+                key={ch.id}
+                className="inline-flex items-center rounded-full bg-amber-200/80 px-3 py-0.5 text-xs font-extrabold text-amber-950"
+              >
+                {ch.nomeCliente
+                  ? `${ch.nomeCliente}, da Mesa ${ch.mesa}, solicita atendimento`
+                  : `Mesa ${ch.mesa} solicita atendimento`}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* QUADRO DE COMANDAS / PEDIDOS */}
       <main className="flex-1">

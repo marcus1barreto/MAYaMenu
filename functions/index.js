@@ -3739,7 +3739,7 @@ async function executarAtivarInstancia(firestoreDb, authUid, authToken, payload,
 
     if (modoAutoCadastroFree) {
       const plano = 'free';
-      const limites = { maxPratos: 20, maxItensMenu: 20, maxMesas: 10 };
+      const limites = { maxPratos: 20, maxItensMenu: 20, maxMesas: 5 };
       const agora = new Date();
       const restaurante = {
         id: authUid, ownerId: authUid, slug, nome, plano,
