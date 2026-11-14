@@ -145,6 +145,17 @@ export function ItemModal({ item, isOpen, onClose, corPrimaria = "#E11D48" }: It
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       {/* Ocultando o botão X nativo porque fizemos um customizado */}
       <DialogContent className="max-w-md w-full bg-white border-none p-0 rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl h-[95dvh] sm:h-auto sm:max-h-[90vh] flex flex-col [&>button]:hidden">
+        {/* BOTÃO VOLTAR FLUTUANTE (ESQUERDA) */}
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Voltar ao cardápio"
+          className="absolute top-4 left-4 z-50 h-10 px-3.5 bg-black/50 backdrop-blur-md hover:bg-black/70 text-white rounded-full flex items-center gap-1.5 text-xs font-bold transition-all shadow-lg cursor-pointer"
+        >
+          <span>←</span>
+          <span>Voltar</span>
+        </button>
+
         {/* BOTÃO DE FECHAR CUSTOMIZADO FLUTUANTE */}
         <button
           type="button"
