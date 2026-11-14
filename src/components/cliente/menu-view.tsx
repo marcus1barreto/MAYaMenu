@@ -1144,7 +1144,7 @@ export function MenuView({
                   <button
                     type="button"
                     onClick={() => {
-                      const shareUrl = typeof window !== "undefined" ? window.location.origin + "/" + restaurante.slug : "";
+                      const shareUrl = typeof window !== "undefined" ? `${window.location.origin}/?r=${encodeURIComponent(restaurante.slug)}` : "";
                       if (navigator.share) {
                         navigator.share({ title: restaurante.nome, text: `Recomendo o ${restaurante.nome}!`, url: shareUrl }).catch(() => {});
                       } else if (navigator.clipboard && shareUrl) {
