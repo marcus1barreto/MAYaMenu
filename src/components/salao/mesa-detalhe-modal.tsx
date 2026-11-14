@@ -751,7 +751,7 @@ export function MesaDetalheModal({
                             className="h-10 text-xs px-3"
                             label="Imprimir (USB)"
                           />
-                          {!jaPago && !modoSomenteLeitura && (
+                          {!jaPago && (
                             <Button
                               type="button"
                               disabled={encerrando}
