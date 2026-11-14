@@ -9,7 +9,7 @@ import { EstabelecimentoSuspensoView } from "@/components/admin/estabelecimento-
 import { TemaUsuarioProvider } from "@/context/tema-context";
 
 function AdminPageContent() {
-  const { user, restaurante, carregando } = useAuth();
+  const { user, restaurante, carregando, logout } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTarget = searchParams.get("redirect");
@@ -44,6 +44,32 @@ function AdminPageContent() {
         <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-96 h-96 rounded-full bg-rose-600/5 blur-[120px] pointer-events-none" />
         <div className="absolute bottom-10 right-10 w-80 h-80 rounded-full bg-amber-500/5 blur-[100px] pointer-events-none" />
         <AdminLoginForm />
+      </div>
+    );
+  }
+
+  // Se o usuário estiver logado com PIN de colaborador (/garcom ou /cozinha), orienta troca limpa de sessão
+  if (user.uid.startsWith("pin_")) {
+    return (
+      <div className="min-h-screen bg-neutral-50 flex items-center justify-center p-4">
+        <div className="w-full max-w-md rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm space-y-4 text-center">
+          <div className="mx-auto w-12 h-12 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center font-black text-xl">
+            !
+          </div>
+          <h1 className="text-lg font-black text-neutral-900">
+            Sessão de equipe ativa neste navegador
+          </h1>
+          <p className="text-sm text-neutral-600">
+            Você está conectado com um PIN de colaborador (Garçom/Cozinha). Para acessar o Painel Administrativo sem conflito de permissões, entre com o e-mail e senha do Proprietário.
+          </p>
+          <button
+            type="button"
+            onClick={() => logout()}
+            className="w-full h-11 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-sm transition-colors"
+          >
+            Sair do perfil de equipe e entrar como Proprietário
+          </button>
+        </div>
       </div>
     );
   }
