@@ -1648,7 +1648,7 @@ export function AdminDashboard() {
                       ehChamado
                         ? "bg-amber-50 border-amber-500 ring-2 ring-amber-400/50 shadow-md shadow-amber-500/10 animate-pulse"
                         : mesa.status === "conta_pedida"
-                        ? "bg-rose-50/90 border-rose-500 hover:border-rose-600 shadow-md shadow-rose-600/10"
+                        ? "bg-rose-50/90 border-rose-500 ring-2 ring-rose-400/50 hover:border-rose-600 shadow-md shadow-rose-600/10"
                         : mesa.status === "paga_ocupada"
                         ? "bg-emerald-50/90 border-emerald-500 shadow-md shadow-emerald-600/10"
                         : mesa.status === "ocupada"
