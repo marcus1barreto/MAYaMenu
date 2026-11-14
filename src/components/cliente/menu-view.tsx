@@ -507,7 +507,9 @@ export function MenuView({
               <Bell className={`w-4 h-4 ${garcomChamadoSucesso ? "fill-neutral-950 animate-bounce" : "text-white"}`} />
               <span>
                 {garcomChamadoSucesso
-                  ? "Garçom a Caminho da Mesa!"
+                  ? moduloAtivo("mod.garcom_salao")
+                    ? "Garçom a Caminho da Mesa!"
+                    : "Atendente a Caminho da Mesa!"
                   : segundosCooldown > 0
                   ? `Aguarde (${segundosCooldown}s)`
                   : "🔔 Solicitar Garçom"}
