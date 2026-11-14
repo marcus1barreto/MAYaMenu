@@ -270,8 +270,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Garante estado limpo e vazio para novo onboarding (Guided Empty State)
       setRestaurante(novoRest);
       setRole("owner");
-      // Atualiza o token após a criação do restaurante; a trigger também atribui a claim owner.
-      await auth.currentUser?.getIdToken(true).catch(() => undefined);
+      // Aguarda brevemente a trigger setRestaurantOwnerClaims propagar a claim owner para o token
+      if (auth.currentUser) {
+        for (let tentativa = 0; tentativa < 5; tentativa += 1) {
+          const tokenRes = await auth.currentUser.getIdTokenResult(true).catch(() => null);
+          if (tokenRes?.claims?.role === "owner") break;
+          await new Promise((r) => setTimeout(r, 800));
+        }
+      }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Erro no cadastro";
       throw new Error(msg);
