@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
+import { moduloAtivo } from "@/lib/modules";
 import { AuthProvider, useAuth } from "@/context/auth-context";
 import { GarcomView } from "@/components/garcom/garcom-view";
 import { AdminLoginForm } from "@/components/admin/admin-login-form";
@@ -13,6 +15,35 @@ import { KeyRound, Shield } from "lucide-react";
 function GarcomPageContent() {
   const { user, restaurante, role, carregando } = useAuth();
   const [usarLoginAdmin, setUsarLoginAdmin] = useState(false);
+
+  if (!moduloAtivo("mod.garcom_salao")) {
+    return (
+      <div className="min-h-screen bg-neutral-50 flex items-center justify-center p-4">
+        <div className="w-full max-w-md rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm text-center space-y-4">
+          <h1 className="text-lg font-black text-neutral-900">
+            Módulo Garçom disponível em breve
+          </h1>
+          <p className="text-sm text-neutral-600">
+            Na versão atual de pré-lançamento, o atendimento é operado diretamente pela Cozinha e pelo Painel Administrativo.
+          </p>
+          <div className="flex gap-2 justify-center">
+            <Link
+              href="/admin"
+              className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold"
+            >
+              Ir para o Admin
+            </Link>
+            <Link
+              href="/cozinha"
+              className="px-4 py-2 rounded-xl border border-neutral-200 bg-neutral-50 hover:bg-neutral-100 text-neutral-800 text-xs font-bold"
+            >
+              Ir para a Cozinha
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (carregando) {
     return (
