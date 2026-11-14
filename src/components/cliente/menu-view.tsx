@@ -978,6 +978,28 @@ export function MenuView({
         </div>
       )}
 
+      {/* BOTÃO REDONDO "ATENDIMENTO" SEMPRE VISÍVEL NO RODAPÉ */}
+      {!ehAutoatendimento && (
+        <button
+          type="button"
+          onClick={handleChamarGarcom}
+          disabled={chamandoGarcom || segundosCooldown > 0}
+          aria-label="Solicitar atendimento"
+          className={`fixed right-4 z-40 flex flex-col items-center justify-center w-16 h-16 rounded-full shadow-2xl border transition-all active:scale-95 ${
+            totalItens > 0 || subtotalComandaBanco > 0 ? "bottom-24" : "bottom-5"
+          } ${
+            segundosCooldown > 0
+              ? "bg-amber-600/90 border-amber-400 text-white cursor-not-allowed"
+              : "bg-emerald-600 hover:bg-emerald-500 border-emerald-400/60 text-white"
+          }`}
+        >
+          <Bell className={`w-5 h-5 ${chamandoGarcom ? "animate-bounce" : ""}`} />
+          <span className="text-[9px] font-black uppercase tracking-tight mt-0.5 leading-none">
+            {segundosCooldown > 0 ? `${segundosCooldown}s` : "Atendimento"}
+          </span>
+        </button>
+      )}
+
       {/* MODAL DE PERSONALIZAÇÃO DE ITEM */}
       <ItemModal
         item={itemSelecionado}

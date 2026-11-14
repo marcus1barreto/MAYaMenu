@@ -4182,8 +4182,10 @@ async function executarChamarGarcom(firestoreDb, authUid, payload) {
         atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
       });
       t.update(mesaRef, {
+        ...(m.statusEstrutural === 'livre' || !m.statusEstrutural ? { statusEstrutural: 'ocupada' } : {}),
         ultimoChamadoGarcomEm: admin.firestore.FieldValue.serverTimestamp(),
         ultimoChamadoGarcomPorUid: authUid,
+        atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
       });
     } else {
       t.create(comandaRef, {
@@ -4195,8 +4197,10 @@ async function executarChamarGarcom(firestoreDb, authUid, payload) {
         chamadoGarcom: { ativo: true, solicitadoEm: admin.firestore.FieldValue.serverTimestamp(), motivo: motivoSeguro },
       });
       t.update(mesaRef, {
+        ...(m.statusEstrutural === 'livre' || !m.statusEstrutural ? { statusEstrutural: 'ocupada' } : {}),
         ultimoChamadoGarcomEm: admin.firestore.FieldValue.serverTimestamp(),
         ultimoChamadoGarcomPorUid: authUid,
+        atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
       });
     }
   });

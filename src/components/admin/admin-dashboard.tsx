@@ -1312,6 +1312,36 @@ export function AdminDashboard() {
       {/* CONTEÚDO PRINCIPAL (MAIS ACIMA NO VIEWPORT) */}
       <main className="flex-1 px-4 sm:px-6 py-3.5 sm:py-4 max-w-5xl w-full mx-auto">
         {(() => {
+          const alertasComunicacao = mesas.flatMap((m) =>
+            (m.comandas || [])
+              .filter((c) => c.chamadoGarcom?.ativo || c.status === "conta_pedida")
+              .map((c) => ({
+                mesa: m.numero,
+                tipo: c.status === "conta_pedida" ? "Pediu a conta" : (c.chamadoGarcom?.motivo || "Solicita atendimento"),
+              }))
+          );
+          if (alertasComunicacao.length === 0) return null;
+          return (
+            <div className="mb-4 rounded-2xl border border-rose-300 bg-rose-50 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+              <div className="text-xs sm:text-sm font-bold text-rose-900">
+                Comunicações de Mesa:{" "}
+                {alertasComunicacao
+                  .map((a) => `Mesa ${a.mesa} (${a.tipo})`)
+                  .join(" • ")}
+              </div>
+              {abaAtiva !== "mesas" && (
+                <button
+                  type="button"
+                  onClick={() => setAbaAtiva("mesas")}
+                  className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold"
+                >
+                  Ver Mesas
+                </button>
+              )}
+            </div>
+          );
+        })()}
+        {(() => {
           const anomaliasCozinha = mesasKdsAtivas.filter((num) => {
             const mesaSalao = mesas.find((m) => Number(m.numero) === num);
             return !mesaSalao || (mesaSalao.status === "livre" && (mesaSalao.comandas?.length ?? 0) === 0);
