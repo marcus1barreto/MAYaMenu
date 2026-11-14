@@ -28,6 +28,9 @@ import {
   Moon,
   Coffee,
   Store,
+  Share2,
+  ThumbsDown,
+  ThumbsUp,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -114,6 +117,8 @@ export function MenuView({
   const [menuLateralAberto, setMenuLateralAberto] = useState(false);
   const [buscaAberta, setBuscaAberta] = useState(false);
   const [contaPagaModal, setContaPagaModal] = useState(false);
+  const [avaliacaoSocial, setAvaliacaoSocial] = useState<"like" | "dislike" | null>(null);
+  const [comentarioSocial, setComentarioSocial] = useState("");
   const [metodoPagamentoEncerrado, setMetodoPagamentoEncerrado] = useState<string | null>(null);
   const [sessaoFinalizada, setSessaoFinalizada] = useState(false);
   const [subtotalComandaBanco, setSubtotalComandaBanco] = useState(0);
@@ -937,65 +942,60 @@ export function MenuView({
         )}
       </main>
 
-      {/* BARRA FLUTUANTE INFERIOR (Acesso permanente à Comanda ou Carrinho) */}
-      {(totalItens > 0 || subtotalComandaBanco > 0) && (
+      {/* BARRA FLUTUANTE INFERIOR (Acesso ao Carrinho quando há itens selecionados) */}
+      {totalItens > 0 && (
         <div className="fixed bottom-4 left-4 right-4 z-40 max-w-md mx-auto">
-          {totalItens > 0 ? (
-            <Button
-              type="button"
-              onClick={() => setCarrinhoAberto(true)}
-              style={{ backgroundColor: corPrimaria }}
-              className="w-full h-16 rounded-2xl shadow-2xl text-white font-black text-base flex items-center justify-between px-5 active:scale-[0.98] transition-all"
-            >
-              <div className="flex items-center gap-3">
-                <div className="relative p-2 bg-white/20 rounded-xl">
-                  <ShoppingBag className="w-5 h-5 text-white" />
-                  <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-white text-neutral-900 rounded-full text-xs font-black flex items-center justify-center shadow-sm">
-                    {totalItens}
-                  </span>
-                </div>
-                <div className="text-left">
-                  <span className="block text-xs uppercase tracking-wider font-semibold opacity-90">
-                    Enviar Rodada / Carrinho
-                  </span>
-                  <span className="text-sm font-bold">Mesa {numeroMesa}</span>
-                </div>
-              </div>
-
-              <div className="text-right">
-                <span className="text-xs uppercase font-semibold opacity-90 block">Total Itens</span>
-                <span className="text-lg font-black tracking-tight">
-                  {subtotal.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+          <Button
+            type="button"
+            onClick={() => setCarrinhoAberto(true)}
+            style={{ backgroundColor: corPrimaria }}
+            className="w-full h-16 rounded-2xl shadow-2xl text-white font-black text-base flex items-center justify-between px-5 active:scale-[0.98] transition-all"
+          >
+            <div className="flex items-center gap-3">
+              <div className="relative p-2 bg-white/20 rounded-xl">
+                <ShoppingBag className="w-5 h-5 text-white" />
+                <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-white text-neutral-900 rounded-full text-xs font-black flex items-center justify-center shadow-sm">
+                  {totalItens}
                 </span>
               </div>
-            </Button>
-          ) : (
-            <Button
-              type="button"
-              onClick={() => setMinhaComandaAberta(true)}
-              className="w-full h-14 rounded-2xl shadow-2xl bg-neutral-900 hover:bg-neutral-800 border border-neutral-700 text-white font-black text-sm flex items-center justify-between px-5 active:scale-[0.98] transition-all"
-            >
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-rose-600/20 text-rose-400 rounded-xl">
-                  <Utensils className="w-5 h-5" />
-                </div>
-                <div className="text-left">
-                  <span className="block text-xs uppercase tracking-wider font-bold text-neutral-300">
-                    Minha Comanda Ativa
-                  </span>
-                  <span className="text-xs text-neutral-400">Mesa {numeroMesa} • Acompanhar pratos</span>
-                </div>
-              </div>
-
-              <div className="text-right">
-                <span className="text-[10px] uppercase font-semibold text-neutral-400 block">Total</span>
-                <span className="text-base font-black text-rose-400 font-mono tracking-tight">
-                  {subtotalComandaBanco.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+              <div className="text-left">
+                <span className="block text-xs uppercase tracking-wider font-semibold opacity-90">
+                  Enviar Rodada / Carrinho
                 </span>
+                <span className="text-sm font-bold">Mesa {numeroMesa}</span>
               </div>
-            </Button>
-          )}
+            </div>
+
+            <div className="text-right">
+              <span className="text-xs uppercase font-semibold opacity-90 block">Total Itens</span>
+              <span className="text-lg font-black tracking-tight">
+                {subtotal.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+              </span>
+            </div>
+          </Button>
         </div>
+      )}
+
+      {/* BOTÃO REDONDO "CONTA" (Visível após pedido ativo/entregue) */}
+      {!ehAutoatendimento && subtotalComandaBanco > 0 && (
+        <button
+          type="button"
+          onClick={() => handlePedirConta()}
+          disabled={pedindoConta || contaPedidaSucesso}
+          aria-label="Pedir a conta"
+          className={`fixed right-28 z-40 flex flex-col items-center justify-center w-20 h-20 rounded-full shadow-2xl border transition-all active:scale-95 px-1 ${
+            totalItens > 0 ? "bottom-24" : "bottom-5"
+          } ${
+            contaPedidaSucesso
+              ? "bg-neutral-700 border-neutral-500 text-neutral-300 cursor-not-allowed"
+              : "bg-amber-600 hover:bg-amber-500 border-amber-400/60 text-white"
+          }`}
+        >
+          <DollarSign className="w-6 h-6" />
+          <span className="text-[11px] font-bold tracking-tight mt-1 leading-none">
+            {contaPedidaSucesso ? "Pedida" : "Conta"}
+          </span>
+        </button>
       )}
 
       {/* BOTÃO REDONDO "ATENDIMENTO" SEMPRE VISÍVEL NO RODAPÉ */}
@@ -1006,7 +1006,7 @@ export function MenuView({
           disabled={chamandoGarcom || segundosCooldown > 0}
           aria-label="Solicitar atendimento"
           className={`fixed right-4 z-40 flex flex-col items-center justify-center w-20 h-20 rounded-full shadow-2xl border transition-all active:scale-95 px-1 ${
-            totalItens > 0 || subtotalComandaBanco > 0 ? "bottom-24" : "bottom-5"
+            totalItens > 0 ? "bottom-24" : "bottom-5"
           } ${
             segundosCooldown > 0
               ? "bg-amber-600/90 border-amber-400 text-white cursor-not-allowed"
@@ -1110,6 +1110,62 @@ export function MenuView({
               <p className="text-xs text-rose-400 font-semibold pt-1">
                 Muito obrigado pela visita! Volte sempre! ✨
               </p>
+            </div>
+
+            {/* AVALIAÇÃO SOCIAL + COMPARTILHAMENTO */}
+            <div className="bg-neutral-800/60 border border-neutral-700/70 rounded-2xl p-3.5 space-y-2.5 text-left">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-neutral-200">Curtiu a experiência?</span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setAvaliacaoSocial(avaliacaoSocial === "like" ? null : "like")}
+                    className={`p-2 rounded-xl border transition-all ${
+                      avaliacaoSocial === "like"
+                        ? "bg-emerald-500/20 border-emerald-500 text-emerald-400"
+                        : "bg-neutral-900 border-neutral-700 text-neutral-400 hover:text-white"
+                    }`}
+                    aria-label="Curtir"
+                  >
+                    <ThumbsUp className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAvaliacaoSocial(avaliacaoSocial === "dislike" ? null : "dislike")}
+                    className={`p-2 rounded-xl border transition-all ${
+                      avaliacaoSocial === "dislike"
+                        ? "bg-rose-500/20 border-rose-500 text-rose-400"
+                        : "bg-neutral-900 border-neutral-700 text-neutral-400 hover:text-white"
+                    }`}
+                    aria-label="Não curtir"
+                  >
+                    <ThumbsDown className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const shareUrl = typeof window !== "undefined" ? window.location.origin + "/" + restaurante.slug : "";
+                      if (navigator.share) {
+                        navigator.share({ title: restaurante.nome, text: `Recomendo o ${restaurante.nome}!`, url: shareUrl }).catch(() => {});
+                      } else if (navigator.clipboard && shareUrl) {
+                        navigator.clipboard.writeText(shareUrl);
+                        alert("Link copiado para compartilhar!");
+                      }
+                    }}
+                    className="p-2 rounded-xl border bg-neutral-900 border-neutral-700 text-neutral-300 hover:text-white transition-all"
+                    aria-label="Compartilhar"
+                  >
+                    <Share2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+              <textarea
+                value={comentarioSocial}
+                onChange={(e) => setComentarioSocial(e.target.value)}
+                placeholder="Deixe um comentário rápido..."
+                rows={2}
+                className="w-full rounded-xl bg-neutral-900 border border-neutral-700 px-3 py-2 text-xs text-white placeholder:text-neutral-500 focus:outline-none focus:border-rose-500 resize-none"
+              />
             </div>
 
             <div className="pt-2 flex flex-col gap-2">

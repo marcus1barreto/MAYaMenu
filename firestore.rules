@@ -346,7 +346,7 @@ service cloud.firestore {
               ])
               && (
                 !request.resource.data.diff(resource.data).affectedKeys().hasAny(['metodoPagamento'])
-                || request.resource.data.metodoPagamento in ['balcao', 'cartao', 'dinheiro', 'pix', 'maquininha']
+                || request.resource.data.metodoPagamento in ['balcao', 'cartao', 'cartao_garcom', 'dinheiro', 'pix', 'maquininha']
               )
               && (
                 !request.resource.data.diff(resource.data).affectedKeys().hasAny(['pixPayload'])
