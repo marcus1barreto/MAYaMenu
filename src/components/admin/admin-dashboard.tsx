@@ -359,6 +359,34 @@ export function AdminDashboard() {
 
   // Controle de Mesas do Salão (sincronizadas com Firestore conforme o limite do plano)
   const { maxMesas } = getLimitesLicenca(restaurante);
+  const [mesasKdsAtivas, setMesasKdsAtivas] = useState<number[]>([]);
+
+  useEffect(() => {
+    if (!restaurante?.id) return;
+    const qKds = query(
+      collectionGroup(db, "kds_tickets"),
+      where("restauranteId", "==", restaurante.id)
+    );
+    const unsub = onSnapshot(
+      qKds,
+      (snap) => {
+        const nums = new Set<number>();
+        snap.docs.forEach((d) => {
+          const data = d.data() || {};
+          if (data.status === "a_fazer" || data.status === "em_preparo" || data.status === "pronto") {
+            const n = Number(data.numeroMesa ?? data.mesa);
+            if (Number.isFinite(n) && n > 0) nums.add(n);
+          }
+        });
+        setMesasKdsAtivas(Array.from(nums));
+      },
+      () => {
+        // Silencia erro caso sessão ainda esteja propagando
+      }
+    );
+    return () => unsub();
+  }, [restaurante?.id]);
+
   const [mesas, setMesas] = useState<MesaOperacional[]>(() => {
     const mapaLimpo: MesaOperacional[] = [];
     for (let i = 1; i <= maxMesas; i++) {
@@ -1283,6 +1311,27 @@ export function AdminDashboard() {
 
       {/* CONTEÚDO PRINCIPAL (MAIS ACIMA NO VIEWPORT) */}
       <main className="flex-1 px-4 sm:px-6 py-3.5 sm:py-4 max-w-5xl w-full mx-auto">
+        {(() => {
+          const anomaliasCozinha = mesasKdsAtivas.filter((num) => {
+            const mesaSalao = mesas.find((m) => Number(m.numero) === num);
+            return !mesaSalao || (mesaSalao.status === "livre" && (mesaSalao.comandas?.length ?? 0) === 0);
+          });
+          if (anomaliasCozinha.length === 0) return null;
+          return (
+            <div className="mb-4 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+              <div className="text-xs sm:text-sm font-bold text-amber-900">
+                Divergência detectada: há pedido ativo na Cozinha para {anomaliasCozinha.map((m) => `Mesa ${m}`).join(", ")} que ainda não apareceu no salão.
+              </div>
+              <button
+                type="button"
+                onClick={() => window.location.reload()}
+                className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold"
+              >
+                Sincronizar
+              </button>
+            </div>
+          );
+        })()}
         {/* ABA: CARDÁPIO */}
         {abaAtiva === "cardapio" && (
           <div className="space-y-4">
