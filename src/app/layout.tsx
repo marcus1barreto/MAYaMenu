@@ -57,6 +57,16 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       className={`${geistSans.variable} ${geistMono.variable} ${inter.variable} ${playfair.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
+        <div className="w-full bg-amber-400 text-neutral-950 text-xs sm:text-sm font-semibold px-3 py-1.5 text-center border-b border-amber-500/40">
+          Este aplicativo está em teste de lançamento. Se quiser,{" "}
+          <a
+            href="mailto:contato@mayamenu.com.br?subject=Contato%20-%20Teste%20de%20Lan%C3%A7amento%20MAYaMenu"
+            className="underline font-bold hover:text-neutral-800"
+          >
+            deixe um contato para nos falarmos depois
+          </a>
+          .
+        </div>
         <OfflineBanner />
         <SerwistProvider swUrl="/serwist/sw.js">{children}</SerwistProvider>
       </body>
