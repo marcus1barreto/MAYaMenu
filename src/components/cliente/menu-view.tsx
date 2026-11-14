@@ -985,7 +985,7 @@ export function MenuView({
           onClick={handleChamarGarcom}
           disabled={chamandoGarcom || segundosCooldown > 0}
           aria-label="Solicitar atendimento"
-          className={`fixed right-4 z-40 flex flex-col items-center justify-center w-16 h-16 rounded-full shadow-2xl border transition-all active:scale-95 ${
+          className={`fixed right-4 z-40 flex flex-col items-center justify-center w-20 h-20 rounded-full shadow-2xl border transition-all active:scale-95 px-1 ${
             totalItens > 0 || subtotalComandaBanco > 0 ? "bottom-24" : "bottom-5"
           } ${
             segundosCooldown > 0
@@ -993,8 +993,8 @@ export function MenuView({
               : "bg-emerald-600 hover:bg-emerald-500 border-emerald-400/60 text-white"
           }`}
         >
-          <Bell className={`w-5 h-5 ${chamandoGarcom ? "animate-bounce" : ""}`} />
-          <span className="text-[9px] font-black uppercase tracking-tight mt-0.5 leading-none">
+          <Bell className={`w-6 h-6 ${chamandoGarcom ? "animate-bounce" : ""}`} />
+          <span className="text-[11px] font-bold tracking-tight mt-1 leading-none">
             {segundosCooldown > 0 ? `${segundosCooldown}s` : "Atendimento"}
           </span>
         </button>
