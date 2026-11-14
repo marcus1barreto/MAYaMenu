@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { moduloAtivo } from "@/lib/modules";
 import { useAuth } from "@/context/auth-context";
 import { CARDAPIO_DEMO } from "@/lib/mock-data";
 import type { MenuItem, ComandaCliente, HistoricoSessaoMesa, TipoChavePix } from "@/types";
@@ -1243,36 +1244,40 @@ export function AdminDashboard() {
             <span>Mesas & QR Codes</span>
           </button>
 
-          <button
-            type="button"
-            onClick={() => setAbaAtiva("equipe")}
-            className={`py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all flex items-center gap-2 ${
-              abaAtiva === "equipe"
-                ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <Users className="w-4 h-4" />
-            <span>Equipe & Acessos</span>
-          </button>
+          {moduloAtivo("mod.garcom_salao") && (
+            <button
+              type="button"
+              onClick={() => setAbaAtiva("equipe")}
+              className={`py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all flex items-center gap-2 ${
+                abaAtiva === "equipe"
+                  ? "border-primary text-primary"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Users className="w-4 h-4" />
+              <span>Equipe & Acessos</span>
+            </button>
+          )}
 
-          <button
-            type="button"
-            onClick={() => setAbaAtiva("analytics")}
-            className={`py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all flex items-center gap-2 relative ${
-              abaAtiva === "analytics"
-                ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <BarChart3 className="w-4 h-4 text-amber-500" />
-            <span className="flex items-center gap-1.5">
-              MAYa Inteligência
-              <Badge className="bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 text-[9px] font-black uppercase px-1.5 py-0">
-                PRO 🚀
-              </Badge>
-            </span>
-          </button>
+          {moduloAtivo("mod.analytics_historico") && (
+            <button
+              type="button"
+              onClick={() => setAbaAtiva("analytics")}
+              className={`py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all flex items-center gap-2 relative ${
+                abaAtiva === "analytics"
+                  ? "border-primary text-primary"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <BarChart3 className="w-4 h-4 text-amber-500" />
+              <span className="flex items-center gap-1.5">
+                MAYa Inteligência
+                <Badge className="bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 text-[9px] font-black uppercase px-1.5 py-0">
+                  PRO 🚀
+                </Badge>
+              </span>
+            </button>
+          )}
         </div>
       </div>
 
