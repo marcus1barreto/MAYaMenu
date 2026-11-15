@@ -2149,12 +2149,18 @@ async function executarProcessarSelloutOutbox(firestoreDb, restauranteId, eventI
  * registradas (campo historicoSessaoId) não geram novo histórico nem nova métrica.
  */
 async function executarLiberarMesa(firestoreDb, authUid, authToken, payload) {
-  const { restauranteId, mesa, comandasIds } = payload || {};
+  const { restauranteId, mesa, comandasIds, forcar, motivoEncerramento, observacaoEncerramento } = payload || {};
   if (!authUid) {
     throw new functions.https.HttpsError('unauthenticated', 'Autenticação necessária.');
   }
   if (!restauranteId || mesa === undefined || mesa === null || !Array.isArray(comandasIds)) {
     throw new functions.https.HttpsError('invalid-argument', 'Parâmetros inválidos para liberação da mesa.');
+  }
+  const ehForcado = forcar === true;
+  const motivoSeguro = String(motivoEncerramento || '').trim().slice(0, 120);
+  const obsSegura = String(observacaoEncerramento || '').trim().slice(0, 300);
+  if (ehForcado && !motivoSeguro) {
+    throw new functions.https.HttpsError('invalid-argument', 'Informe o motivo para forçar o encerramento da mesa.');
   }
 
   const restDoc = await resolverRestDoc(firestoreDb, restauranteId);
@@ -2189,8 +2195,8 @@ async function executarLiberarMesa(firestoreDb, authUid, authToken, payload) {
         jaRegistradas++;
         return;
       }
-      // A liberação é apenas pós-pagamento: nunca converte uma comanda aberta em paga.
-      if (c.status !== 'pago' || c.arquivada !== true || !c.pagoEm) {
+      // A liberação normal é apenas pós-pagamento; no modo forçado (kill), encerra com motivo registrado.
+      if (!ehForcado && (c.status !== 'pago' || c.arquivada !== true || !c.pagoEm)) {
         throw new functions.https.HttpsError(
           'failed-precondition',
           'A comanda precisa estar paga e encerrada pelo fluxo de fechamento antes da liberação.'

@@ -664,13 +664,23 @@ export async function definirTaxaServicoMesa(
 export async function liberarMesaFirestore(
   restauranteId: string,
   mesaNumero: number | string,
-  comandasIds: string[]
+  comandasIds: string[],
+  opcoes?: {
+    forcar?: boolean;
+    motivoEncerramento?: string;
+    observacaoEncerramento?: string;
+  }
 ): Promise<void> {
   const liberarMesaFn = httpsCallable(functions, "liberarMesaBackend");
   await liberarMesaFn({
     restauranteId,
     mesa: mesaNumero,
     comandasIds,
+    ...(opcoes?.forcar ? {
+      forcar: true,
+      motivoEncerramento: opcoes.motivoEncerramento,
+      observacaoEncerramento: opcoes.observacaoEncerramento || "",
+    } : {}),
   });
 }
 

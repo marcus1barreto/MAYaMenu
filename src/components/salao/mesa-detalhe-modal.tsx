@@ -98,6 +98,9 @@ export function MesaDetalheModal({
   const [observacao, setObservacao] = useState(observacaoInicial);
   const [taxaServicoAtiva, setTaxaServicoAtiva] = useState(true);
   const [encerrando, setEncerrando] = useState(false);
+  const [forcarEncerramentoAberto, setForcarEncerramentoAberto] = useState(false);
+  const [motivoForcar, setMotivoForcar] = useState("");
+  const [obsForcar, setObsForcar] = useState("");
   const [atualizandoEntregaId, setAtualizandoEntregaId] = useState<string | null>(null);
   const [modalTransferirAberto, setModalTransferirAberto] = useState(false);
   const [garcomDestinoId, setGarcomDestinoId] = useState<string>("");
@@ -885,6 +888,85 @@ export function MesaDetalheModal({
                         <CheckCircle2 className="w-5 h-5" />
                         <span>{encerrando ? "Processando..." : "Encerrar e Liberar Mesa"}</span>
                       </button>
+                    )}
+
+                    {mesa.comandas.length > 0 && (
+                      <div className="pt-2 border-t border-border/60">
+                        {!forcarEncerramentoAberto ? (
+                          <button
+                            type="button"
+                            onClick={() => setForcarEncerramentoAberto(true)}
+                            disabled={encerrando}
+                            className="w-full py-2 text-xs font-bold text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors"
+                          >
+                            Forçar Encerramento (Kill)
+                          </button>
+                        ) : (
+                          <div className="p-3 rounded-xl bg-rose-50/80 border border-rose-200 space-y-2.5">
+                            <p className="text-xs font-bold text-rose-900">
+                              Encerrar mesa forçadamente
+                            </p>
+                            <input
+                              type="text"
+                              value={motivoForcar}
+                              onChange={(e) => setMotivoForcar(e.target.value)}
+                              placeholder="Motivo obrigatório (ex: Desistência, Erro de abertura)"
+                              className="w-full rounded-lg border border-rose-300 bg-white px-2.5 py-1.5 text-xs text-neutral-900 focus:outline-none focus:border-rose-500"
+                            />
+                            <textarea
+                              value={obsForcar}
+                              onChange={(e) => setObsForcar(e.target.value)}
+                              placeholder="Dados adicionais / observações para auditoria (opcional)"
+                              rows={2}
+                              className="w-full rounded-lg border border-rose-300 bg-white px-2.5 py-1.5 text-xs text-neutral-900 focus:outline-none focus:border-rose-500 resize-none"
+                            />
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setForcarEncerramentoAberto(false);
+                                  setMotivoForcar("");
+                                  setObsForcar("");
+                                }}
+                                className="flex-1 py-1.5 rounded-lg border border-neutral-300 bg-white text-xs font-bold text-neutral-700"
+                              >
+                                Cancelar
+                              </button>
+                              <button
+                                type="button"
+                                disabled={encerrando || !motivoForcar.trim()}
+                                onClick={async () => {
+                                  if (!motivoForcar.trim()) return;
+                                  setEncerrando(true);
+                                  try {
+                                    await liberarMesaFirestore(
+                                      restauranteId,
+                                      mesa.numero,
+                                      mesa.comandas.map((c) => c.id),
+                                      {
+                                        forcar: true,
+                                        motivoEncerramento: motivoForcar.trim(),
+                                        observacaoEncerramento: obsForcar.trim(),
+                                      }
+                                    );
+                                    setForcarEncerramentoAberto(false);
+                                    setMotivoForcar("");
+                                    setObsForcar("");
+                                    onClose();
+                                  } catch (err: any) {
+                                    alert(err?.message || "Não foi possível forçar o encerramento.");
+                                  } finally {
+                                    setEncerrando(false);
+                                  }
+                                }}
+                                className="flex-1 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-xs font-bold text-white"
+                              >
+                                Confirmar Kill
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     )}
                   </div>
                 </div>
