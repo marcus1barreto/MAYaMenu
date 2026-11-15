@@ -1264,22 +1264,11 @@ export function MenuView({
                 type="button"
                 onClick={() => {
                   setContaPagaModal(false);
-                  setContaPedidaSucesso(false);
-                }}
-                className="w-full h-11 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs uppercase tracking-wider"
-              >
-                Continuar na Mesa (Novo Pedido)
-              </Button>
-
-              <Button
-                type="button"
-                onClick={() => {
-                  setContaPagaModal(false);
                   setSessaoFinalizada(true);
                 }}
                 className="w-full h-11 bg-rose-600 hover:bg-rose-500 text-white font-black rounded-xl text-xs uppercase tracking-wider"
               >
-                Concluir e Sair
+                Concluir
               </Button>
             </div>
           </div>

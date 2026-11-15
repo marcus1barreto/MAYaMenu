@@ -755,10 +755,11 @@ export function MesaDetalheModal({
                             label="Imprimir (USB)"
                           />
                           {!jaPago && comanda.subtotal > 0 && (() => {
-                            const temItemNaoServido = (comanda.itens || []).some(
-                              (it: any) =>
+                            const pedidosDaComanda = pedidosMesa.filter((p) => p.clienteId === comanda.id);
+                            const temItemNaoServido = pedidosDaComanda.some(
+                              (p) =>
                                 !["entregue", "cancelado", "estornado"].includes(
-                                  String(it.statusPedido || "").toLowerCase()
+                                  String(p.status || "").toLowerCase()
                                 )
                             );
                             if (temItemNaoServido) {
