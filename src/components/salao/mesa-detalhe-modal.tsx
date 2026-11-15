@@ -755,7 +755,9 @@ export function MesaDetalheModal({
                             label="Imprimir (USB)"
                           />
                           {!jaPago && comanda.subtotal > 0 && (() => {
-                            const pedidosDaComanda = pedidosMesa.filter((p) => p.clienteId === comanda.id);
+                            const pedidosDaComanda = pedidosMesa.filter(
+                              (p) => p.clienteId === comanda.id && (comanda.status === "pago" || String(p.status) !== "pago")
+                            );
                             const temItemNaoServido = pedidosDaComanda.some(
                               (p) =>
                                 !["entregue", "pago", "cancelado", "estornado"].includes(
