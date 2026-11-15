@@ -596,6 +596,12 @@ export function AdminDashboard() {
     try {
       const { liberarMesaFirestore } = await import("@/lib/restaurante-service");
       await liberarMesaFirestore(restaurante.id, mesaNumero, comandasIds);
+      const { doc, updateDoc, serverTimestamp } = await import("firebase/firestore");
+      const { db } = await import("@/lib/firebase");
+      await updateDoc(
+        doc(db, "restaurantes", restaurante.id, "mesas", String(mesaNumero)),
+        { statusEstrutural: "livre", atualizadoEm: serverTimestamp() }
+      ).catch(() => {});
     } catch (err) {
       console.error("Falha ao liberar mesa no backend:", err);
       alert(err instanceof Error ? err.message : "Não foi possível liberar a mesa.");
