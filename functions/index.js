@@ -2263,16 +2263,7 @@ async function executarLiberarMesa(firestoreDb, authUid, authToken, payload) {
     for (const op of operacoes) {
       op.pedidosDocs.forEach((pDoc) => t.delete(pDoc.ref));
       op.kdsRefs.forEach((kRef) => t.delete(kRef));
-      t.update(op.item.ref, {
-        status: op.item.data.status === 'pago' ? 'pago' : 'encerrada_forcada',
-        ...(op.item.data.status === 'pago' ? { pagoEm: op.item.data.pagoEm || agoraServer } : {}),
-        ...(ehForcado ? { motivoEncerramento: motivoSeguro } : {}),
-        encerradaEm: agoraServer,
-        encerradaPorUid: authUid,
-        arquivada: true,
-        historicoSessaoId: historicoId,
-        atualizadoEm: agoraServer,
-      });
+      t.delete(op.item.ref);
     }
 
     t.set(historicoRef, {

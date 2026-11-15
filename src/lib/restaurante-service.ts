@@ -495,13 +495,10 @@ export function escutarComandasSalão(
   onAtualizacao: (comandas: (ComandaCliente & { refPath: string })[]) => void,
   slugAlternativo?: string
 ): Unsubscribe {
-  const idsParaBuscar = Array.from(
-    new Set([restauranteIdOuSlug, slugAlternativo].filter(Boolean) as string[])
+  const q = query(
+    collectionGroup(db, "comandas_abertas"),
+    where("restauranteId", "==", restauranteIdOuSlug)
   );
-
-  const q = idsParaBuscar.length > 1
-    ? query(collectionGroup(db, "comandas_abertas"), where("restauranteId", "in", idsParaBuscar))
-    : query(collectionGroup(db, "comandas_abertas"), where("restauranteId", "==", idsParaBuscar[0]));
 
   return onSnapshot(
     q,
