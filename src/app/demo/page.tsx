@@ -27,7 +27,9 @@ import {
   ArrowRight,
   Info,
   ExternalLink,
+  RotateCcw,
 } from "lucide-react";
+import { resetarEstabelecimentoModelo } from "@/lib/demo-seed";
 
 const SLUG_PUBLICO = "modelo-free";
 
@@ -36,12 +38,24 @@ export default function DemoShowroomPage() {
   const [modalQrAberto, setModalQrAberto] = useState<boolean>(false);
   const [copiadoLink, setCopiadoLink] = useState<boolean>(false);
   const [urlOrigem, setUrlOrigem] = useState<string>("");
+  const [resetando, setResetando] = useState<boolean>(false);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
       setUrlOrigem(window.location.origin);
     }
   }, []);
+
+  const handleResetarModelo = async () => {
+    setResetando(true);
+    try {
+      await resetarEstabelecimentoModelo();
+    } catch {
+      // Ignora erro caso offline/sem permissão
+    } finally {
+      setResetando(false);
+    }
+  };
 
   const urlMesaCelular = `${urlOrigem}/r/${SLUG_PUBLICO}?mesa=${mesaDemo}`;
 
@@ -108,6 +122,19 @@ export default function DemoShowroomPage() {
                 <ExternalLink className="w-3 h-3 text-muted-foreground" />
               </Button>
             </Link>
+
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleResetarModelo}
+              disabled={resetando}
+              className="h-8 px-2.5 text-xs font-semibold rounded-xl border-border bg-white text-neutral-700 hover:bg-muted shadow-xs flex items-center gap-1.5"
+              title="Criar/resetar o estabelecimento público modelo-free no Firestore"
+            >
+              <RotateCcw className={`w-3.5 h-3.5 text-neutral-500 ${resetando ? "animate-spin" : ""}`} />
+              <span>{resetando ? "Resetando..." : "Resetar Modelo"}</span>
+            </Button>
 
             <Button
               type="button"
