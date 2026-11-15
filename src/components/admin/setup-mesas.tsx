@@ -438,7 +438,11 @@ export function SetupMesas({ restauranteId, maxMesas }: SetupMesasProps) {
 
               {/* Ações Estruturais da Mesa */}
               <div className="mt-3 pt-2.5 border-t border-border flex flex-wrap items-center justify-between gap-1.5">
-                {!isReservada ? (
+                {isReservada ? (
+                  <Badge variant="outline" className="text-[10px] text-purple-400 border-purple-500/40">
+                    Mesa Reservada
+                  </Badge>
+                ) : num > 5 ? (
                   <Button
                     type="button"
                     size="sm"
@@ -450,11 +454,7 @@ export function SetupMesas({ restauranteId, maxMesas }: SetupMesasProps) {
                     <CalendarClock className="w-3.5 h-3.5" />
                     <span>Reservar</span>
                   </Button>
-                ) : (
-                  <Badge variant="outline" className="text-[10px] text-purple-400 border-purple-500/40">
-                    Mesa Reservada
-                  </Badge>
-                )}
+                ) : null}
 
                 <Button
                   type="button"
