@@ -301,7 +301,7 @@ export function MenuView({
       uid,
       (lista) => {
         const totalAtivo = lista.reduce((acc, p) => {
-          if (p.status !== "cancelado" && p.status !== "estornado" && p.status !== "pago") {
+          if (!["cancelado", "estornado", "pago"].includes(String(p.status))) {
             return acc + (p.subtotal || 0);
           }
           return acc;
