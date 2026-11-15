@@ -128,6 +128,7 @@ export function MenuView({
   const [pedindoConta, setPedindoConta] = useState(false);
   const [contaPedidaSucesso, setContaPedidaSucesso] = useState(false);
   const [comandaStatus, setComandaStatus] = useState<string | null>(null);
+  const [sessaoEncerradaIrrevogavel, setSessaoEncerradaIrrevogavel] = useState(false);
   const [categoriaAtiva, setCategoriaAtiva] = useState<string>("Todas");
   // Limpa resquícios de temas antigos do cliente
   useEffect(() => {
@@ -266,6 +267,9 @@ export function MenuView({
           const data = snap.data() as ComandaCliente & { arquivada?: boolean };
           if (data.arquivada === true && ultimoStatus === null) {
             return;
+          }
+          if (data.arquivada === true && ultimoStatus !== null) {
+            setSessaoEncerradaIrrevogavel(true);
           }
           const statusAnterior = ultimoStatus;
           setComandaStatus(data.status);
@@ -564,6 +568,24 @@ export function MenuView({
           isOpen={historicoAberto}
           onClose={() => setHistoricoAberto(false)}
         />
+      </div>
+    );
+  }
+
+  if (sessaoEncerradaIrrevogavel) {
+    return (
+      <div className="min-h-screen bg-background text-foreground flex items-center justify-center p-6">
+        <div className="max-w-sm w-full bg-card border border-border rounded-3xl p-8 text-center space-y-4 shadow-xl">
+          <div className="w-14 h-14 mx-auto rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-600 flex items-center justify-center">
+            <QrCode className="w-7 h-7" />
+          </div>
+          <h1 className="text-xl font-black text-foreground">
+            Atendimento Encerrado
+          </h1>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            A <strong>Mesa {numeroMesa}</strong> foi encerrada e liberada no caixa. Para iniciar um novo atendimento, escaneie novamente o <strong>QR Code da mesa</strong>.
+          </p>
+        </div>
       </div>
     );
   }
