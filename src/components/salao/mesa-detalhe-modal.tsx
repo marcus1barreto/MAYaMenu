@@ -271,29 +271,15 @@ export function MesaDetalheModal({
     const idRestauranteFinal = restauranteId || slug;
     if (!idRestauranteFinal || !mesa?.numero || !clienteId) return;
 
-    if (!confirm(`Tem certeza que deseja fechar a conta de ${nomeCliente || "Cliente"} e liberar?`)) {
+    if (!confirm(`Confirmar o pagamento da comanda de ${nomeCliente || "Cliente"}?`)) {
       return;
     }
 
     try {
       setEncerrando(true);
-      // O callback confirma o pagamento no backend e só então atualiza o estado local.
       const pagamentoConfirmado = await onMarcarPago(mesa.numero, clienteId);
       if (!pagamentoConfirmado) return;
-
-      // Se todas as comandas estão pagas, tenta liberar. Falha de liberação não desfaz o pagamento.
-      const outrasNaoPagas = comandasComItens.filter((c) => c.id !== clienteId && c.status !== "pago");
-      if (outrasNaoPagas.length === 0) {
-        const mesaLiberada = await onLiberarMesa(mesa.numero);
-        if (mesaLiberada) {
-          alert("Pagamento confirmado, comanda encerrada e mesa liberada.");
-          onClose();
-        } else {
-          alert("Pagamento confirmado. A mesa permanece ocupada até concluir a liberação.");
-        }
-      } else {
-        alert("Pagamento confirmado e comanda encerrada com sucesso.");
-      }
+      alert("Pagamento confirmado! A mesa permanece ocupada até você clicar em 'Encerrar e Liberar Mesa'.");
     } catch (error) {
       console.error("Erro ao fechar conta:", error);
       alert("Erro ao encerrar a mesa. Tente novamente.");
