@@ -118,6 +118,7 @@ export function MenuView({
   const [menuLateralAberto, setMenuLateralAberto] = useState(false);
   const [buscaAberta, setBuscaAberta] = useState(false);
   const [contaPagaModal, setContaPagaModal] = useState(false);
+  const [comprovanteSemPapelAberto, setComprovanteSemPapelAberto] = useState(false);
   const [avaliacaoSocial, setAvaliacaoSocial] = useState<"like" | "dislike" | null>(null);
   const [comentarioSocial, setComentarioSocial] = useState("");
   const [metodoPagamentoEncerrado, setMetodoPagamentoEncerrado] = useState<string | null>(null);
@@ -235,7 +236,8 @@ export function MenuView({
       setContaPedidaSucesso(false);
       setGarcomChamadoSucesso(false);
       setSegundosCooldown(0);
-      setContaPagaModal(true);
+      setContaPagaModal(false);
+      setComprovanteSemPapelAberto(true);
       setMinhaComandaAberta(false);
       setCarrinhoAberto(false);
 
@@ -1091,6 +1093,62 @@ export function MenuView({
           }
         }}
       />
+
+      {/* MODAL 1: COMPROVANTE SEM PAPEL (Aparece primeiro após pagamento) */}
+      {comprovanteSemPapelAberto && (() => {
+        const taxaPct = restaurante.configuracoes?.taxaServico ?? 10;
+        const taxaValor = subtotalComandaBanco * (taxaPct / 100);
+        const totalFinal = subtotalComandaBanco + taxaValor;
+        const linhasCupom = [
+          "========================================",
+          `       ${restaurante.nome.toUpperCase()}`,
+          "       COMPROVANTE DIGITAL (SEM PAPEL)",
+          "========================================",
+          `Data/Hora: ${new Date().toLocaleString("pt-BR")}`,
+          `Mesa: ${numeroMesa}`,
+          `Cliente: ${nomeCliente || "Cliente"}`,
+          `Pagamento: ${metodoPagamentoEncerrado || "Confirmado"}`,
+          "----------------------------------------",
+          `Subtotal:      ${subtotalComandaBanco.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`,
+          `Taxa (${taxaPct}%):   ${taxaValor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`,
+          `TOTAL PAGO:    ${totalFinal.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`,
+          "========================================",
+          "   Obrigado pela visita! - MAYaMenu",
+        ];
+        return (
+          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in">
+            <div className="bg-neutral-900 border border-neutral-800 rounded-3xl max-w-sm w-full p-5 space-y-4 shadow-2xl animate-in zoom-in-95">
+              <div className="text-center">
+                <h3 className="text-base font-black text-white">Comprovante Sem Papel</h3>
+                <p className="text-[11px] text-neutral-400">Pagamento confirmado</p>
+              </div>
+              <pre className="w-full overflow-x-auto rounded-xl bg-amber-50 text-neutral-900 border border-dashed border-stone-400 p-3 font-mono text-xs leading-relaxed whitespace-pre-wrap">
+                {linhasCupom.join("\n")}
+              </pre>
+              <div className="flex flex-col gap-2">
+                <Button
+                  type="button"
+                  onClick={() => simularImpressaoTermicaPDF(`Comprovante Digital - ${restaurante.nome}`, linhasCupom)}
+                  className="w-full h-11 bg-neutral-800 hover:bg-neutral-700 text-white font-bold rounded-xl text-xs uppercase tracking-wider flex items-center justify-center gap-2"
+                >
+                  <Receipt className="w-4 h-4 text-rose-400" />
+                  Salvar PDF / Baixar Cupom
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => {
+                    setComprovanteSemPapelAberto(false);
+                    setContaPagaModal(true);
+                  }}
+                  className="w-full h-11 bg-emerald-600 hover:bg-emerald-500 text-white font-black rounded-xl text-xs uppercase tracking-wider"
+                >
+                  Fechar Comprovante
+                </Button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* MODAL DE FEEDBACK DE CONTA PAGA COM SUCESSO (Sincronia Garçom -> Cliente) */}
       {contaPagaModal && (

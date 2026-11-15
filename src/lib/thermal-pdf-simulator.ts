@@ -23,6 +23,7 @@ export function simularImpressaoTermicaPDF(
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>${escapeHtml(titulo)}</title>
   <style>
     @page {
@@ -43,14 +44,14 @@ export function simularImpressaoTermicaPDF(
       gap: 12px;
     }
     .cupom {
-      width: 72mm;
+      width: min(100%, 360px);
       background: #fffbeb;
       color: #111827;
-      padding: 10px 8px;
+      padding: 14px 12px;
       border: 1px dashed #d6d3d1;
       box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
-      font-size: 11px;
-      line-height: 1.35;
+      font-size: 13px;
+      line-height: 1.4;
       white-space: pre-wrap;
       word-break: break-word;
     }
@@ -96,3 +97,4 @@ export function simularImpressaoTermicaPDF(
 </html>`);
   win.document.close();
 }
+
