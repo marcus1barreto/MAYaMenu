@@ -39,6 +39,7 @@ export interface Restaurante {
     }>;
   };
   configuracoes: {
+    permitirPagamentoAntecipado?: boolean;
     corPrimaria: string; // Injetada no Tailwind
     tema:
       | 'light'
