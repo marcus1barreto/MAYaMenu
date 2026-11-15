@@ -578,23 +578,23 @@ export function KdsView({
                   </div>
 
                   {/* AÇÕES: IMPRIMIR CUPOM TÉRMICO E MARCHAR */}
-                  <div className="p-4 bg-neutral-50/80 border-t border-neutral-100 flex items-center gap-2">
+                  <div className="p-3.5 bg-neutral-50/80 border-t border-neutral-100 flex items-center gap-2">
                     <Button
                       type="button"
                       variant="outline"
                       onClick={() => handleImprimirPedido(ped)}
                       disabled={imprimindoId === ped.id}
-                      className="h-14 px-4 rounded-2xl border-neutral-200 bg-white hover:bg-neutral-100 text-neutral-700 shadow-xs flex items-center justify-center gap-1.5 shrink-0"
+                      className="h-12 px-3 rounded-2xl border-neutral-200 bg-white hover:bg-neutral-100 text-neutral-700 shadow-xs flex items-center justify-center gap-1.5 shrink-0"
                       title="Imprimir comanda de produção térmica (ESC/POS)"
                     >
-                      <Printer className="w-5 h-5 text-neutral-600" />
+                      <Printer className="w-4 h-4 text-neutral-600 shrink-0" />
                       <span className="hidden sm:inline text-xs font-bold">Imprimir</span>
                     </Button>
 
                     <Button
                       type="button"
                       onClick={() => (ehAFazer ? handleMarchar(ped.id) : handleServir(ped.id))}
-                      className={`flex-1 h-14 rounded-2xl font-black text-base shadow-md transition-all active:scale-[0.98] flex items-center justify-center gap-2 ${
+                      className={`min-w-0 flex-1 h-12 px-3 rounded-2xl font-extrabold text-xs sm:text-sm tracking-tight shadow-md transition-all active:scale-[0.98] flex items-center justify-center gap-1.5 ${
                         ehAFazer
                           ? "bg-rose-600 hover:bg-rose-500 text-white shadow-rose-600/25"
                           : "bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/25"
@@ -602,13 +602,13 @@ export function KdsView({
                     >
                       {ehAFazer ? (
                         <>
-                          <ChefHat className="w-5 h-5" />
-                          <span>MARCHAR PEDIDO</span>
+                          <ChefHat className="w-4 h-4 shrink-0" />
+                          <span className="truncate">MARCHAR PEDIDO</span>
                         </>
                       ) : (
                         <>
-                          <CheckCircle className="w-5 h-5" />
-                          <span>Servir (Entregue)</span>
+                          <CheckCircle className="w-4 h-4 shrink-0" />
+                          <span className="truncate">Servir (Entregue)</span>
                         </>
                       )}
                     </Button>
