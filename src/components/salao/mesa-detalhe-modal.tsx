@@ -752,7 +752,7 @@ export function MesaDetalheModal({
                             label="Imprimir (USB)"
                           />
                           {!jaPago && comanda.subtotal > 0 && (() => {
-                            const temItemNaoServido = itensComanda.some(
+                            const temItemNaoServido = (comanda.itens || []).some(
                               (it: any) =>
                                 !["entregue", "cancelado", "estornado"].includes(
                                   String(it.statusPedido || "").toLowerCase()
