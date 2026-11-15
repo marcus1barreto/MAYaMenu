@@ -46,9 +46,6 @@ export const metadata: Metadata = {
 export default function LandingPage() {
   return (
     <div className="min-h-screen bg-white text-neutral-900 flex flex-col selection:bg-rose-600 selection:text-white antialiased font-sans overflow-x-hidden">
-      {/* TARJA PRETA BLACK FREEDAY */}
-      <BlackFreedayBar />
-
       {/* 1. NAVBAR CLARA & PROFISSIONAL (IFOOD STYLE) */}
       <header className="sticky top-0 z-50 w-full border-b border-neutral-200/80 bg-white/95 backdrop-blur-md">
         <div className="max-w-7xl mx-auto px-3.5 sm:px-6 h-16 flex items-center justify-between gap-2">
@@ -67,13 +64,6 @@ export default function LandingPage() {
           </Link>
 
           <nav className="hidden md:flex items-center gap-7 text-sm font-semibold text-neutral-600">
-            <Link href="/demo" className="text-rose-700 hover:text-rose-800 transition-colors flex items-center gap-1.5 font-bold">
-              <Store className="w-4 h-4 text-rose-600" />
-              <span>Restaurante Modelo</span>
-              <span className="px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider bg-rose-100 text-rose-700 border border-rose-200">
-                SHOWROOM
-              </span>
-            </Link>
             <a href="#pilares" className="hover:text-rose-600 transition-colors">
               Como Funciona
             </a>
@@ -83,15 +73,6 @@ export default function LandingPage() {
                 NOVO
               </span>
             </a>
-            {moduloAtivo("mod.vendas_assinaturas") ? (
-              <Link href="/precos" className="hover:text-rose-600 transition-colors">
-                Planos & Preços
-              </Link>
-            ) : (
-              <a href="#precos" className="hover:text-rose-600 transition-colors">
-                Pré-lançamento Grátis
-              </a>
-            )}
             <a href="#perguntas" className="hover:text-rose-600 transition-colors">
               Dúvidas
             </a>
