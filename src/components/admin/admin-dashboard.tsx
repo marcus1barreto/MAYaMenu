@@ -1778,7 +1778,11 @@ export function AdminDashboard() {
                               taxaServicoPercentual={restaurante?.configuracoes?.taxaServico ?? 10}
                             />
                           ) : (
-                            <span className="text-sm font-black text-rose-600 block leading-none">R$ 0,00</span>
+                            <span className="text-sm font-black text-rose-600 block leading-none">
+                              {mesa.comandas
+                                .reduce((acc, c) => acc + (c.subtotal || 0), 0)
+                                .toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                            </span>
                           )}
                           <span className="text-[10px] text-neutral-500 flex items-center gap-1 mt-1 font-semibold">
                             <Users className="w-3 h-3 text-neutral-500" />
