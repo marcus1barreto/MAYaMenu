@@ -302,7 +302,10 @@ export function MesaDetalheModal({
         alert("Não há comandas para liberar nesta mesa.");
         return;
       }
-      if (!todasPagas) {
+      const temComandaComSaldoEmAberto = comandasComItens.some(
+        (c) => c.status !== "pago" && (c.subtotal || 0) > 0
+      );
+      if (temComandaComSaldoEmAberto) {
         alert("Confirme o pagamento de todas as comandas antes de liberar a mesa.");
         return;
       }
