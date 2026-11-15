@@ -578,10 +578,10 @@ export default function LandingPage() {
             <div className="p-6 rounded-2xl bg-white border border-neutral-200 shadow-xs">
               <h3 className="font-bold text-neutral-950 text-base flex items-center gap-2">
                 <HelpCircle className="w-4 h-4 text-rose-600 shrink-0" />
-                O que acontece se meu movimento cair muito no mês?
+                E se eu precisar de mais mesas do que o meu plano atual?
               </h3>
               <p className="text-sm text-neutral-600 mt-2 leading-relaxed">
-                Nós aplicamos a Tarifa Flexível: calculamos o volume real de mesas ativas no período e adaptamos a cobrança. Você só investe na proporção em que o sistema de fato está gerando valor.
+                Você cresce no seu ritmo: a partir do plano gratuito (até 5 mesas), pode adicionar mesas extras pagando um valor proporcional por mesa — até o momento em que o plano superior passe a compensar ainda mais para o seu salão.
               </p>
             </div>
           </div>
