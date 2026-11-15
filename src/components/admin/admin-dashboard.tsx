@@ -1092,20 +1092,14 @@ export function AdminDashboard() {
                 </span>
               ) : (
                 <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => setModalProAberto(true)}
-                    className="text-[10px] font-black px-2.5 py-0.5 rounded-full bg-rose-600 text-white hover:bg-rose-500 flex items-center gap-1 shrink-0 transition-colors shadow-2xs cursor-pointer"
-                    title="Assinar MAYaMenu PRO por R$ 49,90/mês"
-                  >
-                    <Sparkles className="w-2.5 h-2.5 text-white" />
-                    <span>Assinar PRO (R$ 49,90)</span>
-                  </button>
+                  <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    Plano Free
+                  </span>
                   <button
                     type="button"
                     onClick={() => setModalConfigAberto(true)}
                     className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200 flex items-center gap-1 shrink-0 transition-colors cursor-pointer"
-                    title="Possui um voucher de patrocinador? Clique para ativar o Plano PRO"
+                    title="Possui um voucher de patrocinador? Clique para ativar"
                   >
                     <span>Voucher</span>
                   </button>

@@ -437,7 +437,7 @@ export function SetupMesas({ restauranteId, maxMesas }: SetupMesasProps) {
               </div>
 
               {/* Ações Estruturais da Mesa */}
-              <div className="mt-3 pt-2.5 border-t border-border flex items-center justify-between gap-2">
+              <div className="mt-3 pt-2.5 border-t border-border flex flex-wrap items-center justify-between gap-1.5">
                 {!isReservada ? (
                   <Button
                     type="button"
