@@ -86,6 +86,7 @@ import {
   Handshake,
 } from "lucide-react";
 import { SuperadminPatrocinadoresTab } from "./superadmin-patrocinadores-tab";
+import { SuperadminDiagnostico } from "./superadmin-diagnostico";
 import { escutarTodosPatrocinadores } from "@/lib/b2b-service";
 import type { PatrocinadorB2B } from "@/types/b2b";
 
@@ -1935,8 +1936,10 @@ export function SuperAdminView() {
           )}
         </div>
       ) : (
-        /* ABA PATROCINADORES B2B (TRADE MARKETING) */
-        <SuperadminPatrocinadoresTab
+        <div className="space-y-6">
+          <SuperadminDiagnostico />
+          {/* ABA PATROCINADORES B2B (TRADE MARKETING) */}
+          <SuperadminPatrocinadoresTab
           patrocinadores={patrocinadores}
           ehSuperAdmin={ehSuperAdmin}
           onNotificarSucesso={(msg) => {
@@ -1948,6 +1951,7 @@ export function SuperAdminView() {
             setAlertaSucesso(null);
           }}
         />
+        </div>
       )}
 
       {/* MODAL INSPECIONADOR DE JSON DO ARQUIVO MORTO */}
