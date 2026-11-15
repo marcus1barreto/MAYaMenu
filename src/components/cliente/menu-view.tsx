@@ -267,6 +267,7 @@ export function MenuView({
           if (data.arquivada === true && ultimoStatus === null) {
             return;
           }
+          const statusAnterior = ultimoStatus;
           setComandaStatus(data.status);
           ultimoStatus = data.status;
 
@@ -280,7 +281,7 @@ export function MenuView({
 
           if (data.status === "conta_pedida") {
             setContaPedidaSucesso(true);
-          } else if (data.status === "pago") {
+          } else if (data.status === "pago" && statusAnterior !== null && statusAnterior !== "pago") {
             encerrarPorPagamento(data.metodoPagamento);
           }
         } else if (ultimoStatus && ultimoStatus !== "pago") {

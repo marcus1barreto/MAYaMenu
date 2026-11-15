@@ -2058,7 +2058,6 @@ async function executarFecharComanda(firestoreDb, authUid, authToken, payload) {
       pagoEm: agoraServer,
       encerradaEm: agoraServer,
       encerradaPorUid: authUid,
-      arquivada: true,
       atualizadoEm: agoraServer,
     });
     if (itensSellout.length > 0 && !selloutOutboxSnap.exists) {
@@ -2198,7 +2197,7 @@ async function executarLiberarMesa(firestoreDb, authUid, authToken, payload) {
         return;
       }
       // A liberação normal é apenas pós-pagamento; no modo forçado (kill), encerra com motivo registrado.
-      if (!ehForcado && (c.status !== 'pago' || c.arquivada !== true || !c.pagoEm)) {
+      if (!ehForcado && (c.status !== 'pago' || !c.pagoEm)) {
         throw new functions.https.HttpsError(
           'failed-precondition',
           'A comanda precisa estar paga e encerrada pelo fluxo de fechamento antes da liberação.'
@@ -2215,7 +2214,8 @@ async function executarLiberarMesa(firestoreDb, authUid, authToken, payload) {
       throw new functions.https.HttpsError('not-found', 'Nenhuma comanda encontrada para liberar.');
     }
 
-    let subtotalTotalCentavos = 0;
+    let subtotalRecebidoCentavos = 0;
+    let subtotalNaoRecebidoCentavos = 0;
     let abertaEm = null;
     let pagaEm = null;
     let totalEscritas = 3; // histórico + métrica (+ margem)
@@ -2240,14 +2240,19 @@ async function executarLiberarMesa(firestoreDb, authUid, authToken, payload) {
       // O subtotal autoritativo vem exclusivamente dos pedidos não cancelados.
       // Nunca reaproveita o agregado legado da comanda quando o total recalculado é zero:
       // isso poderia registrar receita de uma sessão composta apenas por itens cancelados.
-      subtotalTotalCentavos += subtotalComandaCentavos;
+      if (item.data.status === 'pago') {
+        subtotalRecebidoCentavos += subtotalComandaCentavos;
+      } else {
+        subtotalNaoRecebidoCentavos += subtotalComandaCentavos;
+      }
       if (item.data.criadoEm && !abertaEm) abertaEm = item.data.criadoEm;
       if (item.data.pagoEm || item.data.atualizadoEm) pagaEm = item.data.pagoEm || item.data.atualizadoEm;
 
       operacoes.push({ item, pedidosDocs: pedidosSnap.docs, kdsRefs });
     }
 
-    const subtotalTotal = Number((subtotalTotalCentavos / 100).toFixed(2));
+    const subtotalTotal = Number((subtotalRecebidoCentavos / 100).toFixed(2));
+    const valorNaoRecebido = Number((subtotalNaoRecebidoCentavos / 100).toFixed(2));
     const historicoId = `sessao_${mesaStr}_${Date.now()}`;
     const historicoRef = restDoc.ref.collection('historico_sessoes_mesas').doc(historicoId);
     const agora = new Date();
@@ -2259,8 +2264,9 @@ async function executarLiberarMesa(firestoreDb, authUid, authToken, payload) {
       op.pedidosDocs.forEach((pDoc) => t.delete(pDoc.ref));
       op.kdsRefs.forEach((kRef) => t.delete(kRef));
       t.update(op.item.ref, {
-        status: 'pago',
-        pagoEm: op.item.data.pagoEm || agoraServer,
+        status: op.item.data.status === 'pago' ? 'pago' : 'encerrada_forcada',
+        ...(op.item.data.status === 'pago' ? { pagoEm: op.item.data.pagoEm || agoraServer } : {}),
+        ...(ehForcado ? { motivoEncerramento: motivoSeguro } : {}),
         encerradaEm: agoraServer,
         encerradaPorUid: authUid,
         arquivada: true,
@@ -2280,6 +2286,12 @@ async function executarLiberarMesa(firestoreDb, authUid, authToken, payload) {
       pagaEm: pagaEm || agoraServer,
       liberadaEm: agoraServer,
       liberadaPorUid: authUid,
+      ...(ehForcado ? {
+        encerramentoForcado: true,
+        motivoEncerramento: motivoSeguro,
+        observacaoEncerramento: obsSegura,
+        valorNaoRecebido,
+      } : {}),
     });
 
     t.set(
@@ -2290,6 +2302,7 @@ async function executarLiberarMesa(firestoreDb, authUid, authToken, payload) {
         totalFaturado: admin.firestore.FieldValue.increment(subtotalTotal),
         totalSessoes: admin.firestore.FieldValue.increment(1),
         totalClientes: admin.firestore.FieldValue.increment(quantidade),
+        ...(ehForcado ? { totalEncerramentosForcados: admin.firestore.FieldValue.increment(1) } : {}),
         atualizadoEm: agoraServer,
       },
       { merge: true }

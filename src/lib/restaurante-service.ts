@@ -509,7 +509,7 @@ export function escutarComandasSalão(
       const lista: (ComandaCliente & { refPath: string })[] = [];
       snapshot.forEach((d) => {
         const data = d.data() as ComandaCliente;
-        if (data.status === "pago" || (data as any).arquivada === true) return;
+        if ((data as any).arquivada === true) return;
         lista.push({
           ...data,
           id: d.id,

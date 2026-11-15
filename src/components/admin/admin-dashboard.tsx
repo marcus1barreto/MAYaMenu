@@ -374,7 +374,8 @@ export function AdminDashboard() {
     if (!restaurante?.id) return;
     const qKds = query(
       collectionGroup(db, "kds_tickets"),
-      where("restauranteId", "==", restaurante.id)
+      where("restauranteId", "==", restaurante.id),
+      where("status", "in", ["a_fazer", "em_preparo", "pronto"])
     );
     const unsub = onSnapshot(
       qKds,

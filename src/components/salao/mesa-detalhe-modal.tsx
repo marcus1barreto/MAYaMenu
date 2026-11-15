@@ -758,7 +758,7 @@ export function MesaDetalheModal({
                             const pedidosDaComanda = pedidosMesa.filter((p) => p.clienteId === comanda.id);
                             const temItemNaoServido = pedidosDaComanda.some(
                               (p) =>
-                                !["entregue", "cancelado", "estornado"].includes(
+                                !["entregue", "pago", "cancelado", "estornado"].includes(
                                   String(p.status || "").toLowerCase()
                                 )
                             );
