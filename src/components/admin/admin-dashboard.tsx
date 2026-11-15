@@ -9,6 +9,7 @@ import { getLimitesLicenca, getPlanoRestaurante } from "@/lib/licenca-limites";
 import { parseDateToMillis } from "@/lib/datas";
 import { db } from "@/lib/firebase";
 import { collectionGroup, query, where, onSnapshot } from "firebase/firestore";
+import { simularImpressaoTermicaPDF } from "@/lib/thermal-pdf-simulator";
 import {
   escutarCardapio,
   escutarComandasSalão,
@@ -1160,6 +1161,37 @@ export function AdminDashboard() {
               <ExternalLink className="w-3 h-3 opacity-60" />
             </Button>
           </Link>
+
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() =>
+              simularImpressaoTermicaPDF(`Teste de Impressão - ${restaurante?.nome || "MAYaMenu"}`, [
+                "========================================",
+                `       ${(restaurante?.nome || "MAYAMENU").toUpperCase()}`,
+                "         TESTE DE IMPRESSAO 80MM",
+                "========================================",
+                `Data/Hora: ${new Date().toLocaleString("pt-BR")}`,
+                "Mesa: 01 (Simulacao)",
+                "----------------------------------------",
+                "QTD  ITEM                       VALOR",
+                "----------------------------------------",
+                "1x   Porcao Teste               R$ 30,00",
+                "     + Acompanha: Farofa        R$  0,00",
+                "----------------------------------------",
+                "Subtotal:                       R$ 30,00",
+                "Taxa de Servico (10%):          R$  3,00",
+                "TOTAL:                          R$ 33,00",
+                "========================================",
+                "   Simulador Termico PDF - MAYaMenu",
+              ])
+            }
+            className="bg-card border-border hover:bg-muted text-foreground font-bold text-xs h-9 px-3 rounded-xl flex items-center gap-1.5 shadow-xs transition-all"
+            title="Simulador de Impressora Térmica (PDF 80mm)"
+          >
+            <span className="hidden sm:inline">Teste de Impressão</span>
+            <span className="sm:hidden">PDF 80mm</span>
+          </Button>
 
           <Button
             type="button"
