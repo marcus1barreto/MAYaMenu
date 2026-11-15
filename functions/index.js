@@ -953,7 +953,9 @@ function validarLimiteMesaLicenciado(restData, numeroMesa) {
   const limiteInformado = restData?.maxMesas
     ?? restData?.licenca?.limites?.maxMesas
     ?? restData?.licenca?.maxMesas;
-  const limite = Number(limiteInformado);
+  const limiteBase = Number(limiteInformado);
+  const extras = Math.max(0, Math.floor(Number(restData?.mesasExtrasContratadas ?? restData?.licenca?.mesasExtrasContratadas ?? 0) || 0));
+  const limite = limiteBase + extras;
   if (!Number.isSafeInteger(limite) || limite < 1) {
     throw new functions.https.HttpsError(
       'failed-precondition',
