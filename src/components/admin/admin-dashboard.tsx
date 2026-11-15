@@ -407,9 +407,10 @@ export function AdminDashboard() {
       new Set([restaurante?.id, restaurante?.slug].filter(Boolean) as string[])
     );
 
-    const q = idsParaBuscar.length > 1
-      ? query(collectionGroup(db, "comandas_abertas"), where("restauranteId", "in", idsParaBuscar))
-      : query(collectionGroup(db, "comandas_abertas"), where("restauranteId", "==", idsParaBuscar[0]));
+    const q = query(
+      collectionGroup(db, "comandas_abertas"),
+      where("restauranteId", "==", restaurante.id)
+    );
 
     const unsub = onSnapshot(
       q,
