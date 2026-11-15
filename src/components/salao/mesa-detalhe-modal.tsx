@@ -936,7 +936,7 @@ export function MesaDetalheModal({
                                 type="button"
                                 disabled={encerrando || !motivoForcar.trim()}
                                 onClick={async () => {
-                                  if (!motivoForcar.trim()) return;
+                                  if (!motivoForcar.trim() || !restauranteId) return;
                                   setEncerrando(true);
                                   try {
                                     await liberarMesaFirestore(
