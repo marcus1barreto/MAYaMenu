@@ -632,36 +632,6 @@ export function MenuView({
               <Search className="w-4 h-4" />
             </button>
 
-            {/* Ícone da Comanda / Carrinho com Badge Numérico de Itens */}
-            <button
-              type="button"
-              onClick={() => {
-                if (totalItens > 0) {
-                  setCarrinhoAberto(true);
-                } else {
-                  setMinhaComandaAberta(true);
-                }
-              }}
-              style={{ backgroundColor: (totalItens > 0 || subtotalComandaBanco > 0) ? corPrimaria : undefined }}
-              className={`relative h-9 px-3 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95 shadow-sm ${
-                (totalItens > 0 || subtotalComandaBanco > 0)
-                  ? "text-white shadow-sm"
-                  : "bg-card hover:bg-muted border border-border text-muted-foreground hover:text-foreground"
-              }`}
-              title="Abrir Comanda e Pedidos"
-            >
-              <Utensils className="w-3.5 h-3.5" />
-              <span className="hidden xs:inline">Comanda</span>
-
-              {/* Badge Dinâmico de Quantidade de Itens */}
-              {totalItens > 0 ? (
-                <span className="ml-0.5 px-1.5 py-0.2 rounded-full bg-white text-neutral-950 text-[10px] font-black font-mono">
-                  {totalItens}
-                </span>
-              ) : subtotalComandaBanco > 0 ? (
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-              ) : null}
-            </button>
           </div>
         </div>
 
@@ -982,6 +952,44 @@ export function MenuView({
           </Button>
         </div>
       )}
+
+      {/* BOTÃO REDONDO "COMANDA" (Alinhado com os demais, do lado oposto) */}
+      <button
+        type="button"
+        onClick={() => {
+          if (totalItens > 0) {
+            setCarrinhoAberto(true);
+          } else {
+            setMinhaComandaAberta(true);
+          }
+        }}
+        aria-label="Abrir Comanda"
+        style={{
+          backgroundColor:
+            totalItens > 0 || subtotalComandaBanco > 0 ? corPrimaria : undefined,
+        }}
+        className={`fixed left-5 z-40 flex flex-col items-center justify-center w-20 h-20 rounded-full shadow-2xl border transition-all active:scale-95 px-1 ${
+          totalItens > 0 ? "bottom-24" : "bottom-5"
+        } ${
+          totalItens > 0 || subtotalComandaBanco > 0
+            ? "text-white border-white/30"
+            : "bg-neutral-900 hover:bg-neutral-800 border-neutral-700 text-white"
+        }`}
+      >
+        <div className="relative">
+          <Utensils className="w-6 h-6" />
+          {totalItens > 0 ? (
+            <span className="absolute -top-2 -right-2.5 px-1.5 py-0.2 rounded-full bg-white text-neutral-950 text-[10px] font-black font-mono shadow-xs">
+              {totalItens}
+            </span>
+          ) : subtotalComandaBanco > 0 ? (
+            <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
+          ) : null}
+        </div>
+        <span className="text-[11px] font-bold mt-1 leading-none">
+          Comanda
+        </span>
+      </button>
 
       {/* BOTÃO REDONDO "CONTA" (Visível após pedido ativo/entregue) */}
       {!ehAutoatendimento && subtotalComandaBanco > 0 && (
