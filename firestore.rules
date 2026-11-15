@@ -273,6 +273,16 @@ service cloud.firestore {
 
       // Mesas e Salão: Leitura restrita à equipe operacional ou SuperAdmin (elimina leitura pública desnecessária)
       // Campos de credencial QR (qrCredencialHash, qrVersao, qrCredencial) são protegidos contra escrita direta
+      // Livro-razão financeiro imutável (append-only)
+      match /movimentacoes_caixa/{movId} {
+        allow read: if isOwner(restauranteId) || isGarcom(restauranteId) || isSuperAdmin();
+        allow create: if (isOwner(restauranteId) || isGarcom(restauranteId) || isSuperAdmin())
+          && request.resource.data.valorCentavos is int
+          && request.resource.data.valorCentavos >= 0
+          && request.resource.data.idempotencyKey == movId;
+        allow update, delete: if false;
+      }
+
       match /mesas/{numeroMesa} {
         allow read: if isOwner(restauranteId) || isGarcom(restauranteId) || isSuperAdmin();
         allow create: if (isOwner(restauranteId) || isGarcom(restauranteId) || isSuperAdmin())
