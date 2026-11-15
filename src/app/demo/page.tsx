@@ -219,23 +219,42 @@ export default function DemoSandboxPage() {
               <span>
                 {visao === "cliente" && (
                   <>
-                    <strong>Visão do Cliente na Mesa {mesaDemo}:</strong> Navegue pelo cardápio, adicione opções personalizadas e experimente fazer um pedido de teste sem medo.
+                    <strong>Visão do Cliente na Mesa {mesaDemo}:</strong> Navegue pelo cardápio, use o botão flutuante de Atendimento e faça um pedido de teste sem medo.
                   </>
                 )}
                 {visao === "cozinha" && (
                   <>
-                    <strong>Visão KDS Cozinha (Mundo 3):</strong> Veja como os pratos pedidos na mesa caem instantaneamente na tela da cozinha com tempos e cronômetros de preparo.
+                    <strong>Visão KDS Cozinha:</strong> Veja os pedidos da mesa caírem na hora com cronômetro de preparo para marchar e marcar como servido.
                   </>
                 )}
                 {visao === "garcom" && (
                   <>
-                    <strong>Visão Radar do Garçom:</strong> Acompanhe as mesas ativas, comandas abertas e solicitações de atendimento sem papel nem confusão.
+                    <strong>Visão Radar do Garçom (Módulo Pro opcional):</strong> No plano Free você opera direto pelo Admin de Mesas; aqui você acompanha mesas, comandas e chamados em tempo real.
                   </>
                 )}
               </span>
             </div>
             <span className="text-[10px] text-rose-600 font-bold uppercase tracking-wider shrink-0 hidden md:inline">
               Ambiente Autônomo Seguro
+            </span>
+          </div>
+        </div>
+
+        {/* ROTEIRO GUIADO EM 4 PASSOS + DIFERENCIAIS DO PLANO FREE */}
+        <div className="bg-white border-b border-neutral-200 px-4 py-2 text-[11px] text-neutral-600">
+          <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <span className="font-bold text-neutral-800 uppercase tracking-wider text-[10px]">Roteiro:</span>
+              <span><strong>1.</strong> Pedir / Chamar Atendimento</span>
+              <span className="text-neutral-300">→</span>
+              <span><strong>2.</strong> Cozinha Marchar &amp; Servir</span>
+              <span className="text-neutral-300">→</span>
+              <span><strong>3.</strong> Cobrar &amp; Comprovante Sem Papel (80mm)</span>
+              <span className="text-neutral-300">→</span>
+              <span><strong>4.</strong> Liberar Mesa no Admin</span>
+            </div>
+            <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2.5 py-0.5 shrink-0">
+              5 mesas grátis + R$ 8/extra
             </span>
           </div>
         </div>
