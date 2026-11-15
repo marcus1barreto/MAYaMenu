@@ -4167,9 +4167,9 @@ async function executarChamarGarcom(firestoreDb, authUid, payload) {
     if (typeof m.qrCredencialHash !== 'string' || !compararSegredoConstante(recebido, m.qrCredencialHash)) {
       throw new functions.https.HttpsError('permission-denied', 'QR Code inválido ou revogado.');
     }
-    if (comandaSnap.exists) {
+    if (comandaSnap.exists && (comandaSnap.data() || {}).arquivada !== true) {
       const c = comandaSnap.data() || {};
-      if (c.status === 'pago' || c.arquivada === true) {
+      if (c.status === 'pago') {
         throw new functions.https.HttpsError('failed-precondition', 'A comanda já foi encerrada.');
       }
       const ultimo = c.chamadoGarcom?.solicitadoEm;
@@ -4188,10 +4188,10 @@ async function executarChamarGarcom(firestoreDb, authUid, payload) {
         atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
       });
     } else {
-      t.create(comandaRef, {
+      t.set(comandaRef, {
         id: authUid, restauranteId: restDoc.id, slug: String(restData.slug || restDoc.id),
         nomeCliente: nome, mesa: numeroMesa, numeroMesa,
-        subtotal: 0, status: 'pedindo',
+        subtotal: 0, status: 'pedindo', arquivada: false,
         criadoEm: admin.firestore.FieldValue.serverTimestamp(),
         atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
         chamadoGarcom: { ativo: true, solicitadoEm: admin.firestore.FieldValue.serverTimestamp(), motivo: motivoSeguro },
