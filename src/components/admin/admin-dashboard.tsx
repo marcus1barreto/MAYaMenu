@@ -24,6 +24,11 @@ import {
   trocarOrdemItens,
   fixarItemNoTopo,
 } from "@/lib/restaurante-service";
+import {
+  registrarMovimentacaoFinanceira,
+  paraCentavos,
+  gerarIdempotencyKey,
+} from "@/lib/financial-ledger";
 import { GuidedEmptyCardapio } from "./guided-empty-cardapio";
 import { AdminQrScannerModal } from "./admin-qr-scanner-modal";
 import { ModificadorBuilder } from "./modificador-builder";
@@ -531,6 +536,18 @@ export function AdminDashboard() {
     try {
       // O estado visual só muda depois da confirmação transacional do backend.
       await marcarComandaPagaFirestore(restaurante.id, mesaNumero, clienteId);
+      const mesaAlvo = mesas.find((m) => m.numero === mesaNumero);
+      const comandaAlvo = mesaAlvo?.comandas.find((c) => c.id === clienteId);
+      const valorCentavos = paraCentavos(comandaAlvo?.subtotal || 0);
+      await registrarMovimentacaoFinanceira({
+        restauranteId: restaurante.id,
+        idempotencyKey: gerarIdempotencyKey(`pag_${mesaNumero}_${clienteId}`),
+        sessaoMesaId: clienteId,
+        mesa: mesaNumero,
+        tipo: "pagamento_total",
+        valorCentavos,
+        operadorUid: user?.uid || "admin",
+      }).catch((e) => console.warn("Aviso ledger:", e));
     } catch (err) {
       console.error("Falha ao confirmar pagamento da comanda:", err);
       alert(err instanceof Error ? err.message : "Não foi possível confirmar o pagamento.");
