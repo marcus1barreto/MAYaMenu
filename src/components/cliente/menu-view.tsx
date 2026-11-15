@@ -39,6 +39,7 @@ import { ensureClienteAnonimo, auth, db } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { doc, updateDoc, serverTimestamp, onSnapshot } from "firebase/firestore";
 import { escutarCardapio, escutarRestaurante, chamarGarcomFirestore, escutarPedidosCliente } from "@/lib/restaurante-service";
+import { simularImpressaoTermicaPDF } from "@/lib/thermal-pdf-simulator";
 import { moduloAtivo } from "@/lib/modules";
 import { marcarVisitaAtualComoPaga, limparSessaoClienteLocal } from "@/lib/historico-cliente";
 import { MesaScannerModal } from "./mesa-scanner-modal";
@@ -1175,8 +1176,25 @@ export function MenuView({
               <Button
                 type="button"
                 onClick={() => {
-                  setContaPagaModal(false);
-                  setHistoricoAberto(true);
+                  const taxaPct = restaurante.configuracoes?.taxaServico ?? 10;
+                  const taxaValor = subtotalComandaBanco * (taxaPct / 100);
+                  const totalFinal = subtotalComandaBanco + taxaValor;
+                  simularImpressaoTermicaPDF(`Comprovante Digital - ${restaurante.nome}`, [
+                    "========================================",
+                    `       ${restaurante.nome.toUpperCase()}`,
+                    "       COMPROVANTE DIGITAL (SEM PAPEL)",
+                    "========================================",
+                    `Data/Hora: ${new Date().toLocaleString("pt-BR")}`,
+                    `Mesa: ${numeroMesa}`,
+                    `Cliente: ${nomeCliente || "Cliente"}`,
+                    `Pagamento: ${metodoPagamentoEncerrado || "Confirmado"}`,
+                    "----------------------------------------",
+                    `Subtotal:      ${subtotalComandaBanco.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`,
+                    `Taxa (${taxaPct}%):   ${taxaValor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`,
+                    `TOTAL PAGO:    ${totalFinal.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`,
+                    "========================================",
+                    "   Obrigado pela visita! - MAYaMenu",
+                  ]);
                 }}
                 className="w-full h-11 bg-neutral-800 hover:bg-neutral-700 text-white font-bold rounded-xl text-xs uppercase tracking-wider flex items-center justify-center gap-2"
               >
