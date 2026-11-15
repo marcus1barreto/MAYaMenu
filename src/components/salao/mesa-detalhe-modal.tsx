@@ -67,6 +67,7 @@ interface MesaDetalheModalProps {
   onSalvarObservacao?: (mesaNumero: number, observacao: string) => void;
   observacaoInicial?: string;
   taxaServicoPercentual?: number;
+  permitirPagamentoAntecipado?: boolean;
   garcomLogado?: { uid?: string; nome?: string; fotoUrl?: string };
   garconsDisponiveis?: Array<{ uid: string; nome: string; fotoUrl?: string }>;
   onAssumirMesa?: (mesaNumero: number) => void;
@@ -88,6 +89,7 @@ export function MesaDetalheModal({
   onSalvarObservacao,
   observacaoInicial = "",
   taxaServicoPercentual,
+  permitirPagamentoAntecipado = false,
   garcomLogado,
   garconsDisponiveis,
   onAssumirMesa,
@@ -750,7 +752,7 @@ export function MesaDetalheModal({
                                   String(p.status || "").toLowerCase()
                                 )
                             );
-                            if (temItemNaoServido) {
+                            if (!permitirPagamentoAntecipado && temItemNaoServido) {
                               return (
                                 <span className="flex-1 h-10 px-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-[11px] font-bold flex items-center justify-center text-center">
                                   Aguardando entrega dos itens

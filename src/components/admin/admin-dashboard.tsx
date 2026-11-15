@@ -156,6 +156,9 @@ export function AdminDashboard() {
   const [taxaServicoConfig, setTaxaServicoConfig] = useState<number>(
     restaurante?.configuracoes?.taxaServico !== undefined ? restaurante.configuracoes.taxaServico : 10
   );
+  const [permitirPagamentoAntecipado, setPermitirPagamentoAntecipado] = useState<boolean>(
+    Boolean((restaurante?.configuracoes as any)?.permitirPagamentoAntecipado)
+  );
   const [pixAtivo, setPixAtivo] = useState<boolean>(
     restaurante?.configuracoes?.pixConfig?.ativo ?? false
   );
@@ -1020,6 +1023,7 @@ export function AdminDashboard() {
           modoOperacao,
           modoFilaKds,
           taxaServico: Number(taxaServicoConfig) || 0,
+          permitirPagamentoAntecipado,
           pixConfig: {
             ativo: pixAtivo,
             tipoChave: pixTipoChave,
@@ -2384,6 +2388,7 @@ export function AdminDashboard() {
         slug={slug}
         restauranteId={restaurante?.id}
         taxaServicoPercentual={restaurante?.configuracoes?.taxaServico}
+        permitirPagamentoAntecipado={Boolean((restaurante?.configuracoes as any)?.permitirPagamentoAntecipado)}
         modoSomenteLeitura={true}
         onMarcarPago={handleMarcarComoPago}
         onLiberarMesa={handleLiberarMesa}
@@ -2856,6 +2861,29 @@ export function AdminDashboard() {
               <p className="text-xs text-muted-foreground">
                 Percentual sugerido na conta no momento do fechamento da mesa (0% para desativar, 10% padrão, até 20%).
               </p>
+              <div className="pt-3 border-t border-border/60 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-bold text-foreground">Permitir pagamento antecipado</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    Libera o botão Cobrar mesmo com itens ainda não entregues na mesa.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={permitirPagamentoAntecipado}
+                  onClick={() => setPermitirPagamentoAntecipado((v) => !v)}
+                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
+                    permitirPagamentoAntecipado ? "bg-emerald-600" : "bg-muted"
+                  }`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow transition ${
+                      permitirPagamentoAntecipado ? "translate-x-5" : "translate-x-0"
+                    }`}
+                  />
+                </button>
+              </div>
               <div className="flex items-center gap-3">
                 <Input
                   type="number"
@@ -3074,6 +3102,29 @@ export function AdminDashboard() {
             {/* LINKS JURÍDICOS E CONFORMIDADE */}
             <div className="pt-3 border-t border-border flex items-center justify-between text-[11px] text-muted-foreground">
               <span>Conformidade & Legal</span>
+              <div className="pt-3 border-t border-border/60 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-bold text-foreground">Permitir pagamento antecipado</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    Libera o botão Cobrar mesmo com itens ainda não entregues na mesa.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={permitirPagamentoAntecipado}
+                  onClick={() => setPermitirPagamentoAntecipado((v) => !v)}
+                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
+                    permitirPagamentoAntecipado ? "bg-emerald-600" : "bg-muted"
+                  }`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow transition ${
+                      permitirPagamentoAntecipado ? "translate-x-5" : "translate-x-0"
+                    }`}
+                  />
+                </button>
+              </div>
               <div className="flex items-center gap-3">
                 <Link
                   href="/termos-de-uso"
