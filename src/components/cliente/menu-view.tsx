@@ -1109,8 +1109,11 @@ export function MenuView({
             } else {
               sessionStorage.removeItem(storageKey);
             }
+            const urlAtual = new URL(window.location.href);
+            urlAtual.searchParams.set("mesa", String(novaMesa));
+            window.history.replaceState(null, "", urlAtual.toString());
           } catch {
-            // Ignora erro de storage
+            // Ignora erro de storage/history
           }
         }}
       />
