@@ -1438,16 +1438,21 @@ async function executarCriacaoPedidoCliente(firestoreDb, authUid, payload) {
       );
     }
 
-    // 5. Valida estado da comanda (somente estados abertos recebem novos pedidos)
+    // 5. Valida estado da comanda (somente estados abertos recebem novos pedidos;
+    // comandas arquivadas/encerradas/kill de visitas anteriores são reabertas como nova visita)
     if (comandaSnap.exists) {
       const cData = comandaSnap.data() || {};
-      if (!STATUS_COMANDA_PERMITIDOS.has(cData.status)) {
+      const ehVisitaAnteriorEncerrada =
+        cData.status === 'arquivada' ||
+        cData.status === 'encerrada' ||
+        cData.status === 'kill';
+      if (!ehVisitaAnteriorEncerrada && !STATUS_COMANDA_PERMITIDOS.has(cData.status)) {
         throw new functions.https.HttpsError(
           'failed-precondition',
           'Esta comanda já solicitou fechamento ou foi encerrada no caixa.'
         );
       }
-      if (cData.restauranteId && cData.restauranteId !== realRestauranteId) {
+      if (!ehVisitaAnteriorEncerrada && cData.restauranteId && cData.restauranteId !== realRestauranteId) {
         throw new functions.https.HttpsError('permission-denied', 'Comanda pertence a outro restaurante.');
       }
     }
@@ -1698,13 +1703,17 @@ async function executarLancamentoPedidoGarcom(firestoreDb, authUid, authToken, p
 
     if (comandaSnap.exists) {
       const cData = comandaSnap.data() || {};
-      if (!STATUS_COMANDA_PERMITIDOS.has(cData.status)) {
+      const ehVisitaAnteriorEncerrada =
+        cData.status === 'arquivada' ||
+        cData.status === 'encerrada' ||
+        cData.status === 'kill';
+      if (!ehVisitaAnteriorEncerrada && !STATUS_COMANDA_PERMITIDOS.has(cData.status)) {
         throw new functions.https.HttpsError(
           'failed-precondition',
           'Esta comanda já solicitou fechamento ou foi encerrada no caixa.'
         );
       }
-      if (cData.restauranteId && cData.restauranteId !== realRestauranteId) {
+      if (!ehVisitaAnteriorEncerrada && cData.restauranteId && cData.restauranteId !== realRestauranteId) {
         throw new functions.https.HttpsError('permission-denied', 'Comanda pertence a outro restaurante.');
       }
     }
