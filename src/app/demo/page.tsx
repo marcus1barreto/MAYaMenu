@@ -6,8 +6,8 @@ import { RESTAURANTE_DEMO, CARDAPIO_DEMO } from "@/lib/mock-data";
 import { MenuView } from "@/components/cliente/menu-view";
 import { CartProvider } from "@/context/cart-context";
 import { AuthProvider } from "@/context/auth-context";
-import { KdsView, PEDIDOS_INICIAIS_KDS } from "@/components/admin/kds-view";
-import { GarcomView, MESAS_INICIAIS } from "@/components/garcom/garcom-view";
+import { DemoAdminMesas, type DemoMesa } from "@/components/demo/demo-admin-mesas";
+import { DemoKds } from "@/components/demo/demo-kds";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -33,11 +33,58 @@ import {
   Info,
 } from "lucide-react";
 
+const criarMesasIniciais = (cenario: "demo" | "limpo"): DemoMesa[] => {
+  if (cenario === "limpo") {
+    return Array.from({ length: 5 }, (_, i) => ({
+      numero: i + 1,
+      status: "livre",
+      chamadoAtivo: false,
+      paga: false,
+      itens: [],
+    }));
+  }
+  return [
+    {
+      numero: 1,
+      status: "ocupada",
+      chamadoAtivo: false,
+      paga: false,
+      itens: [
+        { id: "m1-1", nome: "Picanha na Chapa", quantidade: 1, preco: 89.9, status: "servido" },
+        { id: "m1-2", nome: "Suco Natural de Laranja", quantidade: 2, preco: 12.0, status: "servido" },
+      ],
+    },
+    {
+      numero: 2,
+      status: "ocupada",
+      chamadoAtivo: false,
+      paga: false,
+      itens: [
+        { id: "m2-1", nome: "Hambúrguer Artesanal", quantidade: 2, preco: 38.0, status: "pendente" },
+        { id: "m2-2", nome: "Batata Rústica", quantidade: 1, preco: 24.0, status: "preparando" },
+      ],
+    },
+    {
+      numero: 3,
+      status: "ocupada",
+      chamadoAtivo: true,
+      paga: false,
+      itens: [
+        { id: "m3-1", nome: "Espetinho Misto", quantidade: 3, preco: 18.0, status: "servido" },
+      ],
+    },
+    { numero: 4, status: "livre", chamadoAtivo: false, paga: false, itens: [] },
+    { numero: 5, status: "livre", chamadoAtivo: false, paga: false, itens: [] },
+  ];
+};
+
 export default function DemoSandboxPage() {
-  const [visao, setVisao] = useState<"cliente" | "cozinha" | "garcom">("cliente");
-  const [mesaDemo, setMesaDemo] = useState<number>(12);
+  const [visao, setVisao] = useState<"cliente" | "cozinha" | "admin">("cliente");
+  const [mesaDemo, setMesaDemo] = useState<number>(1);
   const [sandboxKey, setSandboxKey] = useState<number>(0);
   const [modoCenario, setModoCenario] = useState<"limpo" | "demo">("demo");
+  const [mesas, setMesas] = useState<DemoMesa[]>(() => criarMesasIniciais("demo"));
+  const [comprovanteMesa, setComprovanteMesa] = useState<DemoMesa | null>(null);
   const [resetando, setResetando] = useState<boolean>(false);
   const [modalQrAberto, setModalQrAberto] = useState<boolean>(false);
   const [copiadoLink, setCopiadoLink] = useState<boolean>(false);
@@ -60,6 +107,7 @@ export default function DemoSandboxPage() {
       // Ignora erro de storage
     }
     setModoCenario("limpo");
+    setMesas(criarMesasIniciais("limpo"));
     setTimeout(() => {
       setSandboxKey((prev) => prev + 1);
       setResetando(false);
@@ -69,10 +117,89 @@ export default function DemoSandboxPage() {
   const carregarCenarioDemo = () => {
     setResetando(true);
     setModoCenario("demo");
+    setMesas(criarMesasIniciais("demo"));
     setTimeout(() => {
       setSandboxKey((prev) => prev + 1);
       setResetando(false);
     }, 200);
+  };
+
+  const handleAdicionarPedidoTeste = (numeroMesa: number) => {
+    const pratosDemo = [
+      { nome: "Hambúrguer Artesanal", preco: 38.0 },
+      { nome: "Espetinho Misto", preco: 18.0 },
+      { nome: "Porção de Fritas", preco: 26.0 },
+      { nome: "Refrigerante Lata", preco: 8.0 },
+    ];
+    const escolhido = pratosDemo[Math.floor(Math.random() * pratosDemo.length)];
+    setMesas((prev) =>
+      prev.map((m) =>
+        m.numero === numeroMesa
+          ? {
+              ...m,
+              status: "ocupada",
+              paga: false,
+              itens: [
+                ...m.itens,
+                {
+                  id: `item-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                  nome: escolhido.nome,
+                  quantidade: 1,
+                  preco: escolhido.preco,
+                  status: "pendente",
+                },
+              ],
+            }
+          : m
+      )
+    );
+  };
+
+  const handleAlternarChamado = (numeroMesa: number) => {
+    setMesas((prev) =>
+      prev.map((m) =>
+        m.numero === numeroMesa ? { ...m, chamadoAtivo: !m.chamadoAtivo } : m
+      )
+    );
+  };
+
+  const handleAvancarItem = (numeroMesa: number, itemId: string) => {
+    setMesas((prev) =>
+      prev.map((m) => {
+        if (m.numero !== numeroMesa) return m;
+        return {
+          ...m,
+          itens: m.itens.map((item) => {
+            if (item.id !== itemId) return item;
+            if (item.status === "pendente") return { ...item, status: "preparando" };
+            if (item.status === "preparando") return { ...item, status: "servido" };
+            return item;
+          }),
+        };
+      })
+    );
+  };
+
+  const handleCobrarMesa = (numeroMesa: number) => {
+    let mesaCobrada: DemoMesa | null = null;
+    setMesas((prev) =>
+      prev.map((m) => {
+        if (m.numero !== numeroMesa) return m;
+        mesaCobrada = { ...m, paga: true, chamadoAtivo: false };
+        return mesaCobrada;
+      })
+    );
+    if (mesaCobrada) setComprovanteMesa(mesaCobrada);
+  };
+
+  const handleLiberarMesa = (numeroMesa: number) => {
+    setMesas((prev) =>
+      prev.map((m) =>
+        m.numero === numeroMesa
+          ? { ...m, status: "livre", chamadoAtivo: false, paga: false, itens: [] }
+          : m
+      )
+    );
   };
 
   const copiarLinkCelular = () => {
@@ -140,15 +267,15 @@ export default function DemoSandboxPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setVisao("garcom")}
+                  onClick={() => setVisao("admin")}
                   className={`flex-1 sm:flex-initial px-3 sm:px-4 py-1.5 rounded-xl transition-all flex items-center justify-center gap-1.5 ${
-                    visao === "garcom"
+                    visao === "admin"
                       ? "bg-white text-rose-700 shadow-xs border border-border/80 font-black"
                       : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
                   <Users className="w-3.5 h-3.5 text-rose-600" />
-                  <span>Radar Garçom</span>
+                  <span>Admin de Mesas</span>
                 </button>
               </div>
             </div>
@@ -227,9 +354,9 @@ export default function DemoSandboxPage() {
                     <strong>Visão KDS Cozinha:</strong> Veja os pedidos da mesa caírem na hora com cronômetro de preparo para marchar e marcar como servido.
                   </>
                 )}
-                {visao === "garcom" && (
+                {visao === "admin" && (
                   <>
-                    <strong>Visão Radar do Garçom (Módulo Pro opcional):</strong> No plano Free você opera direto pelo Admin de Mesas; aqui você acompanha mesas, comandas e chamados em tempo real.
+                    <strong>Visão Admin de Mesas (Plano Free):</strong> Gerencie as 5 mesas grátis, cobre somente após a cozinha servir, gere o Comprovante Sem Papel (80mm) e libere a mesa.
                   </>
                 )}
               </span>
@@ -273,35 +400,66 @@ export default function DemoSandboxPage() {
 
           {visao === "cozinha" && (
             <div className="p-4 md:p-6 max-w-7xl mx-auto">
-              <KdsView
-                restauranteId="rest-demo-alpha"
-                nomeRestaurante={RESTAURANTE_DEMO.nome}
-                isSandbox={true}
-                dadosIniciais={modoCenario === "demo" ? PEDIDOS_INICIAIS_KDS : []}
-              />
+              <DemoKds mesas={mesas} onAvancarItem={handleAvancarItem} />
             </div>
           )}
 
-          {visao === "garcom" && (
+          {visao === "admin" && (
             <div className="p-4 md:p-6 max-w-7xl mx-auto">
-              <GarcomView
-                restauranteId="rest-demo-alpha"
-                slug="demo"
-                nomeRestaurante={RESTAURANTE_DEMO.nome}
-                isSandbox={true}
-                dadosIniciais={
-                  modoCenario === "demo"
-                    ? MESAS_INICIAIS
-                    : Array.from({ length: 8 }, (_, i) => ({
-                        numero: i + 1,
-                        status: "livre" as const,
-                        comandas: [],
-                      }))
-                }
+              <DemoAdminMesas
+                mesas={mesas}
+                onAdicionarPedidoTeste={handleAdicionarPedidoTeste}
+                onAlternarChamado={handleAlternarChamado}
+                onCobrarMesa={handleCobrarMesa}
+                onGerarComprovante={(mesa) => setComprovanteMesa(mesa)}
+                onLiberarMesa={handleLiberarMesa}
               />
             </div>
           )}
         </div>
+
+        {/* MODAL: COMPROVANTE SEM PAPEL (80MM) */}
+        <Dialog
+          open={Boolean(comprovanteMesa)}
+          onOpenChange={(open) => !open && setComprovanteMesa(null)}
+        >
+          <DialogContent className="max-w-xs bg-amber-50 border-amber-200 text-neutral-900 rounded-2xl p-5 font-mono text-xs shadow-2xl">
+            <DialogHeader className="text-center border-b border-dashed border-neutral-400 pb-3">
+              <DialogTitle className="text-sm font-black uppercase tracking-wider">
+                {RESTAURANTE_DEMO.nome}
+              </DialogTitle>
+              <DialogDescription className="text-[11px] text-neutral-600">
+                Comprovante Sem Papel • 80mm • Mesa {comprovanteMesa?.numero}
+              </DialogDescription>
+            </DialogHeader>
+            {comprovanteMesa && (
+              <div className="space-y-2 py-2">
+                {comprovanteMesa.itens.map((item) => (
+                  <div key={item.id} className="flex justify-between gap-2">
+                    <span className="truncate">
+                      {item.quantidade}x {item.nome}
+                    </span>
+                    <span className="shrink-0">
+                      R$ {(item.preco * item.quantidade).toFixed(2)}
+                    </span>
+                  </div>
+                ))}
+                <div className="border-t border-dashed border-neutral-400 pt-2 flex justify-between font-black text-sm">
+                  <span>TOTAL PAGO</span>
+                  <span>
+                    R${" "}
+                    {comprovanteMesa.itens
+                      .reduce((acc, i) => acc + i.preco * i.quantidade, 0)
+                      .toFixed(2)}
+                  </span>
+                </div>
+                <p className="text-[10px] text-center text-neutral-500 pt-1">
+                  Pago sem papel • Mesa aguarda liberação no Admin
+                </p>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
 
         {/* MODAL: EXPERIMENTE NO CELULAR (QR CODE DA MESA MODELO) */}
         <Dialog open={modalQrAberto} onOpenChange={setModalQrAberto}>
