@@ -261,7 +261,7 @@ export function MenuView({
       (snap) => {
         if (snap.exists()) {
           const data = snap.data() as ComandaCliente & { arquivada?: boolean };
-          if (data.arquivada === true) {
+          if (data.arquivada === true && ultimoStatus === null) {
             return;
           }
           setComandaStatus(data.status);
