@@ -414,35 +414,18 @@ export function AdminDashboard() {
     const unsub = onSnapshot(
       q,
       (snapshot) => {
-        // Trata os eventos docChanges para atualizar o estado local de comandas
-        setComandas((prevComandas) => {
-          let lista = [...prevComandas];
-
-          snapshot.docChanges().forEach((change) => {
-            const docId = change.doc.id;
-            if (change.type === "removed") {
-              // Remoção explícita da comanda ao ser liberada / arquivada
-              lista = lista.filter((c) => c.id !== docId);
-            } else if (change.type === "added" || change.type === "modified") {
-              const data = change.doc.data() as ComandaCliente;
-              if ((data as any).arquivada === true) {
-                // Comanda liberada/arquivada: remove do mapa do salão
-                lista = lista.filter((c) => c.id !== docId);
-                return;
-              }
-              const comandaItem: ComandaCliente & { refPath: string } = {
-                ...data,
-                id: docId,
-                refPath: change.doc.ref.path,
-              };
-              const index = lista.findIndex((c) => c.id === docId);
-              if (index >= 0) {
-                lista[index] = comandaItem;
-              } else {
-                lista.push(comandaItem);
-              }
-            }
+        const lista: Array<ComandaCliente & { refPath: string }> = [];
+        snapshot.docs.forEach((docSnap) => {
+          const data = docSnap.data() as ComandaCliente;
+          if ((data as any).arquivada === true) return;
+          lista.push({
+            ...data,
+            id: docSnap.id,
+            refPath: docSnap.ref.path,
           });
+        });
+
+        setComandas(lista);
 
           // Reconstrói as mesas com base nas comandas ativas e no limite do plano
           const mapa = new Map<number, MesaOperacional>();
@@ -510,9 +493,6 @@ export function AdminDashboard() {
             const mesaAtualizada = mapa.get(prevSelecionada.numero);
             return mesaAtualizada || { numero: prevSelecionada.numero, status: "livre", comandas: [] };
           });
-
-          return lista;
-        });
       },
       (err) => {
         console.warn("Listener de comandas do salão no Admin indisponível:", err);
