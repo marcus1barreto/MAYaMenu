@@ -684,7 +684,7 @@ export function MesaDetalheModal({
                                 </span>
 
                                 {/* BOTÃO DE MARCAR COMO SERVIDO / ENTREGUE OU BADGE OFFLINE */}
-                                {!modoSomenteLeitura && (
+                                {(
                                   !it.refPath ? (
                                     <Badge
                                       variant="outline"
@@ -751,24 +751,39 @@ export function MesaDetalheModal({
                             className="h-10 text-xs px-3"
                             label="Imprimir (USB)"
                           />
-                          {!jaPago && comanda.subtotal > 0 && (
-                            <Button
-                              type="button"
-                              disabled={encerrando}
-                              onClick={() => handleEncerrarComandaMesa(comanda.id, comanda.nomeCliente)}
-                              className="flex-1 h-10 bg-neutral-800 hover:bg-emerald-600 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-colors"
-                            >
-                              <DollarSign className="w-3.5 h-3.5" />
-                              <span>
-                                {encerrando
-                                  ? "Processando..."
-                                  : `Cobrar ${comanda.nomeCliente} (${comanda.subtotal.toLocaleString(
-                                    "pt-BR",
-                                    { style: "currency", currency: "BRL" }
-                                  )})`}
-                              </span>
-                            </Button>
-                          )}
+                          {!jaPago && comanda.subtotal > 0 && (() => {
+                            const temItemNaoServido = itensComanda.some(
+                              (it: any) =>
+                                !["entregue", "cancelado", "estornado"].includes(
+                                  String(it.statusPedido || "").toLowerCase()
+                                )
+                            );
+                            if (temItemNaoServido) {
+                              return (
+                                <span className="flex-1 h-10 px-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-[11px] font-bold flex items-center justify-center text-center">
+                                  Aguardando entrega dos itens
+                                </span>
+                              );
+                            }
+                            return (
+                              <Button
+                                type="button"
+                                disabled={encerrando}
+                                onClick={() => handleEncerrarComandaMesa(comanda.id, comanda.nomeCliente)}
+                                className="flex-1 h-10 bg-neutral-800 hover:bg-emerald-600 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-colors"
+                              >
+                                <DollarSign className="w-3.5 h-3.5" />
+                                <span>
+                                  {encerrando
+                                    ? "Processando..."
+                                    : `Cobrar ${comanda.nomeCliente} (${comanda.subtotal.toLocaleString(
+                                      "pt-BR",
+                                      { style: "currency", currency: "BRL" }
+                                    )})`}
+                                </span>
+                              </Button>
+                            );
+                          })()}
                         </div>
                       </div>
                     );
