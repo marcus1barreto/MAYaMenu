@@ -4194,6 +4194,10 @@ async function executarChamarGarcom(firestoreDb, authUid, payload) {
         atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
       });
     } else {
+      if (comandaSnap.exists) {
+        const oldPedidosSnap = await t.get(comandaRef.collection('pedidos'));
+        oldPedidosSnap.forEach((pDoc) => t.delete(pDoc.ref));
+      }
       t.set(comandaRef, {
         id: authUid, restauranteId: restDoc.id, slug: String(restData.slug || restDoc.id),
         nomeCliente: nome, mesa: numeroMesa, numeroMesa,
