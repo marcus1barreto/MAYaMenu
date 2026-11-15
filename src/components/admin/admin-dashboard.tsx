@@ -131,7 +131,15 @@ function ValorDinamicoMesa({
 
 export function AdminDashboard() {
   const { restaurante, user, logout, atualizarRestaurante } = useAuth();
-  const [abaAtiva, setAbaAtiva] = useState<"cardapio" | "mesas" | "equipe" | "analytics">("cardapio");
+  const [abaAtiva, setAbaAtiva] = useState<"cardapio" | "mesas" | "equipe" | "analytics">("mesas");
+
+  useEffect(() => {
+    if (!restaurante?.id || typeof window === "undefined") return;
+    if (window.innerWidth < 1024) return;
+    if (sessionStorage.getItem("mayamenu_kds_auto_opened")) return;
+    sessionStorage.setItem("mayamenu_kds_auto_opened", "1");
+    window.open(`/cozinha?r=${encodeURIComponent(restaurante.id)}`, "mayamenu_kds");
+  }, [restaurante?.id]);
   const [modalConfigAberto, setModalConfigAberto] = useState(false);
   const [modalProAberto, setModalProAberto] = useState(false);
   const [planoCheckoutSelecionado, setPlanoCheckoutSelecionado] = useState<"pro_mensal" | "pro_semestral">("pro_mensal");
