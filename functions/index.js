@@ -4642,5 +4642,71 @@ exports.pixWebhook = functions.https.onRequest(async (req, res) => {
   });
 });
 
+/**
+ * Transferência atômica de mesa pelo cliente ("só solta o galho quando estiver seguro no outro").
+ * Move comanda, pedidos e kds_tickets ativos da mesa de origem para a mesa de destino.
+ */
+exports.transferirMesaCliente = functions.https.onCall(async (data, context) => {
+  const authUid = context.auth && context.auth.uid;
+  if (!authUid) {
+    throw new functions.https.HttpsError('unauthenticated', 'Autenticação necessária.');
+  }
+
+  const restauranteId = String((data && data.restauranteId) || '').trim();
+  const mesaDestino = Number(data && data.mesaDestino);
+  if (!restauranteId || !Number.isFinite(mesaDestino) || mesaDestino <= 0) {
+    throw new functions.https.HttpsError('invalid-argument', 'Dados de transferência inválidos.');
+  }
+
+  const comandaRef = db.collection('restaurantes').doc(restauranteId).collection('comandas').doc(authUid);
+  const pedidosQuery = db
+    .collection('restaurantes')
+    .doc(restauranteId)
+    .collection('pedidos')
+    .where('comandaId', '==', authUid);
+  const kdsQuery = db
+    .collection('restaurantes')
+    .doc(restauranteId)
+    .collection('kds_tickets')
+    .where('comandaId', '==', authUid);
+
+  await db.runTransaction(async (tx) => {
+    const [comandaSnap, pedidosSnap, kdsSnap] = await Promise.all([
+      tx.get(comandaRef),
+      tx.get(pedidosQuery),
+      tx.get(kdsQuery),
+    ]);
+
+    const agora = admin.firestore.FieldValue.serverTimestamp();
+    if (comandaSnap.exists) {
+      const cData = comandaSnap.data() || {};
+      const statusAtual = cData.status;
+      const ehEncerrada =
+        statusAtual === 'arquivada' || statusAtual === 'encerrada' || statusAtual === 'kill';
+      tx.update(comandaRef, {
+        mesa: mesaDestino,
+        status: ehEncerrada ? 'aberta' : statusAtual || 'aberta',
+        atualizadoEm: agora,
+      });
+    }
+
+    pedidosSnap.docs.forEach((docSnap) => {
+      const pData = docSnap.data() || {};
+      if (pData.status !== 'arquivado' && pData.status !== 'cancelado') {
+        tx.update(docSnap.ref, { mesa: mesaDestino, atualizadoEm: agora });
+      }
+    });
+
+    kdsSnap.docs.forEach((docSnap) => {
+      const kData = docSnap.data() || {};
+      if (kData.status !== 'arquivado' && kData.status !== 'cancelado') {
+        tx.update(docSnap.ref, { mesa: mesaDestino, atualizadoEm: agora });
+      }
+    });
+  });
+
+  return { ok: true, mesaDestino };
+});
+
 
 

@@ -1086,7 +1086,19 @@ export function MenuView({
         isOpen={mesaScannerAberto}
         onClose={() => setMesaScannerAberto(false)}
         mesaAtual={numeroMesa}
-        onMesaDetectada={(novaMesa, qrCredencialLida) => {
+        onMesaDetectada={async (novaMesa, qrCredencialLida) => {
+          try {
+            const { httpsCallable } = await import("firebase/functions");
+            const { functions } = await import("@/lib/firebase");
+            const transferir = httpsCallable(functions, "transferirMesaCliente");
+            await transferir({
+              restauranteId: restaurante.id,
+              mesaDestino: Number(novaMesa),
+            });
+          } catch (err) {
+            console.warn("Falha ao transferir comanda para a nova mesa:", err);
+          }
+
           setMesa(novaMesa);
           setQrCredencialAtiva(qrCredencialLida);
           try {
