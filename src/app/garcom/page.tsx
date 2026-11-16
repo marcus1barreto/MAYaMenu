@@ -21,10 +21,10 @@ function GarcomPageContent() {
       <div className="min-h-screen bg-neutral-50 flex items-center justify-center p-4">
         <div className="w-full max-w-md rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm text-center space-y-4">
           <h1 className="text-lg font-black text-neutral-900">
-            Módulo Garçom disponível em breve
+            Módulo Garçom disponível na versão PRO
           </h1>
           <p className="text-sm text-neutral-600">
-            Na versão atual de pré-lançamento, o atendimento é operado diretamente pela Cozinha e pelo Painel Administrativo.
+            Na versão Free, o atendimento é operado diretamente pela Cozinha e pelo Painel Administrativo. Na versão PRO, você libera o terminal dedicado para garçons.
           </p>
           <div className="flex gap-2 justify-center">
             <Link
