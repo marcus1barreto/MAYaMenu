@@ -80,7 +80,7 @@ export function montarUrlQrAcessoSetor(
   token: string
 ): string {
   const base = origin.replace(/\/+$/, "");
-  const rota = setor === "cozinha" ? "/cozinha" : setor === "garcom" ? "/garcom" : "/admin";
+  const rota = setor === "cozinha" ? "/cozinha" : setor === "garcom" ? "/garcom" : "/admin/operacao";
   // Credencial vai exclusivamente no fragmento `#acesso=` para nunca trafegar em logs HTTP/Referer.
   return `${base}${rota}?r=${encodeURIComponent(restauranteId)}#acesso=${encodeURIComponent(token)}`;
 }

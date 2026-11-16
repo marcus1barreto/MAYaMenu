@@ -137,9 +137,42 @@ function ValorDinamicoMesa({
   );
 }
 
-export function AdminDashboard() {
+export type ModoPainelAdmin = "operacao" | "gerencial" | "setup";
+
+interface AdminDashboardProps {
+  modo?: ModoPainelAdmin;
+  secaoInicial?: string;
+}
+
+function resolverAbaPorModo(
+  modo: ModoPainelAdmin,
+  secaoInicial?: string
+): "monitor" | "cardapio" | "mesas_setup" | "equipe" | "analytics" {
+  if (modo === "operacao") return "monitor";
+  if (modo === "gerencial") {
+    return secaoInicial === "analytics" ? "analytics" : "cardapio";
+  }
+  return secaoInicial === "equipe" ? "equipe" : "mesas_setup";
+}
+
+export function AdminDashboard({
+  modo = "operacao",
+  secaoInicial,
+}: AdminDashboardProps) {
   const { restaurante, user, logout, atualizarRestaurante } = useAuth();
-  const [abaAtiva, setAbaAtiva] = useState<"monitor" | "cardapio" | "mesas_setup" | "equipe" | "analytics">("monitor");
+  const [abaAtiva, setAbaAtiva] = useState<
+    "monitor" | "cardapio" | "mesas_setup" | "equipe" | "analytics"
+  >(() => resolverAbaPorModo(modo, secaoInicial));
+
+  useEffect(() => {
+    setAbaAtiva(resolverAbaPorModo(modo, secaoInicial));
+  }, [modo, secaoInicial]);
+
+  useEffect(() => {
+    if (modo === "setup" && secaoInicial === "config") {
+      setModalConfigAberto(true);
+    }
+  }, [modo, secaoInicial]);
   const [modalConfigAberto, setModalConfigAberto] = useState(false);
   const [modalProAberto, setModalProAberto] = useState(false);
   const [planoCheckoutSelecionado, setPlanoCheckoutSelecionado] = useState<"pro_mensal" | "pro_semestral">("pro_mensal");
@@ -1053,8 +1086,8 @@ export function AdminDashboard() {
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col transition-colors duration-200">
-      {/* TARJA PRETA BLACK FREEDAY PARA USUÁRIOS NO PLANO FREE */}
-      {restaurante?.plano !== "pro" && !restaurante?.patrocinio?.ativo && (
+      {/* TARJA BLACK FREEDAY EXIBIDA APENAS EM GERENCIAL E SETUP (NÃO POLUI O CAIXA/OPERAÇÃO) */}
+      {modo !== "operacao" && restaurante?.plano !== "pro" && !restaurante?.patrocinio?.ativo && (
         <div className="bg-neutral-950 text-white border-b border-neutral-800 px-4 py-2 text-xs flex flex-wrap items-center justify-between gap-2 shadow-xs z-30">
           <div className="flex items-center gap-2 mx-auto sm:mx-0 flex-wrap justify-center">
             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-gradient-to-r from-amber-500/20 to-rose-500/20 border border-amber-500/40 text-[10px] font-black uppercase tracking-wider text-amber-300">
@@ -1079,8 +1112,8 @@ export function AdminDashboard() {
         </div>
       )}
 
-      {/* BARRA SUPERIOR DO PAINEL (COMPACTA PARA ELEVAR OS CARDS) */}
-      <header className="px-4 sm:px-6 py-3 sm:py-3.5 bg-card border-b border-border flex flex-wrap items-center justify-between gap-3 shadow-xs">
+      {/* BARRA SUPERIOR DO PAINEL SEPARADA POR CONTEXTO DE ROTA */}
+      <header className="px-4 sm:px-6 py-3 bg-card border-b border-border flex flex-wrap items-center justify-between gap-3 shadow-xs">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-rose-600 flex items-center justify-center font-black text-white shadow-md">
             M
@@ -1105,155 +1138,217 @@ export function AdminDashboard() {
                   <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
                     Plano Free
                   </span>
-                  <button
-                    type="button"
-                    onClick={() => setModalConfigAberto(true)}
-                    className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200 flex items-center gap-1 shrink-0 transition-colors cursor-pointer"
-                    title="Possui um voucher de patrocinador? Clique para ativar"
-                  >
-                    <span>Voucher</span>
-                  </button>
+                  {modo !== "operacao" && (
+                    <button
+                      type="button"
+                      onClick={() => setModalConfigAberto(true)}
+                      className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200 flex items-center gap-1 shrink-0 transition-colors cursor-pointer"
+                      title="Possui um voucher de patrocinador? Clique para ativar"
+                    >
+                      <span>Voucher</span>
+                    </button>
+                  )}
                 </div>
               )}
             </div>
             <p className="text-[11px] text-muted-foreground">
-              {abaAtiva === "monitor"
-                ? "Operação em tempo real"
-                : "Ajustes & Estrutura da Casa"}
+              {modo === "operacao"
+                ? "Operação ao Vivo • Salão & Balcão"
+                : modo === "gerencial"
+                  ? "Gerencial • Cardápio & Resultados"
+                  : "Setup • Mesas, Equipe & Configurações"}
             </p>
           </div>
         </div>
 
-        {/* ATALHOS DE OPERAÇÃO VS UTILITÁRIOS & AJUSTES */}
-        <div className="flex flex-wrap items-center gap-2.5">
-          {/* BLOCO OPERAÇÃO (USO NO TURNO) */}
-          <div className="flex flex-wrap items-center gap-1.5">
-            {/* BOTÃO LEITOR DE BALCÃO / CAIXA */}
-            <Button
-              type="button"
-              onClick={() => setScannerBalcaoAberto(true)}
-              className="bg-amber-500 hover:bg-amber-400 text-neutral-950 font-black text-xs h-9 px-3 rounded-xl flex items-center gap-1.5 shadow-xs transition-all active:scale-95"
-              title="Escanear comanda do cliente no balcão para baixa imediata"
-            >
-              <QrCode className="w-3.5 h-3.5 text-neutral-950" />
-              <span className="hidden sm:inline">Escanear Comanda</span>
-            </Button>
+        {/* SELETOR PRINCIPAL DE ROTAS: OPERAÇÃO | GERENCIAL | SETUP */}
+        <nav
+          aria-label="Alternar área do painel"
+          className="flex items-center gap-1 p-1 bg-muted/70 border border-border rounded-2xl shadow-2xs"
+        >
+          <Link
+            href="/admin/operacao"
+            className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 ${
+              modo === "operacao"
+                ? "bg-card text-foreground shadow-xs border border-border/80"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span>Operação</span>
+            {mesas.filter((m) => m.status !== "livre").length > 0 && (
+              <Badge className="bg-amber-500 text-neutral-950 text-[10px] font-black px-1.5 py-0 h-4">
+                {mesas.filter((m) => m.status !== "livre").length}
+              </Badge>
+            )}
+          </Link>
 
-            <Link href={restaurante?.id ? `/cozinha?r=${encodeURIComponent(restaurante.id)}` : "/cozinha"} target="_blank">
+          <Link
+            href="/admin/gerencial"
+            className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 ${
+              modo === "gerencial"
+                ? "bg-card text-foreground shadow-xs border border-border/80"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <BarChart3 className="w-3.5 h-3.5 text-amber-500" />
+            <span>Gerencial</span>
+          </Link>
+
+          <Link
+            href="/admin/setup"
+            className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 ${
+              modo === "setup"
+                ? "bg-card text-foreground shadow-xs border border-border/80"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <SlidersHorizontal className="w-3.5 h-3.5 text-primary" />
+            <span>Setup</span>
+          </Link>
+        </nav>
+
+        {/* AÇÕES CONTEXTUAIS DA ROTA ATUAL */}
+        <div className="flex flex-wrap items-center gap-1.5">
+          {modo === "operacao" && (
+            <>
               <Button
-                variant="outline"
-                className="bg-card border-border hover:bg-muted text-amber-600 dark:text-amber-400 font-bold text-xs h-9 px-3 rounded-xl flex items-center gap-1.5"
+                type="button"
+                onClick={() => setScannerBalcaoAberto(true)}
+                className="bg-amber-500 hover:bg-amber-400 text-neutral-950 font-black text-xs h-9 px-3 rounded-xl flex items-center gap-1.5 shadow-xs transition-all active:scale-95"
+                title="Escanear comanda do cliente no balcão para baixa imediata"
               >
-                <ChefHat className="w-3.5 h-3.5" />
-                <span>KDS Cozinha</span>
-                <ExternalLink className="w-3 h-3 opacity-60" />
+                <QrCode className="w-3.5 h-3.5 text-neutral-950" />
+                <span className="hidden sm:inline">Escanear Comanda</span>
               </Button>
-            </Link>
 
-            <Link href={restaurante?.id ? `/garcom?r=${encodeURIComponent(restaurante.id)}` : "/garcom"} target="_blank" className="relative group">
-              <Button
-                variant="outline"
-                className="bg-card border-border hover:bg-muted text-emerald-600 dark:text-emerald-400 font-bold text-xs h-9 px-3 rounded-xl flex items-center gap-1.5 shadow-2xs hover:border-emerald-300 transition-all"
-                title={!moduloAtivo("mod.garcom_salao") ? "Disponível na versão Pro" : "Abrir o Terminal de Pedidos e Atendimento do Garçom em nova aba"}
-              >
-                <UtensilsCrossed className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                <span>App Garçom</span>
+              <Link href={restaurante?.id ? `/cozinha?r=${encodeURIComponent(restaurante.id)}` : "/cozinha"} target="_blank">
+                <Button
+                  variant="outline"
+                  className="bg-card border-border hover:bg-muted text-amber-600 dark:text-amber-400 font-bold text-xs h-9 px-3 rounded-xl flex items-center gap-1.5"
+                >
+                  <ChefHat className="w-3.5 h-3.5" />
+                  <span>KDS Cozinha</span>
+                  <ExternalLink className="w-3 h-3 opacity-60" />
+                </Button>
+              </Link>
+
+              <Link href={restaurante?.id ? `/garcom?r=${encodeURIComponent(restaurante.id)}` : "/garcom"} target="_blank" className="relative group">
+                <Button
+                  variant="outline"
+                  className="bg-card border-border hover:bg-muted text-emerald-600 dark:text-emerald-400 font-bold text-xs h-9 px-3 rounded-xl flex items-center gap-1.5 shadow-2xs hover:border-emerald-300 transition-all"
+                  title={!moduloAtivo("mod.garcom_salao") ? "Disponível na versão Pro" : "Abrir o Terminal de Pedidos e Atendimento do Garçom em nova aba"}
+                >
+                  <UtensilsCrossed className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                  <span>App Garçom</span>
+                  {!moduloAtivo("mod.garcom_salao") && (
+                    <span className="ml-0.5 px-1.5 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-[9px] font-black uppercase text-amber-600">
+                      Pro
+                    </span>
+                  )}
+                  <ExternalLink className="w-3 h-3 opacity-60" />
+                </Button>
                 {!moduloAtivo("mod.garcom_salao") && (
-                  <span className="ml-0.5 px-1.5 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-[9px] font-black uppercase text-amber-600">
-                    Pro
+                  <span className="pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity absolute left-1/2 -translate-x-1/2 top-full mt-1.5 z-50 whitespace-nowrap rounded-lg bg-neutral-900 px-2.5 py-1 text-[10px] font-bold text-white shadow-lg">
+                    Disponível na versão Pro
                   </span>
                 )}
-                <ExternalLink className="w-3 h-3 opacity-60" />
-              </Button>
-              {!moduloAtivo("mod.garcom_salao") && (
-                <span className="pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity absolute left-1/2 -translate-x-1/2 top-full mt-1.5 z-50 whitespace-nowrap rounded-lg bg-neutral-900 px-2.5 py-1 text-[10px] font-bold text-white shadow-lg">
-                  Disponível na versão Pro
-                </span>
-              )}
-            </Link>
+              </Link>
 
+              <Link href={`${urlPublica}?mesa=1`} target="_blank">
+                <Button
+                  variant="outline"
+                  className="bg-card border-border hover:bg-muted text-foreground font-bold text-xs h-9 px-3 rounded-xl flex items-center gap-1.5"
+                  title="Visualizar o cardápio digital como cliente"
+                >
+                  <Smartphone className="w-3.5 h-3.5 text-rose-500" />
+                  <span className="hidden md:inline">Cardápio PWA</span>
+                  <ExternalLink className="w-3 h-3 opacity-60" />
+                </Button>
+              </Link>
+            </>
+          )}
+
+          {modo === "gerencial" && (
             <Link href={`${urlPublica}?mesa=1`} target="_blank">
               <Button
                 variant="outline"
                 className="bg-card border-border hover:bg-muted text-foreground font-bold text-xs h-9 px-3 rounded-xl flex items-center gap-1.5"
-                title="Visualizar o cardápio digital como cliente"
+                title="Visualizar o cardápio publicado para os clientes"
               >
                 <Smartphone className="w-3.5 h-3.5 text-rose-500" />
-                <span className="hidden md:inline">Cardápio PWA</span>
+                <span>Ver Cardápio PWA</span>
                 <ExternalLink className="w-3 h-3 opacity-60" />
               </Button>
             </Link>
-          </div>
+          )}
 
-          <div className="hidden lg:block h-6 w-px bg-border mx-0.5" />
-
-          {/* BLOCO AJUSTES & UTILITÁRIOS (DISCRETO) */}
-          <div className="flex items-center gap-1 p-1 bg-muted/60 border border-border/80 rounded-xl">
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => setModalConfigAberto(true)}
-              className="text-foreground hover:bg-card font-bold text-xs h-7 px-2.5 rounded-lg flex items-center gap-1.5"
-              title="Ajustes da Loja, Pix, Taxa e Aparência"
-            >
-              <Settings className="w-3.5 h-3.5 text-primary" />
-              <span className="hidden sm:inline">Config</span>
-            </Button>
-
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() =>
-                simularImpressaoTermicaPDF(`Teste de Impressão - ${restaurante?.nome || "MAYaMenu"}`, [
-                  "========================================",
-                  `       ${(restaurante?.nome || "MAYAMENU").toUpperCase()}`,
-                  "         TESTE DE IMPRESSAO 80MM",
-                  "========================================",
-                  `Data/Hora: ${new Date().toLocaleString("pt-BR")}`,
-                  "Mesa: 01 (Simulacao)",
-                  "----------------------------------------",
-                  "QTD  ITEM                       VALOR",
-                  "----------------------------------------",
-                  "1x   Porcao Teste               R$ 30,00",
-                  "     + Acompanha: Farofa        R$  0,00",
-                  "----------------------------------------",
-                  "Subtotal:                       R$ 30,00",
-                  "Taxa de Servico (10%):          R$  3,00",
-                  "TOTAL:                          R$ 33,00",
-                  "========================================",
-                  "   Simulador Termico PDF - MAYaMenu",
-                ])
-              }
-              className="text-muted-foreground hover:text-foreground hover:bg-card font-semibold text-xs h-7 px-2.5 rounded-lg flex items-center gap-1.5"
-              title="Simulador de Impressora Térmica (PDF 80mm)"
-            >
-              <Printer className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Teste 80mm</span>
-            </Button>
-
-            <Link href="/manual" target="_blank">
+          {modo === "setup" && (
+            <div className="flex items-center gap-1 p-1 bg-muted/60 border border-border/80 rounded-xl">
               <Button
+                type="button"
                 variant="ghost"
-                className="text-muted-foreground hover:text-foreground hover:bg-card font-semibold text-xs h-7 px-2.5 rounded-lg flex items-center gap-1.5"
-                title="Abrir Central de Ajuda, Guia Rápido e FAQ"
+                onClick={() => setModalConfigAberto(true)}
+                className="text-foreground hover:bg-card font-bold text-xs h-7 px-2.5 rounded-lg flex items-center gap-1.5"
+                title="Ajustes da Loja, Pix, Taxa e Aparência"
               >
-                <BookOpen className="w-3.5 h-3.5 text-rose-500" />
-                <span className="hidden sm:inline">Manual</span>
+                <Settings className="w-3.5 h-3.5 text-primary" />
+                <span>Loja &amp; Pix</span>
               </Button>
-            </Link>
 
-            <div className="h-4 w-px bg-border mx-0.5" />
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() =>
+                  simularImpressaoTermicaPDF(`Teste de Impressão - ${restaurante?.nome || "MAYaMenu"}`, [
+                    "========================================",
+                    `       ${(restaurante?.nome || "MAYAMENU").toUpperCase()}`,
+                    "         TESTE DE IMPRESSAO 80MM",
+                    "========================================",
+                    `Data/Hora: ${new Date().toLocaleString("pt-BR")}`,
+                    "Mesa: 01 (Simulacao)",
+                    "----------------------------------------",
+                    "QTD  ITEM                       VALOR",
+                    "----------------------------------------",
+                    "1x   Porcao Teste               R$ 30,00",
+                    "     + Acompanha: Farofa        R$  0,00",
+                    "----------------------------------------",
+                    "Subtotal:                       R$ 30,00",
+                    "Taxa de Servico (10%):          R$  3,00",
+                    "TOTAL:                          R$ 33,00",
+                    "========================================",
+                    "   Simulador Termico PDF - MAYaMenu",
+                  ])
+                }
+                className="text-muted-foreground hover:text-foreground hover:bg-card font-semibold text-xs h-7 px-2.5 rounded-lg flex items-center gap-1.5"
+                title="Simulador de Impressora Térmica (PDF 80mm)"
+              >
+                <Printer className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Teste 80mm</span>
+              </Button>
 
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={logout}
-              className="text-muted-foreground hover:text-rose-600 hover:bg-card rounded-lg text-xs h-7 px-2 transition-colors"
-              title="Sair do Painel"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-            </Button>
-          </div>
+              <Link href="/manual" target="_blank">
+                <Button
+                  variant="ghost"
+                  className="text-muted-foreground hover:text-foreground hover:bg-card font-semibold text-xs h-7 px-2.5 rounded-lg flex items-center gap-1.5"
+                  title="Abrir Central de Ajuda, Guia Rápido e FAQ"
+                >
+                  <BookOpen className="w-3.5 h-3.5 text-rose-500" />
+                  <span className="hidden sm:inline">Manual</span>
+                </Button>
+              </Link>
+            </div>
+          )}
+
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={logout}
+            className="text-muted-foreground hover:text-rose-600 hover:bg-muted rounded-xl text-xs h-9 px-2.5 transition-colors"
+            title="Sair do Painel"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+          </Button>
         </div>
       </header>
 
@@ -1296,114 +1391,85 @@ export function AdminDashboard() {
         </div>
       )}
 
-      {/* NAVEGAÇÃO DE ABAS: SEPARAÇÃO CLARA ENTRE OPERAÇÃO E AJUSTES */}
-      <div className="border-b border-border px-4 sm:px-6 bg-card/60">
-        <div className="flex items-center gap-2 max-w-5xl mx-auto overflow-x-auto py-1">
-          {/* ZONA 1: OPERAÇÃO AO VIVO */}
-          <div className="flex items-center gap-1.5 shrink-0 pr-1">
-            <span className="hidden md:inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 text-[10px] font-black uppercase tracking-wider">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              Operação
-            </span>
+      {/* SUB-NAVEGAÇÃO ESPECÍFICA DE GERENCIAL OU SETUP (OPERAÇÃO VAI DIRETO AO SALÃO) */}
+      {modo !== "operacao" && (
+        <div className="border-b border-border px-4 sm:px-6 bg-card/60">
+          <div className="flex items-center justify-between gap-2 max-w-5xl mx-auto overflow-x-auto py-1.5">
+            {modo === "gerencial" ? (
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setAbaAtiva("cardapio")}
+                  className={`py-2 px-3.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
+                    abaAtiva === "cardapio"
+                      ? "bg-primary/10 text-primary border border-primary/25 shadow-2xs"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
+                  }`}
+                >
+                  <UtensilsCrossed className="w-4 h-4" />
+                  <span>Cardápio &amp; Itens ({itensCardapio.length})</span>
+                </button>
 
-            <button
-              type="button"
-              onClick={() => setAbaAtiva("monitor")}
-              className={`py-2 px-3 rounded-xl text-xs font-black transition-all flex items-center gap-2 whitespace-nowrap ${
-                abaAtiva === "monitor"
-                  ? "bg-primary/10 text-primary border border-primary/25 shadow-2xs"
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
-              }`}
-            >
-              <Activity className="w-4 h-4" />
-              <span>Salão ao Vivo</span>
-              {mesas.filter((m) => m.status !== "livre").length > 0 && (
-                <Badge className="bg-amber-500 text-neutral-950 text-[10px] font-black px-1.5 py-0 h-4">
-                  {mesas.filter((m) => m.status !== "livre").length}
-                </Badge>
-              )}
-            </button>
-          </div>
+                <button
+                  type="button"
+                  onClick={() => setAbaAtiva("analytics")}
+                  className={`py-2 px-3.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 relative group whitespace-nowrap ${
+                    abaAtiva === "analytics"
+                      ? "bg-primary/10 text-primary border border-primary/25 shadow-2xs"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
+                  }`}
+                >
+                  <BarChart3 className="w-4 h-4 text-amber-500" />
+                  <span className="flex items-center gap-1.5">
+                    MAYa Inteligência
+                    <Badge className="bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 text-[9px] font-black uppercase px-1.5 py-0">
+                      PRO 🚀
+                    </Badge>
+                  </span>
+                  {!moduloAtivo("mod.analytics_historico") && (
+                    <span className="pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity absolute left-1/2 -translate-x-1/2 top-full mt-1 z-50 whitespace-nowrap rounded-lg bg-neutral-900 px-2.5 py-1 text-[10px] font-bold text-white shadow-lg">
+                      Disponível na versão Pro
+                    </span>
+                  )}
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setAbaAtiva("mesas_setup")}
+                  className={`py-2 px-3.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
+                    abaAtiva === "mesas_setup"
+                      ? "bg-primary/10 text-primary border border-primary/25 shadow-2xs"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
+                  }`}
+                >
+                  <QrCode className="w-4 h-4" />
+                  <span>Mesas, Praças &amp; QR Codes</span>
+                </button>
 
-          {/* DIVISOR OPERAÇÃO × AJUSTES */}
-          <div className="h-5 w-px bg-border mx-1 shrink-0" />
-
-          {/* ZONA 2: AJUSTES & GESTÃO */}
-          <div className="flex items-center gap-1 shrink-0">
-            <span className="hidden md:inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-muted text-muted-foreground text-[10px] font-black uppercase tracking-wider mr-0.5">
-              <SlidersHorizontal className="w-3 h-3" />
-              Ajustes
-            </span>
-
-            <button
-              type="button"
-              onClick={() => setAbaAtiva("cardapio")}
-              className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
-                abaAtiva === "cardapio"
-                  ? "bg-muted text-foreground border border-border shadow-2xs"
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
-              }`}
-            >
-              <UtensilsCrossed className="w-4 h-4" />
-              <span>Cardápio ({itensCardapio.length})</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setAbaAtiva("mesas_setup")}
-              className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
-                abaAtiva === "mesas_setup"
-                  ? "bg-muted text-foreground border border-border shadow-2xs"
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
-              }`}
-            >
-              <QrCode className="w-4 h-4" />
-              <span>Mesas &amp; QR Codes</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setAbaAtiva("equipe")}
-              className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
-                abaAtiva === "equipe"
-                  ? "bg-muted text-foreground border border-border shadow-2xs"
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
-              }`}
-            >
-              <Users className="w-4 h-4" />
-              <span>Equipe &amp; Chef</span>
-              {moduloAtivo("core.chef") && (
-                <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 text-[9px] font-black uppercase px-1.5 py-0">
-                  Chef Free
-                </Badge>
-              )}
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setAbaAtiva("analytics")}
-              className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center gap-2 relative group whitespace-nowrap ${
-                abaAtiva === "analytics"
-                  ? "bg-muted text-foreground border border-border shadow-2xs"
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
-              }`}
-            >
-              <BarChart3 className="w-4 h-4 text-amber-500" />
-              <span className="flex items-center gap-1.5">
-                MAYa Inteligência
-                <Badge className="bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 text-[9px] font-black uppercase px-1.5 py-0">
-                  PRO 🚀
-                </Badge>
-              </span>
-              {!moduloAtivo("mod.analytics_historico") && (
-                <span className="pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity absolute left-1/2 -translate-x-1/2 top-full mt-1 z-50 whitespace-nowrap rounded-lg bg-neutral-900 px-2.5 py-1 text-[10px] font-bold text-white shadow-lg">
-                  Disponível na versão Pro
-                </span>
-              )}
-            </button>
+                <button
+                  type="button"
+                  onClick={() => setAbaAtiva("equipe")}
+                  className={`py-2 px-3.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
+                    abaAtiva === "equipe"
+                      ? "bg-primary/10 text-primary border border-primary/25 shadow-2xs"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
+                  }`}
+                >
+                  <Users className="w-4 h-4" />
+                  <span>Equipe, PINs &amp; QRs de Setor</span>
+                  {moduloAtivo("core.chef") && (
+                    <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 text-[9px] font-black uppercase px-1.5 py-0">
+                      Chef Free
+                    </Badge>
+                  )}
+                </button>
+              </div>
+            )}
           </div>
         </div>
-      </div>
+      )}
 
       {/* CONTEÚDO PRINCIPAL (MAIS ACIMA NO VIEWPORT) */}
       <main className="flex-1 px-4 sm:px-6 py-3.5 sm:py-4 max-w-5xl w-full mx-auto">
@@ -1426,13 +1492,12 @@ export function AdminDashboard() {
                   .join(" • ")}
               </div>
               {abaAtiva !== "monitor" && (
-                <button
-                  type="button"
-                  onClick={() => setAbaAtiva("monitor")}
+                <Link
+                  href="/admin/operacao"
                   className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold"
                 >
                   Ver Salão ao Vivo
-                </button>
+                </Link>
               )}
             </div>
           );
@@ -1696,16 +1761,17 @@ export function AdminDashboard() {
                   </span>
                 </div>
 
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setAbaAtiva("mesas_setup")}
-                  className="h-8 px-3 rounded-xl text-xs font-bold border-border text-muted-foreground hover:text-foreground flex items-center gap-1.5"
-                >
-                  <SlidersHorizontal className="w-3.5 h-3.5" />
-                  <span>Ajustar Mesas &amp; QRs</span>
-                </Button>
+                <Link href="/admin/setup">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 px-3 rounded-xl text-xs font-bold border-border text-muted-foreground hover:text-foreground flex items-center gap-1.5"
+                  >
+                    <SlidersHorizontal className="w-3.5 h-3.5" />
+                    <span>Setup de Mesas</span>
+                  </Button>
+                </Link>
               </div>
             </div>
 
@@ -1851,16 +1917,17 @@ export function AdminDashboard() {
                 </p>
               </div>
 
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setAbaAtiva("monitor")}
-                className="h-8 px-3 rounded-xl text-xs font-bold border-emerald-500/30 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10 flex items-center gap-1.5"
-              >
-                <Activity className="w-3.5 h-3.5" />
-                <span>Voltar ao Salão ao Vivo</span>
-              </Button>
+              <Link href="/admin/operacao">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 px-3 rounded-xl text-xs font-bold border-emerald-500/30 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10 flex items-center gap-1.5"
+                >
+                  <Activity className="w-3.5 h-3.5" />
+                  <span>Voltar ao Salão ao Vivo</span>
+                </Button>
+              </Link>
             </div>
 
             <SetupMesas
