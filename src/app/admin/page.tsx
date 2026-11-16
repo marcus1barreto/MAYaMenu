@@ -9,7 +9,7 @@ import { EstabelecimentoSuspensoView } from "@/components/admin/estabelecimento-
 import { TemaUsuarioProvider } from "@/context/tema-context";
 
 function AdminPageContent() {
-  const { user, restaurante, carregando, logout } = useAuth();
+  const { user, restaurante, role, carregando, logout } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTarget = searchParams.get("redirect");
@@ -69,6 +69,45 @@ function AdminPageContent() {
           >
             Sair do perfil de equipe e entrar como Proprietário
           </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Guard de tenant ausente: impede operação fantasma com fallback "demo" (ex.: conta SuperAdmin ou sem loja vinculada)
+  if (!restaurante) {
+    return (
+      <div className="min-h-screen bg-neutral-50 flex items-center justify-center p-4">
+        <div className="w-full max-w-md rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm space-y-4 text-center">
+          <div className="mx-auto w-12 h-12 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center font-black text-xl">
+            !
+          </div>
+          <h1 className="text-lg font-black text-neutral-900">
+            {role === "superadmin"
+              ? "Sessão SuperAdmin sem restaurante vinculado"
+              : "Nenhum restaurante vinculado a esta conta"}
+          </h1>
+          <p className="text-sm text-neutral-600 leading-relaxed">
+            A conta conectada (<strong className="text-neutral-900">{user.email}</strong>) não possui um estabelecimento cadastrado. Para gerenciar cardápio, mesas e gerar QR Codes, entre com a conta do proprietário da loja.
+          </p>
+          <div className="flex flex-col gap-2 pt-1">
+            {role === "superadmin" && (
+              <button
+                type="button"
+                onClick={() => router.push("/superadmin")}
+                className="w-full h-11 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white font-bold text-sm transition-colors"
+              >
+                Ir para o Painel SuperAdmin
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => logout()}
+              className="w-full h-11 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-sm transition-colors"
+            >
+              Trocar de Conta (Entrar como Proprietário)
+            </button>
+          </div>
         </div>
       </div>
     );

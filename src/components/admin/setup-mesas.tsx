@@ -144,6 +144,10 @@ export function SetupMesas({ restauranteId, maxMesas }: SetupMesasProps) {
 
   // Emite ou rotaciona o QR físico; o segredo só é mostrado nesta sessão.
   const handleEmitirQr = async (num: number, rotacionar: boolean) => {
+    if (!restauranteId) {
+      alert("Restaurante não identificado nesta sessão. Entre com a conta do proprietário da loja.");
+      return;
+    }
     if (rotacionar && !window.confirm("Rotacionar o QR invalidará imediatamente o código físico anterior. Deseja continuar?")) {
       return;
     }
@@ -346,29 +350,27 @@ export function SetupMesas({ restauranteId, maxMesas }: SetupMesasProps) {
           return (
             <div
               key={num}
-              className={`p-4 rounded-2xl border-2 transition-all flex flex-col justify-between relative overflow-hidden ${
-                !isAtiva
-                  ? "bg-muted/40 border-dashed border-border opacity-60"
-                  : isReservada
+              className={`p-4 rounded-2xl border-2 transition-all flex flex-col justify-between relative overflow-hidden ${!isAtiva
+                ? "bg-muted/40 border-dashed border-border opacity-60"
+                : isReservada
                   ? "bg-purple-500/5 border-purple-500/50 shadow-sm"
                   : isBloqueada
-                  ? "bg-red-500/5 border-red-500/40 shadow-sm"
-                  : "bg-card border-border hover:border-border/80 shadow-xs"
-              }`}
+                    ? "bg-red-500/5 border-red-500/40 shadow-sm"
+                    : "bg-card border-border hover:border-border/80 shadow-xs"
+                }`}
             >
               {/* Topo do Card da Mesa */}
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-2.5">
                   <div
-                    className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-sm shadow-xs ${
-                      !isAtiva
-                        ? "bg-neutral-800 text-neutral-400"
-                        : isReservada
+                    className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-sm shadow-xs ${!isAtiva
+                      ? "bg-neutral-800 text-neutral-400"
+                      : isReservada
                         ? "bg-purple-600 text-white"
                         : isBloqueada
-                        ? "bg-red-600 text-white"
-                        : "bg-primary text-primary-foreground"
-                    }`}
+                          ? "bg-red-600 text-white"
+                          : "bg-primary text-primary-foreground"
+                      }`}
                   >
                     {num}
                   </div>
@@ -474,11 +476,10 @@ export function SetupMesas({ restauranteId, maxMesas }: SetupMesasProps) {
                   variant="ghost"
                   disabled={!isAtiva}
                   onClick={() => handleToggleBloqueio(num, isBloqueada)}
-                  className={`h-7 px-2 text-[11px] font-bold rounded-lg flex items-center gap-1 ${
-                    isBloqueada
-                      ? "text-red-400 hover:bg-red-500/10"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
+                  className={`h-7 px-2 text-[11px] font-bold rounded-lg flex items-center gap-1 ${isBloqueada
+                    ? "text-red-400 hover:bg-red-500/10"
+                    : "text-muted-foreground hover:text-foreground"
+                    }`}
                   title={isBloqueada ? "Desbloquear mesa" : "Bloquear mesa temporariamente"}
                 >
                   {isBloqueada ? <Lock className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}

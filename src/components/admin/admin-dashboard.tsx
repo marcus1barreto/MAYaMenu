@@ -438,72 +438,72 @@ export function AdminDashboard() {
 
         setComandas(lista);
 
-          // Reconstrói as mesas com base nas comandas ativas e no limite do plano
-          const mapa = new Map<number, MesaOperacional>();
-          for (let i = 1; i <= maxMesas; i++) {
-            mapa.set(i, { numero: i, status: "livre", comandas: [] });
+        // Reconstrói as mesas com base nas comandas ativas e no limite do plano
+        const mapa = new Map<number, MesaOperacional>();
+        for (let i = 1; i <= maxMesas; i++) {
+          mapa.set(i, { numero: i, status: "livre", comandas: [] });
+        }
+
+        for (const c of lista) {
+          if ((c as any).arquivada === true) continue;
+          const numMesa = Number(c.mesa) || 1;
+          const mesaAtual = mapa.get(numMesa) || { numero: numMesa, status: "livre", comandas: [] };
+          const garcomChamadoAtivo = Boolean(c.chamadoGarcom?.ativo);
+
+          mesaAtual.comandas.push({
+            id: c.id,
+            nomeCliente: c.nomeCliente,
+            subtotal: c.subtotal || 0,
+            status: c.status,
+            metodoPagamento: c.metodoPagamento,
+            itens: [],
+            chamadoGarcom: c.chamadoGarcom,
+          });
+
+          if (garcomChamadoAtivo) {
+            mesaAtual.chamandoGarcom = true;
           }
 
-          for (const c of lista) {
-            if ((c as any).arquivada === true) continue;
-            const numMesa = Number(c.mesa) || 1;
-            const mesaAtual = mapa.get(numMesa) || { numero: numMesa, status: "livre", comandas: [] };
-            const garcomChamadoAtivo = Boolean(c.chamadoGarcom?.ativo);
+          if (c.status === "conta_pedida") {
+            mesaAtual.status = "conta_pedida";
+          } else if (c.status === "pago") {
+            const todasPagas = mesaAtual.comandas.every((cmd) => cmd.status === "pago");
+            if (todasPagas && mesaAtual.status !== "conta_pedida") {
+              mesaAtual.status = "paga_ocupada";
 
-            mesaAtual.comandas.push({
-              id: c.id,
-              nomeCliente: c.nomeCliente,
-              subtotal: c.subtotal || 0,
-              status: c.status,
-              metodoPagamento: c.metodoPagamento,
-              itens: [],
-              chamadoGarcom: c.chamadoGarcom,
-            });
+              // Registra o momento em que a conta foi paga a partir de atualizadoEm
+              const millisPago = parseDateToMillis(c.atualizadoEm);
 
-            if (garcomChamadoAtivo) {
-              mesaAtual.chamandoGarcom = true;
-            }
-
-            if (c.status === "conta_pedida") {
-              mesaAtual.status = "conta_pedida";
-            } else if (c.status === "pago") {
-              const todasPagas = mesaAtual.comandas.every((cmd) => cmd.status === "pago");
-              if (todasPagas && mesaAtual.status !== "conta_pedida") {
-                mesaAtual.status = "paga_ocupada";
-
-                // Registra o momento em que a conta foi paga a partir de atualizadoEm
-                const millisPago = parseDateToMillis(c.atualizadoEm);
-
-                if (millisPago) {
-                  if (!mesaAtual.pagoEm || millisPago > mesaAtual.pagoEm) {
-                    mesaAtual.pagoEm = millisPago;
-                  }
-                }
-
-                // Alerta Proativo de Upsell: verifica se já ultrapassou o tempo de tolerância
-                if (mesaAtual.pagoEm) {
-                  const minutosPassados = (Date.now() - mesaAtual.pagoEm) / (1000 * 60);
-                  if (minutosPassados >= TEMPO_TOLERANCIA_MINUTOS) {
-                    mesaAtual.alertaUpsell = true;
-                  }
+              if (millisPago) {
+                if (!mesaAtual.pagoEm || millisPago > mesaAtual.pagoEm) {
+                  mesaAtual.pagoEm = millisPago;
                 }
               }
-            } else if (mesaAtual.status !== "conta_pedida" && mesaAtual.status !== "paga_ocupada") {
-              mesaAtual.status = "ocupada";
-            }
 
-            mapa.set(numMesa, mesaAtual);
+              // Alerta Proativo de Upsell: verifica se já ultrapassou o tempo de tolerância
+              if (mesaAtual.pagoEm) {
+                const minutosPassados = (Date.now() - mesaAtual.pagoEm) / (1000 * 60);
+                if (minutosPassados >= TEMPO_TOLERANCIA_MINUTOS) {
+                  mesaAtual.alertaUpsell = true;
+                }
+              }
+            }
+          } else if (mesaAtual.status !== "conta_pedida" && mesaAtual.status !== "paga_ocupada") {
+            mesaAtual.status = "ocupada";
           }
 
-          const novasMesas = Array.from(mapa.values());
-          setMesas(novasMesas);
+          mapa.set(numMesa, mesaAtual);
+        }
 
-          // Sincroniza a mesa selecionada se estiver aberta no modal
-          setMesaSelecionada((prevSelecionada) => {
-            if (!prevSelecionada) return null;
-            const mesaAtualizada = mapa.get(prevSelecionada.numero);
-            return mesaAtualizada || { numero: prevSelecionada.numero, status: "livre", comandas: [] };
-          });
+        const novasMesas = Array.from(mapa.values());
+        setMesas(novasMesas);
+
+        // Sincroniza a mesa selecionada se estiver aberta no modal
+        setMesaSelecionada((prevSelecionada) => {
+          if (!prevSelecionada) return null;
+          const mesaAtualizada = mapa.get(prevSelecionada.numero);
+          return mesaAtualizada || { numero: prevSelecionada.numero, status: "livre", comandas: [] };
+        });
       },
       (err) => {
         console.warn("Listener de comandas do salão no Admin indisponível:", err);
@@ -593,7 +593,7 @@ export function AdminDashboard() {
       await updateDoc(
         doc(db, "restaurantes", restaurante.id, "mesas", String(mesaNumero)),
         { statusEstrutural: "livre", atualizadoEm: serverTimestamp() }
-      ).catch(() => {});
+      ).catch(() => { });
     } catch (err) {
       console.error("Falha ao liberar mesa no backend:", err);
       alert(err instanceof Error ? err.message : "Não foi possível liberar a mesa.");
@@ -700,17 +700,17 @@ export function AdminDashboard() {
             novasComandas = m.comandas.map((c) =>
               c.id === comandaExistente.id
                 ? {
-                    ...c,
-                    subtotal: c.subtotal + precoFinal,
-                    itens: [
-                      ...c.itens,
-                      {
-                        nome: item.nome,
-                        quantidade,
-                        precoFinal: item.precoBase,
-                      },
-                    ],
-                  }
+                  ...c,
+                  subtotal: c.subtotal + precoFinal,
+                  itens: [
+                    ...c.itens,
+                    {
+                      nome: item.nome,
+                      quantidade,
+                      precoFinal: item.precoBase,
+                    },
+                  ],
+                }
                 : c
             );
           } else {
@@ -754,17 +754,17 @@ export function AdminDashboard() {
           comandas: prev.comandas.map((c) =>
             c.id === comandaExistente.id
               ? {
-                  ...c,
-                  subtotal: c.subtotal + precoFinal,
-                  itens: [
-                    ...c.itens,
-                    {
-                      nome: item.nome,
-                      quantidade,
-                      precoFinal: item.precoBase,
-                    },
-                  ],
-                }
+                ...c,
+                subtotal: c.subtotal + precoFinal,
+                itens: [
+                  ...c.itens,
+                  {
+                    nome: item.nome,
+                    quantidade,
+                    precoFinal: item.precoBase,
+                  },
+                ],
+              }
               : c
           ),
         };
@@ -895,13 +895,13 @@ export function AdminDashboard() {
       setEnviandoFoto(true);
       try {
         const urlUpload = await uploadFotoPrato(restaurante.id, arquivoFoto);
-        
+
         // Se já existia uma foto antiga no Storage antes da troca, remove para não deixar lixo
         if (
           itemEmEdicao.fotoUrl &&
           itemEmEdicao.fotoUrl !== urlUpload &&
           (itemEmEdicao.fotoUrl.includes("firebasestorage.googleapis.com") ||
-           itemEmEdicao.fotoUrl.includes("storage.googleapis.com"))
+            itemEmEdicao.fotoUrl.includes("storage.googleapis.com"))
         ) {
           excluirFotoPrato(itemEmEdicao.fotoUrl).catch((err) =>
             console.warn("Aviso ao limpar foto anterior no Storage:", err)
@@ -1046,8 +1046,8 @@ export function AdminDashboard() {
     }
   };
 
-  const slug = restaurante?.slug || "demo";
-  const urlPublica = `/r/${slug}`;
+  const slug = restaurante?.slug || "";
+  const urlPublica = slug ? `/r/${slug}` : "/admin";
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col transition-colors duration-200">
@@ -1252,13 +1252,12 @@ export function AdminDashboard() {
       {/* BANNER DE AVISO DO CHECKOUT / PAGAMENTO */}
       {avisoCheckout && (
         <div
-          className={`px-4 py-2.5 text-center text-xs font-bold flex items-center justify-between gap-3 border-b animate-in fade-in ${
-            avisoCheckout.tipo === "sucesso"
-              ? "bg-emerald-50 border-emerald-200 text-emerald-900"
-              : avisoCheckout.tipo === "info"
+          className={`px-4 py-2.5 text-center text-xs font-bold flex items-center justify-between gap-3 border-b animate-in fade-in ${avisoCheckout.tipo === "sucesso"
+            ? "bg-emerald-50 border-emerald-200 text-emerald-900"
+            : avisoCheckout.tipo === "info"
               ? "bg-blue-50 border-blue-200 text-blue-900"
               : "bg-rose-50 border-rose-200 text-rose-900"
-          }`}
+            }`}
         >
           <div className="flex items-center justify-center gap-2 mx-auto">
             {avisoCheckout.tipo === "sucesso" ? (
@@ -1287,11 +1286,10 @@ export function AdminDashboard() {
           <button
             type="button"
             onClick={() => setAbaAtiva("cardapio")}
-            className={`py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all flex items-center gap-2 ${
-              abaAtiva === "cardapio"
-                ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
+            className={`py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all flex items-center gap-2 ${abaAtiva === "cardapio"
+              ? "border-primary text-primary"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
           >
             <UtensilsCrossed className="w-4 h-4" />
             <span>Cardápio & Itens ({itensCardapio.length})</span>
@@ -1300,11 +1298,10 @@ export function AdminDashboard() {
           <button
             type="button"
             onClick={() => setAbaAtiva("mesas")}
-            className={`py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all flex items-center gap-2 ${
-              abaAtiva === "mesas"
-                ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
+            className={`py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all flex items-center gap-2 ${abaAtiva === "mesas"
+              ? "border-primary text-primary"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
           >
             <QrCode className="w-4 h-4" />
             <span>Mesas & QR Codes</span>
@@ -1313,11 +1310,10 @@ export function AdminDashboard() {
           <button
             type="button"
             onClick={() => setAbaAtiva("equipe")}
-            className={`py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all flex items-center gap-2 relative group ${
-              abaAtiva === "equipe"
-                ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
+            className={`py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all flex items-center gap-2 relative group ${abaAtiva === "equipe"
+              ? "border-primary text-primary"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
           >
             <Users className="w-4 h-4" />
             <span>Equipe & Acessos</span>
@@ -1336,11 +1332,10 @@ export function AdminDashboard() {
           <button
             type="button"
             onClick={() => setAbaAtiva("analytics")}
-            className={`py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all flex items-center gap-2 relative group ${
-              abaAtiva === "analytics"
-                ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
+            className={`py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all flex items-center gap-2 relative group ${abaAtiva === "analytics"
+              ? "border-primary text-primary"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
           >
             <BarChart3 className="w-4 h-4 text-amber-500" />
             <span className="flex items-center gap-1.5">
@@ -1498,13 +1493,12 @@ export function AdminDashboard() {
                             return (
                               <div
                                 key={item.id}
-                                className={`p-3.5 sm:p-4 rounded-2xl border-2 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
-                                  ehPatrocinado
-                                    ? "bg-amber-50/20 border-amber-300/80 shadow-xs hover:border-amber-400"
-                                    : item.ativo
-                                      ? "bg-white border-neutral-200/90 hover:border-neutral-300 shadow-sm hover:shadow-md"
-                                      : "bg-neutral-50 border-neutral-200/70 opacity-60"
-                                }`}
+                                className={`p-3.5 sm:p-4 rounded-2xl border-2 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${ehPatrocinado
+                                  ? "bg-amber-50/20 border-amber-300/80 shadow-xs hover:border-amber-400"
+                                  : item.ativo
+                                    ? "bg-white border-neutral-200/90 hover:border-neutral-300 shadow-sm hover:shadow-md"
+                                    : "bg-neutral-50 border-neutral-200/70 opacity-60"
+                                  }`}
                               >
                                 <div className="flex items-center gap-3 min-w-0">
                                   {item.fotoUrl && (
@@ -1582,11 +1576,10 @@ export function AdminDashboard() {
                                     <button
                                       type="button"
                                       onClick={() => handleExcluirPrato(item.id, item.fotoUrl)}
-                                      className={`p-1.5 rounded-lg text-xs transition-colors border ${
-                                        item.bloqueadoParaExclusao
-                                          ? "bg-amber-50 text-amber-700 hover:bg-amber-100 hover:text-amber-800 border-amber-200 cursor-help"
-                                          : "bg-red-500/10 hover:bg-red-500/20 text-red-500 border-red-500/20"
-                                      }`}
+                                      className={`p-1.5 rounded-lg text-xs transition-colors border ${item.bloqueadoParaExclusao
+                                        ? "bg-amber-50 text-amber-700 hover:bg-amber-100 hover:text-amber-800 border-amber-200 cursor-help"
+                                        : "bg-red-500/10 hover:bg-red-500/20 text-red-500 border-red-500/20"
+                                        }`}
                                       title={
                                         item.bloqueadoParaExclusao
                                           ? "Item oficial do patrocínio (bloqueado para exclusão)"
@@ -1634,11 +1627,10 @@ export function AdminDashboard() {
                 <button
                   type="button"
                   onClick={() => setSubAbaMesas("monitor")}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
-                    subAbaMesas === "monitor"
-                      ? "bg-primary text-primary-foreground shadow-xs"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${subAbaMesas === "monitor"
+                    ? "bg-primary text-primary-foreground shadow-xs"
+                    : "text-muted-foreground hover:text-foreground"
+                    }`}
                 >
                   <QrCode className="w-3.5 h-3.5" />
                   <span>Monitor ao Vivo</span>
@@ -1647,11 +1639,10 @@ export function AdminDashboard() {
                 <button
                   type="button"
                   onClick={() => setSubAbaMesas("setup")}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
-                    subAbaMesas === "setup"
-                      ? "bg-primary text-primary-foreground shadow-xs"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${subAbaMesas === "setup"
+                    ? "bg-primary text-primary-foreground shadow-xs"
+                    : "text-muted-foreground hover:text-foreground"
+                    }`}
                 >
                   <Settings className="w-3.5 h-3.5" />
                   <span>Setup & Praças</span>
@@ -1661,7 +1652,7 @@ export function AdminDashboard() {
 
             {subAbaMesas === "setup" ? (
               <SetupMesas
-                restauranteId={restaurante?.id || "demo"}
+                restauranteId={restaurante?.id || ""}
                 maxMesas={maxMesas}
               />
             ) : (
@@ -1683,135 +1674,132 @@ export function AdminDashboard() {
                 </div>
 
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-              {mesas.map((mesa) => {
-                const num = mesa.numero;
-                const ehChamado = Boolean(mesa.chamandoGarcom);
-                const totalMesa = mesa.comandas.reduce((acc, c) => acc + c.subtotal, 0);
-                const qtdClientes = mesa.comandas.length;
+                  {mesas.map((mesa) => {
+                    const num = mesa.numero;
+                    const ehChamado = Boolean(mesa.chamandoGarcom);
+                    const totalMesa = mesa.comandas.reduce((acc, c) => acc + c.subtotal, 0);
+                    const qtdClientes = mesa.comandas.length;
 
-                return (
-                  <div
-                    key={num}
-                    onClick={() => handleAbrirMesa(num)}
-                    className={`p-3.5 sm:p-4 rounded-2xl border-2 text-left transition-all flex flex-col justify-between min-h-[140px] group relative overflow-hidden cursor-pointer select-none active:scale-[0.98] ${
-                      ehChamado
-                        ? "bg-amber-50 border-amber-500 ring-2 ring-amber-400/50 shadow-md shadow-amber-500/10 animate-pulse"
-                        : mesa.status === "conta_pedida"
-                        ? "bg-rose-50/90 border-rose-500 ring-2 ring-rose-400/50 hover:border-rose-600 shadow-md shadow-rose-600/10"
-                        : mesa.status === "paga_ocupada"
-                        ? "bg-emerald-50/90 border-emerald-500 shadow-md shadow-emerald-600/10"
-                        : mesa.status === "ocupada"
-                        ? "bg-amber-50/70 border-amber-400 hover:border-amber-500 shadow-sm"
-                        : "bg-white border-neutral-200/90 hover:border-neutral-400 shadow-sm hover:shadow-md"
-                    }`}
-                  >
-                    {/* Indicador de Status Superior */}
-                    <div className="flex items-start justify-between w-full">
+                    return (
                       <div
-                        className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-sm transition-transform group-hover:scale-105 ${
-                          ehChamado
-                            ? "bg-amber-400 text-neutral-950 font-black shadow-md shadow-amber-400/50 animate-bounce"
-                            : mesa.status === "conta_pedida"
-                            ? "bg-rose-600 text-white shadow-md shadow-rose-600/40 animate-pulse"
+                        key={num}
+                        onClick={() => handleAbrirMesa(num)}
+                        className={`p-3.5 sm:p-4 rounded-2xl border-2 text-left transition-all flex flex-col justify-between min-h-[140px] group relative overflow-hidden cursor-pointer select-none active:scale-[0.98] ${ehChamado
+                          ? "bg-amber-50 border-amber-500 ring-2 ring-amber-400/50 shadow-md shadow-amber-500/10 animate-pulse"
+                          : mesa.status === "conta_pedida"
+                            ? "bg-rose-50/90 border-rose-500 ring-2 ring-rose-400/50 hover:border-rose-600 shadow-md shadow-rose-600/10"
                             : mesa.status === "paga_ocupada"
-                            ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/40"
-                            : mesa.status === "ocupada"
-                            ? "bg-amber-500 text-neutral-950 font-black shadow-md"
-                            : "bg-neutral-100 text-neutral-900 border border-neutral-200 group-hover:bg-neutral-200/70"
-                        }`}
-                      >
-                        {num}
-                      </div>
-
-                      <div className="flex flex-col items-end gap-1">
-                        {ehChamado && (
-                          <Badge className="bg-amber-400 text-neutral-950 text-[9px] font-black uppercase tracking-wider px-2 py-0.5 flex items-center gap-1 shadow-md">
-                            <Bell className="w-2.5 h-2.5 fill-neutral-950" />
-                            Garçom!
-                          </Badge>
-                        )}
-
-                        <Badge
-                          variant="outline"
-                          className={`text-[9px] uppercase font-black tracking-wider px-2 py-0.5 rounded-full ${
-                            mesa.status === "conta_pedida"
-                              ? mesa.comandas.some((cmd) => cmd.metodoPagamento === "pix")
-                                ? "bg-teal-100 text-teal-800 border-teal-300 font-black flex items-center gap-1"
-                                : "bg-rose-100 text-rose-700 border-rose-300 font-black"
-                              : mesa.status === "paga_ocupada"
-                              ? "bg-emerald-100 text-emerald-800 border-emerald-300 font-black"
+                              ? "bg-emerald-50/90 border-emerald-500 shadow-md shadow-emerald-600/10"
                               : mesa.status === "ocupada"
-                              ? "bg-amber-100 text-amber-900 border-amber-300 font-black"
-                              : "bg-neutral-100 text-neutral-600 border-neutral-200 font-bold"
+                                ? "bg-amber-50/70 border-amber-400 hover:border-amber-500 shadow-sm"
+                                : "bg-white border-neutral-200/90 hover:border-neutral-400 shadow-sm hover:shadow-md"
                           }`}
-                        >
-                          {mesa.status === "conta_pedida" ? (
-                            mesa.comandas.some((cmd) => cmd.metodoPagamento === "pix") ? (
-                              <>
-                                <QrCode className="w-2.5 h-2.5" />
-                                PIX
-                              </>
-                            ) : (
-                              "Conta"
-                            )
-                          ) : mesa.status === "paga_ocupada" ? (
-                            "Paga"
-                          ) : mesa.status === "ocupada" ? (
-                            "Ocupada"
-                          ) : (
-                            "Livre"
-                          )}
-                        </Badge>
+                      >
+                        {/* Indicador de Status Superior */}
+                        <div className="flex items-start justify-between w-full">
+                          <div
+                            className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-sm transition-transform group-hover:scale-105 ${ehChamado
+                              ? "bg-amber-400 text-neutral-950 font-black shadow-md shadow-amber-400/50 animate-bounce"
+                              : mesa.status === "conta_pedida"
+                                ? "bg-rose-600 text-white shadow-md shadow-rose-600/40 animate-pulse"
+                                : mesa.status === "paga_ocupada"
+                                  ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/40"
+                                  : mesa.status === "ocupada"
+                                    ? "bg-amber-500 text-neutral-950 font-black shadow-md"
+                                    : "bg-neutral-100 text-neutral-900 border border-neutral-200 group-hover:bg-neutral-200/70"
+                              }`}
+                          >
+                            {num}
+                          </div>
 
-                        {mesa.alertaUpsell && (
-                          <Badge className="bg-purple-100 text-purple-900 border border-purple-300 text-[9px] font-black uppercase tracking-wider px-2 py-0.5 shadow-xs flex items-center gap-1 animate-pulse">
-                            ⏳ +15m parada
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
+                          <div className="flex flex-col items-end gap-1">
+                            {ehChamado && (
+                              <Badge className="bg-amber-400 text-neutral-950 text-[9px] font-black uppercase tracking-wider px-2 py-0.5 flex items-center gap-1 shadow-md">
+                                <Bell className="w-2.5 h-2.5 fill-neutral-950" />
+                                Garçom!
+                              </Badge>
+                            )}
 
-                    {/* Resumo da Mesa */}
-                    <div className="mt-3">
-                      <span className="text-xs font-black text-neutral-950 block">Mesa {num}</span>
-                      {mesa.status !== "livre" ? (
-                        <div className="mt-1">
-                          {mesa.comandas.length === 1 ? (
-                            <ValorDinamicoMesa 
-                              restauranteId={restaurante?.id}
-                              mesaSelecionada={num}
-                              comandaId={mesa.comandas[0].id}
-                              taxaServicoPercentual={restaurante?.configuracoes?.taxaServico ?? 10}
-                            />
-                          ) : (
-                            <span className="text-sm font-black text-rose-600 block leading-none">
-                              {(() => {
-                                const subTotal = mesa.comandas.reduce((acc, c) => acc + (c.subtotal || 0), 0);
-                                const taxaPct = restaurante?.configuracoes?.taxaServico ?? 10;
-                                return (subTotal + subTotal * (taxaPct / 100)).toLocaleString("pt-BR", {
-                                  style: "currency",
-                                  currency: "BRL",
-                                });
-                              })()}
-                            </span>
-                          )}
-                          <span className="text-[10px] text-neutral-500 flex items-center gap-1 mt-1 font-semibold">
-                            <Users className="w-3 h-3 text-neutral-500" />
-                            {qtdClientes} {qtdClientes === 1 ? "pessoa" : "pessoas"}
-                          </span>
+                            <Badge
+                              variant="outline"
+                              className={`text-[9px] uppercase font-black tracking-wider px-2 py-0.5 rounded-full ${mesa.status === "conta_pedida"
+                                ? mesa.comandas.some((cmd) => cmd.metodoPagamento === "pix")
+                                  ? "bg-teal-100 text-teal-800 border-teal-300 font-black flex items-center gap-1"
+                                  : "bg-rose-100 text-rose-700 border-rose-300 font-black"
+                                : mesa.status === "paga_ocupada"
+                                  ? "bg-emerald-100 text-emerald-800 border-emerald-300 font-black"
+                                  : mesa.status === "ocupada"
+                                    ? "bg-amber-100 text-amber-900 border-amber-300 font-black"
+                                    : "bg-neutral-100 text-neutral-600 border-neutral-200 font-bold"
+                                }`}
+                            >
+                              {mesa.status === "conta_pedida" ? (
+                                mesa.comandas.some((cmd) => cmd.metodoPagamento === "pix") ? (
+                                  <>
+                                    <QrCode className="w-2.5 h-2.5" />
+                                    PIX
+                                  </>
+                                ) : (
+                                  "Conta"
+                                )
+                              ) : mesa.status === "paga_ocupada" ? (
+                                "Paga"
+                              ) : mesa.status === "ocupada" ? (
+                                "Ocupada"
+                              ) : (
+                                "Livre"
+                              )}
+                            </Badge>
+
+                            {mesa.alertaUpsell && (
+                              <Badge className="bg-purple-100 text-purple-900 border border-purple-300 text-[9px] font-black uppercase tracking-wider px-2 py-0.5 shadow-xs flex items-center gap-1 animate-pulse">
+                                ⏳ +15m parada
+                              </Badge>
+                            )}
+                          </div>
                         </div>
-                      ) : (
-                        <span className="text-[10px] text-emerald-600 font-bold block mt-1">● Disponível</span>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </>
+
+                        {/* Resumo da Mesa */}
+                        <div className="mt-3">
+                          <span className="text-xs font-black text-neutral-950 block">Mesa {num}</span>
+                          {mesa.status !== "livre" ? (
+                            <div className="mt-1">
+                              {mesa.comandas.length === 1 ? (
+                                <ValorDinamicoMesa
+                                  restauranteId={restaurante?.id}
+                                  mesaSelecionada={num}
+                                  comandaId={mesa.comandas[0].id}
+                                  taxaServicoPercentual={restaurante?.configuracoes?.taxaServico ?? 10}
+                                />
+                              ) : (
+                                <span className="text-sm font-black text-rose-600 block leading-none">
+                                  {(() => {
+                                    const subTotal = mesa.comandas.reduce((acc, c) => acc + (c.subtotal || 0), 0);
+                                    const taxaPct = restaurante?.configuracoes?.taxaServico ?? 10;
+                                    return (subTotal + subTotal * (taxaPct / 100)).toLocaleString("pt-BR", {
+                                      style: "currency",
+                                      currency: "BRL",
+                                    });
+                                  })()}
+                                </span>
+                              )}
+                              <span className="text-[10px] text-neutral-500 flex items-center gap-1 mt-1 font-semibold">
+                                <Users className="w-3 h-3 text-neutral-500" />
+                                {qtdClientes} {qtdClientes === 1 ? "pessoa" : "pessoas"}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-[10px] text-emerald-600 font-bold block mt-1">● Disponível</span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+          </div>
         )}
-      </div>
-    )}
 
 
 
@@ -1834,11 +1822,10 @@ export function AdminDashboard() {
               return (
                 <>
                   <div
-                    className={`space-y-6 ${
-                      isFree
-                        ? "filter blur-md select-none pointer-events-none opacity-40"
-                        : "opacity-100"
-                    }`}
+                    className={`space-y-6 ${isFree
+                      ? "filter blur-md select-none pointer-events-none opacity-40"
+                      : "opacity-100"
+                      }`}
                   >
                     {/* Sub-Navegação: Geral vs Laboratório de Salão */}
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-border">
@@ -1858,22 +1845,20 @@ export function AdminDashboard() {
                         <button
                           type="button"
                           onClick={() => setSubAbaAnalytics("geral")}
-                          className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
-                            subAbaAnalytics === "geral"
-                              ? "bg-primary text-primary-foreground shadow-xs"
-                              : "text-muted-foreground hover:text-foreground"
-                          }`}
+                          className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${subAbaAnalytics === "geral"
+                            ? "bg-primary text-primary-foreground shadow-xs"
+                            : "text-muted-foreground hover:text-foreground"
+                            }`}
                         >
                           Visão Geral
                         </button>
                         <button
                           type="button"
                           onClick={() => setSubAbaAnalytics("laboratorio")}
-                          className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 ${
-                            subAbaAnalytics === "laboratorio"
-                              ? "bg-purple-600 text-white shadow-xs"
-                              : "text-muted-foreground hover:text-purple-600 dark:hover:text-purple-300"
-                          }`}
+                          className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 ${subAbaAnalytics === "laboratorio"
+                            ? "bg-purple-600 text-white shadow-xs"
+                            : "text-muted-foreground hover:text-purple-600 dark:hover:text-purple-300"
+                            }`}
                         >
                           <Zap className="w-3.5 h-3.5" />
                           Laboratório de Salão
@@ -2017,10 +2002,10 @@ export function AdminDashboard() {
                                     m.vezesOcupada === 0
                                       ? "bg-neutral-50 text-neutral-500 border-2 border-neutral-200"
                                       : proporcao > 0.7
-                                      ? "bg-rose-600 text-white border-2 border-rose-600 shadow-md shadow-rose-600/30"
-                                      : proporcao > 0.3
-                                      ? "bg-amber-100 text-amber-950 border-2 border-amber-300 font-bold"
-                                      : "bg-neutral-100 text-neutral-800 border-2 border-neutral-200";
+                                        ? "bg-rose-600 text-white border-2 border-rose-600 shadow-md shadow-rose-600/30"
+                                        : proporcao > 0.3
+                                          ? "bg-amber-100 text-amber-950 border-2 border-amber-300 font-bold"
+                                          : "bg-neutral-100 text-neutral-800 border-2 border-neutral-200";
 
                                   return (
                                     <div
@@ -2130,11 +2115,11 @@ export function AdminDashboard() {
                       </div>
                     );
                   })()}
-          </>
-        );
-      })()}
-    </div>
-  )}
+                </>
+              );
+            })()}
+          </div>
+        )}
       </main>
 
       {/* MODAL DE ASSINATURA MAYAMENU PRO (MERCADO PAGO) */}
@@ -2158,13 +2143,12 @@ export function AdminDashboard() {
           {/* MENSAGEM DE AVISO / RETORNO SE HOUVER */}
           {avisoCheckout && (
             <div
-              className={`p-3 rounded-2xl text-xs font-semibold border flex items-start gap-2.5 ${
-                avisoCheckout.tipo === "sucesso"
-                  ? "bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 text-emerald-800 dark:text-emerald-300"
-                  : avisoCheckout.tipo === "info"
+              className={`p-3 rounded-2xl text-xs font-semibold border flex items-start gap-2.5 ${avisoCheckout.tipo === "sucesso"
+                ? "bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 text-emerald-800 dark:text-emerald-300"
+                : avisoCheckout.tipo === "info"
                   ? "bg-blue-50 dark:bg-blue-950/30 border-blue-200 text-blue-800 dark:text-blue-300"
                   : "bg-rose-50 dark:bg-rose-950/30 border-rose-200 text-rose-800 dark:text-rose-300"
-              }`}
+                }`}
             >
               {avisoCheckout.tipo === "sucesso" ? (
                 <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
@@ -2206,11 +2190,10 @@ export function AdminDashboard() {
             {/* PLANO MENSAL */}
             <div
               onClick={() => setPlanoCheckoutSelecionado("pro_mensal")}
-              className={`relative cursor-pointer rounded-2xl p-4 border-2 transition-all flex flex-col justify-between ${
-                planoCheckoutSelecionado === "pro_mensal"
-                  ? "border-rose-600 bg-rose-50/40 dark:bg-rose-950/20 shadow-md ring-2 ring-rose-600/20"
-                  : "border-border bg-card hover:border-slate-300 dark:hover:border-slate-700"
-              }`}
+              className={`relative cursor-pointer rounded-2xl p-4 border-2 transition-all flex flex-col justify-between ${planoCheckoutSelecionado === "pro_mensal"
+                ? "border-rose-600 bg-rose-50/40 dark:bg-rose-950/20 shadow-md ring-2 ring-rose-600/20"
+                : "border-border bg-card hover:border-slate-300 dark:hover:border-slate-700"
+                }`}
             >
               <div>
                 <div className="flex items-center justify-between mb-1">
@@ -2239,11 +2222,10 @@ export function AdminDashboard() {
             {/* PLANO SEMESTRAL */}
             <div
               onClick={() => setPlanoCheckoutSelecionado("pro_semestral")}
-              className={`relative cursor-pointer rounded-2xl p-4 border-2 transition-all flex flex-col justify-between ${
-                planoCheckoutSelecionado === "pro_semestral"
-                  ? "border-rose-600 bg-rose-50/40 dark:bg-rose-950/20 shadow-md ring-2 ring-rose-600/20"
-                  : "border-border bg-card hover:border-slate-300 dark:hover:border-slate-700"
-              }`}
+              className={`relative cursor-pointer rounded-2xl p-4 border-2 transition-all flex flex-col justify-between ${planoCheckoutSelecionado === "pro_semestral"
+                ? "border-rose-600 bg-rose-50/40 dark:bg-rose-950/20 shadow-md ring-2 ring-rose-600/20"
+                : "border-border bg-card hover:border-slate-300 dark:hover:border-slate-700"
+                }`}
             >
               <div className="absolute -top-2.5 right-3 bg-neutral-950 border border-amber-500/50 text-amber-300 text-[9px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full shadow-md flex items-center gap-1">
                 <span>🖤 BLACK FREEDAY • 17% OFF</span>
@@ -2632,11 +2614,10 @@ export function AdminDashboard() {
                                 setItemEmEdicao({ ...itemEmEdicao, fotoUrl: foto.url });
                               }
                             }}
-                            className={`relative aspect-square rounded-xl overflow-hidden border-2 transition-all group ${
-                              selecionada
-                                ? "border-primary scale-105 shadow-md shadow-primary/20"
-                                : "border-border hover:border-muted-foreground/60 opacity-80 hover:opacity-100"
-                            }`}
+                            className={`relative aspect-square rounded-xl overflow-hidden border-2 transition-all group ${selecionada
+                              ? "border-primary scale-105 shadow-md shadow-primary/20"
+                              : "border-border hover:border-muted-foreground/60 opacity-80 hover:opacity-100"
+                              }`}
                           >
                             <Image src={foto.thumbnail} alt={foto.titulo} fill className="object-cover" />
                             {selecionada && (
@@ -2734,11 +2715,10 @@ export function AdminDashboard() {
                 <button
                   type="button"
                   onClick={() => setModoOperacao("hibrido")}
-                  className={`p-3 rounded-xl border text-left transition-all ${
-                    modoOperacao === "hibrido"
-                      ? "bg-primary/10 border-primary text-foreground shadow-xs"
-                      : "bg-card border-border text-muted-foreground hover:border-primary/40 hover:bg-muted/50"
-                  }`}
+                  className={`p-3 rounded-xl border text-left transition-all ${modoOperacao === "hibrido"
+                    ? "bg-primary/10 border-primary text-foreground shadow-xs"
+                    : "bg-card border-border text-muted-foreground hover:border-primary/40 hover:bg-muted/50"
+                    }`}
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-foreground">Híbrido / Suporte (Padrão)</span>
@@ -2752,11 +2732,10 @@ export function AdminDashboard() {
                 <button
                   type="button"
                   onClick={() => setModoOperacao("com_garcom")}
-                  className={`p-3 rounded-xl border text-left transition-all ${
-                    modoOperacao === "com_garcom"
-                      ? "bg-primary/10 border-primary text-foreground shadow-xs"
-                      : "bg-card border-border text-muted-foreground hover:border-primary/40 hover:bg-muted/50"
-                  }`}
+                  className={`p-3 rounded-xl border text-left transition-all ${modoOperacao === "com_garcom"
+                    ? "bg-primary/10 border-primary text-foreground shadow-xs"
+                    : "bg-card border-border text-muted-foreground hover:border-primary/40 hover:bg-muted/50"
+                    }`}
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-foreground">Garçom Obrigatório</span>
@@ -2770,11 +2749,10 @@ export function AdminDashboard() {
                 <button
                   type="button"
                   onClick={() => setModoOperacao("balcao")}
-                  className={`p-3 rounded-xl border text-left transition-all ${
-                    modoOperacao === "balcao"
-                      ? "bg-primary/10 border-primary text-foreground shadow-xs"
-                      : "bg-card border-border text-muted-foreground hover:border-primary/40 hover:bg-muted/50"
-                  }`}
+                  className={`p-3 rounded-xl border text-left transition-all ${modoOperacao === "balcao"
+                    ? "bg-primary/10 border-primary text-foreground shadow-xs"
+                    : "bg-card border-border text-muted-foreground hover:border-primary/40 hover:bg-muted/50"
+                    }`}
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-foreground">Sem Garçom (Autoatendimento)</span>
@@ -2802,11 +2780,10 @@ export function AdminDashboard() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {/* Card 1: Modo Sequencial */}
                 <label
-                  className={`relative cursor-pointer rounded-xl border p-4 flex flex-col gap-2 transition-all duration-200 ${
-                    modoFilaKds === "sequencial"
-                      ? "bg-primary/10 border-primary shadow-xs"
-                      : "bg-card border-border hover:border-primary/40 hover:bg-muted/50"
-                  }`}
+                  className={`relative cursor-pointer rounded-xl border p-4 flex flex-col gap-2 transition-all duration-200 ${modoFilaKds === "sequencial"
+                    ? "bg-primary/10 border-primary shadow-xs"
+                    : "bg-card border-border hover:border-primary/40 hover:bg-muted/50"
+                    }`}
                 >
                   <input
                     type="radio"
@@ -2818,18 +2795,16 @@ export function AdminDashboard() {
                   />
                   <div className="flex items-center gap-2">
                     <div
-                      className={`p-1.5 rounded-lg ${
-                        modoFilaKds === "sequencial"
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-muted text-muted-foreground"
-                      }`}
+                      className={`p-1.5 rounded-lg ${modoFilaKds === "sequencial"
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted text-muted-foreground"
+                        }`}
                     >
                       <ListOrdered className="w-4 h-4" />
                     </div>
                     <span
-                      className={`text-sm font-bold ${
-                        modoFilaKds === "sequencial" ? "text-primary" : "text-foreground"
-                      }`}
+                      className={`text-sm font-bold ${modoFilaKds === "sequencial" ? "text-primary" : "text-foreground"
+                        }`}
                     >
                       Sequencial (Padrão)
                     </span>
@@ -2841,11 +2816,10 @@ export function AdminDashboard() {
 
                 {/* Card 2: Modo Agrupamento */}
                 <label
-                  className={`relative cursor-pointer rounded-xl border p-4 flex flex-col gap-2 transition-all duration-200 ${
-                    modoFilaKds === "agrupamento"
-                      ? "bg-emerald-500/10 border-emerald-500 shadow-xs"
-                      : "bg-card border-border hover:border-emerald-500/40 hover:bg-muted/50"
-                  }`}
+                  className={`relative cursor-pointer rounded-xl border p-4 flex flex-col gap-2 transition-all duration-200 ${modoFilaKds === "agrupamento"
+                    ? "bg-emerald-500/10 border-emerald-500 shadow-xs"
+                    : "bg-card border-border hover:border-emerald-500/40 hover:bg-muted/50"
+                    }`}
                 >
                   <input
                     type="radio"
@@ -2860,18 +2834,16 @@ export function AdminDashboard() {
                   </div>
                   <div className="flex items-center gap-2">
                     <div
-                      className={`p-1.5 rounded-lg ${
-                        modoFilaKds === "agrupamento"
-                          ? "bg-emerald-600 text-white"
-                          : "bg-muted text-muted-foreground"
-                      }`}
+                      className={`p-1.5 rounded-lg ${modoFilaKds === "agrupamento"
+                        ? "bg-emerald-600 text-white"
+                        : "bg-muted text-muted-foreground"
+                        }`}
                     >
                       <Layers className="w-4 h-4" />
                     </div>
                     <span
-                      className={`text-sm font-bold ${
-                        modoFilaKds === "agrupamento" ? "text-emerald-600 dark:text-emerald-400" : "text-foreground"
-                      }`}
+                      className={`text-sm font-bold ${modoFilaKds === "agrupamento" ? "text-emerald-600 dark:text-emerald-400" : "text-foreground"
+                        }`}
                     >
                       Agrupamento Ágil
                     </span>
@@ -2909,14 +2881,12 @@ export function AdminDashboard() {
                   role="switch"
                   aria-checked={permitirPagamentoAntecipado}
                   onClick={() => setPermitirPagamentoAntecipado((v) => !v)}
-                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
-                    permitirPagamentoAntecipado ? "bg-emerald-600" : "bg-muted"
-                  }`}
+                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${permitirPagamentoAntecipado ? "bg-emerald-600" : "bg-muted"
+                    }`}
                 >
                   <span
-                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow transition ${
-                      permitirPagamentoAntecipado ? "translate-x-5" : "translate-x-0"
-                    }`}
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow transition ${permitirPagamentoAntecipado ? "translate-x-5" : "translate-x-0"
+                      }`}
                   />
                 </button>
               </div>
@@ -2936,11 +2906,10 @@ export function AdminDashboard() {
                       key={sugestao}
                       type="button"
                       onClick={() => setTaxaServicoConfig(sugestao)}
-                      className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                        taxaServicoConfig === sugestao
-                          ? "bg-primary text-primary-foreground shadow-xs"
-                          : "bg-card border border-border text-foreground hover:bg-muted"
-                      }`}
+                      className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all ${taxaServicoConfig === sugestao
+                        ? "bg-primary text-primary-foreground shadow-xs"
+                        : "bg-card border border-border text-foreground hover:bg-muted"
+                        }`}
                     >
                       {sugestao}%
                     </button>
