@@ -91,7 +91,7 @@ import { SuperadminDiagnostico } from "./superadmin-diagnostico";
 import { escutarTodosPatrocinadores } from "@/lib/b2b-service";
 import type { PatrocinadorB2B } from "@/types/b2b";
 
-import { EMAILS_SUPERADMIN_AUTORIZADOS } from "@/lib/superadmin-auth";
+import { EMAILS_SUPERADMIN_AUTORIZADOS, sincronizarCookieSessao } from "@/lib/superadmin-auth";
 export { EMAILS_SUPERADMIN_AUTORIZADOS };
 
 export function SuperAdminView() {
@@ -137,6 +137,7 @@ export function SuperAdminView() {
 
   // Estado de Autenticação do Operador do SuperAdmin
   const [usuarioAuth, setUsuarioAuth] = useState<User | null>(null);
+  const [claimSuperAdmin, setClaimSuperAdmin] = useState(false);
   const [modalLoginAberto, setModalLoginAberto] = useState(false);
   const [loginEmail, setLoginEmail] = useState("");
   const [loginSenha, setLoginSenha] = useState("");
@@ -152,6 +153,44 @@ export function SuperAdminView() {
   const [pendingRestauranteId, setPendingRestauranteId] = useState<string | null>(null);
 
   useEffect(() => {
+    const unsubAuth = onAuthStateChanged(auth, async (user) => {
+      setUsuarioAuth(user);
+      if (user && !user.isAnonymous) {
+        try {
+          const tokenRes = await user.getIdTokenResult();
+          setClaimSuperAdmin(tokenRes.claims?.superadmin === true);
+          sincronizarCookieSessao(tokenRes.token);
+        } catch (e) {
+          setClaimSuperAdmin(false);
+          console.warn("Aviso ao sincronizar token no superadmin:", e);
+        }
+      } else {
+        setClaimSuperAdmin(false);
+        sincronizarCookieSessao(null);
+      }
+    });
+    return () => {
+      unsubAuth();
+    };
+  }, []);
+
+  useEffect(() => {
+    const emailCheck = usuarioAuth?.email?.toLowerCase() || "";
+    const devE2eBypass =
+      process.env.NODE_ENV !== "production" &&
+      typeof window !== "undefined" &&
+      window.location.search.includes("e2e=true");
+    const autorizado = Boolean(
+      devE2eBypass ||
+        (usuarioAuth &&
+          !usuarioAuth.isAnonymous &&
+          (EMAILS_SUPERADMIN_AUTORIZADOS.includes(emailCheck) || claimSuperAdmin))
+    );
+    if (!autorizado) {
+      setChamadosSuporte([]);
+      return;
+    }
+
     const unsubLicencas = escutarLicencas((dados) => {
       setLicencas(dados);
     });
@@ -164,38 +203,6 @@ export function SuperAdminView() {
     const unsubPatrocinadores = escutarTodosPatrocinadores((dados) => {
       setPatrocinadores(dados);
     });
-    const unsubAuth = onAuthStateChanged(auth, async (user) => {
-      setUsuarioAuth(user);
-      if (user) {
-        try {
-          const token = await user.getIdToken();
-          const isHttps = typeof window !== "undefined" && window.location.protocol === "https:";
-          document.cookie = `__session=${token}; path=/; ${isHttps ? "secure;" : ""} samesite=lax; max-age=3600`;
-        } catch (e) {
-          console.warn("Aviso ao sincronizar token no superadmin:", e);
-        }
-      } else {
-        setChamadosSuporte([]);
-        document.cookie = `__session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
-      }
-    });
-    return () => {
-      unsubLicencas();
-      unsubArquivo();
-      unsubRestaurantes();
-      unsubPatrocinadores();
-      unsubAuth();
-    };
-  }, []);
-
-  useEffect(() => {
-    const emailCheck = usuarioAuth?.email?.toLowerCase() || "";
-    const autorizado = Boolean(
-      usuarioAuth &&
-        !usuarioAuth.isAnonymous &&
-        EMAILS_SUPERADMIN_AUTORIZADOS.includes(emailCheck)
-    );
-    if (!autorizado) return;
 
     const qChamados = query(
       collection(db, "chamados_suporte"),
@@ -224,8 +231,14 @@ export function SuperAdminView() {
         setChamadosSuporte([]);
       }
     );
-    return () => unsubChamados();
-  }, [usuarioAuth]);
+    return () => {
+      unsubLicencas();
+      unsubArquivo();
+      unsubRestaurantes();
+      unsubPatrocinadores();
+      unsubChamados();
+    };
+  }, [usuarioAuth, claimSuperAdmin]);
 
   const handleLoginOperador = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -247,6 +260,7 @@ export function SuperAdminView() {
 
   const handleLogoutOperador = async () => {
     try {
+      sincronizarCookieSessao(null);
       await signOut(auth);
       setAlertaSucesso("Sessão administrativa encerrada.");
     } catch (err) {
@@ -385,16 +399,16 @@ export function SuperAdminView() {
         prev.map((r) =>
           r.id === restauranteId
             ? {
-                ...r,
+              ...r,
+              plano: novoPlano,
+              maxMesas: novosLimites.maxMesas,
+              maxPratos: novosLimites.maxPratos,
+              licenca: {
+                ...r.licenca,
                 plano: novoPlano,
-                maxMesas: novosLimites.maxMesas,
-                maxPratos: novosLimites.maxPratos,
-                licenca: {
-                  ...r.licenca,
-                  plano: novoPlano,
-                  limites: novosLimites,
-                },
-              }
+                limites: novosLimites,
+              },
+            }
             : r
         )
       );
@@ -411,11 +425,11 @@ export function SuperAdminView() {
           prev.map((r) =>
             r.id === restauranteId
               ? {
-                  ...r,
-                  plano: planoAnterior,
-                  maxMesas: limitesAnteriores.maxMesas,
-                  maxPratos: limitesAnteriores.maxPratos,
-                }
+                ...r,
+                plano: planoAnterior,
+                maxMesas: limitesAnteriores.maxMesas,
+                maxPratos: limitesAnteriores.maxPratos,
+              }
               : r
           )
         );
@@ -450,13 +464,13 @@ export function SuperAdminView() {
         prev.map((r) =>
           r.id === restauranteId
             ? {
-                ...r,
+              ...r,
+              suspenso,
+              configuracoes: {
+                ...r.configuracoes,
                 suspenso,
-                configuracoes: {
-                  ...r.configuracoes,
-                  suspenso,
-                },
-              }
+              },
+            }
             : r
         )
       );
@@ -475,13 +489,13 @@ export function SuperAdminView() {
           prev.map((r) =>
             r.id === restauranteId
               ? {
-                  ...r,
+                ...r,
+                suspenso: estadoAnterior,
+                configuracoes: {
+                  ...r.configuracoes,
                   suspenso: estadoAnterior,
-                  configuracoes: {
-                    ...r.configuracoes,
-                    suspenso: estadoAnterior,
-                  },
-                }
+                },
+              }
               : r
           )
         );
@@ -618,15 +632,14 @@ export function SuperAdminView() {
     usuarioAuth &&
       !usuarioAuth.isAnonymous &&
       usuarioAuth.email &&
-      (EMAILS_SUPERADMIN_AUTORIZADOS.includes(emailAtual) ||
-        (usuarioAuth as any).customClaims?.superadmin === true)
+      (EMAILS_SUPERADMIN_AUTORIZADOS.includes(emailAtual) || claimSuperAdmin)
   );
 
   const isSuperAdminAutorizado = Boolean(
     ehSuperAdmin ||
-      (process.env.NODE_ENV !== "production" &&
-        typeof window !== "undefined" &&
-        window.location.search.includes("e2e=true"))
+    (process.env.NODE_ENV !== "production" &&
+      typeof window !== "undefined" &&
+      window.location.search.includes("e2e=true"))
   );
 
   if (!isSuperAdminAutorizado) {
@@ -953,66 +966,60 @@ export function SuperAdminView() {
       <div className="flex flex-wrap items-center gap-2 border-b border-border pb-3">
         <button
           onClick={() => setAbaAtiva("restaurantes")}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-            abaAtiva === "restaurantes"
-              ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/30"
-              : "bg-card text-muted-foreground hover:text-foreground border border-border"
-          }`}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${abaAtiva === "restaurantes"
+            ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/30"
+            : "bg-card text-muted-foreground hover:text-foreground border border-border"
+            }`}
         >
           <Store className="w-4 h-4" />
           Estabelecimentos em Operação ({restaurantesFiltrados.length})
         </button>
         <button
           onClick={() => setAbaAtiva("ativas")}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-            abaAtiva === "ativas"
-              ? "bg-rose-600 text-white shadow-md shadow-rose-600/30"
-              : "bg-card text-muted-foreground hover:text-foreground border border-border"
-          }`}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${abaAtiva === "ativas"
+            ? "bg-rose-600 text-white shadow-md shadow-rose-600/30"
+            : "bg-card text-muted-foreground hover:text-foreground border border-border"
+            }`}
         >
           <KeyRound className="w-4 h-4" />
           Emissão & Convites Disponíveis ({licencasFiltradas.length})
         </button>
         <button
           onClick={() => setAbaAtiva("vencidas")}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-            abaAtiva === "vencidas"
-              ? "bg-orange-600 text-white shadow-md shadow-orange-600/30"
-              : "bg-card text-muted-foreground hover:text-foreground border border-border"
-          }`}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${abaAtiva === "vencidas"
+            ? "bg-orange-600 text-white shadow-md shadow-orange-600/30"
+            : "bg-card text-muted-foreground hover:text-foreground border border-border"
+            }`}
         >
           <ClockAlert className="w-4 h-4" />
           Licenças Vencidas ({licencasVencidas.length})
         </button>
         <button
           onClick={() => setAbaAtiva("arquivo_morto")}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-            abaAtiva === "arquivo_morto"
-              ? "bg-purple-600 text-white shadow-md shadow-purple-600/30"
-              : "bg-card text-muted-foreground hover:text-foreground border border-border"
-          }`}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${abaAtiva === "arquivo_morto"
+            ? "bg-purple-600 text-white shadow-md shadow-purple-600/30"
+            : "bg-card text-muted-foreground hover:text-foreground border border-border"
+            }`}
         >
           <Archive className="w-4 h-4" />
           Arquivo Morto / JSONs ({arquivoMorto.length})
         </button>
         <button
           onClick={() => setAbaAtiva("patrocinadores")}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-            abaAtiva === "patrocinadores"
-              ? "bg-rose-600 text-white shadow-md shadow-rose-600/30"
-              : "bg-card text-muted-foreground hover:text-foreground border border-border"
-          }`}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${abaAtiva === "patrocinadores"
+            ? "bg-rose-600 text-white shadow-md shadow-rose-600/30"
+            : "bg-card text-muted-foreground hover:text-foreground border border-border"
+            }`}
         >
           <Building2 className="w-4 h-4" />
           Patrocinadores B2B ({patrocinadores.length})
         </button>
         <button
           onClick={() => setAbaAtiva("chamados")}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-            abaAtiva === "chamados"
-              ? "bg-amber-500 text-neutral-950 shadow-md shadow-amber-500/25"
-              : "bg-card text-muted-foreground hover:text-foreground border border-border"
-          }`}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${abaAtiva === "chamados"
+            ? "bg-amber-500 text-neutral-950 shadow-md shadow-amber-500/25"
+            : "bg-card text-muted-foreground hover:text-foreground border border-border"
+            }`}
         >
           <MessageCircle className="w-4 h-4" />
           Chamados ({chamadosSuporte.filter((c) => c.status === "pendente").length})
@@ -1063,13 +1070,11 @@ export function SuperAdminView() {
                 return (
                   <div
                     key={rest.id}
-                    className={`p-5 bg-card border rounded-3xl space-y-4 shadow-xs transition-all ${
-                      isItemPending ? "ring-2 ring-primary/50 opacity-90 scale-[0.99]" : ""
-                    } ${
-                      isSuspenso
+                    className={`p-5 bg-card border rounded-3xl space-y-4 shadow-xs transition-all ${isItemPending ? "ring-2 ring-primary/50 opacity-90 scale-[0.99]" : ""
+                      } ${isSuspenso
                         ? "border-rose-200 bg-rose-50/40"
                         : "border-border hover:border-primary/40"
-                    }`}
+                      }`}
                   >
                     {/* TOPO: NOME E STATUS */}
                     <div className="flex items-start justify-between gap-3">
@@ -1094,15 +1099,14 @@ export function SuperAdminView() {
                           <Loader2 className="w-3.5 h-3.5 animate-spin text-primary shrink-0" />
                         )}
                         <Badge
-                          className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full ${
-                            isSuspenso
-                              ? "bg-rose-50 text-rose-800 border border-rose-200"
-                              : planoAtual === "enterprise"
+                          className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full ${isSuspenso
+                            ? "bg-rose-50 text-rose-800 border border-rose-200"
+                            : planoAtual === "enterprise"
                               ? "bg-amber-50 text-amber-800 border border-amber-200"
                               : planoAtual === "pro"
-                              ? "bg-violet-50 text-violet-800 border border-violet-200"
-                              : "bg-muted text-muted-foreground border border-border"
-                          }`}
+                                ? "bg-violet-50 text-violet-800 border border-violet-200"
+                                : "bg-muted text-muted-foreground border border-border"
+                            }`}
                         >
                           {isSuspenso ? "Suspenso" : planoAtual}
                         </Badge>
@@ -1137,11 +1141,10 @@ export function SuperAdminView() {
                           type="button"
                           disabled={isItemPending}
                           onClick={() => handleAlterarPlano(rest.id, "free", rest.licenca?.id)}
-                          className={`px-2.5 py-1 text-[10px] sm:text-xs font-bold rounded-md transition-all disabled:opacity-50 ${
-                            planoAtual === "free"
-                              ? "bg-card text-foreground shadow-xs"
-                              : "text-muted-foreground hover:text-foreground"
-                          }`}
+                          className={`px-2.5 py-1 text-[10px] sm:text-xs font-bold rounded-md transition-all disabled:opacity-50 ${planoAtual === "free"
+                            ? "bg-card text-foreground shadow-xs"
+                            : "text-muted-foreground hover:text-foreground"
+                            }`}
                         >
                           FREE
                         </button>
@@ -1150,11 +1153,10 @@ export function SuperAdminView() {
                           type="button"
                           disabled={isItemPending}
                           onClick={() => handleAlterarPlano(rest.id, "pro", rest.licenca?.id)}
-                          className={`px-2.5 py-1 text-[10px] sm:text-xs font-bold rounded-md transition-all disabled:opacity-50 ${
-                            planoAtual === "pro"
-                              ? "bg-violet-600 text-white shadow-xs"
-                              : "text-muted-foreground hover:text-violet-600"
-                          }`}
+                          className={`px-2.5 py-1 text-[10px] sm:text-xs font-bold rounded-md transition-all disabled:opacity-50 ${planoAtual === "pro"
+                            ? "bg-violet-600 text-white shadow-xs"
+                            : "text-muted-foreground hover:text-violet-600"
+                            }`}
                         >
                           PRO
                         </button>
@@ -1163,11 +1165,10 @@ export function SuperAdminView() {
                           type="button"
                           disabled={isItemPending}
                           onClick={() => handleAlterarPlano(rest.id, "enterprise", rest.licenca?.id)}
-                          className={`px-2.5 py-1 text-[10px] sm:text-xs font-bold rounded-md transition-all disabled:opacity-50 ${
-                            planoAtual === "enterprise"
-                              ? "bg-amber-500 text-white shadow-xs"
-                              : "text-muted-foreground hover:text-amber-600"
-                          }`}
+                          className={`px-2.5 py-1 text-[10px] sm:text-xs font-bold rounded-md transition-all disabled:opacity-50 ${planoAtual === "enterprise"
+                            ? "bg-amber-500 text-white shadow-xs"
+                            : "text-muted-foreground hover:text-amber-600"
+                            }`}
                         >
                           ENTERPRISE
                         </button>
@@ -1250,11 +1251,10 @@ export function SuperAdminView() {
                   <button
                     type="button"
                     onClick={() => setModoEmissao("individual")}
-                    className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
-                      modoEmissao === "individual"
-                        ? "bg-card text-foreground shadow-xs"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
+                    className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${modoEmissao === "individual"
+                      ? "bg-card text-foreground shadow-xs"
+                      : "text-muted-foreground hover:text-foreground"
+                      }`}
                   >
                     <KeyRound className="w-3.5 h-3.5" />
                     Individual
@@ -1262,20 +1262,18 @@ export function SuperAdminView() {
                   <button
                     type="button"
                     onClick={() => setModoEmissao("lote")}
-                    className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
-                      modoEmissao === "lote"
-                        ? "bg-rose-600 text-white shadow-xs"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
+                    className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${modoEmissao === "lote"
+                      ? "bg-rose-600 text-white shadow-xs"
+                      : "text-muted-foreground hover:text-foreground"
+                      }`}
                   >
                     <Boxes className="w-3.5 h-3.5" />
                     <span>Fábrica em Lote</span>
                     <span
-                      className={`px-1 py-0.2 rounded text-[8px] font-black uppercase tracking-wider transition-colors ${
-                        modoEmissao === "lote"
-                          ? "bg-white text-rose-600"
-                          : "bg-rose-100 text-rose-700 border border-rose-200"
-                      }`}
+                      className={`px-1 py-0.2 rounded text-[8px] font-black uppercase tracking-wider transition-colors ${modoEmissao === "lote"
+                        ? "bg-white text-rose-600"
+                        : "bg-rose-100 text-rose-700 border border-rose-200"
+                        }`}
                     >
                       NOVO
                     </span>
@@ -1300,11 +1298,10 @@ export function SuperAdminView() {
                             key={q}
                             type="button"
                             onClick={() => setQuantidadeLote(q)}
-                            className={`py-1.5 rounded-xl text-xs font-black border transition-all ${
-                              quantidadeLote === q
-                                ? "bg-rose-600 border-rose-500 text-white shadow-xs"
-                                : "bg-card border-border text-muted-foreground hover:text-foreground"
-                            }`}
+                            className={`py-1.5 rounded-xl text-xs font-black border transition-all ${quantidadeLote === q
+                              ? "bg-rose-600 border-rose-500 text-white shadow-xs"
+                              : "bg-card border-border text-muted-foreground hover:text-foreground"
+                              }`}
                           >
                             {q} un
                           </button>
@@ -1326,11 +1323,10 @@ export function SuperAdminView() {
                             key={p}
                             type="button"
                             onClick={() => setPlanoSelecionado(p)}
-                            className={`p-2.5 rounded-2xl text-xs font-black uppercase tracking-wider border transition-all ${
-                              ativo
-                                ? "bg-primary border-primary text-primary-foreground shadow-xs"
-                                : "bg-muted/50 border-border text-muted-foreground hover:text-foreground"
-                            }`}
+                            className={`p-2.5 rounded-2xl text-xs font-black uppercase tracking-wider border transition-all ${ativo
+                              ? "bg-primary border-primary text-primary-foreground shadow-xs"
+                              : "bg-muted/50 border-border text-muted-foreground hover:text-foreground"
+                              }`}
                           >
                             {p}
                           </button>
@@ -1553,13 +1549,12 @@ export function SuperAdminView() {
                         </div>
 
                         <Badge
-                          className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full ${
-                            disponivel
-                              ? "bg-amber-50 text-amber-800 border border-amber-200"
-                              : ativa
+                          className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full ${disponivel
+                            ? "bg-amber-50 text-amber-800 border border-amber-200"
+                            : ativa
                               ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
                               : "bg-rose-50 text-rose-800 border border-rose-200"
-                          }`}
+                            }`}
                         >
                           {lic.status}
                         </Badge>
@@ -1655,11 +1650,10 @@ export function SuperAdminView() {
                             <button
                               type="button"
                               onClick={() => handleAlterarPlano(lic.restauranteId || lic.id, "free", lic.id)}
-                              className={`px-3 py-1.5 text-[10px] sm:text-xs font-bold rounded-md transition-all ${
-                                lic.plano === "free"
-                                  ? "bg-card text-foreground shadow-xs"
-                                  : "text-muted-foreground hover:text-foreground"
-                              }`}
+                              className={`px-3 py-1.5 text-[10px] sm:text-xs font-bold rounded-md transition-all ${lic.plano === "free"
+                                ? "bg-card text-foreground shadow-xs"
+                                : "text-muted-foreground hover:text-foreground"
+                                }`}
                             >
                               FREE
                             </button>
@@ -1668,11 +1662,10 @@ export function SuperAdminView() {
                             <button
                               type="button"
                               onClick={() => handleAlterarPlano(lic.restauranteId || lic.id, "pro", lic.id)}
-                              className={`px-3 py-1.5 text-[10px] sm:text-xs font-bold rounded-md transition-all ${
-                                lic.plano === "pro"
-                                  ? "bg-violet-600 text-white shadow-xs"
-                                  : "text-muted-foreground hover:text-violet-600"
-                              }`}
+                              className={`px-3 py-1.5 text-[10px] sm:text-xs font-bold rounded-md transition-all ${lic.plano === "pro"
+                                ? "bg-violet-600 text-white shadow-xs"
+                                : "text-muted-foreground hover:text-violet-600"
+                                }`}
                             >
                               PRO
                             </button>
@@ -1681,11 +1674,10 @@ export function SuperAdminView() {
                             <button
                               type="button"
                               onClick={() => handleAlterarPlano(lic.restauranteId || lic.id, "enterprise", lic.id)}
-                              className={`px-3 py-1.5 text-[10px] sm:text-xs font-bold rounded-md transition-all ${
-                                lic.plano === "enterprise"
-                                  ? "bg-amber-500 text-white shadow-xs"
-                                  : "text-muted-foreground hover:text-amber-600"
-                              }`}
+                              className={`px-3 py-1.5 text-[10px] sm:text-xs font-bold rounded-md transition-all ${lic.plano === "enterprise"
+                                ? "bg-amber-500 text-white shadow-xs"
+                                : "text-muted-foreground hover:text-amber-600"
+                                }`}
                             >
                               ENTERPRISE
                             </button>
@@ -2075,17 +2067,17 @@ export function SuperAdminView() {
           <SuperadminDiagnostico />
           {/* ABA PATROCINADORES B2B (TRADE MARKETING) */}
           <SuperadminPatrocinadoresTab
-          patrocinadores={patrocinadores}
-          ehSuperAdmin={ehSuperAdmin}
-          onNotificarSucesso={(msg) => {
-            setAlertaSucesso(msg);
-            setAlertaErro(null);
-          }}
-          onNotificarErro={(msg) => {
-            setAlertaErro(msg);
-            setAlertaSucesso(null);
-          }}
-        />
+            patrocinadores={patrocinadores}
+            ehSuperAdmin={ehSuperAdmin}
+            onNotificarSucesso={(msg) => {
+              setAlertaSucesso(msg);
+              setAlertaErro(null);
+            }}
+            onNotificarErro={(msg) => {
+              setAlertaErro(msg);
+              setAlertaSucesso(null);
+            }}
+          />
         </div>
       )}
 

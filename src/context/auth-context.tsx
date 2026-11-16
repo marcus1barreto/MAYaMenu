@@ -13,11 +13,27 @@ import {
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import type { Restaurante } from "@/types";
 import { RESTAURANTE_DEMO } from "@/lib/mock-data";
+import { sincronizarCookieSessao } from "@/lib/superadmin-auth";
+
+type RoleUsuario = "owner" | "garcom" | "cozinha" | "superadmin" | null;
+
+function extrairRoleDasClaims(claims: Record<string, unknown>): RoleUsuario {
+  const roleBruta = claims.role;
+  if (
+    roleBruta === "owner" ||
+    roleBruta === "garcom" ||
+    roleBruta === "cozinha" ||
+    roleBruta === "superadmin"
+  ) {
+    return roleBruta;
+  }
+  return claims.superadmin === true ? "superadmin" : null;
+}
 
 interface AuthContextType {
   user: User | null;
   restaurante: Restaurante | null;
-  role: "owner" | "garcom" | "cozinha" | "superadmin" | null;
+  role: RoleUsuario;
   carregando: boolean;
   login: (email: string, pass: string) => Promise<void>;
   cadastrar: (
@@ -48,20 +64,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let unsubRestaurante: (() => void) | null = null;
 
-    // Sincroniza o JWT fresco do Firebase Auth com o cookie '__session' para o Middleware
+    // Sincroniza apenas contas autenticadas não-anônimas com o cookie '__session' para o Proxy
     const unsubIdToken = onIdTokenChanged(auth, async (currentUser) => {
-      if (currentUser) {
-        // Pega o JWT fresco e sincroniza também as claims após triggers de provisionamento.
+      if (currentUser && !currentUser.isAnonymous) {
         const tokenResult = await currentUser.getIdTokenResult();
-        const token = tokenResult.token;
-        const roleClaim = (tokenResult.claims.role as any) || (tokenResult.claims.superadmin ? "superadmin" : null);
-        setRole(roleClaim);
-        const isHttps = typeof window !== "undefined" && window.location.protocol === "https:";
-        // Salva no cookie '__session' (apenas usa 'secure' em HTTPS para não falhar no localhost)
-        document.cookie = `__session=${token}; path=/; ${isHttps ? "secure;" : ""} samesite=lax; max-age=3600`;
+        setRole(extrairRoleDasClaims(tokenResult.claims));
+        sincronizarCookieSessao(tokenResult.token);
       } else {
-        // Limpa o cookie se deslogar
-        document.cookie = `__session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
+        sincronizarCookieSessao(null);
       }
     });
 
@@ -81,8 +91,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           let targetRestId = currentUser.uid;
           try {
             const tokenResult = await currentUser.getIdTokenResult();
-            const roleClaim = (tokenResult.claims.role as any) || (tokenResult.claims.superadmin ? "superadmin" : null);
-            setRole(roleClaim);
+            setRole(extrairRoleDasClaims(tokenResult.claims));
             if (tokenResult.claims.restauranteId) {
               targetRestId = tokenResult.claims.restauranteId as string;
             }
@@ -171,6 +180,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // A leitura é um get pontual autorizado pelas Rules, nunca uma listagem da raiz privada.
       try {
         const tokenResult = await cred.user.getIdTokenResult();
+        if (!cred.user.isAnonymous) {
+          sincronizarCookieSessao(tokenResult.token);
+        }
+        setRole(extrairRoleDasClaims(tokenResult.claims));
         const restauranteId = typeof tokenResult.claims.restauranteId === "string"
           ? tokenResult.claims.restauranteId
           : uid;
@@ -288,12 +301,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = async () => {
     localStorage.removeItem("mayamenu_mock_auth");
+    sincronizarCookieSessao(null);
     try {
       await firebaseSignOut(auth);
     } catch {
       // Ignora se não conectado
     }
     setUser(null);
+    setRole(null);
     setRestaurante(null);
   };
 

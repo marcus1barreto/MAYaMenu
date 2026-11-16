@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { EMAILS_SUPERADMIN_AUTORIZADOS } from "@/lib/superadmin-auth";
+import { avaliarTokenSessaoSuperadmin } from "@/lib/superadmin-auth";
 
 export function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname;
@@ -14,44 +14,20 @@ export function proxy(request: NextRequest) {
     }
 
     const sessionCookie = request.cookies.get("__session")?.value;
+    const avaliacao = avaliarTokenSessaoSuperadmin(sessionCookie);
 
-    if (!sessionCookie) {
-      // Sem token de sessão? Redireciona suavemente para o login no admin com destino salvo
+    if (!avaliacao.autorizado) {
+      // Redireciona ao fluxo seguro de login/troca de conta em /admin em vez de travar em 404 sem saída
       const loginUrl = new URL("/admin", request.url);
       loginUrl.searchParams.set("redirect", path);
+      if (avaliacao.motivo === "conta_sem_permissao") {
+        loginUrl.searchParams.set("motivo", "conta_sem_permissao");
+      }
       return NextResponse.redirect(loginUrl);
     }
 
-    try {
-      // 2. Decodifica o payload do JWT (A segunda parte do base64)
-      const payloadBase64 = sessionCookie.split(".")[1];
-      if (!payloadBase64) {
-        const loginUrl = new URL("/admin", request.url);
-        loginUrl.searchParams.set("redirect", path);
-        return NextResponse.redirect(loginUrl);
-      }
-      const decodedJson = Buffer.from(payloadBase64, "base64").toString("utf8");
-      const decodedToken = JSON.parse(decodedJson);
-
-      const email = typeof decodedToken.email === "string" ? decodedToken.email.toLowerCase() : "";
-      const ehEmailAutorizado = EMAILS_SUPERADMIN_AUTORIZADOS.includes(email);
-      const temClaimSuperadmin = decodedToken.superadmin === true;
-
-      // 3. A Checagem da Chave Mestra (claim ou email na whitelist oficial)
-      if (!temClaimSuperadmin && !ehEmailAutorizado) {
-        // Usuário autenticado comum (ex: gerente de restaurante que tenta bisbilhotar o SuperAdmin)
-        // Bloqueia com 404 silencioso estrito
-        return NextResponse.rewrite(new URL("/404", request.url));
-      }
-
-      // 4. Operador autorizado. Deixa passar.
-      return NextResponse.next();
-    } catch {
-      // Qualquer erro de formatação de token redireciona para login seguro
-      const loginUrl = new URL("/admin", request.url);
-      loginUrl.searchParams.set("redirect", path);
-      return NextResponse.redirect(loginUrl);
-    }
+    // Operador autorizado. Deixa passar.
+    return NextResponse.next();
   }
 
   return NextResponse.next();

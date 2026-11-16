@@ -8,7 +8,12 @@ import { QrAcessoSetorGate } from "@/components/auth/qr-acesso-setor-gate";
 import { AdminDashboard, type ModoPainelAdmin } from "@/components/admin/admin-dashboard";
 import { EstabelecimentoSuspensoView } from "@/components/admin/estabelecimento-suspenso-view";
 import { TemaUsuarioProvider } from "@/context/tema-context";
-import { isEmailSuperAdmin } from "@/lib/superadmin-auth";
+import {
+  isEmailSuperAdmin,
+  isPrivilegedSuperadminPath,
+  isSafeInternalRedirect,
+  sincronizarCookieSessao,
+} from "@/lib/superadmin-auth";
 
 interface AdminRouteShellProps {
   modo: ModoPainelAdmin;
@@ -24,18 +29,49 @@ function AdminRouteShellContent({ modo, redirectRoot = false }: AdminRouteShellP
   const ehContaSuperAdmin = Boolean(
     user && !user.isAnonymous && (role === "superadmin" || isEmailSuperAdmin(user.email))
   );
+  const alvoPrivilegiado = isPrivilegedSuperadminPath(redirectTarget);
+
+  const navegarParaDestinoPrivilegiado = async (destino: string) => {
+    try {
+      if (user && !user.isAnonymous) {
+        const token = await user.getIdToken();
+        sincronizarCookieSessao(token);
+      }
+    } catch {
+      // Segue com o redirecionamento usando o cookie atual caso getIdToken falhe momentaneamente
+    }
+    router.replace(destino);
+  };
 
   // Encaminhamento automático: ?redirect= válido, SuperAdmin sem loja, ou entrada raiz /admin -> /admin/operacao.
   useEffect(() => {
     if (carregando || !user || user.isAnonymous) return;
     if (user.uid.startsWith("pin_") || user.uid.startsWith("qr_setor_")) return;
 
-    if (redirectTarget && redirectTarget.startsWith("/")) {
-      router.replace(redirectTarget);
-      return;
-    }
-    if (ehContaSuperAdmin && !restaurante) {
-      router.replace("/superadmin");
+    const destinoAuto =
+      isSafeInternalRedirect(redirectTarget) && (!alvoPrivilegiado || ehContaSuperAdmin)
+        ? redirectTarget
+        : ehContaSuperAdmin && !restaurante
+          ? "/superadmin"
+          : null;
+
+    if (destinoAuto) {
+      if (isPrivilegedSuperadminPath(destinoAuto)) {
+        let cancelado = false;
+        (async () => {
+          try {
+            const token = await user.getIdToken();
+            if (!cancelado) sincronizarCookieSessao(token);
+          } catch {
+            // Prossegue mesmo se getIdToken falhar momentaneamente
+          }
+          if (!cancelado) router.replace(destinoAuto);
+        })();
+        return () => {
+          cancelado = true;
+        };
+      }
+      router.replace(destinoAuto);
       return;
     }
     if (redirectRoot && restaurante) {
@@ -43,7 +79,7 @@ function AdminRouteShellContent({ modo, redirectRoot = false }: AdminRouteShellP
         typeof window !== "undefined" ? window.location.search : "";
       router.replace(`/admin/operacao${searchAtual}`);
     }
-  }, [carregando, user, redirectTarget, ehContaSuperAdmin, restaurante, redirectRoot, router]);
+  }, [carregando, user, redirectTarget, alvoPrivilegiado, ehContaSuperAdmin, restaurante, redirectRoot, router]);
 
   if (carregando) {
     return (
@@ -97,6 +133,41 @@ function AdminRouteShellContent({ modo, redirectRoot = false }: AdminRouteShellP
     );
   }
 
+  // Conta autenticada de restaurante que tentou acessar /superadmin ou /hq pelo navegador
+  if (!ehContaSuperAdmin && alvoPrivilegiado) {
+    return (
+      <div className="min-h-screen bg-neutral-50 flex items-center justify-center p-4">
+        <div className="w-full max-w-md rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm space-y-4 text-center">
+          <div className="mx-auto w-12 h-12 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center font-black text-xl">
+            !
+          </div>
+          <h1 className="text-lg font-black text-neutral-900">
+            Conta atual sem permissão para esta área
+          </h1>
+          <p className="text-sm text-neutral-600 leading-relaxed">
+            Você está conectado com a conta <strong className="text-neutral-900">{user.email}</strong>. Para entrar na rota administrativa global, saia e entre com uma conta de operador autorizada.
+          </p>
+          <div className="flex flex-col gap-2 pt-1">
+            <button
+              type="button"
+              onClick={() => logout()}
+              className="w-full h-11 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-sm transition-colors"
+            >
+              Sair e Entrar com Outra Conta
+            </button>
+            <button
+              type="button"
+              onClick={() => router.replace(restaurante ? "/admin/operacao" : "/")}
+              className="w-full h-11 rounded-xl border border-neutral-200 bg-white hover:bg-neutral-50 text-neutral-800 font-bold text-sm transition-colors"
+            >
+              {restaurante ? "Voltar para o Painel do Restaurante" : "Voltar para o Início"}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // Conta autenticada sem loja vinculada
   if (!restaurante) {
     return (
@@ -117,7 +188,7 @@ function AdminRouteShellContent({ modo, redirectRoot = false }: AdminRouteShellP
             {ehContaSuperAdmin && (
               <button
                 type="button"
-                onClick={() => router.replace("/superadmin")}
+                onClick={() => void navegarParaDestinoPrivilegiado("/superadmin")}
                 className="w-full h-11 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white font-bold text-sm transition-colors"
               >
                 Ir para o Painel SuperAdmin
