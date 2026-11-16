@@ -39,7 +39,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "MAYaMenu | Menus Inteligentes para Restaurantes, Bares e Lanchonetes",
     description:
-      "Tecnologia de grandes restaurantes acessível para o seu negócio. Cardápio digital PWA e gestão de pedidos por R$ 0,26 ao dia por mesa.",
+      "Tecnologia de grandes restaurantes acessível para o seu negócio. Comece grátis com 5 mesas e sem limite de itens — e amplie por apenas R$ 8,00/mês por mesa extra (27 centavos por dia).",
   },
 };
 
@@ -115,14 +115,15 @@ export default function LandingPage() {
 
               {/* Subtítulo M3 Body Large */}
               <p className="mt-4 sm:mt-5 text-base sm:text-lg lg:text-xl text-neutral-600 max-w-2xl font-normal leading-relaxed">
-                {moduloAtivo("mod.vendas_assinaturas") ? (
-                  <>
-                    Por apenas <strong className="text-neutral-950 font-bold">R$ 0,26 diários por mesa</strong>,
-                    organize a sua cozinha, acabe com a confusão nos pedidos e aumente o faturamento. Tecnologia limpa feita para quem vive a realidade do salão.
-                  </>
-                ) : (
-                  "Organize a sua cozinha, acabe com a confusão nos pedidos e aumente o faturamento. Tecnologia limpa feita para quem vive a realidade do salão."
-                )}
+                Organize a sua cozinha, acabe com a confusão nos pedidos e controle todo o salão sem dor de cabeça.{" "}
+                <strong className="text-neutral-950 font-bold">
+                  Comece grátis com 5 mesas (sem limite de itens)
+                </strong>{" "}
+                e, se precisar crescer, adicione mesas extras por apenas{" "}
+                <strong className="text-rose-600 font-bold">
+                  R$ 8,00/mês cada — incríveis 27 centavos por dia por mesa extra
+                </strong>
+                .
               </p>
 
               {/* CTAs de Conversão (Áreas de toque mínimas de 44px) */}
@@ -173,10 +174,10 @@ export default function LandingPage() {
                     <Store className="w-4 h-4 sm:w-5 sm:h-5" />
                   </div>
                   <div>
-                    <div className="text-[11px] sm:text-xs text-neutral-500 font-semibold leading-tight">Custo diário</div>
+                    <div className="text-[11px] sm:text-xs text-neutral-500 font-semibold leading-tight">Mesa extra (R$ 8,00/mês)</div>
                     <div className="text-xs sm:text-sm font-black text-neutral-950 flex items-baseline gap-1">
-                      <span>R$ 0,26</span>
-                      <span className="text-[10px] sm:text-xs text-neutral-500 font-normal">/ mesa</span>
+                      <span>27 centavos</span>
+                      <span className="text-[10px] sm:text-xs text-neutral-500 font-normal">/ dia por mesa</span>
                     </div>
                   </div>
                 </div>
@@ -384,10 +385,10 @@ export default function LandingPage() {
               <div className="rounded-3xl border border-neutral-200 bg-white p-6 sm:p-10 shadow-xl text-center space-y-4">
                 <div className="text-3xl sm:text-5xl font-black text-neutral-950">Grátis</div>
                 <p className="text-sm sm:text-base text-neutral-600 max-w-lg mx-auto">
-                  Até <strong>5 mesas</strong> (com possibilidade de mesas extras por <strong>R$ 8,00/mesa</strong>) e <strong>sem limite de itens</strong>, com QR Code, <strong>KDS da Cozinha</strong>, solicitação de atendimento e <strong>Pix</strong>.
+                  Até <strong>5 mesas grátis</strong> e <strong>sem limite de itens</strong>, com QR Code, <strong>KDS da Cozinha</strong>, solicitação de atendimento e <strong>Pix direto</strong>. Precisa de mais espaço? Adicione mesas extras por apenas <strong>R$ 8,00/mês cada</strong> — isso dá só <strong>27 centavos por dia por mesa extra</strong> para ter o controle completo do salão na palma da mão!
                 </p>
                 <p className="text-xs text-neutral-500">
-                  Versão PRO: até <strong>20 mesas</strong> (+ mesas extras a R$ 8,00/mesa) e recursos avançados de salão e gestão.
+                  Versão PRO: até <strong>20 mesas</strong> (+ mesas extras a R$ 8,00/mês — 27 centavos/dia por mesa extra) e gestão avançada de equipe e salão.
                 </p>
                 <div className="pt-2">
                   <Link
@@ -420,14 +421,14 @@ export default function LandingPage() {
               <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-center">
                 <div className="md:col-span-7 flex flex-col items-start">
                   <div className="text-xs font-bold uppercase tracking-wider text-rose-600 mb-2">
-                    A Tarifa Flexível
+                    Mesa Extra Sob Demanda
                   </div>
                   <div className="flex items-baseline gap-2">
                     <span className="text-4xl sm:text-6xl font-black text-neutral-950 tracking-tight">R$ 8,00</span>
-                    <span className="text-neutral-500 text-sm sm:text-base font-medium">ao mês por mesa</span>
+                    <span className="text-neutral-500 text-sm sm:text-base font-medium">ao mês por mesa extra</span>
                   </div>
                   <div className="text-xs text-rose-600 font-bold mt-1">
-                    (Equivale a R$ 0,26 por dia por mesa)
+                    (Apenas 27 centavos por dia cada mesa extra — menos que um cafezinho por mês!)
                   </div>
 
                   <p className="mt-5 text-sm sm:text-base text-neutral-600 leading-relaxed">
@@ -545,7 +546,7 @@ export default function LandingPage() {
                 E se eu precisar de mais mesas do que o meu plano atual?
               </h3>
                 <p className="text-sm text-neutral-600 mt-2 leading-relaxed">
-                Você cresce no seu ritmo: a partir do plano Free (até 5 mesas, sem limite de itens), é possível adicionar mesas extras por R$ 8,00/mês por mesa — ou migrar para o plano PRO (até 20 mesas + mesas extras a R$ 8,00/mês, também sem limite de itens).
+                Você cresce no seu ritmo: a partir do plano Free (até 5 mesas, sem limite de itens), é possível adicionar mesas extras por R$ 8,00/mês por mesa (apenas 27 centavos por dia cada mesa extra!) — ou migrar para o plano PRO (até 20 mesas + mesas extras por R$ 8,00/mês, também sem limite de itens).
               </p>
             </div>
           </div>

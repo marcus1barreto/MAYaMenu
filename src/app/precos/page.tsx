@@ -37,7 +37,9 @@ export default function PrecosPage() {
             Cresça no ritmo do seu salão
           </h1>
           <p className="text-sm sm:text-base text-neutral-600 max-w-2xl mx-auto">
-            Sem limite de itens no cardápio. Comece grátis com 5 mesas ou amplie sua operação com mesas extras a R$ 8,00/mês por mesa.
+            Sem limite de itens no cardápio. Comece grátis com 5 mesas e amplie quando precisar por apenas{" "}
+            <strong className="text-neutral-950">R$ 8,00/mês por mesa extra</strong> — isso dá só{" "}
+            <strong className="text-rose-600">27 centavos por dia cada mesa extra</strong> para ter cozinha, QR Code, comandas e Pix sob controle total!
           </p>
         </div>
 
@@ -52,7 +54,7 @@ export default function PrecosPage() {
               <ul className="space-y-2.5 text-sm text-neutral-700">
                 <li className="flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                  <span>Até 5 mesas (+ extras por R$ 8,00/mês/mesa)</span>
+                  <span>Até 5 mesas (+ extras por R$ 8,00/mês — 27 centavos/dia por mesa)</span>
                 </li>
                 <li className="flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
@@ -86,7 +88,7 @@ export default function PrecosPage() {
               <ul className="space-y-2.5 text-sm text-neutral-700">
                 <li className="flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                  <span>Até 20 mesas (+ extras por R$ 8,00/mês/mesa)</span>
+                  <span>Até 20 mesas (+ extras por R$ 8,00/mês — 27 centavos/dia por mesa)</span>
                 </li>
                 <li className="flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
