@@ -90,10 +90,8 @@ import { SuperadminDiagnostico } from "./superadmin-diagnostico";
 import { escutarTodosPatrocinadores } from "@/lib/b2b-service";
 import type { PatrocinadorB2B } from "@/types/b2b";
 
-export const EMAILS_SUPERADMIN_AUTORIZADOS = [
-  "admin@mayamenu.com",
-  "marcus1fialho@gmail.com",
-];
+import { EMAILS_SUPERADMIN_AUTORIZADOS } from "@/lib/superadmin-auth";
+export { EMAILS_SUPERADMIN_AUTORIZADOS };
 
 export function SuperAdminView() {
   const [licencas, setLicencas] = useState<Licenca[]>([]);

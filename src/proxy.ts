@@ -1,11 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-
-const EMAILS_SUPERADMIN_AUTORIZADOS = [
-  "admin@mayamenu.com",
-  "teste@teste.com",
-  "marcus1fialho@gmail.com",
-];
+import { EMAILS_SUPERADMIN_AUTORIZADOS } from "@/lib/superadmin-auth";
 
 export function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname;

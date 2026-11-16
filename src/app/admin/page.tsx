@@ -7,19 +7,28 @@ import { AdminLoginForm } from "@/components/admin/admin-login-form";
 import { AdminDashboard } from "@/components/admin/admin-dashboard";
 import { EstabelecimentoSuspensoView } from "@/components/admin/estabelecimento-suspenso-view";
 import { TemaUsuarioProvider } from "@/context/tema-context";
+import { isEmailSuperAdmin } from "@/lib/superadmin-auth";
 
 function AdminPageContent() {
   const { user, restaurante, role, carregando, logout } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTarget = searchParams.get("redirect");
+  const ehContaSuperAdmin = Boolean(
+    user && !user.isAnonymous && (role === "superadmin" || isEmailSuperAdmin(user.email))
+  );
 
-  // Se o usuário logou e havia um redirecionamento pendente (ex: /superadmin), encaminha automaticamente
+  // Encaminhamento automático: se havia ?redirect= válido ou se é SuperAdmin sem restaurante, vai direto para o painel adequado.
   useEffect(() => {
-    if (user && !user.isAnonymous && redirectTarget && redirectTarget.startsWith("/")) {
-      router.push(redirectTarget);
+    if (carregando || !user || user.isAnonymous) return;
+    if (redirectTarget && redirectTarget.startsWith("/")) {
+      router.replace(redirectTarget);
+      return;
     }
-  }, [user, redirectTarget, router]);
+    if (ehContaSuperAdmin && !restaurante) {
+      router.replace("/superadmin");
+    }
+  }, [carregando, user, redirectTarget, ehContaSuperAdmin, restaurante, router]);
 
   if (carregando) {
     return (
@@ -74,7 +83,7 @@ function AdminPageContent() {
     );
   }
 
-  // Guard de tenant ausente: impede operação fantasma com fallback "demo" (ex.: conta SuperAdmin ou sem loja vinculada)
+  // Guard de tenant ausente: SuperAdmin já está sendo encaminhado para /superadmin; contas comuns sem loja trocam de sessão.
   if (!restaurante) {
     return (
       <div className="min-h-screen bg-neutral-50 flex items-center justify-center p-4">
@@ -83,18 +92,18 @@ function AdminPageContent() {
             !
           </div>
           <h1 className="text-lg font-black text-neutral-900">
-            {role === "superadmin"
-              ? "Sessão SuperAdmin sem restaurante vinculado"
+            {ehContaSuperAdmin
+              ? "Redirecionando para o Painel SuperAdmin..."
               : "Nenhum restaurante vinculado a esta conta"}
           </h1>
           <p className="text-sm text-neutral-600 leading-relaxed">
             A conta conectada (<strong className="text-neutral-900">{user.email}</strong>) não possui um estabelecimento cadastrado. Para gerenciar cardápio, mesas e gerar QR Codes, entre com a conta do proprietário da loja.
           </p>
           <div className="flex flex-col gap-2 pt-1">
-            {role === "superadmin" && (
+            {ehContaSuperAdmin && (
               <button
                 type="button"
-                onClick={() => router.push("/superadmin")}
+                onClick={() => router.replace("/superadmin")}
                 className="w-full h-11 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white font-bold text-sm transition-colors"
               >
                 Ir para o Painel SuperAdmin
