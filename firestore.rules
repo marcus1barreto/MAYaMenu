@@ -220,7 +220,7 @@ service cloud.firestore {
       match /cardapio/{itemId} {
         allow read: if true;
         allow create: if isSuperAdmin() || (
-          isOwner(restauranteId)
+          (isOwner(restauranteId) || (isCozinha(restauranteId) && request.resource.data.ativo == false))
           && !itemId.matches('^spn-.*')
           && !('origemPatrocinadorId' in request.resource.data)
           && !('patrocinioId' in request.resource.data)
@@ -230,6 +230,10 @@ service cloud.firestore {
           && !('seloPatrocinador' in request.resource.data)
         );
         allow update: if isSuperAdmin() || (
+          isCozinha(restauranteId)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['ativo'])
+          && request.resource.data.ativo is bool
+        ) || (
           isOwner(restauranteId)
           && !itemId.matches('^spn-.*')
           && !('origemPatrocinadorId' in resource.data)
@@ -256,7 +260,8 @@ service cloud.firestore {
       // Fichas técnicas e receitas privadas do Chef (nunca expostas no cardápio público)
       match /fichas_tecnicas/{fichaId} {
         allow read: if isOwner(restauranteId) || isGarcom(restauranteId) || isCozinha(restauranteId) || isSuperAdmin();
-        allow create, update, delete: if isOwner(restauranteId) || isSuperAdmin();
+        allow create, update: if isOwner(restauranteId) || isCozinha(restauranteId) || isSuperAdmin();
+        allow delete: if isOwner(restauranteId) || isSuperAdmin();
       }
 
       // Fila Operacional da Cozinha (KDS Tickets Isolados)

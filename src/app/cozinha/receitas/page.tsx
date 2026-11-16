@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { AuthProvider, useAuth } from "@/context/auth-context";
 import { AdminLoginForm } from "@/components/admin/admin-login-form";
 import { EstabelecimentoSuspensoView } from "@/components/admin/estabelecimento-suspenso-view";
@@ -9,7 +9,6 @@ import { ReceitasChefView } from "@/components/cozinha/receitas-chef-view";
 import { PinLockGuard } from "@/components/salao/pin-lock-guard";
 import { Button } from "@/components/ui/button";
 import { TemaUsuarioProvider } from "@/context/tema-context";
-import { moduloAtivo } from "@/lib/modules";
 
 function ReceitasChefPageContent() {
   const { user, restaurante, role, carregando } = useAuth();
@@ -23,7 +22,7 @@ function ReceitasChefPageContent() {
             C
           </div>
           <div className="text-xs font-bold tracking-wider uppercase text-neutral-400">
-            Carregando Fichas do Chef...
+            Carregando Espaço do Chef...
           </div>
         </div>
       </div>
@@ -50,21 +49,22 @@ function ReceitasChefPageContent() {
     return <EstabelecimentoSuspensoView restaurante={restaurante} />;
   }
 
+  const isGestor = Boolean(role === "owner" || role === "superadmin");
+
   const livroElement = (
     <ReceitasChefView
       restauranteId={restaurante?.id || ""}
       nomeRestaurante={restaurante?.nome || "MAYaMenu"}
+      isGestor={isGestor}
     />
   );
 
-  const permitirProprietarioDireto =
-    !moduloAtivo("mod.garcom_salao") &&
-    Boolean(
-      user &&
-        !user.isAnonymous &&
-        (role === "owner" || role === "superadmin") &&
-        restaurante
-    );
+  const permitirProprietarioDireto = Boolean(
+    user &&
+      !user.isAnonymous &&
+      (role === "owner" || role === "superadmin") &&
+      restaurante
+  );
 
   return (
     <TemaUsuarioProvider scope="cozinha" fallbackTemaRestaurante={restaurante?.configuracoes?.tema}>
@@ -86,9 +86,11 @@ function ReceitasChefPageContent() {
 export default function CozinhaReceitasPage() {
   return (
     <AuthProvider>
-      <QrAcessoSetorGate setor="cozinha">
-        <ReceitasChefPageContent />
-      </QrAcessoSetorGate>
+      <Suspense fallback={null}>
+        <QrAcessoSetorGate setor="cozinha">
+          <ReceitasChefPageContent />
+        </QrAcessoSetorGate>
+      </Suspense>
     </AuthProvider>
   );
 }

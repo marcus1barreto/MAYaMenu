@@ -34,6 +34,7 @@ import { AdminQrScannerModal } from "./admin-qr-scanner-modal";
 import { ModificadorBuilder } from "./modificador-builder";
 import { GestaoEquipe } from "./gestao-equipe";
 import { SetupMesas } from "./setup-mesas";
+import { OnboardingTourCard } from "./onboarding-tour-card";
 import { FichaTecnicaEditorModal } from "@/components/cozinha/ficha-tecnica-modal";
 import { escutarFichasTecnicas } from "@/lib/fichas-tecnicas-service";
 import { MAYA_MEDIA_LIBRARY } from "@/lib/maya-media-library";
@@ -93,6 +94,7 @@ import {
   Printer,
   SlidersHorizontal,
   Activity,
+  HelpCircle,
 } from "lucide-react";
 import confetti from "canvas-confetti";
 import Link from "next/link";
@@ -182,6 +184,7 @@ export function AdminDashboard({
   const [avisoCheckout, setAvisoCheckout] = useState<{ tipo: "sucesso" | "erro" | "info"; msg: string } | null>(null);
   const [itensCardapio, setItensCardapio] = useState<MenuItem[]>([]);
   const [carregandoCardapio, setCarregandoCardapio] = useState(true);
+  const [tourForcadoAberto, setTourForcadoAberto] = useState(false);
   const [fichasPorItem, setFichasPorItem] = useState<Record<string, FichaTecnicaItem>>({});
   const [itemEditandoFicha, setItemEditandoFicha] = useState<MenuItem | null>(null);
   const [modoOperacao, setModoOperacao] = useState<"com_garcom" | "hibrido" | "balcao">(
@@ -1274,6 +1277,17 @@ export function AdminDashboard({
                   <ExternalLink className="w-3 h-3 opacity-60" />
                 </Button>
               </Link>
+
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setTourForcadoAberto((v) => !v)}
+                className="text-muted-foreground hover:text-foreground hover:bg-muted rounded-xl text-xs h-9 px-2.5 flex items-center gap-1"
+                title="Abrir Guia Rápido (Tour de 4 passos)"
+              >
+                <HelpCircle className="w-3.5 h-3.5" />
+                <span className="hidden xl:inline">Guia</span>
+              </Button>
             </>
           )}
 
@@ -1540,13 +1554,43 @@ export function AdminDashboard({
                 <p className="text-xs font-bold text-neutral-400">Carregando cardápio...</p>
               </div>
             ) : itensCardapio.length === 0 ? (
-              /* GUIDED EMPTY STATE: ONBOARDING DO 1º PRATO */
-              <GuidedEmptyCardapio
-                restauranteId={restaurante?.id || "demo"}
-                onItemCriado={() => {
-                  // O listener em tempo real já sincroniza o novo prato
-                }}
-              />
+              /* GUIDED EMPTY STATE: CONVITE AO ESPAÇO DO CHEF OU WIZARD LOCAL */
+              <div className="space-y-4">
+                <div className="rounded-2xl border border-amber-500/35 bg-amber-500/10 p-4 flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <ChefHat className="w-5 h-5 text-amber-600 shrink-0" />
+                    <div>
+                      <p className="text-xs font-black text-foreground">
+                        Prefere criar os pratos junto com a Cozinha e já salvar a Ficha Técnica?
+                      </p>
+                      <p className="text-[11px] text-muted-foreground">
+                        O Admin entra direto no Espaço do Chef (`/cozinha/receitas`) sem precisar digitar PIN.
+                      </p>
+                    </div>
+                  </div>
+                  <Link
+                    href={
+                      restaurante?.id
+                        ? `/cozinha/receitas?r=${encodeURIComponent(restaurante.id)}`
+                        : "/cozinha/receitas"
+                    }
+                  >
+                    <Button
+                      type="button"
+                      className="h-9 px-4 rounded-xl bg-amber-500 hover:bg-amber-400 text-neutral-950 font-black text-xs"
+                    >
+                      Criar 1º Item no Espaço do Chef
+                    </Button>
+                  </Link>
+                </div>
+
+                <GuidedEmptyCardapio
+                  restauranteId={restaurante?.id || "demo"}
+                  onItemCriado={() => {
+                    // O listener em tempo real já sincroniza o novo prato
+                  }}
+                />
+              </div>
             ) : (
               <div className="space-y-6">
                 <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1779,6 +1823,16 @@ export function AdminDashboard({
         {/* ABA OPERACIONAL: SALÃO AO VIVO (MONITOR DE MESAS) */}
         {abaAtiva === "monitor" && (
           <div className="space-y-5">
+            {!carregandoCardapio && restaurante?.id && (
+              <OnboardingTourCard
+                restauranteId={restaurante.id}
+                nomeRestaurante={restaurante.nome || "Seu Restaurante"}
+                totalItensMenu={itensCardapio.length}
+                forcarAberto={tourForcadoAberto}
+                onFecharTour={() => setTourForcadoAberto(false)}
+              />
+            )}
+
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
                 <div className="flex items-center gap-2">
