@@ -5,6 +5,15 @@ import type { Timestamp } from "firebase/firestore";
 
 export type ModoOperacao = 'com_garcom' | 'hibrido' | 'balcao';
 export type ModoFilaKds = 'sequencial' | 'agrupamento';
+export type SetorQrAcesso = 'cozinha' | 'garcom' | 'admin';
+
+export interface AcessoSetorStatus {
+  ativo?: boolean;
+  versao?: number;
+  atualizadoEm?: string;
+  revogadoEm?: string;
+  atualizadoPor?: string;
+}
 
 export interface Restaurante {
   id: string;
@@ -20,6 +29,7 @@ export interface Restaurante {
   termsVersion?: string; // Versão dos termos aceitos (Ex: "1.0.0")
   suspenso?: boolean;
   licenca?: Partial<Licenca>;
+  acessosSetores?: Partial<Record<SetorQrAcesso, AcessoSetorStatus>>;
   patrocinio?: {
     ativo: boolean;
     patrocinadorId: string;

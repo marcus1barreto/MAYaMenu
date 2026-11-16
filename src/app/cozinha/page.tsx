@@ -1,5 +1,7 @@
 "use client";
 
+import { QrAcessoSetorGate } from "@/components/auth/qr-acesso-setor-gate";
+
 import { useState } from "react";
 import { AuthProvider, useAuth } from "@/context/auth-context";
 import { KdsView } from "@/components/admin/kds-view";
@@ -65,7 +67,13 @@ function CozinhaPageContent() {
 
   const permitirProprietarioDireto =
     !moduloAtivo("mod.garcom_salao") &&
-    Boolean(user && !user.isAnonymous && !user.uid.startsWith("pin_") && restaurante);
+    Boolean(
+      user &&
+        !user.isAnonymous &&
+        !user.uid.startsWith("pin_") &&
+        !user.uid.startsWith("qr_setor_") &&
+        restaurante
+    );
 
   return (
     <TemaUsuarioProvider scope="cozinha" fallbackTemaRestaurante={restaurante?.configuracoes?.tema}>
@@ -87,7 +95,9 @@ function CozinhaPageContent() {
 export default function CozinhaPage() {
   return (
     <AuthProvider>
-      <CozinhaPageContent />
+      <QrAcessoSetorGate setor="cozinha">
+        <CozinhaPageContent />
+      </QrAcessoSetorGate>
     </AuthProvider>
   );
 }

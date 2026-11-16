@@ -5,6 +5,7 @@ import Link from "next/link";
 import { db, functions } from "@/lib/firebase";
 import { collection, onSnapshot, query, doc, updateDoc } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
+import { QrAcessoSetoresCard } from "./qr-acesso-setores-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -556,50 +557,65 @@ export function GestaoEquipe({ restauranteId, nomeRestaurante = "MAYaMenu" }: Ge
         </form>
       </div>
 
+      {/* QRS DE ACESSO RÁPIDO POR SETOR */}
+      <QrAcessoSetoresCard
+        restauranteId={restauranteId}
+        nomeRestaurante={nomeRestaurante}
+      />
+
       {/* LISTA DE MEMBROS E EMISSÃO DE CRACHÁS */}
-      <div className="bg-card border border-border rounded-2xl p-5 shadow-xs">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-xs font-black uppercase text-muted-foreground tracking-wider">
-            Colaboradores Ativos ({equipe.length})
-          </h3>
+      {(() => {
+        const equipeHumana = equipe.filter(
+          (m) =>
+            (m as { tipo?: string; ocultoListaPin?: boolean }).tipo !== "qr_setor" &&
+            (m as { tipo?: string; ocultoListaPin?: boolean }).ocultoListaPin !== true &&
+            !String(m.id || "").startsWith("qr_setor_")
+        );
 
-          {equipe.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setMostrarPinsGlobais(!mostrarPinsGlobais)}
-              className="text-xs text-muted-foreground hover:text-foreground font-semibold flex items-center gap-1.5 transition-colors"
-            >
-              {mostrarPinsGlobais ? (
-                <>
-                  <EyeOff className="w-3.5 h-3.5" />
-                  <span>Ocultar Todos os PINs</span>
-                </>
-              ) : (
-                <>
-                  <Eye className="w-3.5 h-3.5" />
-                  <span>Ver Todos os PINs</span>
-                </>
+        return (
+          <div className="bg-card border border-border rounded-2xl p-5 shadow-xs">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xs font-black uppercase text-muted-foreground tracking-wider">
+                Colaboradores Ativos ({equipeHumana.length})
+              </h3>
+
+              {equipeHumana.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setMostrarPinsGlobais(!mostrarPinsGlobais)}
+                  className="text-xs text-muted-foreground hover:text-foreground font-semibold flex items-center gap-1.5 transition-colors"
+                >
+                  {mostrarPinsGlobais ? (
+                    <>
+                      <EyeOff className="w-3.5 h-3.5" />
+                      <span>Ocultar Todos os PINs</span>
+                    </>
+                  ) : (
+                    <>
+                      <Eye className="w-3.5 h-3.5" />
+                      <span>Ver Todos os PINs</span>
+                    </>
+                  )}
+                </button>
               )}
-            </button>
-          )}
-        </div>
+            </div>
 
-        {carregando ? (
-          <div className="py-12 flex flex-col items-center justify-center space-y-2">
-            <Loader2 className="w-6 h-6 text-rose-500 animate-spin" />
-            <p className="text-xs font-bold text-muted-foreground">Carregando colaboradores...</p>
-          </div>
-        ) : equipe.length === 0 ? (
-          <div className="py-10 text-center border-2 border-dashed border-border rounded-xl">
-            <Users className="w-8 h-8 mx-auto text-muted-foreground/40 mb-2" />
-            <p className="text-xs font-bold text-muted-foreground">Nenhum colaborador cadastrado ainda.</p>
-            <p className="text-[11px] text-muted-foreground/70 mt-0.5">
-              Cadastre seus garçons e cozinheiros com nome e PIN para liberar o terminal do salão.
-            </p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {equipe.map((membro) => {
+            {carregando ? (
+              <div className="py-12 flex flex-col items-center justify-center space-y-2">
+                <Loader2 className="w-6 h-6 text-rose-500 animate-spin" />
+                <p className="text-xs font-bold text-muted-foreground">Carregando colaboradores...</p>
+              </div>
+            ) : equipeHumana.length === 0 ? (
+              <div className="py-10 text-center border-2 border-dashed border-border rounded-xl">
+                <Users className="w-8 h-8 mx-auto text-muted-foreground/40 mb-2" />
+                <p className="text-xs font-bold text-muted-foreground">Nenhum colaborador cadastrado ainda.</p>
+                <p className="text-[11px] text-muted-foreground/70 mt-0.5">
+                  Use os QRs de setor acima para acesso rápido ou cadastre colaboradores individuais com PIN.
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {equipeHumana.map((membro) => {
               const isGarcom = membro.role === "garcom";
               const pinConfigurado = Boolean(membro.pinHash || membro.pin);
               const pinVisivel = Boolean(membro.pin) && (mostrarPinsGlobais || pinsVisiveisIndividuais[membro.id]);
@@ -701,11 +717,13 @@ export function GestaoEquipe({ restauranteId, nomeRestaurante = "MAYaMenu" }: Ge
                     </Button>
                   </div>
                 </div>
-              );
-            })}
+                  );
+                })}
+              </div>
+            )}
           </div>
-        )}
-      </div>
+        );
+      })()}
 
       {/* MODAL DE ALTERAÇÃO RÁPIDA DE PIN */}
       <Dialog

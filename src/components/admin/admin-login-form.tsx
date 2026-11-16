@@ -518,6 +518,9 @@ export function AdminLoginForm({ onLogado }: { onLogado?: () => void }) {
 
         {/* RODAPÉ COM LINK PARA MANUAL E POLÍTICAS LEGAIS */}
         <div className="relative mt-6 pt-5 border-t border-neutral-100 flex flex-col gap-2 text-xs text-neutral-500">
+          <p className="text-[11px] text-neutral-400 text-center pb-1">
+            Ou aponte a câmera para o <strong>QR Administrativo opcional</strong> (quando ativado pelo proprietário em Equipe &amp; Chef).
+          </p>
           <div className="flex items-center justify-between">
             <span>Precisa de ajuda?</span>
             <a

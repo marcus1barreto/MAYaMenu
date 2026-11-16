@@ -1,5 +1,7 @@
 "use client";
 
+import { QrAcessoSetorGate } from "@/components/auth/qr-acesso-setor-gate";
+
 import { useState } from "react";
 import Link from "next/link";
 import { moduloAtivo } from "@/lib/modules";
@@ -105,7 +107,9 @@ function GarcomPageContent() {
 export default function GarcomPage() {
   return (
     <AuthProvider>
-      <GarcomPageContent />
+      <QrAcessoSetorGate setor="garcom" habilitado={moduloAtivo("mod.garcom_salao")}>
+        <GarcomPageContent />
+      </QrAcessoSetorGate>
     </AuthProvider>
   );
 }

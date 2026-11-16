@@ -322,6 +322,8 @@ function validarMembroEquipeParaLogin(membroData, membroDocId) {
     membroData
     && membroData.ativo === true
     && membroData.uid === membroDocId
+    && membroData.tipo !== 'qr_setor'
+    && membroData.ocultoListaPin !== true
     && ['garcom', 'cozinha'].includes(membroData.role)
   );
 }
@@ -541,6 +543,7 @@ exports.listarEquipePublica = functions.https.onCall(async (data, context) => {
   snap.forEach((d) => {
     const m = d.data() || {};
     if (m.ativo !== true || !['garcom', 'cozinha'].includes(m.role) || m.uid !== d.id) return;
+    if (m.tipo === 'qr_setor' || m.ocultoListaPin === true || String(d.id).startsWith('qr_setor_')) return;
     membros.push({
       id: d.id,
       uid: m.uid || d.id,
@@ -552,6 +555,288 @@ exports.listarEquipePublica = functions.https.onCall(async (data, context) => {
 
   membros.sort((a, b) => a.nome.localeCompare(b.nome));
   return { membros };
+});
+
+const SETORES_QR_ACESSO = ['cozinha', 'garcom', 'admin'];
+
+function buildQrSetorStaffDocId(setor, restDocId) {
+  return `qr_setor_${setor}_${restDocId}`.slice(0, 128);
+}
+
+async function resolveRestauranteDocPorIdOuSlug(firestoreDb, restauranteId) {
+  let restDoc = await firestoreDb.collection('restaurantes').doc(restauranteId).get();
+  if (!restDoc.exists) {
+    const q = await firestoreDb.collection('restaurantes').where('slug', '==', restauranteId).limit(1).get();
+    if (!q.empty) restDoc = q.docs[0];
+  }
+  return restDoc;
+}
+
+/**
+ * Gerencia emissão, rotação e revogação dos QR Codes de acesso rápido por setor
+ * (`cozinha`, `garcom`, `admin`). Armazena exclusivamente hash SHA-256 no banco.
+ */
+async function executarGerenciarQrAcessoSetor(firestoreDb, authUid, authToken, payload, authApi = null) {
+  if (!authUid) {
+    throw new functions.https.HttpsError('unauthenticated', 'Autenticação necessária.');
+  }
+
+  const { restauranteId, setor, acao } = payload || {};
+  if (typeof restauranteId !== 'string' || !restauranteId.trim() || restauranteId.length > 128 ||
+      !SETORES_QR_ACESSO.includes(setor) ||
+      !['emitir', 'rotacionar', 'revogar'].includes(acao)) {
+    throw new functions.https.HttpsError(
+      'invalid-argument',
+      'Parâmetros inválidos. Informe restauranteId, setor (cozinha, garcom, admin) e acao (emitir, rotacionar, revogar).'
+    );
+  }
+
+  const restDoc = await resolveRestauranteDocPorIdOuSlug(firestoreDb, restauranteId.trim());
+  if (!restDoc.exists) {
+    throw new functions.https.HttpsError('not-found', 'Estabelecimento não encontrado.');
+  }
+
+  const restDataInicial = restDoc.data() || {};
+  const isSuperadmin = authToken?.superadmin === true;
+  const isOwner = restDataInicial.ownerId === authUid;
+  if (!isOwner && !isSuperadmin) {
+    throw new functions.https.HttpsError(
+      'permission-denied',
+      'Apenas o proprietário do estabelecimento pode gerenciar os QR codes de setor.'
+    );
+  }
+
+  const tokenGerado = acao === 'revogar' ? null : crypto.randomBytes(24).toString('hex');
+  const agoraIso = new Date().toISOString();
+  const staffDocId = setor === 'admin' ? null : buildQrSetorStaffDocId(setor, restDoc.id);
+  let novaVersao = 1;
+  let slugAtual = restDataInicial.slug || restDoc.id;
+
+  await firestoreDb.runTransaction(async (t) => {
+    const snap = await t.get(restDoc.ref);
+    if (!snap.exists) {
+      throw new functions.https.HttpsError('not-found', 'Estabelecimento não encontrado.');
+    }
+    const rData = snap.data() || {};
+    slugAtual = rData.slug || restDoc.id;
+
+    const acessosAtuais = (rData.acessosSetores && typeof rData.acessosSetores === 'object')
+      ? rData.acessosSetores
+      : {};
+    const setorAtual = (acessosAtuais[setor] && typeof acessosAtuais[setor] === 'object')
+      ? acessosAtuais[setor]
+      : {};
+    const versaoAnterior = Number.isFinite(Number(setorAtual.versao)) ? Number(setorAtual.versao) : 0;
+    novaVersao = versaoAnterior + 1;
+
+    const setorPayload = acao === 'revogar'
+      ? {
+          ativo: false,
+          versao: novaVersao,
+          atualizadoEm: agoraIso,
+          revogadoEm: agoraIso,
+          atualizadoPor: authUid,
+        }
+      : {
+          ativo: true,
+          hash: hashQrCredencial(tokenGerado),
+          versao: novaVersao,
+          atualizadoEm: agoraIso,
+          atualizadoPor: authUid,
+        };
+
+    t.set(
+      restDoc.ref,
+      {
+        acessosSetores: {
+          ...acessosAtuais,
+          [setor]: setorPayload,
+        },
+      },
+      { merge: true }
+    );
+
+    if (staffDocId) {
+      const staffRef = restDoc.ref.collection('equipe').doc(staffDocId);
+      t.set(
+        staffRef,
+        {
+          uid: staffDocId,
+          role: setor,
+          nome: setor === 'cozinha' ? 'Acesso QR Cozinha' : 'Acesso QR Salão',
+          ativo: acao !== 'revogar',
+          tipo: 'qr_setor',
+          ocultoListaPin: true,
+          versaoSetor: novaVersao,
+          atualizadoEm: agoraIso,
+        },
+        { merge: true }
+      );
+    }
+  });
+
+  if (staffDocId && (acao === 'revogar' || acao === 'rotacionar')) {
+    const firebaseAuth = authApi || admin.auth();
+    if (firebaseAuth && typeof firebaseAuth.revokeRefreshTokens === 'function') {
+      await firebaseAuth.revokeRefreshTokens(staffDocId).catch(() => {});
+    }
+  }
+
+  const resposta = {
+    sucesso: true,
+    acao,
+    setor,
+    ativo: acao !== 'revogar',
+    versao: novaVersao,
+    restauranteId: restDoc.id,
+    slug: slugAtual,
+  };
+  if (tokenGerado) {
+    resposta.token = tokenGerado;
+  }
+  return resposta;
+}
+
+exports.gerenciarQrAcessoSetor = functions.https.onCall(async (data, context) => {
+  return executarGerenciarQrAcessoSetor(getDb(), context.auth?.uid, context.auth?.token, data);
+});
+
+/**
+ * Autentica um dispositivo via QR Code de setor (`cozinha`, `garcom`, `admin`).
+ * Protegido com rate limiting atômico de 3 camadas e comparação de hash em tempo constante.
+ */
+async function executarLoginComQrSetor(firestoreDb, data, rawRequest, authApi = null) {
+  const { restauranteId, setor, token } = data || {};
+  const tokenLimpo = typeof token === 'string' ? token.trim() : '';
+
+  if (typeof restauranteId !== 'string' || !restauranteId.trim() || restauranteId.length > 128 ||
+      !SETORES_QR_ACESSO.includes(setor) ||
+      !tokenLimpo || tokenLimpo.length < 16 || tokenLimpo.length > 256) {
+    throw new functions.https.HttpsError(
+      'invalid-argument',
+      'QR Code de setor inválido ou malformado.'
+    );
+  }
+
+  const restDoc = await resolveRestauranteDocPorIdOuSlug(firestoreDb, restauranteId.trim());
+  if (!restDoc.exists) {
+    throw new functions.https.HttpsError('not-found', 'Estabelecimento não encontrado.');
+  }
+
+  const realRestauranteId = restDoc.id;
+  const restData = restDoc.data() || {};
+  const agora = Date.now();
+  const clientIp = extrairIpConviavel(rawRequest);
+  const ipKey = sanitizarChave(clientIp);
+
+  const ipRateLimitRef = restDoc.ref.collection('_pin_rate_limits').doc(`ip_qr_${ipKey}`);
+  const userRateLimitRef = restDoc.ref.collection('_pin_rate_limits').doc(`setor_qr_${sanitizarChave(setor)}`);
+  const globalRestRateLimitRef = restDoc.ref.collection('_pin_rate_limits').doc('tenant_global');
+
+  await firestoreDb.runTransaction(async (t) => {
+    const [ipDoc, userDoc, globalDoc] = await Promise.all([
+      t.get(ipRateLimitRef), t.get(userRateLimitRef), t.get(globalRestRateLimitRef),
+    ]);
+    const bloqueio = verificarBloqueioAtivo({
+      ipData: ipDoc.exists ? ipDoc.data() : null,
+      userData: userDoc.exists ? userDoc.data() : null,
+      globalData: globalDoc.exists ? globalDoc.data() : null,
+      agora,
+    });
+    if (bloqueio.bloqueado) {
+      throw new functions.https.HttpsError('resource-exhausted', bloqueio.mensagem);
+    }
+  });
+
+  const setorCfg = (restData.acessosSetores && typeof restData.acessosSetores === 'object')
+    ? restData.acessosSetores[setor]
+    : null;
+  const hashRecebido = hashQrCredencial(tokenLimpo);
+  let credencialValida = Boolean(
+    setorCfg
+    && setorCfg.ativo === true
+    && typeof setorCfg.hash === 'string'
+    && compararSegredoConstante(hashRecebido, setorCfg.hash)
+  );
+
+  let targetUid = null;
+  const targetRole = setor === 'admin' ? 'owner' : setor;
+
+  if (credencialValida) {
+    if (setor === 'admin') {
+      if (typeof restData.ownerId === 'string' && restData.ownerId.trim().length > 0) {
+        targetUid = String(restData.ownerId);
+      } else {
+        credencialValida = false;
+      }
+    } else {
+      const staffDocId = buildQrSetorStaffDocId(setor, realRestauranteId);
+      const staffSnap = await restDoc.ref.collection('equipe').doc(staffDocId).get();
+      const sData = staffSnap.exists ? (staffSnap.data() || {}) : {};
+      if (staffSnap.exists && sData.ativo === true && sData.role === setor && sData.tipo === 'qr_setor') {
+        targetUid = staffDocId;
+      } else {
+        credencialValida = false;
+      }
+    }
+  }
+
+  await firestoreDb.runTransaction(async (t) => {
+    const [curIpDoc, curUserDoc, curGlobalDoc] = await Promise.all([
+      t.get(ipRateLimitRef), t.get(userRateLimitRef), t.get(globalRestRateLimitRef),
+    ]);
+    const curIpData = curIpDoc.exists ? curIpDoc.data() : null;
+    const curUserData = curUserDoc.exists ? curUserDoc.data() : null;
+    const curGlobalData = curGlobalDoc.exists ? curGlobalDoc.data() : null;
+    const bloqueioTransacional = verificarBloqueioAtivo({
+      ipData: curIpData, userData: curUserData, globalData: curGlobalData, agora,
+    });
+    if (bloqueioTransacional.bloqueado) {
+      throw new functions.https.HttpsError('resource-exhausted', bloqueioTransacional.mensagem);
+    }
+
+    if (!credencialValida) {
+      const { ipPayload, userPayload, globalPayload } = calcularPayloadsFalha({
+        curIpData: curIpData || {},
+        curUserData: curUserData || {},
+        curGlobalData: curGlobalData || {},
+        agora,
+      });
+      t.set(ipRateLimitRef, ipPayload, { merge: true });
+      t.set(userRateLimitRef, userPayload, { merge: true });
+      t.set(globalRestRateLimitRef, globalPayload, { merge: true });
+    } else {
+      t.delete(ipRateLimitRef);
+      t.delete(userRateLimitRef);
+    }
+  });
+
+  if (!credencialValida || !targetUid) {
+    throw new functions.https.HttpsError(
+      'permission-denied',
+      'QR Code de acesso inválido, expirado ou desativado pelo estabelecimento.'
+    );
+  }
+
+  const firebaseAuth = authApi || admin.auth();
+  const customToken = await firebaseAuth.createCustomToken(targetUid, {
+    role: targetRole,
+    restauranteId: realRestauranteId,
+    acessoQrSetor: setor,
+  });
+
+  return {
+    sucesso: true,
+    token: customToken,
+    restauranteId: realRestauranteId,
+    slug: restData.slug || realRestauranteId,
+    setor,
+    role: targetRole,
+  };
+}
+
+exports.loginComQrSetor = functions.https.onCall(async (data, context) => {
+  return executarLoginComQrSetor(getDb(), data, context.rawRequest);
 });
 
 /**
@@ -4586,6 +4871,8 @@ exports._internal = {
   validarLimiteMesaLicenciado,
   validarMembroEquipeParaLogin,
   executarLoginComPin,
+  executarGerenciarQrAcessoSetor,
+  executarLoginComQrSetor,
   getMesaTokenSecret,
   verificarMesaToken,
   validarModificadoresServidor,

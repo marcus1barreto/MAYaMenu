@@ -4,6 +4,7 @@ import { Suspense, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AuthProvider, useAuth } from "@/context/auth-context";
 import { AdminLoginForm } from "@/components/admin/admin-login-form";
+import { QrAcessoSetorGate } from "@/components/auth/qr-acesso-setor-gate";
 import { AdminDashboard } from "@/components/admin/admin-dashboard";
 import { EstabelecimentoSuspensoView } from "@/components/admin/estabelecimento-suspenso-view";
 import { TemaUsuarioProvider } from "@/context/tema-context";
@@ -58,7 +59,7 @@ function AdminPageContent() {
   }
 
   // Se o usuário estiver logado com PIN de colaborador (/garcom ou /cozinha), orienta troca limpa de sessão
-  if (user.uid.startsWith("pin_")) {
+  if (user.uid.startsWith("pin_") || user.uid.startsWith("qr_setor_")) {
     return (
       <div className="min-h-screen bg-neutral-50 flex items-center justify-center p-4">
         <div className="w-full max-w-md rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm space-y-4 text-center">
@@ -149,7 +150,9 @@ export default function AdminPage() {
           </div>
         </div>
       }>
-        <AdminPageContent />
+        <QrAcessoSetorGate setor="admin">
+          <AdminPageContent />
+        </QrAcessoSetorGate>
       </Suspense>
     </AuthProvider>
   );
