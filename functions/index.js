@@ -943,13 +943,24 @@ async function executarEnviarContatoEspecialista(
   const ntfyUrl = String(process.env.NTFY_CONTATO_URL || '').trim();
   const httpFetch = fetchFn || (typeof fetch === 'function' ? fetch : null);
   if (httpFetch && /^https?:\/\//i.test(ntfyUrl)) {
+    const appBaseUrl = String(process.env.MAYAMENU_APP_URL || 'https://mayamenu.com.br')
+      .trim()
+      .replace(/\/+$/, '');
+    const safeTitle =
+      `MAYaMenu: ${assunto} (${nome})`
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^\x20-\x7E]/g, '')
+        .trim()
+        .slice(0, 100) || 'MAYaMenu: Novo chamado';
     try {
       await httpFetch(ntfyUrl, {
         method: 'POST',
         headers: {
-          Title: `MAYaMenu: ${assunto} (${nome})`.slice(0, 100),
+          Title: safeTitle,
           Priority: 'default',
           Tags: 'speech_balloon',
+          Click: `${appBaseUrl}/superadmin`,
         },
         body: `${nome} <${email}>${restauranteNome ? ` [${restauranteNome}]` : ''}\n${mensagem}`,
         ...(typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function'

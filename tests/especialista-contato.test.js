@@ -150,6 +150,45 @@ async function runTests() {
     assert.strictEqual(saved.authUid, "uid_carlos");
   });
 
+  await test("Notificação ntfy sanitiza Title ASCII para emojis/acentos e inclui link Click", async () => {
+    const db = createFakeDb();
+    const req = { headers: { "x-forwarded-for": "187.10.20.4" } };
+    process.env.NTFY_CONTATO_URL = "https://ntfy.sh/mayamenu-teste-ok";
+    process.env.MAYAMENU_APP_URL = "https://mayamenu.com.br/";
+
+    let capturedUrl = null;
+    let capturedOpts = null;
+    const okFetch = async (url, opts) => {
+      capturedUrl = url;
+      capturedOpts = opts;
+      return { ok: true };
+    };
+
+    try {
+      const res = await executarEnviarContatoEspecialista(
+        db,
+        {
+          nome: "João Café 😀",
+          email: "joao@cafe.com.br",
+          assunto: "duvida_planos",
+          mensagem: "Quero saber como liberar mais mesas no sistema.",
+          restauranteNome: "Café Central",
+        },
+        req,
+        null,
+        okFetch
+      );
+      assert.strictEqual(res.sucesso, true);
+      assert.strictEqual(capturedUrl, "https://ntfy.sh/mayamenu-teste-ok");
+      assert.strictEqual(capturedOpts.headers.Click, "https://mayamenu.com.br/superadmin");
+      assert.ok(/^[\x20-\x7E]+$/.test(capturedOpts.headers.Title));
+      assert.ok(capturedOpts.headers.Title.includes("Joao Cafe"));
+    } finally {
+      delete process.env.NTFY_CONTATO_URL;
+      delete process.env.MAYAMENU_APP_URL;
+    }
+  });
+
   await test("Rate limiting: bloqueia após 4 envios seguidos do mesmo IP", async () => {
     const db = createFakeDb();
     const req = { headers: { "x-forwarded-for": "187.10.20.99" } };
