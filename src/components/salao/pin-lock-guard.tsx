@@ -146,6 +146,14 @@ export function PinLockGuard({ role, restauranteId, slug, children }: PinLockGua
         const list: ColaboradorItem[] = [];
         snap.forEach((d) => {
           const m = d.data();
+          if (
+            m.ativo === false ||
+            m.tipo === "qr_setor" ||
+            m.ocultoListaPin === true ||
+            d.id.startsWith("qr_setor_")
+          ) {
+            return;
+          }
           list.push({
             id: d.id,
             uid: m.uid || d.id,

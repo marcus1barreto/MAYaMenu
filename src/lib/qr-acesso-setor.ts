@@ -152,17 +152,11 @@ export async function autenticarComQrSetor(
     await cred.user.getIdToken(true);
 
     if (setor === "cozinha" || setor === "garcom") {
+      // Acesso nominal obrigatório: o QR de setor autentica apenas o vínculo com o restaurante
+      // e limpa qualquer desbloqueio prévio para exigir seleção do colaborador e PIN pessoal.
       try {
-        sessionStorage.setItem(`mayamenu_pin_unlocked_${setor}_${data.restauranteId}`, "true");
-        sessionStorage.setItem(
-          `mayamenu_colaborador_${setor}_${data.restauranteId}`,
-          JSON.stringify({
-            uid: cred.user.uid,
-            nome: setor === "cozinha" ? "Equipe Cozinha (QR)" : "Equipe Salão (QR)",
-            role: setor,
-            fotoUrl: null,
-          })
-        );
+        sessionStorage.removeItem(`mayamenu_pin_unlocked_${setor}_${data.restauranteId}`);
+        sessionStorage.removeItem(`mayamenu_colaborador_${setor}_${data.restauranteId}`);
       } catch {
         // Ignora falha de storage
       }

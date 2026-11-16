@@ -70,8 +70,7 @@ function CozinhaPageContent() {
     Boolean(
       user &&
         !user.isAnonymous &&
-        !user.uid.startsWith("pin_") &&
-        !user.uid.startsWith("qr_setor_") &&
+        (role === "owner" || role === "superadmin") &&
         restaurante
     );
 

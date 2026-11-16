@@ -67,16 +67,16 @@ const META_SETORES: Array<{
   {
     setor: "cozinha",
     titulo: "QR Cozinha (KDS)",
-    subtitulo: "Módulo Chef • Liberado no Free",
+    subtitulo: "Módulo Chef • Free + PIN nominal",
     observacao:
-      "Cole na parede da cozinha ou abra no tablet da expedição para login direto no KDS sem usar a senha do dono.",
+      "Cole na cozinha para os colaboradores abrirem o KDS pelo celular ou tablet, escolherem o próprio nome e digitarem o PIN individual.",
   },
   {
     setor: "garcom",
     titulo: "QR Salão / Garçom",
-    subtitulo: "Disponível na versão Pro",
+    subtitulo: "Disponível na versão Pro • PIN nominal",
     observacao:
-      "Acesso rápido do salão para lançar pedidos e acompanhar mesas diretamente pelo celular.",
+      "Direciona o garçom para a seleção nominal com PIN para lançar pedidos e acompanhar mesas diretamente pelo celular.",
   },
   {
     setor: "admin",
@@ -209,7 +209,7 @@ export function QrAcessoSetoresCard({
     const avisoRodape =
       setor === "admin"
         ? "RESTRITO AO CAIXA / GERÊNCIA — Nunca deixe este QR visível ao público."
-        : "Aponte a câmera do tablet ou celular para abrir direto o terminal deste setor.";
+        : "Aponte a câmera do tablet ou celular para abrir este setor, escolha seu nome e digite seu PIN individual.";
 
     const janela = window.open("", "_blank", "width=480,height=640");
     if (!janela) return;
@@ -519,7 +519,7 @@ export function QrAcessoSetoresCard({
                 <p className="text-[11px] font-semibold text-neutral-600 leading-relaxed">
                   {modalQr.setor === "admin"
                     ? "Uso exclusivo do caixa ou gerência. Caso alguém não autorizado fotografe este QR, clique em Regenerar ou Desativar."
-                    : "Aponte a câmera do celular ou tablet do setor para entrar direto no sistema. Regenerar invalida este código imediatamente."}
+                    : "Aponte a câmera do celular ou tablet do setor para abrir a lista nominal e digitar seu PIN pessoal. Regenerar invalida este código imediatamente."}
                 </p>
               </div>
 

@@ -15,12 +15,12 @@ interface QrAcessoSetorGateProps {
 
 const LABELS_SETOR: Record<SetorQrAcesso, { titulo: string; subtitulo: string }> = {
   cozinha: {
-    titulo: "Conectando KDS da Cozinha...",
-    subtitulo: "Validando QR de acesso rápido do Módulo Chef.",
+    titulo: "Abrindo KDS da Cozinha...",
+    subtitulo: "Validando QR do setor para identificação nominal com PIN.",
   },
   garcom: {
-    titulo: "Conectando Terminal do Salão...",
-    subtitulo: "Validando QR de acesso rápido do atendimento.",
+    titulo: "Abrindo Terminal do Salão...",
+    subtitulo: "Validando QR do setor para identificação nominal com PIN.",
   },
   admin: {
     titulo: "Conectando Painel Administrativo...",
