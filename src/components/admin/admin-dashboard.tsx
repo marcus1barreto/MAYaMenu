@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { moduloAtivo } from "@/lib/modules";
 import { useAuth } from "@/context/auth-context";
 import { CARDAPIO_DEMO } from "@/lib/mock-data";
-import type { MenuItem, ComandaCliente, HistoricoSessaoMesa, TipoChavePix } from "@/types";
+import type { MenuItem, ComandaCliente, HistoricoSessaoMesa, TipoChavePix, FichaTecnicaItem } from "@/types";
 import { getLimitesLicenca, getPlanoRestaurante } from "@/lib/licenca-limites";
 import { parseDateToMillis } from "@/lib/datas";
 import { db } from "@/lib/firebase";
@@ -34,6 +34,8 @@ import { AdminQrScannerModal } from "./admin-qr-scanner-modal";
 import { ModificadorBuilder } from "./modificador-builder";
 import { GestaoEquipe } from "./gestao-equipe";
 import { SetupMesas } from "./setup-mesas";
+import { FichaTecnicaEditorModal } from "@/components/cozinha/ficha-tecnica-modal";
+import { escutarFichasTecnicas } from "@/lib/fichas-tecnicas-service";
 import { MAYA_MEDIA_LIBRARY } from "@/lib/maya-media-library";
 import { validarVoucherPatrocinio, ativarPatrocinioNoRestaurante } from "@/lib/b2b-service";
 import {
@@ -180,6 +182,8 @@ export function AdminDashboard({
   const [avisoCheckout, setAvisoCheckout] = useState<{ tipo: "sucesso" | "erro" | "info"; msg: string } | null>(null);
   const [itensCardapio, setItensCardapio] = useState<MenuItem[]>([]);
   const [carregandoCardapio, setCarregandoCardapio] = useState(true);
+  const [fichasPorItem, setFichasPorItem] = useState<Record<string, FichaTecnicaItem>>({});
+  const [itemEditandoFicha, setItemEditandoFicha] = useState<MenuItem | null>(null);
   const [modoOperacao, setModoOperacao] = useState<"com_garcom" | "hibrido" | "balcao">(
     restaurante?.configuracoes?.modoOperacao || "hibrido"
   );
@@ -388,7 +392,7 @@ export function AdminDashboard({
     };
   }, [restaurante?.id]);
 
-  // Sincroniza cardápio em tempo real com o Firestore
+  // Sincroniza cardápio e fichas técnicas do Chef em tempo real com o Firestore
   useEffect(() => {
     if (!restaurante?.id) return;
 
@@ -397,8 +401,12 @@ export function AdminDashboard({
       setItensCardapio(novosItens);
       setCarregandoCardapio(false);
     });
+    const unsubFichas = escutarFichasTecnicas(restaurante.id, setFichasPorItem);
 
-    return () => unsub();
+    return () => {
+      unsub();
+      unsubFichas();
+    };
   }, [restaurante?.id]);
 
   // Controle de Mesas do Salão (sincronizadas com Firestore conforme o limite do plano)
@@ -1549,14 +1557,35 @@ export function AdminDashboard({
                     </p>
                   </div>
 
-                  <Button
-                    type="button"
-                    onClick={handleAbrirNovoPrato}
-                    className="bg-rose-600 hover:bg-rose-500 text-white font-black text-xs h-9 px-4 rounded-xl flex items-center gap-1.5 shadow-md shadow-rose-600/20"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span>+ Adicionar Novo Item</span>
-                  </Button>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Link
+                      href={
+                        restaurante?.id
+                          ? `/cozinha/receitas?r=${encodeURIComponent(restaurante.id)}`
+                          : "/cozinha/receitas"
+                      }
+                      target="_blank"
+                    >
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-9 px-3.5 rounded-xl text-xs font-bold border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300 hover:bg-amber-500/20 flex items-center gap-1.5"
+                      >
+                        <BookOpen className="w-3.5 h-3.5" />
+                        <span>Livro do Chef</span>
+                        <ExternalLink className="w-3 h-3 opacity-60" />
+                      </Button>
+                    </Link>
+
+                    <Button
+                      type="button"
+                      onClick={handleAbrirNovoPrato}
+                      className="bg-rose-600 hover:bg-rose-500 text-white font-black text-xs h-9 px-4 rounded-xl flex items-center gap-1.5 shadow-md shadow-rose-600/20"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>+ Adicionar Novo Item</span>
+                    </Button>
+                  </div>
                 </div>
 
                 {/* AGRUPAMENTO POR CATEGORIAS COM ORDENAÇÃO TÁTIL (Patrocinadas em 1º lugar) */}
@@ -1632,6 +1661,12 @@ export function AdminDashboard({
                                           {item.seloPatrocinador || "Parceiro Oficial"} • Fixado no Topo
                                         </span>
                                       )}
+                                      {fichasPorItem[item.id] && (
+                                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1 shrink-0">
+                                          <BookOpen className="w-2.5 h-2.5 text-emerald-600" />
+                                          Ficha Técnica
+                                        </span>
+                                      )}
                                       <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-600 border border-neutral-200 font-bold">
                                         #{idx + 1}
                                       </span>
@@ -1683,6 +1718,19 @@ export function AdminDashboard({
 
                                   {/* AÇÕES DE EDIÇÃO & DISPONIBILIDADE */}
                                   <div className="flex items-center gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => setItemEditandoFicha(item)}
+                                      className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-colors border flex items-center gap-1 ${
+                                        fichasPorItem[item.id]
+                                          ? "bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-200"
+                                          : "bg-card hover:bg-muted text-muted-foreground border-border"
+                                      }`}
+                                      title="Cadastrar ou editar receita, gramatura e modo de preparo deste prato"
+                                    >
+                                      <BookOpen className="w-3.5 h-3.5 text-amber-600" />
+                                      <span>Ficha</span>
+                                    </button>
                                     <button
                                       type="button"
                                       onClick={() => handleEditarPrato(item)}
@@ -3291,6 +3339,14 @@ export function AdminDashboard({
           </div>
         </DialogContent>
       </Dialog>
+
+      <FichaTecnicaEditorModal
+        open={Boolean(itemEditandoFicha)}
+        onOpenChange={(open) => !open && setItemEditandoFicha(null)}
+        restauranteId={restaurante?.id || ""}
+        menuItem={itemEditandoFicha}
+        fichaAtual={itemEditandoFicha ? fichasPorItem[itemEditandoFicha.id] : null}
+      />
     </div>
   );
 }

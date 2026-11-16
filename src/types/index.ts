@@ -109,6 +109,28 @@ export interface MenuItem {
   posicaoFixaTopo?: boolean;
 }
 
+export interface IngredienteFichaTecnica {
+  id: string;
+  nome: string;
+  quantidade: string;
+  observacao?: string;
+}
+
+export interface FichaTecnicaItem {
+  id: string; // Mesmo ID do item no cardápio
+  menuItemId: string;
+  nomeItem: string;
+  estacao?: string;
+  rendimento?: string;
+  tempoPreparoMin?: number;
+  ingredientes: IngredienteFichaTecnica[];
+  modoPreparo: string;
+  alergenos?: string;
+  observacoesEmpratamento?: string;
+  fotoReferenciaUrl?: string;
+  atualizadoEm?: string;
+}
+
 export interface OpcaoModificador {
   id?: string;
   nome: string;

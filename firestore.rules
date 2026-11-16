@@ -253,6 +253,12 @@ service cloud.firestore {
         );
       }
 
+      // Fichas técnicas e receitas privadas do Chef (nunca expostas no cardápio público)
+      match /fichas_tecnicas/{fichaId} {
+        allow read: if isOwner(restauranteId) || isGarcom(restauranteId) || isCozinha(restauranteId) || isSuperAdmin();
+        allow create, update, delete: if isOwner(restauranteId) || isSuperAdmin();
+      }
+
       // Fila Operacional da Cozinha (KDS Tickets Isolados)
       match /kds_tickets/{ticketId} {
         // Leitura restrita à equipe operacional do restaurante ou superadmin
