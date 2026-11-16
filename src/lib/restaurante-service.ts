@@ -531,23 +531,25 @@ export function escutarPedidosMesa(
   slugAlternativo?: string
 ): Unsubscribe {
   const numMesa = Number(mesaNumero) || mesaNumero;
-  const idsParaBuscar = Array.from(
-    new Set([restauranteIdOuSlug, slugAlternativo].filter(Boolean) as string[])
-  );
+  const idCanonical = (restauranteIdOuSlug || slugAlternativo || "").trim();
+  if (!idCanonical) {
+    onAtualizacao([]);
+    return () => {};
+  }
 
-  const q = idsParaBuscar.length > 1
-    ? query(
-        collectionGroup(db, "pedidos"),
-        where("restauranteId", "in", idsParaBuscar)
-      )
-    : query(
-        collectionGroup(db, "pedidos"),
-        where("restauranteId", "==", idsParaBuscar[0])
-      );
+  // Usa exclusivamente igualdade no campo indexado restauranteId para compatibilidade
+  // com firestore.rules (consultas 'in' com slug falham na validação de tenant).
+  const q = query(
+    collectionGroup(db, "pedidos"),
+    where("restauranteId", "==", idCanonical)
+  );
 
   return onSnapshot(
     q,
     (snapshot) => {
+      if (snapshot.metadata.fromCache && typeof navigator !== "undefined" && navigator.onLine) {
+        return;
+      }
       const lista: PedidoComRef[] = [];
       snapshot.forEach((d) => {
         const dados = d.data() as PedidoRodada & { mesa?: number | string; numeroMesa?: number | string };

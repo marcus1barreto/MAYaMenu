@@ -395,16 +395,13 @@ export function GarcomView({
   // 1. Escuta todas as comandas abertas do salão em tempo real com expurgo explícito de 'removed'
   useEffect(() => {
     if (bloqueadoPorAutoatendimento) return;
-    const idBusca = restauranteId || restaurante?.id || slug || restaurante?.slug;
+    const idBusca = restaurante?.id || restauranteId || slug || restaurante?.slug;
     if (!idBusca) return;
 
-    const idsParaBuscar = Array.from(
-      new Set([restauranteId, restaurante?.id, slug, restaurante?.slug].filter(Boolean) as string[])
+    const q = query(
+      collectionGroup(db, "comandas_abertas"),
+      where("restauranteId", "==", idBusca)
     );
-
-    const q = idsParaBuscar.length > 1
-      ? query(collectionGroup(db, "comandas_abertas"), where("restauranteId", "in", idsParaBuscar))
-      : query(collectionGroup(db, "comandas_abertas"), where("restauranteId", "==", idsParaBuscar[0]));
 
     const unsub = onSnapshot(
       q,
@@ -528,20 +525,20 @@ export function GarcomView({
   // 2. Escuta pedidos prontos na cozinha (Bandeja / Avisos de Entrega) em tempo real
   useEffect(() => {
     if (bloqueadoPorAutoatendimento) return;
-    const idBusca = restauranteId || restaurante?.id || slug || restaurante?.slug;
+    const idBusca = restaurante?.id || restauranteId || slug || restaurante?.slug;
     if (!idBusca) return;
 
-    const idsParaBuscar = Array.from(
-      new Set([restauranteId, restaurante?.id, slug, restaurante?.slug].filter(Boolean) as string[])
+    const q = query(
+      collectionGroup(db, "pedidos"),
+      where("restauranteId", "==", idBusca)
     );
-
-    const q = idsParaBuscar.length > 1
-      ? query(collectionGroup(db, "pedidos"), where("restauranteId", "in", idsParaBuscar))
-      : query(collectionGroup(db, "pedidos"), where("restauranteId", "==", idsParaBuscar[0]));
 
     const unsub = onSnapshot(
       q,
       (snapshot) => {
+        if (snapshot.metadata.fromCache && typeof navigator !== "undefined" && navigator.onLine) {
+          return;
+        }
         const prontos: PedidoComRef[] = [];
         snapshot.forEach((docSnap) => {
           const data = docSnap.data() as PedidoRodada;
@@ -568,6 +565,7 @@ export function GarcomView({
       },
       (err) => {
         console.warn("Aviso ao escutar pedidos prontos na cozinha:", err);
+        setPedidosProntos([]);
       }
     );
 
@@ -1356,7 +1354,7 @@ export function GarcomView({
         isOpen={!!mesaSelecionada}
         onClose={() => setMesaSelecionada(null)}
         slug={slug}
-        restauranteId={restauranteId}
+        restauranteId={restaurante?.id || restauranteId}
         pedidosOffline={pedidosOffline}
         taxaServicoPercentual={restaurante?.configuracoes?.taxaServico}
         garcomLogado={colaboradorAtivo || (user ? { uid: user.uid, nome: user.displayName || "Garçom" } : undefined)}
