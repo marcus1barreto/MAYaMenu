@@ -1310,22 +1310,17 @@ export function AdminDashboard() {
           <button
             type="button"
             onClick={() => setAbaAtiva("equipe")}
-            className={`py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all flex items-center gap-2 relative group ${abaAtiva === "equipe"
+            className={`py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all flex items-center gap-2 ${abaAtiva === "equipe"
               ? "border-primary text-primary"
               : "border-transparent text-muted-foreground hover:text-foreground"
               }`}
           >
             <Users className="w-4 h-4" />
-            <span>Equipe & Acessos</span>
-            {!moduloAtivo("mod.garcom_salao") && (
-              <>
-                <Badge className="bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 text-[9px] font-black uppercase px-1.5 py-0">
-                  PRO
-                </Badge>
-                <span className="pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity absolute left-1/2 -translate-x-1/2 top-full mt-1 z-50 whitespace-nowrap rounded-lg bg-neutral-900 px-2.5 py-1 text-[10px] font-bold text-white shadow-lg">
-                  Disponível na versão Pro
-                </span>
-              </>
+            <span>Equipe & Chef</span>
+            {moduloAtivo("core.chef") && (
+              <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 text-[9px] font-black uppercase px-1.5 py-0">
+                Chef Free
+              </Badge>
             )}
           </button>
 
@@ -1806,7 +1801,7 @@ export function AdminDashboard() {
         {/* ABA: EQUIPE & ACESSOS */}
         {abaAtiva === "equipe" && (
           <GestaoEquipe
-            restauranteId={restaurante?.id || "demo"}
+            restauranteId={restaurante?.id || ""}
             nomeRestaurante={restaurante?.nome || "MAYaMenu"}
           />
         )}

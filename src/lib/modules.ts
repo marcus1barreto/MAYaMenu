@@ -15,6 +15,7 @@ export type ModuloId =
   | "core.cardapio"
   | "core.mesas_qr"
   | "core.cozinha"
+  | "core.chef"
   | "core.atendimento"
   | "core.pagamento_pix"
   | "mod.garcom_salao"
@@ -28,6 +29,7 @@ export const MODULOS_ATIVOS: Record<ModuloId, boolean> = {
   "core.cardapio": true,
   "core.mesas_qr": true,
   "core.cozinha": true,
+  "core.chef": true, // Módulo Chef: colaborador da cozinha (PIN/Crachá + KDS) liberado por padrão no Free
   "core.atendimento": true,
   "core.pagamento_pix": true,
   "mod.garcom_salao": !PRELAUNCH_MODE,

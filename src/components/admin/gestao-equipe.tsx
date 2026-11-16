@@ -40,6 +40,7 @@ import {
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { uploadFotoEquipe } from "@/lib/storage-service";
+import { moduloAtivo } from "@/lib/modules";
 
 function gerarPinOperacionalSeguro(): string {
   if (!globalThis.crypto?.getRandomValues) {
@@ -79,7 +80,9 @@ export function GestaoEquipe({ restauranteId, nomeRestaurante = "MAYaMenu" }: Ge
   const [nomeNovo, setNomeNovo] = useState("");
   const [pinNovo, setPinNovo] = useState("");
   const [emailNovo, setEmailNovo] = useState("");
-  const [roleNovo, setRoleNovo] = useState<"garcom" | "cozinha">("garcom");
+  const [roleNovo, setRoleNovo] = useState<"garcom" | "cozinha">(() =>
+    moduloAtivo("mod.garcom_salao") ? "garcom" : "cozinha"
+  );
   const [arquivoFoto, setArquivoFoto] = useState<File | null>(null);
   const [previewFoto, setPreviewFoto] = useState<string | null>(null);
 
@@ -158,6 +161,16 @@ export function GestaoEquipe({ restauranteId, nomeRestaurante = "MAYaMenu" }: Ge
     e.preventDefault();
     setMensagemSucesso(null);
     setMensagemErro(null);
+
+    if (!restauranteId) {
+      setMensagemErro("Restaurante não identificado nesta sessão.");
+      return;
+    }
+
+    if (roleNovo === "garcom" && !moduloAtivo("mod.garcom_salao")) {
+      setMensagemErro("O perfil Garçom (Salão) está disponível na versão PRO. No Free, cadastre colaboradores no Módulo Chef (Cozinha).");
+      return;
+    }
 
     const nomeLimpo = nomeNovo.trim();
     if (!nomeLimpo) {
@@ -308,28 +321,38 @@ export function GestaoEquipe({ restauranteId, nomeRestaurante = "MAYaMenu" }: Ge
 
           <div className="flex flex-wrap items-center gap-2">
             {/* BOTÃO ATALHO PARA O APP DO GARÇOM */}
-            <Link href={restauranteId ? `/garcom?r=${encodeURIComponent(restauranteId)}` : "/garcom"} target="_blank">
+            <Link href={restauranteId ? `/garcom?r=${encodeURIComponent(restauranteId)}` : "/garcom"} target="_blank" className="relative group">
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
                 className="bg-emerald-50 dark:bg-emerald-950/30 hover:bg-emerald-100 dark:hover:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border-emerald-300 dark:border-emerald-800 text-xs font-bold h-9 px-3 rounded-xl flex items-center gap-1.5 shadow-2xs"
-                title="Abrir o Terminal do Garçom em nova aba"
+                title={!moduloAtivo("mod.garcom_salao") ? "Disponível na versão Pro" : "Abrir o Terminal do Garçom em nova aba"}
               >
                 <UtensilsCrossed className="w-3.5 h-3.5 text-emerald-600" />
                 <span>Abrir Terminal Garçom</span>
+                {!moduloAtivo("mod.garcom_salao") && (
+                  <span className="ml-0.5 px-1.5 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-[9px] font-black uppercase text-amber-600">
+                    Pro
+                  </span>
+                )}
                 <ExternalLink className="w-3 h-3 opacity-60" />
               </Button>
+              {!moduloAtivo("mod.garcom_salao") && (
+                <span className="pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity absolute left-1/2 -translate-x-1/2 top-full mt-1.5 z-50 whitespace-nowrap rounded-lg bg-neutral-900 px-2.5 py-1 text-[10px] font-bold text-white shadow-lg">
+                  Disponível na versão Pro
+                </span>
+              )}
             </Link>
 
-            {/* BOTÃO ATALHO PARA A COZINHA */}
+            {/* BOTÃO ATALHO PARA A COZINHA (Módulo Chef liberado no Free) */}
             <Link href={restauranteId ? `/cozinha?r=${encodeURIComponent(restauranteId)}` : "/cozinha"} target="_blank">
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
                 className="bg-amber-50 dark:bg-amber-950/30 hover:bg-amber-100 dark:hover:bg-amber-950/50 text-amber-800 dark:text-amber-400 border-amber-300 dark:border-amber-800 text-xs font-bold h-9 px-3 rounded-xl flex items-center gap-1.5 shadow-2xs"
-                title="Abrir o KDS da Cozinha em nova aba"
+                title="Abrir o KDS da Cozinha (Módulo Chef) em nova aba"
               >
                 <ChefHat className="w-3.5 h-3.5 text-amber-600" />
                 <span>Abrir KDS Cozinha</span>
@@ -428,7 +451,7 @@ export function GestaoEquipe({ restauranteId, nomeRestaurante = "MAYaMenu" }: Ge
                   type="text"
                   value={nomeNovo}
                   onChange={(e) => setNomeNovo(e.target.value)}
-                  placeholder="ex: Carlos Garçom, Marcos, Ana"
+                  placeholder="ex: Chef Carlos, Cozinha 1, Ana"
                   className="h-10 text-xs rounded-xl font-bold"
                   disabled={processando}
                   required
@@ -445,9 +468,18 @@ export function GestaoEquipe({ restauranteId, nomeRestaurante = "MAYaMenu" }: Ge
                   className="w-full h-10 px-3 rounded-xl border border-input bg-background text-xs font-bold focus:outline-hidden focus:ring-2 focus:ring-ring"
                   disabled={processando}
                 >
-                  <option value="garcom">🍽️ Garçom (Salão, Mesas & Comandas)</option>
-                  <option value="cozinha">👨‍🍳 Cozinha (KDS & Produção de Pratos)</option>
+                  <option value="cozinha">👨‍🍳 Módulo Chef / Cozinha (Liberado no Free)</option>
+                  <option value="garcom">
+                    {moduloAtivo("mod.garcom_salao")
+                      ? "🍽️ Garçom (Salão, Mesas & Comandas)"
+                      : "🍽️ Garçom (Salão) — Disponível na versão Pro"}
+                  </option>
                 </select>
+                {roleNovo === "garcom" && !moduloAtivo("mod.garcom_salao") && (
+                  <span className="mt-1 inline-block rounded-lg bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 text-[10px] font-bold text-amber-700 dark:text-amber-300">
+                    Disponível na versão Pro
+                  </span>
+                )}
               </div>
 
               {/* CAMPO DE PIN NUMÉRICO (4 A 6 DÍGITOS) */}
@@ -479,7 +511,7 @@ export function GestaoEquipe({ restauranteId, nomeRestaurante = "MAYaMenu" }: Ge
                   disabled={processando}
                 />
                 <span className="text-[10px] text-muted-foreground mt-1 block">
-                  Usado para o garçom desbloquear a tela no salão em segundos.
+                  Usado para o colaborador desbloquear a tela da Cozinha (ou Salão na versão PRO) em segundos.
                 </span>
               </div>
 
