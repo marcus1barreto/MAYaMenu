@@ -528,7 +528,8 @@ export function escutarPedidosMesa(
   restauranteIdOuSlug: string,
   mesaNumero: number | string,
   onAtualizacao: (pedidos: PedidoComRef[]) => void,
-  slugAlternativo?: string
+  slugAlternativo?: string,
+  comandasIds?: string[]
 ): Unsubscribe {
   const numMesa = Number(mesaNumero) || mesaNumero;
   const idCanonical = (restauranteIdOuSlug || slugAlternativo || "").trim();
@@ -537,8 +538,63 @@ export function escutarPedidosMesa(
     return () => {};
   }
 
-  // Usa exclusivamente igualdade no campo indexado restauranteId para compatibilidade
-  // com firestore.rules (consultas 'in' com slug falham na validação de tenant).
+  // Quando as comandas ativas da mesa são informadas, escuta diretamente suas
+  // subcoleções `pedidos` (sem depender de índices/regras de collectionGroup).
+  if (Array.isArray(comandasIds)) {
+    const idsLimpos = Array.from(new Set(comandasIds.map((id) => String(id || "").trim()).filter(Boolean)));
+    if (idsLimpos.length === 0) {
+      onAtualizacao([]);
+      return () => {};
+    }
+
+    const pedidosPorComanda = new Map<string, PedidoComRef[]>();
+    const emitir = () => {
+      const todos: PedidoComRef[] = [];
+      pedidosPorComanda.forEach((arr) => todos.push(...arr));
+      onAtualizacao(todos);
+    };
+
+    const unsubs = idsLimpos.map((clienteId) => {
+      const colRef = collection(
+        db,
+        "restaurantes",
+        idCanonical,
+        "mesas",
+        String(mesaNumero),
+        "comandas_abertas",
+        clienteId,
+        "pedidos"
+      );
+      return onSnapshot(
+        colRef,
+        (snapshot) => {
+          const lista: PedidoComRef[] = [];
+          snapshot.forEach((d) => {
+            const dados = d.data() as PedidoRodada;
+            lista.push({
+              ...dados,
+              clienteId: dados.clienteId || clienteId,
+              id: d.id,
+              refPath: d.ref.path,
+            });
+          });
+          pedidosPorComanda.set(clienteId, lista);
+          emitir();
+        },
+        (err) => {
+          console.warn(`Listener de pedidos da comanda ${clienteId} (Mesa ${mesaNumero}) indisponível:`, err);
+          pedidosPorComanda.set(clienteId, []);
+          emitir();
+        }
+      );
+    });
+
+    return () => {
+      unsubs.forEach((u) => u());
+    };
+  }
+
+  // Fallback via collectionGroup apenas para chamadas sem comandasIds.
   const q = query(
     collectionGroup(db, "pedidos"),
     where("restauranteId", "==", idCanonical)
@@ -547,9 +603,6 @@ export function escutarPedidosMesa(
   return onSnapshot(
     q,
     (snapshot) => {
-      if (snapshot.metadata.fromCache && typeof navigator !== "undefined" && navigator.onLine) {
-        return;
-      }
       const lista: PedidoComRef[] = [];
       snapshot.forEach((d) => {
         const dados = d.data() as PedidoRodada & { mesa?: number | string; numeroMesa?: number | string };

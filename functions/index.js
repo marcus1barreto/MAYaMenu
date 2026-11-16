@@ -1459,6 +1459,14 @@ async function executarCriacaoPedidoCliente(firestoreDb, authUid, payload) {
 
     // 6. Gravação atômica (comanda + pedido + kds_ticket + registro de idempotência)
     const agoraServer = admin.firestore.FieldValue.serverTimestamp();
+    const comandaAtual = comandaSnap.exists ? (comandaSnap.data() || {}) : {};
+    const ehReaberturaEncerrada =
+      comandaAtual.status === 'arquivada' ||
+      comandaAtual.status === 'encerrada' ||
+      comandaAtual.status === 'kill';
+    const subtotalAtualCentavos = !comandaSnap.exists || ehReaberturaEncerrada
+      ? 0
+      : Math.round((Number(comandaAtual.subtotal) || 0) * 100);
     const dadosComanda = {
       id: authUid,
       restauranteId: realRestauranteId,
@@ -1466,8 +1474,10 @@ async function executarCriacaoPedidoCliente(firestoreDb, authUid, payload) {
       nomeCliente: nomeLimpo,
       mesa: mesaNumero,
       numeroMesa: mesaNumero,
+      subtotal: (subtotalAtualCentavos + subtotalCentavos) / 100,
+      arquivada: false,
       atualizadoEm: agoraServer,
-      status: comandaSnap.exists ? comandaSnap.data().status : 'aguardando_pratos',
+      status: !comandaSnap.exists || ehReaberturaEncerrada ? 'aguardando_pratos' : comandaAtual.status,
     };
     if (!comandaSnap.exists) {
       dadosComanda.criadoEm = agoraServer;

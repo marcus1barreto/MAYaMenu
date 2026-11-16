@@ -536,9 +536,6 @@ export function GarcomView({
     const unsub = onSnapshot(
       q,
       (snapshot) => {
-        if (snapshot.metadata.fromCache && typeof navigator !== "undefined" && navigator.onLine) {
-          return;
-        }
         const prontos: PedidoComRef[] = [];
         snapshot.forEach((docSnap) => {
           const data = docSnap.data() as PedidoRodada;

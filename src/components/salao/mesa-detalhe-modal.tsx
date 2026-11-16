@@ -192,6 +192,11 @@ export function MesaDetalheModal({
 
   // Escuta os pedidos/pratos reais da mesa no Firestore quando o modal está aberto
   const [pedidosMesa, setPedidosMesa] = useState<PedidoComRef[]>([]);
+  const comandasIdsKey = (mesa?.comandas || [])
+    .map((c) => c.id)
+    .filter(Boolean)
+    .sort()
+    .join(",");
 
   useEffect(() => {
     if (!isOpen || !mesa || (!restauranteId && !slug)) {
@@ -199,6 +204,7 @@ export function MesaDetalheModal({
       return;
     }
 
+    const comandasIds = comandasIdsKey ? comandasIdsKey.split(",") : [];
     setPedidosMesa([]);
     const unsub = escutarPedidosMesa(
       restauranteId || slug!,
@@ -206,14 +212,15 @@ export function MesaDetalheModal({
       (lista) => {
         setPedidosMesa(lista);
       },
-      slug
+      slug,
+      comandasIds
     );
 
     return () => {
       unsub();
       setPedidosMesa([]);
     };
-  }, [isOpen, mesa?.numero, restauranteId, slug]);
+  }, [isOpen, mesa?.numero, restauranteId, slug, comandasIdsKey]);
 
   // ✅ 2. EARLY RETURN SOMENTE DEPOIS DE TODOS OS HOOKS
   if (!isOpen || !mesa) return null;
