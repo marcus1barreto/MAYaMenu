@@ -6,7 +6,6 @@ const nextConfig: NextConfig = {
   cacheComponents: true,
   partialPrefetching: true,
   experimental: {
-    // @ts-ignore
     agentUpgrade: "security",
   },
   images: {
