@@ -538,13 +538,11 @@ export function escutarPedidosMesa(
   const q = idsParaBuscar.length > 1
     ? query(
         collectionGroup(db, "pedidos"),
-        where("restauranteId", "in", idsParaBuscar),
-        where("numeroMesa", "==", numMesa)
+        where("restauranteId", "in", idsParaBuscar)
       )
     : query(
         collectionGroup(db, "pedidos"),
-        where("restauranteId", "==", idsParaBuscar[0]),
-        where("numeroMesa", "==", numMesa)
+        where("restauranteId", "==", idsParaBuscar[0])
       );
 
   return onSnapshot(
@@ -552,12 +550,20 @@ export function escutarPedidosMesa(
     (snapshot) => {
       const lista: PedidoComRef[] = [];
       snapshot.forEach((d) => {
-        lista.push({ ...(d.data() as PedidoRodada), id: d.id, refPath: d.ref.path });
+        const dados = d.data() as PedidoRodada & { mesa?: number | string; numeroMesa?: number | string };
+        const mesaDoPedido = dados.numeroMesa ?? dados.mesa;
+        const mesmaMesa =
+          Number.isFinite(Number(numMesa)) && Number.isFinite(Number(mesaDoPedido))
+            ? Number(mesaDoPedido) === Number(numMesa)
+            : String(mesaDoPedido) === String(numMesa);
+        if (!mesmaMesa) return;
+        lista.push({ ...dados, id: d.id, refPath: d.ref.path });
       });
       onAtualizacao(lista);
     },
     (err) => {
       console.warn(`Listener de pedidos da Mesa ${mesaNumero} indisponível:`, err);
+      onAtualizacao([]);
     }
   );
 }

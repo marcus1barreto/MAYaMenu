@@ -194,8 +194,12 @@ export function MesaDetalheModal({
   const [pedidosMesa, setPedidosMesa] = useState<PedidoComRef[]>([]);
 
   useEffect(() => {
-    if (!isOpen || !mesa || (!restauranteId && !slug)) return;
+    if (!isOpen || !mesa || (!restauranteId && !slug)) {
+      setPedidosMesa([]);
+      return;
+    }
 
+    setPedidosMesa([]);
     const unsub = escutarPedidosMesa(
       restauranteId || slug!,
       mesa.numero,
@@ -205,7 +209,10 @@ export function MesaDetalheModal({
       slug
     );
 
-    return () => unsub();
+    return () => {
+      unsub();
+      setPedidosMesa([]);
+    };
   }, [isOpen, mesa?.numero, restauranteId, slug]);
 
   // ✅ 2. EARLY RETURN SOMENTE DEPOIS DE TODOS OS HOOKS
@@ -217,15 +224,15 @@ export function MesaDetalheModal({
     if (c.itens && c.itens.length > 0) return c; // Já possui itens lançados
 
     const pedidosDesteCliente = pedidosMesa.filter(
-      (p) => p.clienteId === c.id || p.nomeCliente?.toLowerCase() === c.nomeCliente?.toLowerCase()
+      (p) => p.clienteId === c.id
     );
 
     const todosItens: ItemComandaGarcom[] = [];
     let subtotalCalculado = 0;
 
     pedidosDesteCliente.forEach((p) => {
-      // Ignora pedidos cancelados ou estornados
-      if (p.status === "cancelado" || p.status === "estornado") return;
+      // Ignora pedidos cancelados, estornados ou já pagos
+      if (["cancelado", "estornado", "pago"].includes(String(p.status))) return;
 
       if (Array.isArray(p.itens)) {
         p.itens.forEach((it) => {
@@ -245,7 +252,7 @@ export function MesaDetalheModal({
 
     return {
       ...c,
-      subtotal: subtotalCalculado > 0 ? subtotalCalculado : c.subtotal,
+      subtotal: c.status === "pago" ? 0 : (subtotalCalculado > 0 ? subtotalCalculado : c.subtotal),
       itens: todosItens,
     };
   });
@@ -660,7 +667,7 @@ export function MesaDetalheModal({
                           {comanda.itens.map((it, idx) => (
                             <div key={idx} className="flex justify-between items-start">
                               <div>
-                                <span className="font-semibold text-white">
+                                <span className="font-semibold text-foreground">
                                   {it.quantidade}x {it.nome}
                                 </span>
                                 {it.modificadores && it.modificadores.length > 0 && (

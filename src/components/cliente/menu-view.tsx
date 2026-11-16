@@ -222,11 +222,7 @@ export function MenuView({
         setMetodoPagamentoEncerrado(metodo);
       }
 
-      // Mata os listeners imediatamente para evitar loop
-      if (unsubComanda) {
-        unsubComanda();
-        unsubComanda = null;
-      }
+      // Mantém unsubComanda ativo para detectar futura liberação irrevogável da mesa pelo caixa
       if (unsubPedidos) {
         unsubPedidos();
         unsubPedidos = null;
@@ -243,6 +239,39 @@ export function MenuView({
       setCarrinhoAberto(false);
 
       // Limpeza Local
+      limparSessaoClienteLocal(restaurante.slug);
+      if (typeof limparCarrinho === "function") {
+        limparCarrinho();
+      }
+    };
+
+    const encerrarSessaoIrrevogavel = () => {
+      encerrado = true;
+      if (unsubComanda) {
+        unsubComanda();
+        unsubComanda = null;
+      }
+      if (unsubPedidos) {
+        unsubPedidos();
+        unsubPedidos = null;
+      }
+
+      setSessaoEncerradaIrrevogavel(true);
+      setSessaoFinalizada(false);
+      setContaPagaModal(false);
+      setComprovanteSemPapelAberto(false);
+      setContaPedidaSucesso(false);
+      setGarcomChamadoSucesso(false);
+      setSegundosCooldown(0);
+      setMinhaComandaAberta(false);
+      setCarrinhoAberto(false);
+      setQrCredencialAtiva(undefined);
+
+      try {
+        sessionStorage.removeItem(`mayamenu_qr_${restaurante.id}_mesa_${String(numeroMesa)}`);
+      } catch {
+        // Ignora erro de sessionStorage
+      }
       limparSessaoClienteLocal(restaurante.slug);
       if (typeof limparCarrinho === "function") {
         limparCarrinho();
@@ -269,7 +298,8 @@ export function MenuView({
             return;
           }
           if (data.arquivada === true && ultimoStatus !== null) {
-            setSessaoEncerradaIrrevogavel(true);
+            encerrarSessaoIrrevogavel();
+            return;
           }
           const statusAnterior = ultimoStatus;
           setComandaStatus(data.status);
@@ -288,9 +318,9 @@ export function MenuView({
           } else if (data.status === "pago" && statusAnterior !== null && statusAnterior !== "pago") {
             encerrarPorPagamento(data.metodoPagamento);
           }
-        } else if (ultimoStatus && ultimoStatus !== "pago") {
-          // A comanda foi removida pelo garçom/admin ao liberar a mesa: conta encerrada
-          encerrarPorPagamento();
+        } else if (ultimoStatus !== null) {
+          // A comanda foi removida/arquivada ao liberar a mesa: encerra a sessão do celular irrevogavelmente
+          encerrarSessaoIrrevogavel();
         }
       },
       (err) => {
@@ -484,6 +514,24 @@ export function MenuView({
     );
   }
 
+  if (sessaoEncerradaIrrevogavel) {
+    return (
+      <div className="min-h-screen bg-background text-foreground flex items-center justify-center p-6">
+        <div className="max-w-sm w-full bg-card border border-border rounded-3xl p-8 text-center space-y-4 shadow-xl">
+          <div className="w-14 h-14 mx-auto rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-600 flex items-center justify-center">
+            <QrCode className="w-7 h-7" />
+          </div>
+          <h1 className="text-xl font-black text-foreground">
+            Atendimento Encerrado
+          </h1>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            A <strong>Mesa {numeroMesa}</strong> foi encerrada e liberada no caixa. Para iniciar um novo atendimento, escaneie novamente o <strong>QR Code da mesa</strong>.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   if (sessaoFinalizada) {
     return (
       <div className="min-h-screen bg-background text-foreground flex flex-col justify-between p-6 antialiased selection:bg-primary selection:text-white relative overflow-hidden">
@@ -511,7 +559,7 @@ export function MenuView({
               <span>Deseja pedir mais alguma coisa?</span>
             </div>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Para reabrir a sua comanda, escaneie o QR Code da mesa novamente com a câmera do seu celular.
+              Para iniciar uma nova comanda ou chamar atendimento, escaneie o QR Code da mesa novamente com a câmera do seu celular.
             </p>
           </div>
 
@@ -527,31 +575,9 @@ export function MenuView({
           </Button>
         </div>
 
-        {/* RODAPÉ: BOTÃO DE SOLICITAR GARÇOM OU AVISO DE AUTOATENDIMENTO */}
+        {/* RODAPÉ: SOMENTE INFORMATIVO APÓS CONTA PAGA (SEM BOTÃO DE REABRIR MESA) */}
         <div className="max-w-md mx-auto w-full pt-8 pb-4 relative z-10 text-center space-y-3">
-          {!ehAutoatendimento ? (
-            <Button
-              type="button"
-              onClick={handleChamarGarcom}
-              disabled={chamandoGarcom || segundosCooldown > 0}
-              className={`w-full h-12 rounded-2xl text-xs uppercase tracking-wider font-black shadow-md flex items-center justify-center gap-2 transition-all ${
-                garcomChamadoSucesso
-                  ? "bg-amber-500 text-neutral-950"
-                  : "bg-primary hover:bg-primary/90 text-white"
-              }`}
-            >
-              <Bell className={`w-4 h-4 ${garcomChamadoSucesso ? "fill-neutral-950 animate-bounce" : "text-white"}`} />
-              <span>
-                {garcomChamadoSucesso
-                  ? moduloAtivo("mod.garcom_salao")
-                    ? "Garçom a Caminho da Mesa!"
-                    : "Atendente a Caminho da Mesa!"
-                  : segundosCooldown > 0
-                  ? `Aguarde (${segundosCooldown}s)`
-                  : "🔔 Solicitar Garçom"}
-              </span>
-            </Button>
-          ) : (
+          {ehAutoatendimento && (
             <div className="p-3.5 bg-muted border border-border rounded-2xl text-xs text-foreground font-semibold flex items-center justify-center gap-2 shadow-xs">
               <Utensils className="w-4 h-4 text-primary" />
               <span>Modo Autoatendimento: Retire seus pedidos no balcão</span>
@@ -568,24 +594,6 @@ export function MenuView({
           isOpen={historicoAberto}
           onClose={() => setHistoricoAberto(false)}
         />
-      </div>
-    );
-  }
-
-  if (sessaoEncerradaIrrevogavel) {
-    return (
-      <div className="min-h-screen bg-background text-foreground flex items-center justify-center p-6">
-        <div className="max-w-sm w-full bg-card border border-border rounded-3xl p-8 text-center space-y-4 shadow-xl">
-          <div className="w-14 h-14 mx-auto rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-600 flex items-center justify-center">
-            <QrCode className="w-7 h-7" />
-          </div>
-          <h1 className="text-xl font-black text-foreground">
-            Atendimento Encerrado
-          </h1>
-          <p className="text-sm text-muted-foreground leading-relaxed">
-            A <strong>Mesa {numeroMesa}</strong> foi encerrada e liberada no caixa. Para iniciar um novo atendimento, escaneie novamente o <strong>QR Code da mesa</strong>.
-          </p>
-        </div>
       </div>
     );
   }
