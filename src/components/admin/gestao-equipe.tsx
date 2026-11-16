@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import Link from "next/link";
 import { db, functions } from "@/lib/firebase";
 import { collection, onSnapshot, query, doc, updateDoc } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
@@ -36,7 +35,6 @@ import {
   Eye,
   EyeOff,
   Dices,
-  ExternalLink,
   Edit3,
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
@@ -307,60 +305,22 @@ export function GestaoEquipe({ restauranteId, nomeRestaurante = "MAYaMenu" }: Ge
 
   return (
     <div className="space-y-6">
-      {/* CABEÇALHO DA SEÇÃO */}
+      {/* CABEÇALHO DA SEÇÃO (AJUSTES DE EQUIPE & ACESSOS NOMINAIS) */}
       <div className="bg-card border border-border rounded-2xl p-5 shadow-xs">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-4 border-b border-border/70">
           <div>
             <div className="flex items-center gap-2">
               <Users className="w-5 h-5 text-rose-600" />
-              <h2 className="text-base font-black tracking-tight">Equipe, Garçons & Acessos por PIN</h2>
+              <h2 className="text-base font-black tracking-tight">Cadastro Nominal, PIN &amp; Crachás</h2>
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              Cadastre garçons e cozinheiros com nome e <strong>PIN numérico de 4 a 6 dígitos</strong>. O sistema gera automaticamente o login rápido e o <strong>Crachá Digital com QR Code</strong>.
+              Cadastre cozinheiros e garçons com nome e <strong>PIN de 4 a 6 dígitos</strong>. Para abrir os terminais durante o turno, use os atalhos de <strong>Operação</strong> no topo.
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            {/* BOTÃO ATALHO PARA O APP DO GARÇOM */}
-            <Link href={restauranteId ? `/garcom?r=${encodeURIComponent(restauranteId)}` : "/garcom"} target="_blank" className="relative group">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="bg-emerald-50 dark:bg-emerald-950/30 hover:bg-emerald-100 dark:hover:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border-emerald-300 dark:border-emerald-800 text-xs font-bold h-9 px-3 rounded-xl flex items-center gap-1.5 shadow-2xs"
-                title={!moduloAtivo("mod.garcom_salao") ? "Disponível na versão Pro" : "Abrir o Terminal do Garçom em nova aba"}
-              >
-                <UtensilsCrossed className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Abrir Terminal Garçom</span>
-                {!moduloAtivo("mod.garcom_salao") && (
-                  <span className="ml-0.5 px-1.5 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-[9px] font-black uppercase text-amber-600">
-                    Pro
-                  </span>
-                )}
-                <ExternalLink className="w-3 h-3 opacity-60" />
-              </Button>
-              {!moduloAtivo("mod.garcom_salao") && (
-                <span className="pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity absolute left-1/2 -translate-x-1/2 top-full mt-1.5 z-50 whitespace-nowrap rounded-lg bg-neutral-900 px-2.5 py-1 text-[10px] font-bold text-white shadow-lg">
-                  Disponível na versão Pro
-                </span>
-              )}
-            </Link>
-
-            {/* BOTÃO ATALHO PARA A COZINHA (Módulo Chef liberado no Free) */}
-            <Link href={restauranteId ? `/cozinha?r=${encodeURIComponent(restauranteId)}` : "/cozinha"} target="_blank">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="bg-amber-50 dark:bg-amber-950/30 hover:bg-amber-100 dark:hover:bg-amber-950/50 text-amber-800 dark:text-amber-400 border-amber-300 dark:border-amber-800 text-xs font-bold h-9 px-3 rounded-xl flex items-center gap-1.5 shadow-2xs"
-                title="Abrir o KDS da Cozinha (Módulo Chef) em nova aba"
-              >
-                <ChefHat className="w-3.5 h-3.5 text-amber-600" />
-                <span>Abrir KDS Cozinha</span>
-                <ExternalLink className="w-3 h-3 opacity-60" />
-              </Button>
-            </Link>
-          </div>
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-emerald-700 dark:text-emerald-400 text-[10px] font-black uppercase tracking-wider shrink-0">
+            Módulo Chef Liberado
+          </span>
         </div>
 
         {/* FEEDBACKS */}
@@ -379,11 +339,11 @@ export function GestaoEquipe({ restauranteId, nomeRestaurante = "MAYaMenu" }: Ge
         )}
 
         {/* FORMULÁRIO DE ADIÇÃO COM FOCO EM NOME + PIN NUMÉRICO */}
-        <form onSubmit={handleAdicionarMembro} className="mt-5 space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-start">
+        <form onSubmit={handleAdicionarMembro} className="mt-4 space-y-4">
+          <div className="flex flex-col sm:flex-row gap-5 items-start">
             {/* FOTO / AVATAR */}
-            <div className="sm:col-span-3 flex flex-col items-center sm:items-start gap-2">
-              <label className="text-[11px] font-black uppercase text-muted-foreground block text-center sm:text-left">
+            <div className="w-full sm:w-28 shrink-0 flex flex-col items-center gap-2">
+              <label className="text-[11px] font-black uppercase text-muted-foreground block text-center">
                 Foto do Crachá
               </label>
 
@@ -396,7 +356,7 @@ export function GestaoEquipe({ restauranteId, nomeRestaurante = "MAYaMenu" }: Ge
                 )}
               </div>
 
-              <div className="flex items-center gap-1.5 w-full">
+              <div className="flex items-center gap-1.5 w-24 sm:w-full">
                 {/* Botão Câmera (Tirar Foto) */}
                 <Button
                   type="button"
@@ -407,7 +367,7 @@ export function GestaoEquipe({ restauranteId, nomeRestaurante = "MAYaMenu" }: Ge
                   title="Tirar foto com a câmera"
                 >
                   <Camera className="w-3.5 h-3.5 text-rose-600" />
-                  <span>Câmera</span>
+                  <span>Foto</span>
                 </Button>
 
                 {/* Botão Upload (Galeria) */}
@@ -443,7 +403,7 @@ export function GestaoEquipe({ restauranteId, nomeRestaurante = "MAYaMenu" }: Ge
             </div>
 
             {/* CAMPOS DE TEXTO */}
-            <div className="sm:col-span-9 grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="flex-1 w-full grid grid-cols-1 sm:grid-cols-2 gap-3.5">
               <div>
                 <label className="text-[11px] font-black uppercase text-muted-foreground mb-1 block">
                   Nome / Apelido do Colaborador *
@@ -508,28 +468,30 @@ export function GestaoEquipe({ restauranteId, nomeRestaurante = "MAYaMenu" }: Ge
                   value={pinNovo}
                   onChange={(e) => setPinNovo(e.target.value.replace(/\D/g, ""))}
                   placeholder="4 a 6 dígitos"
-                  className="h-10 text-xs font-mono font-bold tracking-widest rounded-xl"
+                  className={`h-10 text-xs rounded-xl placeholder:font-sans placeholder:tracking-normal placeholder:font-normal ${
+                    pinNovo ? "font-mono font-bold tracking-widest" : ""
+                  }`}
                   disabled={processando}
                 />
                 <span className="text-[10px] text-muted-foreground mt-1 block">
-                  Usado para o colaborador desbloquear a tela da Cozinha (ou Salão na versão PRO) em segundos.
+                  Usado para o colaborador desbloquear o KDS (ou Salão na versão Pro).
                 </span>
               </div>
 
               <div>
                 <label className="text-[11px] font-black uppercase text-muted-foreground mb-1 block">
-                  E-mail (Opcional - gerado automaticamente)
+                  E-mail (Opcional)
                 </label>
                 <Input
                   type="email"
                   value={emailNovo}
                   onChange={(e) => setEmailNovo(e.target.value)}
-                  placeholder="ex: carlos@restaurante.com (ou deixe em branco)"
+                  placeholder="ex: carlos@restaurante.com"
                   className="h-10 text-xs rounded-xl"
                   disabled={processando}
                 />
                 <span className="text-[10px] text-muted-foreground mt-1 block">
-                  Se vazio, o sistema cria o login técnico automaticamente.
+                  Opcional — se vazio, geramos um identificador interno.
                 </span>
               </div>
             </div>

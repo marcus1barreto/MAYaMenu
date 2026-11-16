@@ -88,6 +88,9 @@ import {
   ShieldCheck,
   Globe,
   CheckCircle2,
+  Printer,
+  SlidersHorizontal,
+  Activity,
 } from "lucide-react";
 import confetti from "canvas-confetti";
 import Link from "next/link";
@@ -136,7 +139,7 @@ function ValorDinamicoMesa({
 
 export function AdminDashboard() {
   const { restaurante, user, logout, atualizarRestaurante } = useAuth();
-  const [abaAtiva, setAbaAtiva] = useState<"cardapio" | "mesas" | "equipe" | "analytics">("mesas");
+  const [abaAtiva, setAbaAtiva] = useState<"monitor" | "cardapio" | "mesas_setup" | "equipe" | "analytics">("monitor");
   const [modalConfigAberto, setModalConfigAberto] = useState(false);
   const [modalProAberto, setModalProAberto] = useState(false);
   const [planoCheckoutSelecionado, setPlanoCheckoutSelecionado] = useState<"pro_mensal" | "pro_semestral">("pro_mensal");
@@ -175,7 +178,6 @@ export function AdminDashboard() {
   const [scannerBalcaoAberto, setScannerBalcaoAberto] = useState(false);
   const [feedbackBalcao, setFeedbackBalcao] = useState<string | null>(null);
   const [subAbaAnalytics, setSubAbaAnalytics] = useState<"geral" | "laboratorio">("geral");
-  const [subAbaMesas, setSubAbaMesas] = useState<"monitor" | "setup">("monitor");
   const [sessoesHistorico, setSessoesHistorico] = useState<HistoricoSessaoMesa[]>([]);
   const [metricasConsolidadas, setMetricasConsolidadas] = useState<{
     totalFaturado: number;
@@ -1114,130 +1116,144 @@ export function AdminDashboard() {
                 </div>
               )}
             </div>
-            <p className="text-[11px] text-muted-foreground">Administração & Operação</p>
+            <p className="text-[11px] text-muted-foreground">
+              {abaAtiva === "monitor"
+                ? "Operação em tempo real"
+                : "Ajustes & Estrutura da Casa"}
+            </p>
           </div>
         </div>
 
-        {/* ATALHOS RÁPIDOS */}
-        <div className="flex flex-wrap items-center gap-2">
-          {/* BOTÃO LEITOR DE BALCÃO / CAIXA */}
-          <Button
-            type="button"
-            onClick={() => setScannerBalcaoAberto(true)}
-            className="bg-amber-500 hover:bg-amber-400 text-neutral-950 font-black text-xs h-9 px-3 rounded-xl flex items-center gap-1.5 shadow-xs transition-all active:scale-95"
-            title="Escanear comanda do cliente no balcão para baixa imediata"
-          >
-            <QrCode className="w-3.5 h-3.5 text-neutral-950" />
-            <span className="hidden sm:inline">Escanear Comanda</span>
-          </Button>
-
-          <Link href={restaurante?.id ? `/garcom?r=${encodeURIComponent(restaurante.id)}` : "/garcom"} target="_blank" className="relative group">
+        {/* ATALHOS DE OPERAÇÃO VS UTILITÁRIOS & AJUSTES */}
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* BLOCO OPERAÇÃO (USO NO TURNO) */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            {/* BOTÃO LEITOR DE BALCÃO / CAIXA */}
             <Button
-              variant="outline"
-              className="bg-card border-border hover:bg-muted text-emerald-600 dark:text-emerald-400 font-bold text-xs h-9 px-3 rounded-xl flex items-center gap-1.5 shadow-2xs hover:border-emerald-300 transition-all"
-              title={!moduloAtivo("mod.garcom_salao") ? "Disponível na versão Pro" : "Abrir o Terminal de Pedidos e Atendimento do Garçom em nova aba"}
+              type="button"
+              onClick={() => setScannerBalcaoAberto(true)}
+              className="bg-amber-500 hover:bg-amber-400 text-neutral-950 font-black text-xs h-9 px-3 rounded-xl flex items-center gap-1.5 shadow-xs transition-all active:scale-95"
+              title="Escanear comanda do cliente no balcão para baixa imediata"
             >
-              <UtensilsCrossed className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-              <span>App Garçom</span>
+              <QrCode className="w-3.5 h-3.5 text-neutral-950" />
+              <span className="hidden sm:inline">Escanear Comanda</span>
+            </Button>
+
+            <Link href={restaurante?.id ? `/cozinha?r=${encodeURIComponent(restaurante.id)}` : "/cozinha"} target="_blank">
+              <Button
+                variant="outline"
+                className="bg-card border-border hover:bg-muted text-amber-600 dark:text-amber-400 font-bold text-xs h-9 px-3 rounded-xl flex items-center gap-1.5"
+              >
+                <ChefHat className="w-3.5 h-3.5" />
+                <span>KDS Cozinha</span>
+                <ExternalLink className="w-3 h-3 opacity-60" />
+              </Button>
+            </Link>
+
+            <Link href={restaurante?.id ? `/garcom?r=${encodeURIComponent(restaurante.id)}` : "/garcom"} target="_blank" className="relative group">
+              <Button
+                variant="outline"
+                className="bg-card border-border hover:bg-muted text-emerald-600 dark:text-emerald-400 font-bold text-xs h-9 px-3 rounded-xl flex items-center gap-1.5 shadow-2xs hover:border-emerald-300 transition-all"
+                title={!moduloAtivo("mod.garcom_salao") ? "Disponível na versão Pro" : "Abrir o Terminal de Pedidos e Atendimento do Garçom em nova aba"}
+              >
+                <UtensilsCrossed className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                <span>App Garçom</span>
+                {!moduloAtivo("mod.garcom_salao") && (
+                  <span className="ml-0.5 px-1.5 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-[9px] font-black uppercase text-amber-600">
+                    Pro
+                  </span>
+                )}
+                <ExternalLink className="w-3 h-3 opacity-60" />
+              </Button>
               {!moduloAtivo("mod.garcom_salao") && (
-                <span className="ml-0.5 px-1.5 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-[9px] font-black uppercase text-amber-600">
-                  Pro
+                <span className="pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity absolute left-1/2 -translate-x-1/2 top-full mt-1.5 z-50 whitespace-nowrap rounded-lg bg-neutral-900 px-2.5 py-1 text-[10px] font-bold text-white shadow-lg">
+                  Disponível na versão Pro
                 </span>
               )}
-              <ExternalLink className="w-3 h-3 opacity-60" />
-            </Button>
-            {!moduloAtivo("mod.garcom_salao") && (
-              <span className="pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity absolute left-1/2 -translate-x-1/2 top-full mt-1.5 z-50 whitespace-nowrap rounded-lg bg-neutral-900 px-2.5 py-1 text-[10px] font-bold text-white shadow-lg">
-                Disponível na versão Pro
-              </span>
-            )}
-          </Link>
+            </Link>
 
-          <Link href={restaurante?.id ? `/cozinha?r=${encodeURIComponent(restaurante.id)}` : "/cozinha"} target="_blank">
+            <Link href={`${urlPublica}?mesa=1`} target="_blank">
+              <Button
+                variant="outline"
+                className="bg-card border-border hover:bg-muted text-foreground font-bold text-xs h-9 px-3 rounded-xl flex items-center gap-1.5"
+                title="Visualizar o cardápio digital como cliente"
+              >
+                <Smartphone className="w-3.5 h-3.5 text-rose-500" />
+                <span className="hidden md:inline">Cardápio PWA</span>
+                <ExternalLink className="w-3 h-3 opacity-60" />
+              </Button>
+            </Link>
+          </div>
+
+          <div className="hidden lg:block h-6 w-px bg-border mx-0.5" />
+
+          {/* BLOCO AJUSTES & UTILITÁRIOS (DISCRETO) */}
+          <div className="flex items-center gap-1 p-1 bg-muted/60 border border-border/80 rounded-xl">
             <Button
-              variant="outline"
-              className="bg-card border-border hover:bg-muted text-amber-500 font-bold text-xs h-9 px-3 rounded-xl flex items-center gap-1.5"
+              type="button"
+              variant="ghost"
+              onClick={() => setModalConfigAberto(true)}
+              className="text-foreground hover:bg-card font-bold text-xs h-7 px-2.5 rounded-lg flex items-center gap-1.5"
+              title="Ajustes da Loja, Pix, Taxa e Aparência"
             >
-              <ChefHat className="w-3.5 h-3.5" />
-              <span>KDS Cozinha</span>
-              <ExternalLink className="w-3 h-3 opacity-60" />
+              <Settings className="w-3.5 h-3.5 text-primary" />
+              <span className="hidden sm:inline">Config</span>
             </Button>
-          </Link>
 
-          <Link href={`${urlPublica}?mesa=1`} target="_blank">
             <Button
-              variant="outline"
-              className="bg-card border-border hover:bg-muted text-foreground font-bold text-xs h-9 px-3 rounded-xl flex items-center gap-1.5"
+              type="button"
+              variant="ghost"
+              onClick={() =>
+                simularImpressaoTermicaPDF(`Teste de Impressão - ${restaurante?.nome || "MAYaMenu"}`, [
+                  "========================================",
+                  `       ${(restaurante?.nome || "MAYAMENU").toUpperCase()}`,
+                  "         TESTE DE IMPRESSAO 80MM",
+                  "========================================",
+                  `Data/Hora: ${new Date().toLocaleString("pt-BR")}`,
+                  "Mesa: 01 (Simulacao)",
+                  "----------------------------------------",
+                  "QTD  ITEM                       VALOR",
+                  "----------------------------------------",
+                  "1x   Porcao Teste               R$ 30,00",
+                  "     + Acompanha: Farofa        R$  0,00",
+                  "----------------------------------------",
+                  "Subtotal:                       R$ 30,00",
+                  "Taxa de Servico (10%):          R$  3,00",
+                  "TOTAL:                          R$ 33,00",
+                  "========================================",
+                  "   Simulador Termico PDF - MAYaMenu",
+                ])
+              }
+              className="text-muted-foreground hover:text-foreground hover:bg-card font-semibold text-xs h-7 px-2.5 rounded-lg flex items-center gap-1.5"
+              title="Simulador de Impressora Térmica (PDF 80mm)"
             >
-              <Smartphone className="w-3.5 h-3.5 text-rose-500" />
-              <span>Cardápio PWA</span>
-              <ExternalLink className="w-3 h-3 opacity-60" />
+              <Printer className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Teste 80mm</span>
             </Button>
-          </Link>
 
-          <Link href="/manual" target="_blank">
+            <Link href="/manual" target="_blank">
+              <Button
+                variant="ghost"
+                className="text-muted-foreground hover:text-foreground hover:bg-card font-semibold text-xs h-7 px-2.5 rounded-lg flex items-center gap-1.5"
+                title="Abrir Central de Ajuda, Guia Rápido e FAQ"
+              >
+                <BookOpen className="w-3.5 h-3.5 text-rose-500" />
+                <span className="hidden sm:inline">Manual</span>
+              </Button>
+            </Link>
+
+            <div className="h-4 w-px bg-border mx-0.5" />
+
             <Button
-              variant="outline"
-              className="bg-card border-border hover:bg-muted text-foreground font-bold text-xs h-9 px-3 rounded-xl flex items-center gap-1.5"
-              title="Abrir Central de Ajuda, Guia Rápido e FAQ"
+              type="button"
+              variant="ghost"
+              onClick={logout}
+              className="text-muted-foreground hover:text-rose-600 hover:bg-card rounded-lg text-xs h-7 px-2 transition-colors"
+              title="Sair do Painel"
             >
-              <BookOpen className="w-3.5 h-3.5 text-rose-600" />
-              <span className="hidden sm:inline">Manual</span>
-              <ExternalLink className="w-3 h-3 opacity-60" />
+              <LogOut className="w-3.5 h-3.5" />
             </Button>
-          </Link>
-
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() =>
-              simularImpressaoTermicaPDF(`Teste de Impressão - ${restaurante?.nome || "MAYaMenu"}`, [
-                "========================================",
-                `       ${(restaurante?.nome || "MAYAMENU").toUpperCase()}`,
-                "         TESTE DE IMPRESSAO 80MM",
-                "========================================",
-                `Data/Hora: ${new Date().toLocaleString("pt-BR")}`,
-                "Mesa: 01 (Simulacao)",
-                "----------------------------------------",
-                "QTD  ITEM                       VALOR",
-                "----------------------------------------",
-                "1x   Porcao Teste               R$ 30,00",
-                "     + Acompanha: Farofa        R$  0,00",
-                "----------------------------------------",
-                "Subtotal:                       R$ 30,00",
-                "Taxa de Servico (10%):          R$  3,00",
-                "TOTAL:                          R$ 33,00",
-                "========================================",
-                "   Simulador Termico PDF - MAYaMenu",
-              ])
-            }
-            className="bg-card border-border hover:bg-muted text-foreground font-bold text-xs h-9 px-3 rounded-xl flex items-center gap-1.5 shadow-xs transition-all"
-            title="Simulador de Impressora Térmica (PDF 80mm)"
-          >
-            <span className="hidden sm:inline">Teste de Impressão</span>
-            <span className="sm:hidden">PDF 80mm</span>
-          </Button>
-
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => setModalConfigAberto(true)}
-            className="bg-card border-border hover:bg-muted text-foreground font-bold text-xs h-9 px-3 rounded-xl flex items-center gap-1.5 shadow-xs transition-all"
-            title="Configurações da Loja"
-          >
-            <Settings className="w-3.5 h-3.5 text-primary" />
-            <span className="hidden sm:inline">Config</span>
-          </Button>
-
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={logout}
-            className="text-muted-foreground hover:text-foreground hover:bg-muted rounded-xl text-xs h-9 px-2.5 transition-colors"
-            title="Sair do Painel"
-          >
-            <LogOut className="w-3.5 h-3.5" />
-          </Button>
+          </div>
         </div>
       </header>
 
@@ -1280,71 +1296,112 @@ export function AdminDashboard() {
         </div>
       )}
 
-      {/* NAVEGAÇÃO DE ABAS */}
+      {/* NAVEGAÇÃO DE ABAS: SEPARAÇÃO CLARA ENTRE OPERAÇÃO E AJUSTES */}
       <div className="border-b border-border px-4 sm:px-6 bg-card/60">
-        <div className="flex items-center gap-2 max-w-5xl mx-auto overflow-x-auto">
-          <button
-            type="button"
-            onClick={() => setAbaAtiva("cardapio")}
-            className={`py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all flex items-center gap-2 ${abaAtiva === "cardapio"
-              ? "border-primary text-primary"
-              : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
-          >
-            <UtensilsCrossed className="w-4 h-4" />
-            <span>Cardápio & Itens ({itensCardapio.length})</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setAbaAtiva("mesas")}
-            className={`py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all flex items-center gap-2 ${abaAtiva === "mesas"
-              ? "border-primary text-primary"
-              : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
-          >
-            <QrCode className="w-4 h-4" />
-            <span>Mesas & QR Codes</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setAbaAtiva("equipe")}
-            className={`py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all flex items-center gap-2 ${abaAtiva === "equipe"
-              ? "border-primary text-primary"
-              : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
-          >
-            <Users className="w-4 h-4" />
-            <span>Equipe & Chef</span>
-            {moduloAtivo("core.chef") && (
-              <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 text-[9px] font-black uppercase px-1.5 py-0">
-                Chef Free
-              </Badge>
-            )}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setAbaAtiva("analytics")}
-            className={`py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all flex items-center gap-2 relative group ${abaAtiva === "analytics"
-              ? "border-primary text-primary"
-              : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
-          >
-            <BarChart3 className="w-4 h-4 text-amber-500" />
-            <span className="flex items-center gap-1.5">
-              MAYa Inteligência
-              <Badge className="bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 text-[9px] font-black uppercase px-1.5 py-0">
-                PRO 🚀
-              </Badge>
+        <div className="flex items-center gap-2 max-w-5xl mx-auto overflow-x-auto py-1">
+          {/* ZONA 1: OPERAÇÃO AO VIVO */}
+          <div className="flex items-center gap-1.5 shrink-0 pr-1">
+            <span className="hidden md:inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 text-[10px] font-black uppercase tracking-wider">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              Operação
             </span>
-            {!moduloAtivo("mod.analytics_historico") && (
-              <span className="pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity absolute left-1/2 -translate-x-1/2 top-full mt-1 z-50 whitespace-nowrap rounded-lg bg-neutral-900 px-2.5 py-1 text-[10px] font-bold text-white shadow-lg">
-                Disponível na versão Pro
+
+            <button
+              type="button"
+              onClick={() => setAbaAtiva("monitor")}
+              className={`py-2 px-3 rounded-xl text-xs font-black transition-all flex items-center gap-2 whitespace-nowrap ${
+                abaAtiva === "monitor"
+                  ? "bg-primary/10 text-primary border border-primary/25 shadow-2xs"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
+              }`}
+            >
+              <Activity className="w-4 h-4" />
+              <span>Salão ao Vivo</span>
+              {mesas.filter((m) => m.status !== "livre").length > 0 && (
+                <Badge className="bg-amber-500 text-neutral-950 text-[10px] font-black px-1.5 py-0 h-4">
+                  {mesas.filter((m) => m.status !== "livre").length}
+                </Badge>
+              )}
+            </button>
+          </div>
+
+          {/* DIVISOR OPERAÇÃO × AJUSTES */}
+          <div className="h-5 w-px bg-border mx-1 shrink-0" />
+
+          {/* ZONA 2: AJUSTES & GESTÃO */}
+          <div className="flex items-center gap-1 shrink-0">
+            <span className="hidden md:inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-muted text-muted-foreground text-[10px] font-black uppercase tracking-wider mr-0.5">
+              <SlidersHorizontal className="w-3 h-3" />
+              Ajustes
+            </span>
+
+            <button
+              type="button"
+              onClick={() => setAbaAtiva("cardapio")}
+              className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
+                abaAtiva === "cardapio"
+                  ? "bg-muted text-foreground border border-border shadow-2xs"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
+              }`}
+            >
+              <UtensilsCrossed className="w-4 h-4" />
+              <span>Cardápio ({itensCardapio.length})</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setAbaAtiva("mesas_setup")}
+              className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
+                abaAtiva === "mesas_setup"
+                  ? "bg-muted text-foreground border border-border shadow-2xs"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
+              }`}
+            >
+              <QrCode className="w-4 h-4" />
+              <span>Mesas &amp; QR Codes</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setAbaAtiva("equipe")}
+              className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
+                abaAtiva === "equipe"
+                  ? "bg-muted text-foreground border border-border shadow-2xs"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
+              }`}
+            >
+              <Users className="w-4 h-4" />
+              <span>Equipe &amp; Chef</span>
+              {moduloAtivo("core.chef") && (
+                <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 text-[9px] font-black uppercase px-1.5 py-0">
+                  Chef Free
+                </Badge>
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setAbaAtiva("analytics")}
+              className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center gap-2 relative group whitespace-nowrap ${
+                abaAtiva === "analytics"
+                  ? "bg-muted text-foreground border border-border shadow-2xs"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
+              }`}
+            >
+              <BarChart3 className="w-4 h-4 text-amber-500" />
+              <span className="flex items-center gap-1.5">
+                MAYa Inteligência
+                <Badge className="bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 text-[9px] font-black uppercase px-1.5 py-0">
+                  PRO 🚀
+                </Badge>
               </span>
-            )}
-          </button>
+              {!moduloAtivo("mod.analytics_historico") && (
+                <span className="pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity absolute left-1/2 -translate-x-1/2 top-full mt-1 z-50 whitespace-nowrap rounded-lg bg-neutral-900 px-2.5 py-1 text-[10px] font-bold text-white shadow-lg">
+                  Disponível na versão Pro
+                </span>
+              )}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -1368,13 +1425,13 @@ export function AdminDashboard() {
                   .map((a) => `Mesa ${a.mesa} (${a.tipo})`)
                   .join(" • ")}
               </div>
-              {abaAtiva !== "mesas" && (
+              {abaAtiva !== "monitor" && (
                 <button
                   type="button"
-                  onClick={() => setAbaAtiva("mesas")}
+                  onClick={() => setAbaAtiva("monitor")}
                   className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold"
                 >
-                  Ver Mesas
+                  Ver Salão ao Vivo
                 </button>
               )}
             </div>
@@ -1606,69 +1663,53 @@ export function AdminDashboard() {
           </div>
         )}
 
-        {/* ABA: CONTROLE OPERACIONAL DAS MESAS */}
-        {abaAtiva === "mesas" && (
-          <div className="space-y-6">
+        {/* ABA OPERACIONAL: SALÃO AO VIVO (MONITOR DE MESAS) */}
+        {abaAtiva === "monitor" && (
+          <div className="space-y-5">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
-                <h2 className="text-lg font-bold text-white">Controle de Mesas do Salão</h2>
-                <p className="text-xs text-neutral-400">
-                  Monitore o consumo ao vivo ou configure a disponibilidade física, reservas e praças de atendimento.
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <h2 className="text-lg font-black text-foreground tracking-tight">
+                    Salão ao Vivo
+                  </h2>
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Monitore consumo em tempo real, chamados de atendimento, pedidos de conta e fechamento das mesas.
                 </p>
               </div>
 
-              {/* Sub-menu: Monitor ao Vivo vs Setup & Praças */}
-              <div className="flex items-center gap-1.5 p-1 bg-card border border-border rounded-xl shadow-xs">
-                <button
-                  type="button"
-                  onClick={() => setSubAbaMesas("monitor")}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${subAbaMesas === "monitor"
-                    ? "bg-primary text-primary-foreground shadow-xs"
-                    : "text-muted-foreground hover:text-foreground"
-                    }`}
-                >
-                  <QrCode className="w-3.5 h-3.5" />
-                  <span>Monitor ao Vivo</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setSubAbaMesas("setup")}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${subAbaMesas === "setup"
-                    ? "bg-primary text-primary-foreground shadow-xs"
-                    : "text-muted-foreground hover:text-foreground"
-                    }`}
-                >
-                  <Settings className="w-3.5 h-3.5" />
-                  <span>Setup & Praças</span>
-                </button>
-              </div>
-            </div>
-
-            {subAbaMesas === "setup" ? (
-              <SetupMesas
-                restauranteId={restaurante?.id || ""}
-                maxMesas={maxMesas}
-              />
-            ) : (
-              <>
+              <div className="flex flex-wrap items-center gap-4">
                 {/* Legenda de Status */}
-                <div className="flex items-center justify-end gap-3 text-xs font-semibold">
-                  <span className="flex items-center gap-1.5 text-neutral-400">
-                    <span className="w-2.5 h-2.5 rounded-full bg-neutral-700" />
+                <div className="flex items-center gap-3 text-xs font-semibold">
+                  <span className="flex items-center gap-1.5 text-muted-foreground">
+                    <span className="w-2.5 h-2.5 rounded-full bg-neutral-400 dark:bg-neutral-600" />
                     Livre
                   </span>
-                  <span className="flex items-center gap-1.5 text-neutral-400">
+                  <span className="flex items-center gap-1.5 text-muted-foreground">
                     <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
                     Ocupada
                   </span>
-                  <span className="flex items-center gap-1.5 text-rose-400 font-bold">
+                  <span className="flex items-center gap-1.5 text-rose-600 dark:text-rose-400 font-bold">
                     <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping" />
                     Pediu Conta
                   </span>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setAbaAtiva("mesas_setup")}
+                  className="h-8 px-3 rounded-xl text-xs font-bold border-border text-muted-foreground hover:text-foreground flex items-center gap-1.5"
+                >
+                  <SlidersHorizontal className="w-3.5 h-3.5" />
+                  <span>Ajustar Mesas &amp; QRs</span>
+                </Button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
                   {mesas.map((mesa) => {
                     const num = mesa.numero;
                     const ehChamado = Boolean(mesa.chamandoGarcom);
@@ -1790,13 +1831,44 @@ export function AdminDashboard() {
                       </div>
                     );
                   })}
-                </div>
-              </>
-            )}
+            </div>
           </div>
         )}
 
+        {/* ABA AJUSTES: MESAS, PRAÇAS & QR CODES */}
+        {abaAtiva === "mesas_setup" && (
+          <div className="space-y-5">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <SlidersHorizontal className="w-4 h-4 text-primary" />
+                  <h2 className="text-lg font-black text-foreground tracking-tight">
+                    Mesas, Praças &amp; QR Codes
+                  </h2>
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Configure reservas, garçons por praça, disponibilidade física e gere/imprima os QR Codes das mesas.
+                </p>
+              </div>
 
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setAbaAtiva("monitor")}
+                className="h-8 px-3 rounded-xl text-xs font-bold border-emerald-500/30 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10 flex items-center gap-1.5"
+              >
+                <Activity className="w-3.5 h-3.5" />
+                <span>Voltar ao Salão ao Vivo</span>
+              </Button>
+            </div>
+
+            <SetupMesas
+              restauranteId={restaurante?.id || ""}
+              maxMesas={maxMesas}
+            />
+          </div>
+        )}
 
         {/* ABA: EQUIPE & ACESSOS */}
         {abaAtiva === "equipe" && (
