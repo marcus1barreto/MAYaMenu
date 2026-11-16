@@ -839,6 +839,143 @@ exports.loginComQrSetor = functions.https.onCall(async (data, context) => {
   return executarLoginComQrSetor(getDb(), data, context.rawRequest);
 });
 
+const ASSUNTOS_CONTATO_ESPECIALISTA = [
+  'duvida_planos',
+  'duvida_operacao',
+  'suporte_tecnico',
+  'comercial_pro',
+  'sugestao_lancamento',
+];
+
+/**
+ * Recebe solicitações do Assistente / "Falar com Especialista" sem depender de WhatsApp.
+ * Protegido por honeypot anti-bot e rate limit por IP (máx. 4 envios a cada 30 min).
+ */
+async function executarEnviarContatoEspecialista(
+  firestoreDb,
+  data,
+  rawRequest,
+  authUid = null,
+  fetchFn = null
+) {
+  const payload = data || {};
+  if (typeof payload.website === 'string' && payload.website.trim().length > 0) {
+    return { sucesso: true, ignorado: true };
+  }
+
+  const nome = String(payload.nome || '').trim().slice(0, 80);
+  const email = String(payload.email || '').trim().toLowerCase().slice(0, 120);
+  const assuntoRaw = String(payload.assunto || 'duvida_planos').trim();
+  const assunto = ASSUNTOS_CONTATO_ESPECIALISTA.includes(assuntoRaw)
+    ? assuntoRaw
+    : 'duvida_planos';
+  const mensagem = String(payload.mensagem || '').trim().slice(0, 1200);
+  const restauranteId = typeof payload.restauranteId === 'string'
+    ? payload.restauranteId.trim().slice(0, 128)
+    : '';
+  const restauranteNome = typeof payload.restauranteNome === 'string'
+    ? payload.restauranteNome.trim().slice(0, 100)
+    : '';
+  const origem = typeof payload.origem === 'string'
+    ? payload.origem.trim().slice(0, 120)
+    : '';
+
+  if (nome.length < 2) {
+    throw new functions.https.HttpsError('invalid-argument', 'Informe seu nome para contato.');
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw new functions.https.HttpsError('invalid-argument', 'Informe um e-mail válido para retorno.');
+  }
+  if (mensagem.length < 10) {
+    throw new functions.https.HttpsError(
+      'invalid-argument',
+      'Descreva brevemente sua dúvida ou solicitação (mínimo 10 caracteres).'
+    );
+  }
+
+  const agora = Date.now();
+  const janelaContatoMs = 30 * 60 * 1000;
+  const maxTentativasContatoIp = 4;
+  const clientIp = extrairIpConviavel(rawRequest);
+  const ipKey = sanitizarChave(clientIp);
+  const rateRef = firestoreDb.collection('_contato_rate_limits').doc(`ip_${ipKey}`);
+  const chamadoId = `sup-${agora.toString(36)}-${crypto.randomBytes(4).toString('hex')}`;
+  const chamadoRef = firestoreDb.collection('chamados_suporte').doc(chamadoId);
+
+  await firestoreDb.runTransaction(async (tx) => {
+    const rateSnap = await tx.get(rateRef);
+    const rateData = rateSnap.exists ? (rateSnap.data() || {}) : {};
+    const janelaExpirada = !rateData.janelaIniciadaEm || (agora - rateData.janelaIniciadaEm > janelaContatoMs);
+    const contagemAtual = janelaExpirada ? 0 : (Number(rateData.contagem) || 0);
+
+    if (contagemAtual >= maxTentativasContatoIp) {
+      throw new functions.https.HttpsError(
+        'resource-exhausted',
+        'Limite de envios atingido no momento. Aguarde alguns minutos ou escreva para contato@mayamenu.com.br.'
+      );
+    }
+
+    tx.set(
+      rateRef,
+      {
+        contagem: contagemAtual + 1,
+        janelaIniciadaEm: janelaExpirada ? agora : rateData.janelaIniciadaEm,
+        atualizadoEm: agora,
+      },
+      { merge: true }
+    );
+
+    tx.set(chamadoRef, {
+      id: chamadoId,
+      nome,
+      email,
+      assunto,
+      mensagem,
+      restauranteId: restauranteId || null,
+      restauranteNome: restauranteNome || null,
+      authUid: authUid || null,
+      origem: origem || null,
+      status: 'pendente',
+      criadoEm: new Date(agora).toISOString(),
+    });
+  });
+
+  const ntfyUrl = String(process.env.NTFY_CONTATO_URL || '').trim();
+  const httpFetch = fetchFn || (typeof fetch === 'function' ? fetch : null);
+  if (httpFetch && /^https?:\/\//i.test(ntfyUrl)) {
+    try {
+      await httpFetch(ntfyUrl, {
+        method: 'POST',
+        headers: {
+          Title: `MAYaMenu: ${assunto} (${nome})`.slice(0, 100),
+          Priority: 'default',
+          Tags: 'speech_balloon',
+        },
+        body: `${nome} <${email}>${restauranteNome ? ` [${restauranteNome}]` : ''}\n${mensagem}`,
+        ...(typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function'
+          ? { signal: AbortSignal.timeout(3000) }
+          : {}),
+      });
+    } catch {
+      // Falha no canal opcional de push não anula o chamado salvo
+    }
+  }
+
+  return {
+    sucesso: true,
+    chamadoId,
+  };
+}
+
+exports.enviarContatoEspecialista = functions.https.onCall(async (data, context) => {
+  return executarEnviarContatoEspecialista(
+    getDb(),
+    data,
+    context.rawRequest,
+    context.auth?.uid || null
+  );
+});
+
 /**
  * Cloud Function HTTPS Callable para o Dono alterar o PIN de um membro
  */
@@ -4873,6 +5010,7 @@ exports._internal = {
   executarLoginComPin,
   executarGerenciarQrAcessoSetor,
   executarLoginComQrSetor,
+  executarEnviarContatoEspecialista,
   getMesaTokenSecret,
   verificarMesaToken,
   validarModificadoresServidor,

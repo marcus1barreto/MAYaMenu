@@ -1048,6 +1048,58 @@ async function runTests() {
     }
   });
 
+  await test("Fichas técnicas e controles da Cozinha: privacidade, pausa de esgotado e bloqueio de preço", async () => {
+    const ownerADb = testEnv.authenticatedContext("owner_a", { role: "owner", restauranteId: "rest_a" }).firestore();
+    const cozinhaADb = testEnv.authenticatedContext("cozinha_a", { role: "cozinha", restauranteId: "rest_a" }).firestore();
+    const garcomADb = testEnv.authenticatedContext("garcom_a", { role: "garcom", restauranteId: "rest_a" }).firestore();
+    const clienteDb = testEnv.authenticatedContext("cliente_1").firestore();
+    const ownerBDb = testEnv.authenticatedContext("owner_b", { role: "owner", restauranteId: "rest_b" }).firestore();
+
+    await assertSucceeds(ownerADb.doc("restaurantes/rest_a/cardapio/prato_1").set({
+      nome: "Burger Chef",
+      precoBase: 35,
+      ativo: true,
+    }));
+    await assertSucceeds(cozinhaADb.doc("restaurantes/rest_a/fichas_tecnicas/prato_1").set({
+      menuItemId: "prato_1",
+      nomeItem: "Burger Chef",
+      ingredientes: [{ id: "1", nome: "Blend", quantidade: "180g" }],
+      modoPreparo: "Chapa 3 min cada lado",
+    }));
+
+    // Leitura permitida para equipe da casa, negada para público e outro tenant
+    await assertSucceeds(cozinhaADb.doc("restaurantes/rest_a/fichas_tecnicas/prato_1").get());
+    await assertSucceeds(garcomADb.doc("restaurantes/rest_a/fichas_tecnicas/prato_1").get());
+    await assertFails(clienteDb.doc("restaurantes/rest_a/fichas_tecnicas/prato_1").get());
+    await assertFails(ownerBDb.doc("restaurantes/rest_a/fichas_tecnicas/prato_1").get());
+    await assertFails(cozinhaADb.doc("restaurantes/rest_a/fichas_tecnicas/prato_1").delete());
+
+    // Cozinha pode pausar item esgotado e sugerir rascunho pausado, mas não pode alterar preço nem publicar
+    await assertSucceeds(cozinhaADb.doc("restaurantes/rest_a/cardapio/prato_1").update({ ativo: false }));
+    await assertFails(cozinhaADb.doc("restaurantes/rest_a/cardapio/prato_1").update({ precoBase: 1 }));
+    await assertSucceeds(cozinhaADb.doc("restaurantes/rest_a/cardapio/rascunho_chef").set({
+      nome: "Novo Prato Rascunho",
+      precoBase: 0,
+      ativo: false,
+    }));
+    await assertFails(cozinhaADb.doc("restaurantes/rest_a/cardapio/publicado_chef").set({
+      nome: "Tentativa Publicar",
+      precoBase: 1,
+      ativo: true,
+    }));
+  });
+
+  await test("Chamados de suporte: criação e leitura direta bloqueadas para usuários comuns", async () => {
+    const anonDb = testEnv.unauthenticatedContext().firestore();
+    const ownerADb = testEnv.authenticatedContext("owner_a", { role: "owner", restauranteId: "rest_a" }).firestore();
+    const superAdminDb = testEnv.authenticatedContext("admin_uid", { superadmin: true }).firestore();
+
+    await assertFails(anonDb.doc("chamados_suporte/sup_1").set({ nome: "Spam" }));
+    await assertFails(ownerADb.doc("chamados_suporte/sup_2").set({ nome: "Dono" }));
+    await assertFails(ownerADb.doc("chamados_suporte/sup_1").get());
+    await assertSucceeds(superAdminDb.doc("chamados_suporte/sup_1").get());
+  });
+
   console.log("\n=================================================");
   console.log(`Relatório Final de Testes: ${passed} Passaram | ${failed} Falharam`);
   console.log("=================================================");

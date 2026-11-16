@@ -182,7 +182,11 @@ export function ItemModal({ item, isOpen, onClose, corPrimaria = "#E11D48" }: It
           )}
 
           {/* Cabeçalho do Prato */}
-          <div className="p-5 sm:p-6 bg-white relative -mt-6 rounded-t-3xl z-10">
+          <div
+            className={`p-5 sm:p-6 bg-white relative z-10 ${
+              item.fotoUrl ? "-mt-6 rounded-t-3xl" : "pt-16"
+            }`}
+          >
             <h2 className="text-xl sm:text-2xl font-black text-neutral-900 tracking-tight leading-tight">
               {item.nome}
             </h2>
@@ -303,9 +307,9 @@ export function ItemModal({ item, isOpen, onClose, corPrimaria = "#E11D48" }: It
         </div>
 
         {/* RODAPÉ FIXO (Controles de Quantidade e Adicionar ao Carrinho) */}
-        <div className="p-4 sm:p-5 bg-white border-t border-neutral-200 shrink-0 flex items-center gap-3">
+        <div className="p-4 sm:p-5 pb-safe-bottom bg-white border-t border-neutral-200 shrink-0 flex items-center gap-2.5 sm:gap-3">
           {/* Controle de Quantidade */}
-          <div className="flex items-center justify-between bg-neutral-100 rounded-xl p-1 h-14 w-32 border border-neutral-200">
+          <div className="flex items-center justify-between bg-neutral-100 rounded-xl p-1 h-12 sm:h-14 w-28 sm:w-32 border border-neutral-200 shrink-0">
             <button
               type="button"
               onClick={() => setQuantidade((q) => Math.max(1, q - 1))}

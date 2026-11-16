@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ArrowLeft, ArrowRight, CheckCircle2, Sparkles } from "lucide-react";
+import { BotaoFalarEspecialista } from "@/components/suporte/botao-falar-especialista";
 
 export const metadata = {
   title: "Planos & Preços | MAYaMenu",
@@ -108,6 +109,18 @@ export default function PrecosPage() {
               <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
+        </div>
+
+        <div className="rounded-3xl border border-neutral-200 bg-white p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
+          <div>
+            <h2 className="text-base font-black text-neutral-950">
+              Ficou com dúvida sobre mesas extras, impressora ou versão PRO?
+            </h2>
+            <p className="text-xs sm:text-sm text-neutral-600 mt-0.5">
+              Consulte nosso assistente imediato ou envie uma pergunta direto para nossa equipe sem precisar de WhatsApp.
+            </p>
+          </div>
+          <BotaoFalarEspecialista origem="pagina_precos" />
         </div>
       </main>
     </div>

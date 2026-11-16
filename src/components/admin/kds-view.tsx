@@ -343,7 +343,7 @@ export function KdsView({
             <ChefHat className="w-6 h-6 text-white" />
           </div>
           <div>
-            <h1 className="text-xl sm:text-2xl font-black tracking-tight flex items-center gap-2 text-neutral-900">
+            <h1 className="text-lg sm:text-2xl font-black tracking-tight flex flex-wrap items-center gap-2 text-neutral-900">
               <span>KDS da Cozinha</span>
               <span className="text-xs px-2.5 py-0.5 rounded-full bg-rose-50 text-rose-700 font-bold border border-rose-200">
                 AO VIVO
@@ -381,7 +381,7 @@ export function KdsView({
               title="Consultar Livro Técnico de Receitas e Componentes"
             >
               <BookOpen className="w-3.5 h-3.5 text-amber-600" />
-              <span className="hidden sm:inline">Receitas</span>
+              <span>Receitas</span>
             </Button>
           </Link>
 
@@ -438,7 +438,7 @@ export function KdsView({
             </span>
           </Button>
 
-          <div className="flex items-center gap-1.5 bg-neutral-100 p-1.5 rounded-2xl border border-neutral-200/80">
+          <div className="flex flex-wrap items-center gap-1.5 bg-neutral-100 p-1.5 rounded-2xl border border-neutral-200/80 max-w-full">
             <button
               type="button"
               onClick={() => setFiltro("todos")}

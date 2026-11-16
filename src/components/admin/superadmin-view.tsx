@@ -20,7 +20,8 @@ import {
 } from "@/lib/licenca-service";
 import type { Licenca, LicencaArquivada, PlanoTipo, Restaurante } from "@/types";
 import { parseDateToMillis } from "@/lib/datas";
-import { auth } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
+import { collection, doc, limit, onSnapshot, orderBy, query, updateDoc } from "firebase/firestore";
 import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
@@ -98,7 +99,20 @@ export function SuperAdminView() {
   const [arquivoMorto, setArquivoMorto] = useState<LicencaArquivada[]>([]);
   const [restaurantes, setRestaurantes] = useState<Restaurante[]>([]);
   const [patrocinadores, setPatrocinadores] = useState<PatrocinadorB2B[]>([]);
-  const [abaAtiva, setAbaAtiva] = useState<"restaurantes" | "ativas" | "vencidas" | "arquivo_morto" | "patrocinadores">("restaurantes");
+  const [chamadosSuporte, setChamadosSuporte] = useState<
+    Array<{
+      id: string;
+      nome: string;
+      email: string;
+      assunto: string;
+      mensagem: string;
+      restauranteNome?: string | null;
+      origem?: string | null;
+      status: string;
+      criadoEm: string;
+    }>
+  >([]);
+  const [abaAtiva, setAbaAtiva] = useState<"restaurantes" | "ativas" | "vencidas" | "arquivo_morto" | "patrocinadores" | "chamados">("restaurantes");
   const [filtro, setFiltro] = useState<string>("");
   const [planoSelecionado, setPlanoSelecionado] = useState<PlanoTipo>("free");
   const [responsavel, setResponsavel] = useState("");
@@ -161,6 +175,7 @@ export function SuperAdminView() {
           console.warn("Aviso ao sincronizar token no superadmin:", e);
         }
       } else {
+        setChamadosSuporte([]);
         document.cookie = `__session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
       }
     });
@@ -172,6 +187,45 @@ export function SuperAdminView() {
       unsubAuth();
     };
   }, []);
+
+  useEffect(() => {
+    const emailCheck = usuarioAuth?.email?.toLowerCase() || "";
+    const autorizado = Boolean(
+      usuarioAuth &&
+        !usuarioAuth.isAnonymous &&
+        EMAILS_SUPERADMIN_AUTORIZADOS.includes(emailCheck)
+    );
+    if (!autorizado) return;
+
+    const qChamados = query(
+      collection(db, "chamados_suporte"),
+      orderBy("criadoEm", "desc"),
+      limit(50)
+    );
+    const unsubChamados = onSnapshot(
+      qChamados,
+      (snap) => {
+        const lista = snap.docs.map((d) => ({
+          id: d.id,
+          ...(d.data() as {
+            nome: string;
+            email: string;
+            assunto: string;
+            mensagem: string;
+            restauranteNome?: string | null;
+            origem?: string | null;
+            status: string;
+            criadoEm: string;
+          }),
+        }));
+        setChamadosSuporte(lista);
+      },
+      () => {
+        setChamadosSuporte([]);
+      }
+    );
+    return () => unsubChamados();
+  }, [usuarioAuth]);
 
   const handleLoginOperador = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -951,6 +1005,17 @@ export function SuperAdminView() {
         >
           <Building2 className="w-4 h-4" />
           Patrocinadores B2B ({patrocinadores.length})
+        </button>
+        <button
+          onClick={() => setAbaAtiva("chamados")}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+            abaAtiva === "chamados"
+              ? "bg-amber-500 text-neutral-950 shadow-md shadow-amber-500/25"
+              : "bg-card text-muted-foreground hover:text-foreground border border-border"
+          }`}
+        >
+          <MessageCircle className="w-4 h-4" />
+          Chamados ({chamadosSuporte.filter((c) => c.status === "pendente").length})
         </button>
       </div>
 
@@ -1929,6 +1994,79 @@ export function SuperAdminView() {
                   </div>
                 );
               })}
+            </div>
+          )}
+        </div>
+      ) : abaAtiva === "chamados" ? (
+        <div className="space-y-4">
+          <div>
+            <h2 className="text-xl font-black tracking-tight flex items-center gap-2">
+              <MessageCircle className="w-5 h-5 text-amber-500" />
+              Chamados &amp; Contatos de Especialista ({chamadosSuporte.length})
+            </h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Mensagens enviadas pelo Assistente MAYaMenu sem depender de WhatsApp.
+            </p>
+          </div>
+
+          {chamadosSuporte.length === 0 ? (
+            <div className="p-10 rounded-3xl border border-dashed border-border text-center text-xs text-muted-foreground">
+              Nenhum chamado registrado até o momento.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-3">
+              {chamadosSuporte.map((ch) => (
+                <div
+                  key={ch.id}
+                  className="p-4 rounded-2xl bg-card border border-border flex flex-col sm:flex-row sm:items-start justify-between gap-3"
+                >
+                  <div className="space-y-1.5 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge
+                        className={
+                          ch.status === "pendente"
+                            ? "bg-amber-500/15 text-amber-700 border-amber-500/30 text-[10px] font-black"
+                            : "bg-emerald-500/15 text-emerald-700 border-emerald-500/30 text-[10px] font-black"
+                        }
+                      >
+                        {ch.status === "pendente" ? "Pendente" : "Respondido"}
+                      </Badge>
+                      <span className="text-sm font-black text-foreground">{ch.nome}</span>
+                      <span className="text-xs text-muted-foreground">&lt;{ch.email}&gt;</span>
+                      {ch.restauranteNome && (
+                        <Badge variant="outline" className="text-[10px]">
+                          {ch.restauranteNome}
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-xs text-foreground whitespace-pre-wrap leading-relaxed">
+                      {ch.mensagem}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground">
+                      Assunto: {ch.assunto} • Origem: {ch.origem || "-"} • {new Date(ch.criadoEm).toLocaleString("pt-BR")}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <a
+                      href={`mailto:${encodeURIComponent(ch.email)}?subject=${encodeURIComponent("Retorno MAYaMenu - " + ch.assunto)}`}
+                      className="px-3 py-1.5 rounded-xl border border-border bg-muted hover:bg-muted/80 text-xs font-bold"
+                    >
+                      Responder por E-mail
+                    </a>
+                    {ehSuperAdmin && ch.status === "pendente" && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() => updateDoc(doc(db, "chamados_suporte", ch.id), { status: "respondido" })}
+                        className="h-8 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold"
+                      >
+                        Marcar Respondido
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>

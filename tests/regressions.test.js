@@ -822,21 +822,23 @@ async function main() {
       /encerrada/i
     );
 
-    // Liberação: histórico recalculado a partir dos pedidos reais, pedidos/KDS removidos, métrica única
+    // Liberação: histórico recalculado a partir dos pedidos reais, pedidos/KDS/comanda removidos, métrica única
     const l1 = await executarLiberarMesa(db, "garcom_1", {}, { ...base, comandasIds: ["cli_f"] });
     assert.strictEqual(l1.idempotente, false);
     assert.strictEqual(l1.subtotalTotal, 25.8);
     assert.ok(!db._store.has(pedidoPath));
     assert.ok(!db._store.has("restaurantes/rest_1/kds_tickets/ped-fecha-001"));
+    assert.ok(!db._store.has(comandaPath));
     const historicos = [...db._store.keys()].filter((k) => k.includes("/historico_sessoes_mesas/"));
     assert.strictEqual(historicos.length, 1);
     assert.strictEqual(db._store.get(historicos[0]).subtotalTotal, 25.8);
     assert.strictEqual(db._store.get(historicos[0]).liberadaPorUid, "garcom_1");
-    assert.strictEqual(db._store.get(comandaPath).historicoSessaoId, l1.historicoId);
 
-    // Repetir não duplica histórico nem métrica
-    const l2 = await executarLiberarMesa(db, "garcom_1", {}, { ...base, comandasIds: ["cli_f"] });
-    assert.strictEqual(l2.idempotente, true);
+    // Repetir após exclusão da comanda é rejeitado e não duplica histórico nem métrica
+    await assert.rejects(
+      () => executarLiberarMesa(db, "garcom_1", {}, { ...base, comandasIds: ["cli_f"] }),
+      /Nenhuma comanda/i
+    );
     assert.strictEqual([...db._store.keys()].filter((k) => k.includes("/historico_sessoes_mesas/")).length, 1);
     const metricasKeys = [...db._store.keys()].filter((k) => k.includes("/metricas_consolidadas/"));
     assert.strictEqual(metricasKeys.length, 1);

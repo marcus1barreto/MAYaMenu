@@ -1350,8 +1350,10 @@ async function main() {
     const { rest, comanda } = await seed(db, 2, "cli_b");
     await executarFecharComanda(db, "garcom_e", {}, { ...base, mesa: 2, clienteId: "cli_b" });
     const args = [db, "garcom_e", {}, { ...base, mesa: 2, comandasIds: ["cli_b"] }];
-    const res = await Promise.all(Array.from({ length: 8 }, () => executarLiberarMesa(...args)));
-    assert.strictEqual(res.filter((r) => r.idempotente === false).length, 1);
+    const settled = await Promise.allSettled(Array.from({ length: 8 }, () => executarLiberarMesa(...args)));
+    const fulfilled = settled.filter((r) => r.status === "fulfilled").map((r) => r.value);
+    assert.strictEqual(fulfilled.length, 1);
+    assert.strictEqual(fulfilled[0].idempotente, false);
     const hist = await rest.collection("historico_sessoes_mesas").where("mesa", "==", 2).get();
     assert.strictEqual(hist.size, 1);
     assert.strictEqual(hist.docs[0].data().subtotalTotal, 30);
@@ -1361,7 +1363,7 @@ async function main() {
     assert.strictEqual(metricas.docs[0].data().totalFaturado, 30);
     assert.strictEqual((await comanda.collection("pedidos").get()).size, 0);
     assert.strictEqual((await rest.collection("kds_tickets").doc("p1").get()).exists, false);
-    assert.ok((await comanda.get()).data().historicoSessaoId);
+    assert.strictEqual((await comanda.get()).exists, false);
   });
 
   await runTest("Emulador: RBAC, taxa em comanda paga e comanda inexistente são rejeitados", async () => {

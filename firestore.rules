@@ -475,5 +475,15 @@ service cloud.firestore {
       );
     }
 
+    // Chamados assíncronos do Assistente / Falar com Especialista
+    match /chamados_suporte/{chamadoId} {
+      allow read, update, delete: if isSuperAdmin();
+      allow create: if false; // Criação exclusiva via Cloud Function enviarContatoEspecialista
+    }
+
+    match /_contato_rate_limits/{docId} {
+      allow read, write: if false;
+    }
+
   }
 }

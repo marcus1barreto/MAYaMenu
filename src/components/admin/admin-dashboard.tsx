@@ -35,6 +35,7 @@ import { ModificadorBuilder } from "./modificador-builder";
 import { GestaoEquipe } from "./gestao-equipe";
 import { SetupMesas } from "./setup-mesas";
 import { OnboardingTourCard } from "./onboarding-tour-card";
+import { EspecialistaAssistenteModal } from "@/components/suporte/especialista-assistente-modal";
 import { FichaTecnicaEditorModal } from "@/components/cozinha/ficha-tecnica-modal";
 import { escutarFichasTecnicas } from "@/lib/fichas-tecnicas-service";
 import { MAYA_MEDIA_LIBRARY } from "@/lib/maya-media-library";
@@ -185,6 +186,7 @@ export function AdminDashboard({
   const [itensCardapio, setItensCardapio] = useState<MenuItem[]>([]);
   const [carregandoCardapio, setCarregandoCardapio] = useState(true);
   const [tourForcadoAberto, setTourForcadoAberto] = useState(false);
+  const [modalEspecialistaAberto, setModalEspecialistaAberto] = useState(false);
   const [fichasPorItem, setFichasPorItem] = useState<Record<string, FichaTecnicaItem>>({});
   const [itemEditandoFicha, setItemEditandoFicha] = useState<MenuItem | null>(null);
   const [modoOperacao, setModoOperacao] = useState<"com_garcom" | "hibrido" | "balcao">(
@@ -1175,17 +1177,17 @@ export function AdminDashboard({
         {/* SELETOR PRINCIPAL DE ROTAS: OPERAÇÃO | GERENCIAL | SETUP */}
         <nav
           aria-label="Alternar área do painel"
-          className="flex items-center gap-1 p-1 bg-muted/70 border border-border rounded-2xl shadow-2xs"
+          className="order-3 lg:order-none w-full lg:w-auto grid grid-cols-3 lg:flex items-center gap-1 p-1 bg-muted/70 border border-border rounded-2xl shadow-2xs"
         >
           <Link
             href="/admin/operacao"
-            className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 ${
+            className={`px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 ${
               modo === "operacao"
                 ? "bg-card text-foreground shadow-xs border border-border/80"
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
             <span>Operação</span>
             {mesas.filter((m) => m.status !== "livre").length > 0 && (
               <Badge className="bg-amber-500 text-neutral-950 text-[10px] font-black px-1.5 py-0 h-4">
@@ -1196,25 +1198,25 @@ export function AdminDashboard({
 
           <Link
             href="/admin/gerencial"
-            className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 ${
+            className={`px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 ${
               modo === "gerencial"
                 ? "bg-card text-foreground shadow-xs border border-border/80"
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            <BarChart3 className="w-3.5 h-3.5 text-amber-500" />
+            <BarChart3 className="w-3.5 h-3.5 text-amber-500 shrink-0" />
             <span>Gerencial</span>
           </Link>
 
           <Link
             href="/admin/setup"
-            className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 ${
+            className={`px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 ${
               modo === "setup"
                 ? "bg-card text-foreground shadow-xs border border-border/80"
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            <SlidersHorizontal className="w-3.5 h-3.5 text-primary" />
+            <SlidersHorizontal className="w-3.5 h-3.5 text-primary shrink-0" />
             <span>Setup</span>
           </Link>
         </nav>
@@ -2326,12 +2328,10 @@ export function AdminDashboard({
                           <Button
                             type="button"
                             variant="outline"
-                            onClick={() => {
-                              window.open("mailto:contato@mayamenu.com.br?subject=Consultor%20MAYaMenu%20PRO", "_blank");
-                            }}
+                            onClick={() => setModalEspecialistaAberto(true)}
                             className="h-11 px-5 border border-border bg-card hover:bg-muted text-foreground font-bold text-xs rounded-2xl"
                           >
-                            Falar com Consultor
+                            Falar com Especialista
                           </Button>
                         </div>
 
@@ -3400,6 +3400,15 @@ export function AdminDashboard({
         restauranteId={restaurante?.id || ""}
         menuItem={itemEditandoFicha}
         fichaAtual={itemEditandoFicha ? fichasPorItem[itemEditandoFicha.id] : null}
+      />
+
+      <EspecialistaAssistenteModal
+        open={modalEspecialistaAberto}
+        onOpenChange={setModalEspecialistaAberto}
+        emailInicial={user?.email || ""}
+        restauranteId={restaurante?.id || ""}
+        restauranteNome={restaurante?.nome || ""}
+        origem={`admin_${modo}`}
       />
     </div>
   );

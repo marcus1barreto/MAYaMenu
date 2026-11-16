@@ -533,14 +533,14 @@ export function PinLockGuard({ role, restauranteId, slug, children }: PinLockGua
             )}
 
             {/* Teclado Numérico Fat-Finger Harmonizado com Botão de Confirmar */}
-            <div className="grid grid-cols-3 gap-2.5 w-full max-w-[270px]">
+            <div className="grid grid-cols-3 gap-2 sm:gap-2.5 w-full max-w-[270px]">
               {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((num) => (
                 <button
                   key={num}
                   type="button"
                   disabled={autenticando}
                   onClick={() => handleTecla(num)}
-                  className="h-14 rounded-2xl bg-neutral-100 hover:bg-neutral-200 active:scale-95 text-neutral-900 font-black text-xl transition-all shadow-2xs border border-neutral-200/80 disabled:opacity-50"
+                  className="h-12 sm:h-14 rounded-2xl bg-neutral-100 hover:bg-neutral-200 active:scale-95 text-neutral-900 font-black text-lg sm:text-xl transition-all shadow-2xs border border-neutral-200/80 disabled:opacity-50"
                 >
                   {num}
                 </button>
@@ -551,7 +551,7 @@ export function PinLockGuard({ role, restauranteId, slug, children }: PinLockGua
                 type="button"
                 disabled={autenticando}
                 onClick={handleApagar}
-                className="h-14 rounded-2xl bg-neutral-50 hover:bg-neutral-100 active:scale-95 text-neutral-600 font-bold text-xs flex items-center justify-center gap-1 transition-all border border-neutral-200/60 disabled:opacity-50"
+                className="h-12 sm:h-14 rounded-2xl bg-neutral-50 hover:bg-neutral-100 active:scale-95 text-neutral-600 font-bold text-xs flex items-center justify-center gap-1 transition-all border border-neutral-200/60 disabled:opacity-50"
                 title="Apagar último número"
               >
                 <Delete className="w-4 h-4" />
@@ -563,7 +563,7 @@ export function PinLockGuard({ role, restauranteId, slug, children }: PinLockGua
                 type="button"
                 disabled={autenticando}
                 onClick={() => handleTecla("0")}
-                className="h-14 rounded-2xl bg-neutral-100 hover:bg-neutral-200 active:scale-95 text-neutral-900 font-black text-xl transition-all shadow-2xs border border-neutral-200/80 disabled:opacity-50"
+                className="h-12 sm:h-14 rounded-2xl bg-neutral-100 hover:bg-neutral-200 active:scale-95 text-neutral-900 font-black text-lg sm:text-xl transition-all shadow-2xs border border-neutral-200/80 disabled:opacity-50"
               >
                 0
               </button>

@@ -612,7 +612,7 @@ export function MenuView({
   }
 
   return (
-    <div className="min-h-screen bg-background pb-28 text-foreground antialiased selection:bg-primary selection:text-white transition-colors duration-200">
+    <div className="min-h-screen bg-background pb-36 text-foreground antialiased selection:bg-primary selection:text-white transition-colors duration-200 overflow-x-hidden">
       {/* 1. HEADER MOBILE COMPACTO & ELEGANTE */}
       <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-md border-b border-border text-foreground transition-all shadow-xs">
         <div className="max-w-3xl mx-auto px-4 h-14 flex items-center justify-between gap-3">
@@ -886,14 +886,14 @@ export function MenuView({
       {/* LISTA DE ITENS DO CARDÁPIO */}
       <main className="max-w-3xl mx-auto px-4 mt-6">
         <div className="flex items-center justify-between mb-4 px-1">
-          <h2 className="text-sm font-black uppercase tracking-wider text-neutral-500">
+          <h2 className="text-sm font-black uppercase tracking-wider text-muted-foreground">
             {categoriaAtiva === "Todas" ? "Destaques da Casa" : categoriaAtiva} ({itensFiltrados.length})
           </h2>
         </div>
 
         {itensFiltrados.length === 0 ? (
-          <div className="py-16 text-center text-neutral-400">
-            <p className="text-base font-semibold">Nenhum item encontrado.</p>
+          <div className="py-16 text-center text-muted-foreground">
+            <p className="text-base font-semibold text-foreground">Nenhum item encontrado.</p>
             <p className="text-xs">Tente buscar por outro termo.</p>
           </div>
         ) : (
@@ -962,121 +962,111 @@ export function MenuView({
         )}
       </main>
 
-      {/* BARRA FLUTUANTE INFERIOR (Acesso ao Carrinho quando há itens selecionados) */}
-      {totalItens > 0 && (
-        <div className="fixed bottom-4 left-4 right-4 z-40 max-w-md mx-auto">
-          <Button
-            type="button"
-            onClick={() => setCarrinhoAberto(true)}
-            style={{ backgroundColor: corPrimaria }}
-            className="w-full h-16 rounded-2xl shadow-2xl text-white font-black text-base flex items-center justify-between px-5 active:scale-[0.98] transition-all"
-          >
-            <div className="flex items-center gap-3">
-              <div className="relative p-2 bg-white/20 rounded-xl">
-                <ShoppingBag className="w-5 h-5 text-white" />
-                <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-white text-neutral-900 rounded-full text-xs font-black flex items-center justify-center shadow-sm">
-                  {totalItens}
+      {/* DOCA INFERIOR UNIFICADA (RESPONSIVA SEM SOBREPOSIÇÃO EM TELAS PEQUENAS) */}
+      <div className="fixed bottom-0 left-0 right-0 z-40 pointer-events-none px-3 sm:px-4 pb-safe-bottom pt-2 bg-gradient-to-t from-background via-background/90 to-transparent">
+        <div className="max-w-xl mx-auto space-y-2 pointer-events-auto">
+          {totalItens > 0 && (
+            <Button
+              type="button"
+              onClick={() => setCarrinhoAberto(true)}
+              style={{ backgroundColor: corPrimaria }}
+              className="w-full h-14 sm:h-15 rounded-2xl shadow-xl text-white font-black text-sm sm:text-base flex items-center justify-between px-4 sm:px-5 active:scale-[0.98] transition-all"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="relative p-1.5 bg-white/20 rounded-xl shrink-0">
+                  <ShoppingBag className="w-5 h-5 text-white" />
+                  <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-white text-neutral-900 rounded-full text-[11px] font-black flex items-center justify-center shadow-sm">
+                    {totalItens}
+                  </span>
+                </div>
+                <div className="text-left min-w-0">
+                  <span className="block text-[11px] uppercase tracking-wider font-bold opacity-90 truncate">
+                    Enviar Pedido • Mesa {numeroMesa}
+                  </span>
+                </div>
+              </div>
+
+              <div className="text-right shrink-0 pl-2">
+                <span className="text-base sm:text-lg font-black tracking-tight">
+                  {subtotal.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
                 </span>
               </div>
-              <div className="text-left">
-                <span className="block text-xs uppercase tracking-wider font-semibold opacity-90">
-                  Enviar Rodada / Carrinho
-                </span>
-                <span className="text-sm font-bold">Mesa {numeroMesa}</span>
+            </Button>
+          )}
+
+          {/* Ações Rápidas da Mesa em barra única alinhada */}
+          <div className="flex items-center gap-2 bg-card/95 backdrop-blur-md border border-border rounded-2xl p-1.5 shadow-lg">
+            <button
+              type="button"
+              onClick={() => {
+                if (totalItens > 0) {
+                  setCarrinhoAberto(true);
+                } else {
+                  setMinhaComandaAberta(true);
+                }
+              }}
+              aria-label="Abrir Comanda"
+              style={{
+                backgroundColor:
+                  totalItens > 0 || subtotalComandaBanco > 0 ? corPrimaria : undefined,
+              }}
+              className={`flex-1 h-11 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all active:scale-95 px-2.5 ${
+                totalItens > 0 || subtotalComandaBanco > 0
+                  ? "text-white shadow-xs"
+                  : "bg-neutral-900 hover:bg-neutral-800 text-white"
+              }`}
+            >
+              <div className="relative flex items-center">
+                <Utensils className="w-4 h-4" />
+                {totalItens > 0 ? (
+                  <span className="ml-1 px-1.5 py-0.2 rounded-full bg-white text-neutral-950 text-[10px] font-black font-mono">
+                    {totalItens}
+                  </span>
+                ) : subtotalComandaBanco > 0 ? (
+                  <span className="ml-1 w-2 h-2 rounded-full bg-emerald-300 animate-ping" />
+                ) : null}
               </div>
-            </div>
+              <span className="truncate">Comanda</span>
+            </button>
 
-            <div className="text-right">
-              <span className="text-xs uppercase font-semibold opacity-90 block">Total Itens</span>
-              <span className="text-lg font-black tracking-tight">
-                {subtotal.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
-              </span>
-            </div>
-          </Button>
+            {!ehAutoatendimento && subtotalComandaBanco > 0 && (
+              <button
+                type="button"
+                onClick={() => handlePedirConta()}
+                disabled={pedindoConta || contaPedidaSucesso}
+                aria-label="Pedir a conta"
+                className={`flex-1 h-11 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all active:scale-95 px-2.5 ${
+                  contaPedidaSucesso
+                    ? "bg-muted text-muted-foreground cursor-not-allowed"
+                    : "bg-amber-500 hover:bg-amber-400 text-neutral-950 font-black shadow-xs"
+                }`}
+              >
+                <DollarSign className="w-4 h-4 shrink-0" />
+                <span className="truncate">{contaPedidaSucesso ? "Conta Pedida" : "Conta"}</span>
+              </button>
+            )}
+
+            {!ehAutoatendimento && (
+              <button
+                type="button"
+                onClick={handleChamarGarcom}
+                disabled={chamandoGarcom || segundosCooldown > 0}
+                aria-label="Solicitar atendimento"
+                className={`flex-1 h-11 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all active:scale-95 px-2.5 ${
+                  segundosCooldown > 0
+                    ? "bg-amber-500/20 text-amber-800 border border-amber-400/50 cursor-not-allowed"
+                    : "bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs"
+                }`}
+              >
+                <Bell className={`w-4 h-4 shrink-0 ${chamandoGarcom ? "animate-bounce" : ""}`} />
+                <span className="truncate">
+                  {segundosCooldown > 0 ? `${segundosCooldown}s` : "Atendimento"}
+                </span>
+              </button>
+            )}
+          </div>
         </div>
-      )}
-
-      {/* BOTÃO REDONDO "COMANDA" (Alinhado com os demais, do lado oposto) */}
-      <button
-        type="button"
-        onClick={() => {
-          if (totalItens > 0) {
-            setCarrinhoAberto(true);
-          } else {
-            setMinhaComandaAberta(true);
-          }
-        }}
-        aria-label="Abrir Comanda"
-        style={{
-          backgroundColor:
-            totalItens > 0 || subtotalComandaBanco > 0 ? corPrimaria : undefined,
-        }}
-        className={`fixed left-5 z-40 flex flex-col items-center justify-center w-20 h-20 rounded-full shadow-2xl border transition-all active:scale-95 px-1 ${
-          totalItens > 0 ? "bottom-24" : "bottom-5"
-        } ${
-          totalItens > 0 || subtotalComandaBanco > 0
-            ? "text-white border-white/30"
-            : "bg-neutral-900 hover:bg-neutral-800 border-neutral-700 text-white"
-        }`}
-      >
-        <div className="relative">
-          <Utensils className="w-6 h-6" />
-          {totalItens > 0 ? (
-            <span className="absolute -top-2 -right-2.5 px-1.5 py-0.2 rounded-full bg-white text-neutral-950 text-[10px] font-black font-mono shadow-xs">
-              {totalItens}
-            </span>
-          ) : subtotalComandaBanco > 0 ? (
-            <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
-          ) : null}
-        </div>
-        <span className="text-[11px] font-bold mt-1 leading-none">
-          Comanda
-        </span>
-      </button>
-
-      {/* BOTÃO REDONDO "CONTA" (Visível após pedido ativo/entregue) */}
-      {!ehAutoatendimento && subtotalComandaBanco > 0 && (
-        <button
-          type="button"
-          onClick={() => handlePedirConta()}
-          disabled={pedindoConta || contaPedidaSucesso}
-          aria-label="Pedir a conta"
-          className={`fixed right-28 z-40 flex flex-col items-center justify-center w-20 h-20 rounded-full shadow-2xl border transition-all active:scale-95 px-1 ${
-            totalItens > 0 ? "bottom-24" : "bottom-5"
-          } ${
-            contaPedidaSucesso
-              ? "bg-neutral-700 border-neutral-500 text-neutral-300 cursor-not-allowed"
-              : "bg-amber-600 hover:bg-amber-500 border-amber-400/60 text-white"
-          }`}
-        >
-          <DollarSign className="w-6 h-6" />
-          <span className="text-[11px] font-bold tracking-tight mt-1 leading-none">
-            {contaPedidaSucesso ? "Pedida" : "Conta"}
-          </span>
-        </button>
-      )}
-
-      {/* BOTÃO REDONDO "ATENDIMENTO" SEMPRE VISÍVEL NO RODAPÉ */}
-      {!ehAutoatendimento && (
-        <button
-          type="button"
-          onClick={handleChamarGarcom}
-          disabled={chamandoGarcom || segundosCooldown > 0}
-          aria-label="Solicitar atendimento"
-          className={`fixed right-4 z-40 flex flex-col items-center justify-center w-20 h-20 rounded-full shadow-2xl border transition-all active:scale-95 px-1 ${
-            totalItens > 0 ? "bottom-24" : "bottom-5"
-          } ${
-            segundosCooldown > 0
-              ? "bg-amber-600/90 border-amber-400 text-white cursor-not-allowed"
-              : "bg-emerald-600 hover:bg-emerald-500 border-emerald-400/60 text-white"
-          }`}
-        >
-          <Bell className={`w-6 h-6 ${chamandoGarcom ? "animate-bounce" : ""}`} />
-          <span className="text-[11px] font-bold tracking-tight mt-1 leading-none">
-            {segundosCooldown > 0 ? `${segundosCooldown}s` : "Atendimento"}
-          </span>
-        </button>
-      )}
+      </div>
 
       {/* MODAL DE PERSONALIZAÇÃO DE ITEM */}
       <ItemModal
