@@ -2205,14 +2205,6 @@ async function executarLiberarMesa(firestoreDb, authUid, authToken, payload) {
         jaRegistradas++;
         return;
       }
-      // A liberação normal é apenas pós-pagamento (ou saldo zerado); no modo forçado (kill), encerra com motivo registrado.
-      const temSaldoEmAberto = Number(c.subtotal || 0) > 0;
-      if (!ehForcado && temSaldoEmAberto && (c.status !== 'pago' || !c.pagoEm)) {
-        throw new functions.https.HttpsError(
-          'failed-precondition',
-          'A comanda precisa estar paga e encerrada pelo fluxo de fechamento antes da liberação.'
-        );
-      }
       pendentes.push({ ref: snap.ref, data: c });
     });
 
@@ -2242,6 +2234,15 @@ async function executarLiberarMesa(firestoreDb, authUid, authToken, payload) {
         }
         kdsRefs.push(restDoc.ref.collection('kds_tickets').doc(pDoc.id));
       });
+      // A liberação normal é apenas pós-pagamento (ou saldo efetivamente zerado nos pedidos e na comanda).
+      const temSaldoEmAberto =
+        Math.round((Number(item.data.subtotal) || 0) * 100) > 0 || subtotalComandaCentavos > 0;
+      if (!ehForcado && temSaldoEmAberto && (item.data.status !== 'pago' || !item.data.pagoEm)) {
+        throw new functions.https.HttpsError(
+          'failed-precondition',
+          'A comanda precisa estar paga e encerrada pelo fluxo de fechamento antes da liberação.'
+        );
+      }
       totalEscritas += 1 + pedidosSnap.size * 2;
       if (totalEscritas > MAX_ESCRITAS_POR_TRANSACAO) {
         throw new functions.https.HttpsError('failed-precondition', 'Volume de pedidos excede o limite operacional da liberação.');
