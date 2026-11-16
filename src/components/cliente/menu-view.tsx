@@ -124,6 +124,8 @@ export function MenuView({
   const [metodoPagamentoEncerrado, setMetodoPagamentoEncerrado] = useState<string | null>(null);
   const [sessaoFinalizada, setSessaoFinalizada] = useState(false);
   const [subtotalComandaBanco, setSubtotalComandaBanco] = useState(0);
+  const [subtotalComprovante, setSubtotalComprovante] = useState(0);
+  const [taxaComandaAtiva, setTaxaComandaAtiva] = useState(true);
   const [busca, setBusca] = useState("");
   const [pedindoConta, setPedindoConta] = useState(false);
   const [contaPedidaSucesso, setContaPedidaSucesso] = useState(false);
@@ -313,6 +315,9 @@ export function MenuView({
             setGarcomChamadoSucesso(true);
           }
 
+          if (typeof (data as any).taxaServicoAtiva === "boolean") {
+            setTaxaComandaAtiva((data as any).taxaServicoAtiva);
+          }
           if (data.status === "conta_pedida") {
             setContaPedidaSucesso(true);
           } else if (data.status === "pago" && statusAnterior !== null && statusAnterior !== "pago") {
@@ -328,19 +333,27 @@ export function MenuView({
       }
     );
 
-    // 2. Escuta pedidos reais para subtotal exato e dinâmico na barra flutuante
+    // 2. Escuta pedidos reais para subtotal exato e dinâmico na barra flutuante e comprovante
     unsubPedidos = escutarPedidosCliente(
       restaurante.id,
       numeroMesa,
       uid,
       (lista) => {
-        const totalAtivo = lista.reduce((acc, p) => {
-          if (!["cancelado", "estornado", "pago"].includes(String(p.status))) {
-            return acc + (p.subtotal || 0);
+        let totalAtivo = 0;
+        let totalSessao = 0;
+        lista.forEach((p) => {
+          const st = String(p.status);
+          if (st !== "cancelado" && st !== "estornado") {
+            totalSessao += p.subtotal || 0;
+            if (st !== "pago") {
+              totalAtivo += p.subtotal || 0;
+            }
           }
-          return acc;
-        }, 0);
+        });
         setSubtotalComandaBanco(totalAtivo);
+        if (totalSessao > 0) {
+          setSubtotalComprovante(totalSessao);
+        }
       }
     );
 
@@ -1123,10 +1136,14 @@ export function MenuView({
             const transferir = httpsCallable(functions, "transferirMesaCliente");
             await transferir({
               restauranteId: restaurante.id,
+              mesaOrigem: numeroMesa,
               mesaDestino: Number(novaMesa),
+              qrCredencial: qrCredencialLida || qrCredencialAtiva || "",
             });
-          } catch (err) {
+          } catch (err: any) {
             console.warn("Falha ao transferir comanda para a nova mesa:", err);
+            window.alert(err?.message || "Não foi possível transferir sua comanda para a nova mesa.");
+            return;
           }
 
           setMesa(novaMesa);
@@ -1150,9 +1167,10 @@ export function MenuView({
 
       {/* MODAL 1: COMPROVANTE SEM PAPEL (Aparece primeiro após pagamento) */}
       {comprovanteSemPapelAberto && (() => {
-        const taxaPct = restaurante.configuracoes?.taxaServico ?? 10;
-        const taxaValor = subtotalComandaBanco * (taxaPct / 100);
-        const totalFinal = subtotalComandaBanco + taxaValor;
+        const baseComprovante = subtotalComprovante > 0 ? subtotalComprovante : subtotalComandaBanco;
+        const taxaPct = moduloAtivo("mod.taxa_servico") && taxaComandaAtiva ? (restaurante.configuracoes?.taxaServico ?? 10) : 0;
+        const taxaValor = baseComprovante * (taxaPct / 100);
+        const totalFinal = baseComprovante + taxaValor;
         const linhasCupom = [
           "========================================",
           `       ${restaurante.nome.toUpperCase()}`,
@@ -1163,8 +1181,10 @@ export function MenuView({
           `Cliente: ${nomeCliente || "Cliente"}`,
           `Pagamento: ${metodoPagamentoEncerrado || "Confirmado"}`,
           "----------------------------------------",
-          `Subtotal:      ${subtotalComandaBanco.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`,
-          `Taxa (${taxaPct}%):   ${taxaValor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`,
+          `Subtotal:      ${baseComprovante.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`,
+          ...(taxaPct > 0
+            ? [`Taxa (${taxaPct}%):   ${taxaValor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`]
+            : []),
           `TOTAL PAGO:    ${totalFinal.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`,
           "========================================",
           "   Obrigado pela visita! - MAYaMenu",
@@ -1228,69 +1248,36 @@ export function MenuView({
               </p>
             </div>
 
-            {/* AVALIAÇÃO SOCIAL + COMPARTILHAMENTO */}
-            <div className="bg-neutral-800/60 border border-neutral-700/70 rounded-2xl p-3.5 space-y-2.5 text-left">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-neutral-200">Curtiu a experiência?</span>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setAvaliacaoSocial(avaliacaoSocial === "like" ? null : "like")}
-                    className={`p-2 rounded-xl border transition-all ${
-                      avaliacaoSocial === "like"
-                        ? "bg-emerald-500/20 border-emerald-500 text-emerald-400"
-                        : "bg-neutral-900 border-neutral-700 text-neutral-400 hover:text-white"
-                    }`}
-                    aria-label="Curtir"
-                  >
-                    <ThumbsUp className="w-4 h-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setAvaliacaoSocial(avaliacaoSocial === "dislike" ? null : "dislike")}
-                    className={`p-2 rounded-xl border transition-all ${
-                      avaliacaoSocial === "dislike"
-                        ? "bg-rose-500/20 border-rose-500 text-rose-400"
-                        : "bg-neutral-900 border-neutral-700 text-neutral-400 hover:text-white"
-                    }`}
-                    aria-label="Não curtir"
-                  >
-                    <ThumbsDown className="w-4 h-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const shareUrl = typeof window !== "undefined" ? `${window.location.origin}/?r=${encodeURIComponent(restaurante.slug)}` : "";
-                      if (navigator.share) {
-                        navigator.share({ title: restaurante.nome, text: `Recomendo o ${restaurante.nome}!`, url: shareUrl }).catch(() => {});
-                      } else if (navigator.clipboard && shareUrl) {
-                        navigator.clipboard.writeText(shareUrl);
-                        alert("Link copiado para compartilhar!");
-                      }
-                    }}
-                    className="p-2 rounded-xl border bg-neutral-900 border-neutral-700 text-neutral-300 hover:text-white transition-all"
-                    aria-label="Compartilhar"
-                  >
-                    <Share2 className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-              <textarea
-                value={comentarioSocial}
-                onChange={(e) => setComentarioSocial(e.target.value)}
-                placeholder="Deixe um comentário rápido..."
-                rows={2}
-                className="w-full rounded-xl bg-neutral-900 border border-neutral-700 px-3 py-2 text-xs text-white placeholder:text-neutral-500 focus:outline-none focus:border-rose-500 resize-none"
-              />
+            {/* COMPARTILHAMENTO */}
+            <div className="bg-neutral-800/60 border border-neutral-700/70 rounded-2xl p-3.5 flex items-center justify-between">
+              <span className="text-xs font-bold text-neutral-200">Recomendar {restaurante.nome}?</span>
+              <button
+                type="button"
+                onClick={() => {
+                  const shareUrl = typeof window !== "undefined" ? `${window.location.origin}/r/${encodeURIComponent(restaurante.slug)}` : "";
+                  if (navigator.share) {
+                    navigator.share({ title: restaurante.nome, text: `Recomendo o ${restaurante.nome}!`, url: shareUrl }).catch(() => {});
+                  } else if (navigator.clipboard && shareUrl) {
+                    navigator.clipboard.writeText(shareUrl);
+                    alert("Link copiado para compartilhar!");
+                  }
+                }}
+                className="px-3 py-2 rounded-xl border bg-neutral-900 border-neutral-700 text-neutral-200 hover:text-white transition-all flex items-center gap-1.5 text-xs font-bold"
+                aria-label="Compartilhar"
+              >
+                <Share2 className="w-4 h-4" />
+                <span>Compartilhar</span>
+              </button>
             </div>
 
             <div className="pt-2 flex flex-col gap-2">
               <Button
                 type="button"
                 onClick={() => {
-                  const taxaPct = restaurante.configuracoes?.taxaServico ?? 10;
-                  const taxaValor = subtotalComandaBanco * (taxaPct / 100);
-                  const totalFinal = subtotalComandaBanco + taxaValor;
+                  const baseComprovante = subtotalComprovante > 0 ? subtotalComprovante : subtotalComandaBanco;
+                  const taxaPct = moduloAtivo("mod.taxa_servico") && taxaComandaAtiva ? (restaurante.configuracoes?.taxaServico ?? 10) : 0;
+                  const taxaValor = baseComprovante * (taxaPct / 100);
+                  const totalFinal = baseComprovante + taxaValor;
                   simularImpressaoTermicaPDF(`Comprovante Digital - ${restaurante.nome}`, [
                     "========================================",
                     `       ${restaurante.nome.toUpperCase()}`,
@@ -1301,8 +1288,10 @@ export function MenuView({
                     `Cliente: ${nomeCliente || "Cliente"}`,
                     `Pagamento: ${metodoPagamentoEncerrado || "Confirmado"}`,
                     "----------------------------------------",
-                    `Subtotal:      ${subtotalComandaBanco.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`,
-                    `Taxa (${taxaPct}%):   ${taxaValor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`,
+                    `Subtotal:      ${baseComprovante.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`,
+                    ...(taxaPct > 0
+                      ? [`Taxa (${taxaPct}%):   ${taxaValor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`]
+                      : []),
                     `TOTAL PAGO:    ${totalFinal.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`,
                     "========================================",
                     "   Obrigado pela visita! - MAYaMenu",

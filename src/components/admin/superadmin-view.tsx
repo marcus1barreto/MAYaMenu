@@ -92,7 +92,6 @@ import type { PatrocinadorB2B } from "@/types/b2b";
 
 export const EMAILS_SUPERADMIN_AUTORIZADOS = [
   "admin@mayamenu.com",
-  "teste@teste.com",
   "marcus1fialho@gmail.com",
 ];
 
@@ -575,7 +574,7 @@ export function SuperAdminView() {
     ehSuperAdmin ||
       (process.env.NODE_ENV !== "production" &&
         typeof window !== "undefined" &&
-        (window.location.search.includes("e2e=true") || !usuarioAuth))
+        window.location.search.includes("e2e=true"))
   );
 
   if (!isSuperAdminAutorizado) {

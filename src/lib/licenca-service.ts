@@ -21,18 +21,18 @@ import { httpsCallable } from "firebase/functions";
 
 export const LIMITES_POR_PLANO: Record<PlanoTipo, LimitesPlano> = {
   free: {
-    maxPratos: 20,
-    maxItensMenu: 20,
-    maxMesas: 10,
+    maxPratos: 9999,
+    maxItensMenu: 9999,
+    maxMesas: 5,
   },
   pro: {
-    maxPratos: 60,
-    maxItensMenu: 60,
-    maxMesas: 30,
+    maxPratos: 9999,
+    maxItensMenu: 9999,
+    maxMesas: 20,
   },
   enterprise: {
-    maxPratos: 999,
-    maxItensMenu: 999,
+    maxPratos: 9999,
+    maxItensMenu: 9999,
     maxMesas: 999,
   },
 };

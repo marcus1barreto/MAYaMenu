@@ -215,17 +215,14 @@ export function MinhaComandaModal({
 
       await updateDoc(comandaRef, {
         status: "conta_pedida",
-        chamadoGarcom: {
-          ativo: true,
-          motivo: `Fechamento Geral da Mesa ${mesaNumero} (Conta Completa)`,
-          solicitadoEm: serverTimestamp(),
-        },
+        metodoPagamento: "cartao_garcom",
+        solicitacaoPagamentoEm: serverTimestamp(),
         atualizadoEm: serverTimestamp(),
       });
       setMesaTodaPedidaSucesso(true);
     } catch (e) {
-      console.warn("Aviso ao pedir conta completa:", e);
-      setMesaTodaPedidaSucesso(true);
+      console.warn("Falha ao solicitar fechamento da mesa completa:", e);
+      window.alert("Não foi possível enviar a solicitação de fechamento da mesa. Verifique a conexão e tente novamente.");
     } finally {
       setPedindoMesaToda(false);
     }

@@ -223,7 +223,18 @@ export function CartDrawer({
         }
       }
 
+      if (!mesaTokenAtual && !estaSemRede && !semAuthReal) {
+        setErro("Escaneie o QR Code da mesa para validar sua sessão antes de enviar o pedido.");
+        setEnviando(false);
+        return;
+      }
+
       if (estaSemRede || semAuthReal) {
+        if (!qrCredencial) {
+          setErro("Sem conexão e sem credencial QR da mesa nesta sessão. Escaneie o QR Code da mesa para enviar pedidos.");
+          setEnviando(false);
+          return;
+        }
         const salvoNaFila = await enfileirarContingenciaOffline(mesaTokenAtual);
         if (!salvoNaFila) {
           setErro("Sem conexão com a internet e não foi possível salvar o pedido na fila local. Tente novamente.");
@@ -251,7 +262,7 @@ export function CartDrawer({
           if (code.includes("permission-denied") || code.includes("failed-precondition")) {
             alert(
               backendErr?.message ||
-                "Esta comanda já foi encerrada e paga no caixa. Não é possível lançar novos pedidos."
+                "Não foi possível enviar o pedido para esta mesa. Escaneie o QR Code novamente ou consulte o atendimento."
             );
             setEnviando(false);
             return;

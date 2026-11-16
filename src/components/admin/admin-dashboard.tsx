@@ -137,14 +137,6 @@ function ValorDinamicoMesa({
 export function AdminDashboard() {
   const { restaurante, user, logout, atualizarRestaurante } = useAuth();
   const [abaAtiva, setAbaAtiva] = useState<"cardapio" | "mesas" | "equipe" | "analytics">("mesas");
-
-  useEffect(() => {
-    if (!restaurante?.id || typeof window === "undefined") return;
-    if (window.innerWidth < 1024) return;
-    if (sessionStorage.getItem("mayamenu_kds_auto_opened")) return;
-    sessionStorage.setItem("mayamenu_kds_auto_opened", "1");
-    window.open(`/cozinha?r=${encodeURIComponent(restaurante.id)}`, "mayamenu_kds");
-  }, [restaurante?.id]);
   const [modalConfigAberto, setModalConfigAberto] = useState(false);
   const [modalProAberto, setModalProAberto] = useState(false);
   const [planoCheckoutSelecionado, setPlanoCheckoutSelecionado] = useState<"pro_mensal" | "pro_semestral">("pro_mensal");
@@ -895,13 +887,6 @@ export function AdminDashboard() {
     e.preventDefault();
     if (!itemEmEdicao || !itemEmEdicao.nome?.trim() || !restaurante?.id) return;
 
-    // Bloqueio de limite de pratos conforme o plano
-    const { maxPratos } = getLimitesLicenca(restaurante);
-    if (!itemEmEdicao.id && itensCardapio.length >= maxPratos) {
-      alert(`O seu plano permite no máximo ${maxPratos} itens de menu. Faça upgrade para o Plano PRO para liberar até 60 itens!`);
-      return;
-    }
-
     setSalvandoPrato(true);
     let fotoUrlFinal = itemEmEdicao.fotoUrl?.trim() || "";
 
@@ -1040,8 +1025,8 @@ export function AdminDashboard() {
     try {
       await atualizarRestaurante({
         configuracoes: {
-          tema: "white-label",
-          corPrimaria: "#EA1D2C",
+          tema: restaurante?.configuracoes?.tema || "white-label",
+          corPrimaria: restaurante?.configuracoes?.corPrimaria || "#EA1D2C",
           capaUrl: restaurante?.configuracoes?.capaUrl || "/images/capa-padrao.webp",
           modoOperacao,
           modoFilaKds,
@@ -1146,16 +1131,26 @@ export function AdminDashboard() {
             <span className="hidden sm:inline">Escanear Comanda</span>
           </Button>
 
-          <Link href={restaurante?.id ? `/garcom?r=${encodeURIComponent(restaurante.id)}` : "/garcom"} target="_blank">
+          <Link href={restaurante?.id ? `/garcom?r=${encodeURIComponent(restaurante.id)}` : "/garcom"} target="_blank" className="relative group">
             <Button
               variant="outline"
               className="bg-card border-border hover:bg-muted text-emerald-600 dark:text-emerald-400 font-bold text-xs h-9 px-3 rounded-xl flex items-center gap-1.5 shadow-2xs hover:border-emerald-300 transition-all"
-              title="Abrir o Terminal de Pedidos e Atendimento do Garçom em nova aba"
+              title={!moduloAtivo("mod.garcom_salao") ? "Disponível na versão Pro" : "Abrir o Terminal de Pedidos e Atendimento do Garçom em nova aba"}
             >
               <UtensilsCrossed className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
               <span>App Garçom</span>
+              {!moduloAtivo("mod.garcom_salao") && (
+                <span className="ml-0.5 px-1.5 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-[9px] font-black uppercase text-amber-600">
+                  Pro
+                </span>
+              )}
               <ExternalLink className="w-3 h-3 opacity-60" />
             </Button>
+            {!moduloAtivo("mod.garcom_salao") && (
+              <span className="pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity absolute left-1/2 -translate-x-1/2 top-full mt-1.5 z-50 whitespace-nowrap rounded-lg bg-neutral-900 px-2.5 py-1 text-[10px] font-bold text-white shadow-lg">
+                Disponível na versão Pro
+              </span>
+            )}
           </Link>
 
           <Link href={restaurante?.id ? `/cozinha?r=${encodeURIComponent(restaurante.id)}` : "/cozinha"} target="_blank">
@@ -1315,40 +1310,51 @@ export function AdminDashboard() {
             <span>Mesas & QR Codes</span>
           </button>
 
-          {moduloAtivo("mod.garcom_salao") && (
-            <button
-              type="button"
-              onClick={() => setAbaAtiva("equipe")}
-              className={`py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all flex items-center gap-2 ${
-                abaAtiva === "equipe"
-                  ? "border-primary text-primary"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <Users className="w-4 h-4" />
-              <span>Equipe & Acessos</span>
-            </button>
-          )}
-
-          {moduloAtivo("mod.analytics_historico") && (
-            <button
-              type="button"
-              onClick={() => setAbaAtiva("analytics")}
-              className={`py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all flex items-center gap-2 relative ${
-                abaAtiva === "analytics"
-                  ? "border-primary text-primary"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <BarChart3 className="w-4 h-4 text-amber-500" />
-              <span className="flex items-center gap-1.5">
-                MAYa Inteligência
+          <button
+            type="button"
+            onClick={() => setAbaAtiva("equipe")}
+            className={`py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all flex items-center gap-2 relative group ${
+              abaAtiva === "equipe"
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Users className="w-4 h-4" />
+            <span>Equipe & Acessos</span>
+            {!moduloAtivo("mod.garcom_salao") && (
+              <>
                 <Badge className="bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 text-[9px] font-black uppercase px-1.5 py-0">
-                  PRO 🚀
+                  PRO
                 </Badge>
+                <span className="pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity absolute left-1/2 -translate-x-1/2 top-full mt-1 z-50 whitespace-nowrap rounded-lg bg-neutral-900 px-2.5 py-1 text-[10px] font-bold text-white shadow-lg">
+                  Disponível na versão Pro
+                </span>
+              </>
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setAbaAtiva("analytics")}
+            className={`py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all flex items-center gap-2 relative group ${
+              abaAtiva === "analytics"
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <BarChart3 className="w-4 h-4 text-amber-500" />
+            <span className="flex items-center gap-1.5">
+              MAYa Inteligência
+              <Badge className="bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 text-[9px] font-black uppercase px-1.5 py-0">
+                PRO 🚀
+              </Badge>
+            </span>
+            {!moduloAtivo("mod.analytics_historico") && (
+              <span className="pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity absolute left-1/2 -translate-x-1/2 top-full mt-1 z-50 whitespace-nowrap rounded-lg bg-neutral-900 px-2.5 py-1 text-[10px] font-bold text-white shadow-lg">
+                Disponível na versão Pro
               </span>
-            </button>
-          )}
+            )}
+          </button>
         </div>
       </div>
 
@@ -1770,7 +1776,7 @@ export function AdminDashboard() {
                       <span className="text-xs font-black text-neutral-950 block">Mesa {num}</span>
                       {mesa.status !== "livre" ? (
                         <div className="mt-1">
-                          {mesa.comandas.length > 0 ? (
+                          {mesa.comandas.length === 1 ? (
                             <ValorDinamicoMesa 
                               restauranteId={restaurante?.id}
                               mesaSelecionada={num}
@@ -1779,9 +1785,14 @@ export function AdminDashboard() {
                             />
                           ) : (
                             <span className="text-sm font-black text-rose-600 block leading-none">
-                              {mesa.comandas
-                                .reduce((acc, c) => acc + (c.subtotal || 0), 0)
-                                .toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                              {(() => {
+                                const subTotal = mesa.comandas.reduce((acc, c) => acc + (c.subtotal || 0), 0);
+                                const taxaPct = restaurante?.configuracoes?.taxaServico ?? 10;
+                                return (subTotal + subTotal * (taxaPct / 100)).toLocaleString("pt-BR", {
+                                  style: "currency",
+                                  currency: "BRL",
+                                });
+                              })()}
                             </span>
                           )}
                           <span className="text-[10px] text-neutral-500 flex items-center gap-1 mt-1 font-semibold">
@@ -2094,7 +2105,9 @@ export function AdminDashboard() {
                           <Button
                             type="button"
                             variant="outline"
-                            onClick={() => setModalProAberto(true)}
+                            onClick={() => {
+                              window.open("mailto:contato@mayamenu.com.br?subject=Consultor%20MAYaMenu%20PRO", "_blank");
+                            }}
                             className="h-11 px-5 border border-border bg-card hover:bg-muted text-foreground font-bold text-xs rounded-2xl"
                           >
                             Falar com Consultor
@@ -2401,16 +2414,18 @@ export function AdminDashboard() {
         </DialogContent>
       </Dialog>
 
-      {/* MODAL OPERACIONAL DE DETALHES DA MESA (Apenas monitoramento e QR Code no Admin) */}
+      {/* MODAL OPERACIONAL DE DETALHES DA MESA (Operação completa do Salão/Caixa no Admin) */}
       <MesaDetalheModal
         mesa={mesaSelecionada}
         isOpen={modalMesaAberto}
         onClose={() => setModalMesaAberto(false)}
         slug={slug}
         restauranteId={restaurante?.id}
+        nomeRestaurante={restaurante?.nome}
+        cardapio={itensCardapio}
         taxaServicoPercentual={restaurante?.configuracoes?.taxaServico}
         permitirPagamentoAntecipado={Boolean((restaurante?.configuracoes as any)?.permitirPagamentoAntecipado)}
-        modoSomenteLeitura={true}
+        modoSomenteLeitura={false}
         onMarcarPago={handleMarcarComoPago}
         onLiberarMesa={handleLiberarMesa}
         onAtenderGarcom={handleAtenderGarcom}
@@ -3123,29 +3138,6 @@ export function AdminDashboard() {
             {/* LINKS JURÍDICOS E CONFORMIDADE */}
             <div className="pt-3 border-t border-border flex items-center justify-between text-[11px] text-muted-foreground">
               <span>Conformidade & Legal</span>
-              <div className="pt-3 border-t border-border/60 flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-xs font-bold text-foreground">Permitir pagamento antecipado</p>
-                  <p className="text-[11px] text-muted-foreground">
-                    Libera o botão Cobrar mesmo com itens ainda não entregues na mesa.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={permitirPagamentoAntecipado}
-                  onClick={() => setPermitirPagamentoAntecipado((v) => !v)}
-                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
-                    permitirPagamentoAntecipado ? "bg-emerald-600" : "bg-muted"
-                  }`}
-                >
-                  <span
-                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow transition ${
-                      permitirPagamentoAntecipado ? "translate-x-5" : "translate-x-0"
-                    }`}
-                  />
-                </button>
-              </div>
               <div className="flex items-center gap-3">
                 <Link
                   href="/termos-de-uso"

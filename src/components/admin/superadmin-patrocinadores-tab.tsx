@@ -759,7 +759,7 @@ export function SuperadminPatrocinadoresTab({
                   Link de Acesso Direto ao Portal
                 </span>
                 <p className="font-mono text-[10px] text-muted-foreground truncate mt-1">
-                  mayamenu.com.br/parceiros?chave={patrocinadorRecemCriado.chaveAcessoB2B}
+                  mayamenu.com.br/parceiros
                 </p>
               </div>
             </div>

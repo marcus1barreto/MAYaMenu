@@ -1190,9 +1190,9 @@ export function GarcomView({
             return (
               <div
                 key={m.numero}
-                onClick={() => m.comandas.length > 0 && setMesaSelecionada(m)}
+                onClick={() => isAtiva && setMesaSelecionada(m)}
                 className={`p-5 rounded-3xl border-2 text-left transition-all relative overflow-hidden flex flex-col justify-between h-40 select-none ${
-                  m.comandas.length > 0 ? "cursor-pointer active:scale-95" : "cursor-default opacity-40"
+                  isAtiva ? "cursor-pointer active:scale-95" : "cursor-default opacity-40"
                 } ${
                   !isAtiva
                     ? "opacity-30 border-dashed border-border bg-muted/20"

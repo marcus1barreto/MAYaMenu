@@ -52,7 +52,9 @@ interface MesaDetalheModalProps {
   onClose: () => void;
   slug: string;
   restauranteId?: string;
-  modoSomenteLeitura?: boolean; // Se true, esconde ações operacionais (usado no Admin)
+  nomeRestaurante?: string;
+  cardapio?: MenuItem[];
+  modoSomenteLeitura?: boolean; // Se true, esconde ações operacionais
   pedidosOffline?: PedidoFilaOffline[];
   onMarcarPago: (mesaNumero: number, clienteId: string) => Promise<boolean>;
   onLiberarMesa: (mesaNumero: number) => Promise<boolean>;
@@ -80,6 +82,8 @@ export function MesaDetalheModal({
   onClose,
   slug,
   restauranteId,
+  nomeRestaurante,
+  cardapio,
   modoSomenteLeitura = false,
   pedidosOffline,
   onMarcarPago,
@@ -756,6 +760,7 @@ export function MesaDetalheModal({
                           <BotaoImprimirCaixa
                             comanda={comanda}
                             mesaNumero={mesa.numero}
+                            nomeRestaurante={nomeRestaurante}
                             className="h-10 text-xs px-3"
                             label="Imprimir (USB)"
                           />
@@ -818,8 +823,20 @@ export function MesaDetalheModal({
                       </span>
                     </div>
 
-                    <div className="flex items-center justify-between gap-2 text-foreground">
-                      <span className="shrink-0 text-muted-foreground">Taxa de Serviço ({percentualGorjeta}%):</span>
+                    <div className="flex items-center justify-between gap-2 text-foreground relative group">
+                      <span className="shrink-0 text-muted-foreground flex items-center gap-1.5">
+                        <span>Taxa de Serviço ({percentualGorjeta}%):</span>
+                        {!moduloAtivo("mod.taxa_servico") && (
+                          <span className="px-1.5 py-0.5 rounded bg-amber-500/15 border border-amber-500/30 text-[9px] font-black uppercase text-amber-600">
+                            Pro
+                          </span>
+                        )}
+                      </span>
+                      {!moduloAtivo("mod.taxa_servico") && (
+                        <span className="pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity absolute left-0 bottom-full mb-1 z-50 whitespace-nowrap rounded-lg bg-neutral-900 px-2.5 py-1 text-[10px] font-bold text-white shadow-lg">
+                          Disponível na versão Pro
+                        </span>
+                      )}
                       <div className="flex items-center gap-2 ml-auto">
                         <span className="font-bold text-foreground">
                           {taxaServico.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
@@ -879,8 +896,9 @@ export function MesaDetalheModal({
                   {/* 🟢 BOTÃO DE IMPRIMIR MESA E ENCERRAR/LIBERAR */}
                   <div className="mt-4 space-y-2">
                     <BotaoImprimirCaixa
-                      mesa={mesa}
+                      mesa={{ ...mesa, comandas: comandasComItens }}
                       mesaNumero={mesa.numero}
+                      nomeRestaurante={nomeRestaurante}
                       taxaServico={taxaServico}
                       total={totalComTaxa}
                       className="w-full h-11 border-border bg-card hover:bg-muted text-foreground font-bold rounded-xl text-sm"
@@ -1041,7 +1059,10 @@ export function MesaDetalheModal({
                   Selecione o Item do Cardápio
                 </label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-56 overflow-y-auto p-1">
-                  {CARDAPIO_DEMO.map((item) => (
+                  {(cardapio && cardapio.length > 0
+                    ? cardapio.filter((i) => i.ativo !== false)
+                    : CARDAPIO_DEMO
+                  ).map((item) => (
                     <button
                       key={item.id}
                       type="button"

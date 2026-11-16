@@ -150,7 +150,7 @@ export default function HistoricoComandasPage() {
             {/* TOTAL GERAL */}
             <div className="p-4 bg-neutral-50 rounded-2xl border border-neutral-200/60 flex items-center justify-between">
               <span className="text-xs uppercase font-bold tracking-wider text-neutral-600">
-                Total Pago
+                {comandaSelecionada.status === "concluido" ? "Total Pago" : "Subtotal da Rodada"}
               </span>
               <span className="text-xl font-black text-emerald-700 font-mono">
                 {(comandaSelecionada.totalPago || comandaSelecionada.subtotal).toLocaleString(
@@ -173,15 +173,6 @@ export default function HistoricoComandasPage() {
                 comprovantes e itens ficam guardados aqui no seu navegador para conferência futura.
               </p>
             </div>
-            <Link href="/demo">
-              <Button
-                variant="outline"
-                className="mt-2 bg-neutral-50 border-neutral-200 text-neutral-800 text-xs rounded-xl hover:bg-neutral-100"
-              >
-                <Sparkles className="w-3.5 h-3.5 text-amber-500 mr-1.5" />
-                <span>Testar Cardápio na Sandbox Demo</span>
-              </Button>
-            </Link>
           </div>
         ) : (
           /* LISTA DE RECIBOS ANTERIORES */

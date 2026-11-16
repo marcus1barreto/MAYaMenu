@@ -27,9 +27,9 @@ export const CATALOGO_PLANOS_INICIAL: PlanoCatalogo[] = [
     versao: "1.0.0",
     status: "ativo",
     limites: {
-      maxMesas: 10,
-      maxItensMenu: 20,
-      modulosPermitidos: ["cardapio", "mesas_basico", "qr_dinamico"],
+      maxMesas: 5,
+      maxItensMenu: 9999,
+      modulosPermitidos: ["cardapio", "mesas_basico", "qr_dinamico", "kds"],
     },
     comercial: {
       preco: 0,
@@ -50,8 +50,8 @@ export const CATALOGO_PLANOS_INICIAL: PlanoCatalogo[] = [
     versao: "1.0.0",
     status: "ativo",
     limites: {
-      maxMesas: 30,
-      maxItensMenu: 60,
+      maxMesas: 20,
+      maxItensMenu: 9999,
       modulosPermitidos: ["cardapio", "mesas", "kds", "garcom", "analytics", "historico"],
     },
     comercial: {
@@ -75,8 +75,8 @@ export const CATALOGO_PLANOS_INICIAL: PlanoCatalogo[] = [
     versao: "1.0.0",
     status: "ativo",
     limites: {
-      maxMesas: 30,
-      maxItensMenu: 60,
+      maxMesas: 20,
+      maxItensMenu: 9999,
       modulosPermitidos: ["cardapio", "mesas", "kds", "garcom", "analytics", "historico"],
     },
     comercial: {

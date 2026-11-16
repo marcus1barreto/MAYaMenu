@@ -215,11 +215,14 @@ function AtivarContent({ codigoParam }: { codigoParam: string }) {
           </p>
 
           {/* BADGE DE CONFIRMAÇÃO DA LICENÇA (Código embutido e imutável) */}
-          <div className="pt-2 flex items-center justify-center gap-2">
+          <div className="pt-2 flex flex-col items-center justify-center gap-1.5">
             <Badge className="bg-emerald-50 border border-emerald-200 text-emerald-700 px-3.5 py-1 rounded-full text-xs font-mono font-bold flex items-center gap-1.5 shadow-xs">
               <ShieldCheck className="w-3.5 h-3.5" />
               Licença Verificada: {licenca.id} ({licenca.plano.toUpperCase()})
             </Badge>
+            <span className="text-[11px] font-medium text-neutral-500">
+              Até {licenca.limites?.maxMesas ?? (licenca.plano === "pro" ? 20 : 5)} mesas • Cardápio sem limite de itens
+            </span>
           </div>
         </div>
 

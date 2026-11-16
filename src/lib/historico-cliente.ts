@@ -120,11 +120,14 @@ export function marcarVisitaAtualComoPaga(slug: string, mesa: number | string): 
 
   try {
     const historico = obterHistoricoVisitas();
-    const index = historico.findIndex(
-      (v) => v.restaurante.slug === slug && String(v.mesa) === String(mesa) && v.status === "ativo"
-    );
-    if (index >= 0) {
-      historico[index].status = "concluido";
+    let alterou = false;
+    historico.forEach((v) => {
+      if (v.restaurante.slug === slug && String(v.mesa) === String(mesa) && v.status === "ativo") {
+        v.status = "concluido";
+        alterou = true;
+      }
+    });
+    if (alterou) {
       const jsonAtualizado = JSON.stringify(historico);
       localStorage.setItem(STORAGE_KEY_VISITAS, jsonAtualizado);
       localStorage.setItem(STORAGE_KEY_HISTORICO_COMANDAS, jsonAtualizado);

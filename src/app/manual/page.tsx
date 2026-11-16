@@ -86,13 +86,13 @@ const FAQS: FaqItem[] = [
     categoria: "financeiro",
     pergunta: "Como funcionam as cotas e limites de pratos e mesas nos diferentes planos?",
     resposta:
-      "A Concessão Free permite até 15 pratos e 5 mesas de forma perene e vitalícia. O Plano Pro expande a capacidade para até 150 pratos e 30 mesas com relatórios avançados. O Plano VIP atende operações de alto volume com pratos e mesas ilimitados.",
+      "O Plano Free inclui até 5 mesas (com possibilidade de contratar mesas extras por R$ 8,00/mês por mesa) e não possui limite de itens no cardápio. O Plano PRO amplia a operação para até 20 mesas (também com mesas extras por R$ 8,00/mês e sem limite de itens), além de liberar recursos avançados de equipe e gestão.",
   },
   {
     categoria: "financeiro",
     pergunta: "A Concessão Free tem data de expiração ou pegadinha com cobrança automática?",
     resposta:
-      "Não. A concessão Free do MAYaMenu é vitalícia e não requer cartão de crédito para ativação. Você pode utilizar o sistema com até 15 pratos e 5 mesas de forma perene. Upgrades para planos Pro ou Enterprise com capacidade ilimitada são estritamente opcionais por decisão do próprio estabelecimento.",
+      "Não. A versão Free do MAYaMenu é gratuita por tempo indeterminado e não requer cartão de crédito para começar (5 mesas e cardápio sem limite de itens). A contratação de mesas extras (R$ 8,00/mesa) ou upgrade para o Plano PRO é estritamente opcional por decisão do estabelecimento.",
   },
   {
     categoria: "financeiro",

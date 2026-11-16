@@ -705,8 +705,7 @@ export function GestaoEquipe({ restauranteId, nomeRestaurante = "MAYaMenu" }: Ge
                   <button
                     type="button"
                     onClick={() => {
-                      const p = Math.floor(1000 + Math.random() * 9000).toString();
-                      setNovoPinValor(p);
+                      setNovoPinValor(gerarPinOperacionalSeguro());
                     }}
                     className="text-[10px] text-rose-600 font-bold underline"
                   >

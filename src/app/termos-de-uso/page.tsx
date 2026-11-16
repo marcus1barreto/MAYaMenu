@@ -192,7 +192,7 @@ export default function TermosDeUsoPage() {
                   <Sparkles className="w-4 h-4 text-rose-600" /> 3.2. Do Plano Pro (Contratação Pré-paga por Período)
                 </div>
                 <p className="text-xs text-slate-600 leading-relaxed">
-                  A adesão ao Plano Pro é opcional e confere capacidade ampliada de mesas simultâneas (até 30 mesas), cardápio estendido (até 60 itens de menu), painel KDS de cozinha, módulo do garçom e relatórios de vendas. A contratação é pré-paga por período de 1 ou 6 meses e processada pelo Mercado Pago (Pix ou cartão). Não há cobrança recorrente automática: ao fim da vigência, o titular decide se deseja contratar um novo período. A não renovação não gera multa de fidelidade.
+                  A adesão ao Plano Pro é opcional e confere capacidade ampliada de mesas simultâneas (até 20 mesas, com possibilidade de mesas extras a R$ 8,00/mês por mesa), cardápio sem limite de itens, painel KDS de cozinha, módulo do garçom e relatórios de vendas. A contratação é pré-paga por período de 1 ou 6 meses e processada pelo Mercado Pago (Pix ou cartão). Não há cobrança recorrente automática: ao fim da vigência, o titular decide se deseja contratar um novo período. A não renovação não gera multa de fidelidade.
                 </p>
               </div>
 

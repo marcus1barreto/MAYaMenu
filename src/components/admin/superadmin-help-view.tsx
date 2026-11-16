@@ -344,8 +344,8 @@ export function SuperAdminHelpView() {
                     FREE
                   </Badge>
                 </td>
-                <td className="p-4 font-mono font-semibold">15 pratos</td>
-                <td className="p-4 font-mono font-semibold">5 mesas</td>
+                <td className="p-4 font-mono font-semibold">Sem limite</td>
+                <td className="p-4 font-mono font-semibold">5 mesas (+ extras R$ 8/mês)</td>
                 <td className="p-4 text-emerald-600 font-bold">Sim</td>
                 <td className="p-4 text-emerald-600 font-bold">Sim</td>
                 <td className="p-4 text-neutral-500">Degustação, cafeterias pequenas, food trucks</td>
@@ -356,8 +356,8 @@ export function SuperAdminHelpView() {
                     PRO
                   </Badge>
                 </td>
-                <td className="p-4 font-mono font-semibold">150 pratos</td>
-                <td className="p-4 font-mono font-semibold">30 mesas</td>
+                <td className="p-4 font-mono font-semibold">Sem limite</td>
+                <td className="p-4 font-mono font-semibold">20 mesas (+ extras R$ 8/mês)</td>
                 <td className="p-4 text-emerald-600 font-bold">Sim</td>
                 <td className="p-4 text-emerald-600 font-bold">Sim</td>
                 <td className="p-4 text-neutral-500">Restaurantes de salão médio, pizzarias, bares</td>
@@ -365,14 +365,14 @@ export function SuperAdminHelpView() {
               <tr className="hover:bg-neutral-50/60">
                 <td className="p-4 font-bold text-neutral-900 flex items-center gap-2">
                   <Badge variant="outline" className="border-purple-300 bg-purple-50 text-purple-800 font-bold">
-                    VIP
+                    ENTERPRISE (Futuro)
                   </Badge>
                 </td>
-                <td className="p-4 font-mono text-purple-700 font-black">Ilimitado (9999)</td>
-                <td className="p-4 font-mono text-purple-700 font-black">Ilimitado (9999)</td>
+                <td className="p-4 font-mono text-purple-700 font-black">Sem limite</td>
+                <td className="p-4 font-mono text-purple-700 font-black">Até 999 mesas</td>
                 <td className="p-4 text-emerald-600 font-bold">Sim</td>
                 <td className="p-4 text-emerald-600 font-bold">Sim</td>
-                <td className="p-4 text-neutral-500">Redes, franquias, churrascarias e complexos gastronômicos</td>
+                <td className="p-4 text-neutral-500">Grandes operações e redes (etapa futura)</td>
               </tr>
             </tbody>
           </table>

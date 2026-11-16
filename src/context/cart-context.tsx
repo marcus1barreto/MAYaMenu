@@ -157,6 +157,7 @@ export function CartProvider({
     setItens([]);
     try {
       if (typeof window !== "undefined") {
+        localStorage.removeItem(getCartStorageKey(slug, mesa));
         localStorage.removeItem(`mayamenu_cart_${slug}`);
         localStorage.removeItem("mayamenu_cart");
       }

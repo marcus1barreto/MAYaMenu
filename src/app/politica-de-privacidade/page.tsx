@@ -61,6 +61,9 @@ export default function PoliticaPrivacidadePage() {
               <p className="text-sm text-slate-600 mt-2 max-w-2xl leading-relaxed">
                 Saiba como a plataforma MAYaMenu protege, trata e gerencia os dados pessoais de estabelecimentos parceiros e de consumidores finais, em estrito cumprimento à Lei Geral de Proteção de Dados (LGPD).
               </p>
+              <p className="text-xs font-semibold text-slate-500 mt-2">
+                Última atualização: {dataAtualizacao}
+              </p>
             </div>
 
             {/* BOX DO ENCARREGADO (DPO) E DADOS DA EMPRESA */}

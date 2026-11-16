@@ -134,15 +134,6 @@ export default function LandingPage() {
                   <span>Experimente a versão free</span>
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform shrink-0" />
                 </Link>
-
-                <Link
-                  href="/demo"
-                  className="inline-flex items-center justify-center gap-2 px-5 sm:px-6 py-3.5 text-sm sm:text-base font-bold text-rose-700 hover:text-rose-800 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl transition-all text-center shadow-xs"
-                  title="Visite o restaurante modelo MAYaBurger & Co. e experimente na prática"
-                >
-                  <Store className="w-4 h-4 text-rose-600 shrink-0" />
-                  <span>Ver Restaurante Modelo (Ao Vivo)</span>
-                </Link>
               </div>
 
               {/* Micro-aviso de confiança (M3 Label) */}
@@ -393,10 +384,10 @@ export default function LandingPage() {
               <div className="rounded-3xl border border-neutral-200 bg-white p-6 sm:p-10 shadow-xl text-center space-y-4">
                 <div className="text-3xl sm:text-5xl font-black text-neutral-950">Grátis</div>
                 <p className="text-sm sm:text-base text-neutral-600 max-w-lg mx-auto">
-                  Até <strong>5 mesas</strong> com QR Code, <strong>KDS da Cozinha</strong>, botão de <strong>Solicitar atendimento</strong> e recebimento por <strong>Pix</strong>.
+                  Até <strong>5 mesas</strong> (com possibilidade de mesas extras por <strong>R$ 8,00/mesa</strong>) e <strong>sem limite de itens</strong>, com QR Code, <strong>KDS da Cozinha</strong>, solicitação de atendimento e <strong>Pix</strong>.
                 </p>
                 <p className="text-xs text-neutral-500">
-                  Em breve: módulo Garçom, Relatórios Inteligentes e Planos PRO.
+                  Versão PRO: até <strong>20 mesas</strong> (+ mesas extras a R$ 8,00/mesa) e recursos avançados de salão e gestão.
                 </p>
                 <div className="pt-2">
                   <Link
@@ -484,14 +475,6 @@ export default function LandingPage() {
                     <span>Experimente a versão free</span>
                     <ArrowRight className="w-4 h-4" />
                   </Link>
-
-                  <Link
-                    href="/demo"
-                    className="mt-3.5 text-xs text-rose-700 hover:text-rose-800 transition-colors font-bold flex items-center justify-center gap-1.5"
-                  >
-                    <Store className="w-3.5 h-3.5 text-rose-600" />
-                    <span>Ou visite o Restaurante Modelo para degustar</span>
-                  </Link>
                 </div>
               </div>
 
@@ -561,8 +544,8 @@ export default function LandingPage() {
                 <HelpCircle className="w-4 h-4 text-rose-600 shrink-0" />
                 E se eu precisar de mais mesas do que o meu plano atual?
               </h3>
-              <p className="text-sm text-neutral-600 mt-2 leading-relaxed">
-                Você cresce no seu ritmo: a partir do plano gratuito (até 5 mesas), pode adicionar mesas extras pagando um valor proporcional por mesa — até o momento em que o plano superior passe a compensar ainda mais para o seu salão.
+                <p className="text-sm text-neutral-600 mt-2 leading-relaxed">
+                Você cresce no seu ritmo: a partir do plano Free (até 5 mesas, sem limite de itens), é possível adicionar mesas extras por R$ 8,00/mês por mesa — ou migrar para o plano PRO (até 20 mesas + mesas extras a R$ 8,00/mês, também sem limite de itens).
               </p>
             </div>
           </div>
@@ -581,10 +564,6 @@ export default function LandingPage() {
           </div>
 
           <div className="flex flex-wrap items-center justify-center gap-6 text-xs font-semibold text-neutral-600">
-            <Link href="/demo" className="hover:text-rose-600 transition-colors flex items-center gap-1.5 text-neutral-800 font-bold">
-              <Store className="w-3.5 h-3.5 text-rose-600" />
-              <span>Restaurante Modelo (Demo)</span>
-            </Link>
             <Link href="/historico" className="hover:text-rose-600 transition-colors">
               Meus Recibos
             </Link>

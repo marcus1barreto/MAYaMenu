@@ -2967,8 +2967,8 @@ async function executarProcessarPagamentoProAprovado(firestoreDb, attemptId, pay
       contratadoEm: payment.date_approved,
       dataExpiracao: novaDataExpiracao,
       limites: {
-        maxMesas: 30,
-        maxItensMenu: 60,
+        maxMesas: 20,
+        maxItensMenu: 9999,
         modulosPermitidos: ['cardapio', 'mesas', 'kds', 'garcom', 'analytics', 'historico'],
       },
       garantiaAcordo: 'inalteravel',
@@ -2977,9 +2977,9 @@ async function executarProcessarPagamentoProAprovado(firestoreDb, attemptId, pay
 
     tx.update(restRef, {
       plano: 'pro',
-      maxMesas: 30,
-      maxPratos: 60,
-      maxItensMenu: 60,
+      maxMesas: 20,
+      maxPratos: 9999,
+      maxItensMenu: 9999,
       assinatura,
       revisaoFinanceira: admin.firestore.FieldValue.delete(),
       atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
@@ -3772,7 +3772,7 @@ async function executarAtivarInstancia(firestoreDb, authUid, authToken, payload,
 
     if (modoAutoCadastroFree) {
       const plano = 'free';
-      const limites = { maxPratos: 20, maxItensMenu: 20, maxMesas: 5 };
+      const limites = { maxPratos: 9999, maxItensMenu: 9999, maxMesas: 5 };
       const agora = new Date();
       const restaurante = {
         id: authUid, ownerId: authUid, slug, nome, plano,
@@ -3803,10 +3803,10 @@ async function executarAtivarInstancia(firestoreDb, authUid, authToken, payload,
       validarDisponibilidadeAtivacao(licData, codigo);
       const plano = String(licData.plano || 'free');
       const limites = licData.limites || (plano === 'pro'
-        ? { maxPratos: 60, maxItensMenu: 60, maxMesas: 30 }
+        ? { maxPratos: 9999, maxItensMenu: 9999, maxMesas: 20 }
         : plano === 'enterprise'
-          ? { maxPratos: 999, maxItensMenu: 999, maxMesas: 999 }
-          : { maxPratos: 20, maxItensMenu: 20, maxMesas: 10 });
+          ? { maxPratos: 9999, maxItensMenu: 9999, maxMesas: 999 }
+          : { maxPratos: 9999, maxItensMenu: 9999, maxMesas: 5 });
       const agora = new Date();
       const restaurante = {
         id: authUid, ownerId: authUid, slug, nome, plano,
@@ -4664,60 +4664,95 @@ exports.transferirMesaCliente = functions.https.onCall(async (data, context) => 
     throw new functions.https.HttpsError('unauthenticated', 'Autenticação necessária.');
   }
 
+  const firestoreDb = getDb();
   const restauranteId = String((data && data.restauranteId) || '').trim();
-  const mesaDestino = Number(data && data.mesaDestino);
-  if (!restauranteId || !Number.isFinite(mesaDestino) || mesaDestino <= 0) {
+  const mesaOrigemStr = String((data && data.mesaOrigem) ?? '').trim();
+  const mesaDestinoStr = String((data && data.mesaDestino) ?? '').trim();
+  const qrCredencial = String((data && data.qrCredencial) || '').trim();
+  const mesaDestinoNum = Number(mesaDestinoStr);
+  if (!restauranteId || !mesaOrigemStr || !mesaDestinoStr || !Number.isFinite(mesaDestinoNum) || mesaDestinoNum <= 0) {
     throw new functions.https.HttpsError('invalid-argument', 'Dados de transferência inválidos.');
   }
+  if (mesaOrigemStr === mesaDestinoStr) {
+    return { ok: true, mesaDestino: mesaDestinoNum, transferida: false };
+  }
 
-  const comandaRef = db.collection('restaurantes').doc(restauranteId).collection('comandas').doc(authUid);
-  const pedidosQuery = db
-    .collection('restaurantes')
-    .doc(restauranteId)
-    .collection('pedidos')
-    .where('comandaId', '==', authUid);
-  const kdsQuery = db
-    .collection('restaurantes')
-    .doc(restauranteId)
-    .collection('kds_tickets')
-    .where('comandaId', '==', authUid);
+  const restDoc = await resolverRestDoc(firestoreDb, restauranteId);
+  const mesaOrigemRef = restDoc.ref.collection('mesas').doc(mesaOrigemStr);
+  const mesaDestinoRef = restDoc.ref.collection('mesas').doc(mesaDestinoStr);
+  const comandaOrigemRef = mesaOrigemRef.collection('comandas_abertas').doc(authUid);
+  const comandaDestinoRef = mesaDestinoRef.collection('comandas_abertas').doc(authUid);
 
-  await db.runTransaction(async (tx) => {
-    const [comandaSnap, pedidosSnap, kdsSnap] = await Promise.all([
-      tx.get(comandaRef),
-      tx.get(pedidosQuery),
-      tx.get(kdsQuery),
+  let transferida = false;
+  await firestoreDb.runTransaction(async (tx) => {
+    const [mesaDestinoSnap, comandaOrigemSnap, comandaDestinoSnap] = await Promise.all([
+      tx.get(mesaDestinoRef),
+      tx.get(comandaOrigemRef),
+      tx.get(comandaDestinoRef),
     ]);
 
-    const agora = admin.firestore.FieldValue.serverTimestamp();
-    if (comandaSnap.exists) {
-      const cData = comandaSnap.data() || {};
-      const statusAtual = cData.status;
-      const ehEncerrada =
-        statusAtual === 'arquivada' || statusAtual === 'encerrada' || statusAtual === 'kill';
-      tx.update(comandaRef, {
-        mesa: mesaDestino,
-        status: ehEncerrada ? 'aberta' : statusAtual || 'aberta',
-        atualizadoEm: agora,
-      });
+    if (!mesaDestinoSnap.exists) {
+      throw new functions.https.HttpsError('not-found', 'Mesa de destino não encontrada.');
+    }
+    const mDest = mesaDestinoSnap.data() || {};
+    if (mDest.ativa !== true || ['inativa', 'bloqueada', 'reservada'].includes(mDest.statusEstrutural)) {
+      throw new functions.https.HttpsError('failed-precondition', 'Mesa de destino indisponível para transferência.');
+    }
+    if (typeof mDest.qrCredencialHash === 'string' && qrCredencial) {
+      const recebido = hashQrCredencial(qrCredencial);
+      if (!compararSegredoConstante(recebido, mDest.qrCredencialHash)) {
+        throw new functions.https.HttpsError('permission-denied', 'QR Code da mesa de destino inválido ou expirado.');
+      }
     }
 
-    pedidosSnap.docs.forEach((docSnap) => {
-      const pData = docSnap.data() || {};
-      if (pData.status !== 'arquivado' && pData.status !== 'cancelado') {
-        tx.update(docSnap.ref, { mesa: mesaDestino, atualizadoEm: agora });
-      }
+    if (!comandaOrigemSnap.exists) {
+      return;
+    }
+    const cData = comandaOrigemSnap.data() || {};
+    if (cData.arquivada === true || cData.status === 'pago') {
+      return;
+    }
+    if (comandaDestinoSnap.exists && (comandaDestinoSnap.data() || {}).arquivada !== true) {
+      throw new functions.https.HttpsError('failed-precondition', 'Já existe uma comanda ativa sua na mesa de destino.');
+    }
+
+    const pedidosSnap = await tx.get(comandaOrigemRef.collection('pedidos'));
+    const agora = admin.firestore.FieldValue.serverTimestamp();
+
+    tx.set(comandaDestinoRef, {
+      ...cData,
+      mesa: mesaDestinoNum,
+      numeroMesa: mesaDestinoNum,
+      atualizadoEm: agora,
+    });
+    tx.delete(comandaOrigemRef);
+
+    pedidosSnap.docs.forEach((pDoc) => {
+      const pData = pDoc.data() || {};
+      const novoPedidoRef = comandaDestinoRef.collection('pedidos').doc(pDoc.id);
+      tx.set(novoPedidoRef, {
+        ...pData,
+        mesa: mesaDestinoNum,
+        numeroMesa: mesaDestinoNum,
+        atualizadoEm: agora,
+      });
+      tx.delete(pDoc.ref);
+      const kdsRef = restDoc.ref.collection('kds_tickets').doc(pDoc.id);
+      tx.update(kdsRef, {
+        mesa: mesaDestinoNum,
+        numeroMesa: mesaDestinoNum,
+        pedidoRefPath: novoPedidoRef.path,
+        atualizadoEm: agora,
+      });
     });
 
-    kdsSnap.docs.forEach((docSnap) => {
-      const kData = docSnap.data() || {};
-      if (kData.status !== 'arquivado' && kData.status !== 'cancelado') {
-        tx.update(docSnap.ref, { mesa: mesaDestino, atualizadoEm: agora });
-      }
-    });
+    if (mDest.statusEstrutural === 'livre' || !mDest.statusEstrutural) {
+      tx.update(mesaDestinoRef, { statusEstrutural: 'ocupada', atualizadoEm: agora });
+    }
+    transferida = true;
   });
 
-  return { ok: true, mesaDestino };
+  return { ok: true, mesaDestino: mesaDestinoNum, transferida };
 });
 
 

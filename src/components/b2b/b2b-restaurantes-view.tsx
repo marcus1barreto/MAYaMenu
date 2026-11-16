@@ -178,10 +178,16 @@ export function B2BRestaurantesView({ patrocinadorId, lotes }: B2BRestaurantesVi
                     </td>
 
                     <td className="py-4 px-6">
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 font-bold text-[10px] border border-emerald-200">
-                        <ShieldCheck className="w-3 h-3 text-emerald-600" />
-                        Ativo (Plano Pro)
-                      </span>
+                      {(rest as any).status === "suspenso" ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-rose-50 text-rose-800 font-bold text-[10px] border border-rose-200">
+                          Suspenso
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 font-bold text-[10px] border border-emerald-200">
+                          <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                          Ativo (Plano Pro)
+                        </span>
+                      )}
                     </td>
 
                     <td className="py-4 px-6 text-right">

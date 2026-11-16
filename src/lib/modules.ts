@@ -46,7 +46,7 @@ export const LIMITE_MESAS_FREE_PRELAUNCH = 5;
 
 export const PRECO_MESA_EXTRA_MENSAL = 8;
 export const LIMITE_MESAS_FREE = 5;
-export const LIMITE_MESAS_PRO = 10;
+export const LIMITE_MESAS_PRO = 20;
 
 export function calcularLimiteMesas(plano?: string, mesasExtrasContratadas = 0): number {
   const base = plano === "pro" ? LIMITE_MESAS_PRO : LIMITE_MESAS_FREE;
