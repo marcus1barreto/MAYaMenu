@@ -2205,8 +2205,9 @@ async function executarLiberarMesa(firestoreDb, authUid, authToken, payload) {
         jaRegistradas++;
         return;
       }
-      // A liberação normal é apenas pós-pagamento; no modo forçado (kill), encerra com motivo registrado.
-      if (!ehForcado && (c.status !== 'pago' || !c.pagoEm)) {
+      // A liberação normal é apenas pós-pagamento (ou saldo zerado); no modo forçado (kill), encerra com motivo registrado.
+      const temSaldoEmAberto = Number(c.subtotal || 0) > 0;
+      if (!ehForcado && temSaldoEmAberto && (c.status !== 'pago' || !c.pagoEm)) {
         throw new functions.https.HttpsError(
           'failed-precondition',
           'A comanda precisa estar paga e encerrada pelo fluxo de fechamento antes da liberação.'
