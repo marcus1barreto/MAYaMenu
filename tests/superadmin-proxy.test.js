@@ -133,6 +133,7 @@ runTest("Valida redirecionamento interno seguro e rotas privilegiadas", () => {
   assert.strictEqual(isSafeInternalRedirect("//evil.com"), false);
   assert.strictEqual(isSafeInternalRedirect("https://evil.com"), false);
   assert.strictEqual(isPrivilegedSuperadminPath("/superadmin"), true);
+  assert.strictEqual(isPrivilegedSuperadminPath("/superadmin/diagnostico"), true);
   assert.strictEqual(isPrivilegedSuperadminPath("/hq/ajuda"), true);
   assert.strictEqual(isPrivilegedSuperadminPath("/admin/operacao"), false);
   assert.strictEqual(isPrivilegedSuperadminPath("//superadmin"), false);
