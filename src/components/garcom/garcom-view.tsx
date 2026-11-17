@@ -1165,8 +1165,19 @@ export function GarcomView({
           <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
           Ocupada
         </span>
-        <span className="flex items-center gap-1.5 text-rose-400 font-bold">
-          <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping" />
+        <span
+          className={`flex items-center gap-1.5 ${
+            mesasComContaPedida > 0
+              ? "text-rose-400 font-bold"
+              : "text-neutral-400"
+          }`}
+        >
+          <span className="relative flex w-2.5 h-2.5">
+            {mesasComContaPedida > 0 && (
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75" />
+            )}
+            <span className="relative inline-flex rounded-full w-2.5 h-2.5 bg-rose-500" />
+          </span>
           Conta Pedida ({mesasComContaPedida})
         </span>
       </div>

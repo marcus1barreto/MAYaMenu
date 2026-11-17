@@ -1859,10 +1859,29 @@ export function AdminDashboard({
                     <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
                     Ocupada
                   </span>
-                  <span className="flex items-center gap-1.5 text-rose-600 dark:text-rose-400 font-bold">
-                    <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping" />
-                    Pediu Conta
-                  </span>
+                  {(() => {
+                    const qtdContaPedida = mesas.filter(
+                      (m) => m.status === "conta_pedida"
+                    ).length;
+                    const temContaPedida = qtdContaPedida > 0;
+                    return (
+                      <span
+                        className={`flex items-center gap-1.5 ${
+                          temContaPedida
+                            ? "text-rose-600 dark:text-rose-400 font-bold"
+                            : "text-muted-foreground"
+                        }`}
+                      >
+                        <span className="relative flex w-2.5 h-2.5">
+                          {temContaPedida && (
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75" />
+                          )}
+                          <span className="relative inline-flex rounded-full w-2.5 h-2.5 bg-rose-500" />
+                        </span>
+                        Pediu Conta{temContaPedida ? ` (${qtdContaPedida})` : ""}
+                      </span>
+                    );
+                  })()}
                 </div>
 
                 <Link href="/admin/setup">
