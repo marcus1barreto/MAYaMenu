@@ -56,6 +56,40 @@ export async function verificarSlugDisponivel(slug: string): Promise<boolean> {
   }
 }
 
+function mapearRestaurantePublico(
+  id: string,
+  data: Record<string, unknown>,
+  fallbackSlug: string
+): Restaurante {
+  const cfg = ((data.configuracoes as Record<string, unknown> | undefined) || {}) as Partial<
+    Restaurante["configuracoes"]
+  >;
+  return {
+    id,
+    ownerId: (data.ownerId as string) || id,
+    slug: (data.slug as string) || fallbackSlug,
+    nome: (data.nome as string) || "Restaurante",
+    plano: data.plano as Restaurante["plano"],
+    maxMesas: data.maxMesas as number | undefined,
+    maxPratos: data.maxPratos as number | undefined,
+    suspenso: data.suspenso as boolean | undefined,
+    cardapioAtualizadoEm:
+      typeof data.cardapioAtualizadoEm === "string" ? data.cardapioAtualizadoEm : null,
+    licenca: data.licenca as Restaurante["licenca"],
+    configuracoes: {
+      corPrimaria: cfg.corPrimaria || "#E11D48",
+      tema: cfg.tema || "light",
+      logoUrl: cfg.logoUrl,
+      capaUrl: cfg.capaUrl || "/images/capa-padrao.webp",
+      modoOperacao: cfg.modoOperacao || "hibrido",
+      modoFilaKds: cfg.modoFilaKds || "sequencial",
+      taxaServico: typeof cfg.taxaServico === "number" ? cfg.taxaServico : 10,
+      suspenso: cfg.suspenso,
+      pixConfig: cfg.pixConfig,
+    },
+  };
+}
+
 /**
  * Busca restaurante pelo `slug` no Firestore de forma estrita (Tenant Existence Guard).
  * Se o documento não existir, retorna null para interromper e exibir fallback.
@@ -75,57 +109,13 @@ export async function obterRestaurantePorSlugValido(slug: string): Promise<Resta
     const snapshot = await getDocs(q);
     if (!snapshot.empty) {
       const docSnap = snapshot.docs[0];
-      const data = docSnap.data();
-      return {
-        id: docSnap.id,
-        ownerId: data.ownerId || docSnap.id,
-        slug: data.slug || slugLimpo,
-        nome: data.nome || "Restaurante",
-        plano: data.plano,
-        maxMesas: data.maxMesas,
-        maxPratos: data.maxPratos,
-        suspenso: data.suspenso,
-        licenca: data.licenca,
-        configuracoes: {
-          corPrimaria: data.configuracoes?.corPrimaria || "#E11D48",
-          tema: data.configuracoes?.tema || "light",
-          logoUrl: data.configuracoes?.logoUrl,
-          capaUrl: data.configuracoes?.capaUrl || "/images/capa-padrao.webp",
-          modoOperacao: data.configuracoes?.modoOperacao || "hibrido",
-          modoFilaKds: data.configuracoes?.modoFilaKds || "sequencial",
-          taxaServico: typeof data.configuracoes?.taxaServico === "number" ? data.configuracoes.taxaServico : 10,
-          suspenso: data.configuracoes?.suspenso,
-          pixConfig: data.configuracoes?.pixConfig,
-        },
-      };
+      return mapearRestaurantePublico(docSnap.id, docSnap.data(), slugLimpo);
     }
 
     // 2. Consulta pelo UID direto do documento
     const directDoc = await getDoc(doc(db, "restaurantes_publicos", slugLimpo));
     if (directDoc.exists()) {
-      const data = directDoc.data();
-      return {
-        id: directDoc.id,
-        ownerId: data.ownerId || directDoc.id,
-        slug: data.slug || slugLimpo,
-        nome: data.nome || "Restaurante",
-        plano: data.plano,
-        maxMesas: data.maxMesas,
-        maxPratos: data.maxPratos,
-        suspenso: data.suspenso,
-        licenca: data.licenca,
-        configuracoes: {
-          corPrimaria: data.configuracoes?.corPrimaria || "#E11D48",
-          tema: data.configuracoes?.tema || "light",
-          logoUrl: data.configuracoes?.logoUrl,
-          capaUrl: data.configuracoes?.capaUrl || "/images/capa-padrao.webp",
-          modoOperacao: data.configuracoes?.modoOperacao || "hibrido",
-          modoFilaKds: data.configuracoes?.modoFilaKds || "sequencial",
-          taxaServico: typeof data.configuracoes?.taxaServico === "number" ? data.configuracoes.taxaServico : 10,
-          suspenso: data.configuracoes?.suspenso,
-          pixConfig: data.configuracoes?.pixConfig,
-        },
-      };
+      return mapearRestaurantePublico(directDoc.id, directDoc.data(), slugLimpo);
     }
 
     // Documento não existe
@@ -157,29 +147,7 @@ export function escutarRestaurante(
     restRef,
     (snapshot) => {
       if (snapshot.exists()) {
-        const data = snapshot.data();
-        onAtualizacao({
-          id: snapshot.id,
-          ownerId: data.ownerId || snapshot.id,
-          slug: data.slug || "demo",
-          nome: data.nome || "Restaurante",
-          plano: data.plano,
-          maxMesas: data.maxMesas,
-          maxPratos: data.maxPratos,
-          suspenso: data.suspenso,
-          licenca: data.licenca,
-          configuracoes: {
-            corPrimaria: data.configuracoes?.corPrimaria || "#E11D48",
-            tema: data.configuracoes?.tema || "light",
-            logoUrl: data.configuracoes?.logoUrl,
-            capaUrl: data.configuracoes?.capaUrl || "/images/capa-padrao.webp",
-            modoOperacao: data.configuracoes?.modoOperacao || "hibrido",
-            modoFilaKds: data.configuracoes?.modoFilaKds || "sequencial",
-            taxaServico: typeof data.configuracoes?.taxaServico === "number" ? data.configuracoes.taxaServico : 10,
-            suspenso: data.configuracoes?.suspenso,
-            pixConfig: data.configuracoes?.pixConfig,
-          },
-        });
+        onAtualizacao(mapearRestaurantePublico(snapshot.id, snapshot.data(), "demo"));
       } else if (isDemo) {
         onAtualizacao(RESTAURANTE_DEMO);
       }
@@ -221,9 +189,7 @@ export async function obterCardapioDoRestaurante(restauranteId: string): Promise
       snap.forEach((d) => {
         itens.push(normalizarItemCardapio({ id: d.id, ...(d.data() as Omit<MenuItem, "id">) }));
       });
-      // Ordenação rigorosa por 'ordem' crescente
-      itens.sort((a, b) => (a.ordem ?? 9999) - (b.ordem ?? 9999));
-      return itens;
+      return ordenarItensCardapioPatrocinio(itens);
     }
     // Coleção vazia
     return isDemo ? CARDAPIO_DEMO : [];

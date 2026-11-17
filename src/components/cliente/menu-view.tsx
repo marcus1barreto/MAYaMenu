@@ -38,7 +38,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { ensureClienteAnonimo, auth, db } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { doc, updateDoc, serverTimestamp, onSnapshot } from "firebase/firestore";
-import { escutarCardapio, escutarRestaurante, chamarGarcomFirestore, escutarPedidosCliente } from "@/lib/restaurante-service";
+import { obterCardapioDoRestaurante, escutarRestaurante, chamarGarcomFirestore, escutarPedidosCliente } from "@/lib/restaurante-service";
 import { simularImpressaoTermicaPDF } from "@/lib/thermal-pdf-simulator";
 import { moduloAtivo } from "@/lib/modules";
 import { marcarVisitaAtualComoPaga, limparSessaoClienteLocal } from "@/lib/historico-cliente";
@@ -158,23 +158,32 @@ export function MenuView({
     ...outrasCategorias,
   ];
 
-  // Escuta o restaurante em tempo real (mudança de tema, logo, cores)
+  const versaoCardapioRef = useRef<string | null>(restauranteInicial?.cardapioAtualizadoEm ?? null);
+
+  // Escuta o restaurante em tempo real (tema, logo, status e versão do cardápio)
+  // Evita re-ler todo o cardápio na abertura já que o SSR envia os itens iniciais.
   useEffect(() => {
     if (!restauranteInicial?.id) return;
-    const unsub = escutarRestaurante(restauranteInicial.id, (novoRest) => {
-      setRestaurante(novoRest);
-    });
-    return () => unsub();
-  }, [restauranteInicial?.id]);
+    let ativo = true;
 
-  // Escuta o cardápio em tempo real (mudança de preço, pausa de esgotados)
-  useEffect(() => {
-    if (!restaurante.id) return;
-    const unsub = escutarCardapio(restaurante.id, (novosItens) => {
-      setCardapio(novosItens);
+    const unsub = escutarRestaurante(restauranteInicial.id, (novoRest) => {
+      if (!ativo) return;
+      setRestaurante(novoRest);
+
+      const novaVersao = novoRest.cardapioAtualizadoEm ?? null;
+      if (novaVersao && novaVersao !== versaoCardapioRef.current) {
+        versaoCardapioRef.current = novaVersao;
+        void obterCardapioDoRestaurante(novoRest.id).then((novosItens) => {
+          if (ativo) setCardapio(novosItens);
+        });
+      }
     });
-    return () => unsub();
-  }, [restaurante.id]);
+
+    return () => {
+      ativo = false;
+      unsub();
+    };
+  }, [restauranteInicial?.id]);
 
   const [uid, setUid] = useState<string | null>(null);
   const [chamandoGarcom, setChamandoGarcom] = useState(false);

@@ -28,6 +28,7 @@ export interface Restaurante {
   termsAcceptedAt?: string; // Carimbo de data/hora do consentimento LGPD (ISO String)
   termsVersion?: string; // Versão dos termos aceitos (Ex: "1.0.0")
   suspenso?: boolean;
+  cardapioAtualizadoEm?: string | null;
   licenca?: Partial<Licenca>;
   acessosSetores?: Partial<Record<SetorQrAcesso, AcessoSetorStatus>>;
   patrocinio?: {

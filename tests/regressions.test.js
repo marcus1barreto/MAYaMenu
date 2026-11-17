@@ -31,6 +31,8 @@ const {
   executarDefinirTaxaServicoMesa,
   executarFecharComanda,
   executarLiberarMesa,
+  executarSincronizarPerfilPublicoRestaurante,
+  executarSincronizarVersaoCardapioPublico,
 } = _internal;
 
 const TEST_MESA_SECRET = "segredo-super-forte-de-teste-mayamenu-32bytes-ok";
@@ -857,6 +859,40 @@ async function main() {
       () => executarLiberarMesa(db, "garcom_1", {}, { restauranteId: "rest_1", mesa: 9, comandasIds: ["inexistente"] }),
       /Nenhuma comanda/i
     );
+  });
+
+  await runTest("Alavanca 1 Cardápio Versão: carimba cardapioAtualizadoEm, preserva ao sincronizar perfil e ignora evento antigo", async () => {
+    const db = createFakeFirestore();
+    // Sem perfil público ainda, ignora sem criar documento órfão
+    const rVazio = await executarSincronizarVersaoCardapioPublico(db, "rest_v1", "2026-11-17T00:00:00.000Z");
+    assert.strictEqual(rVazio.ignorado, true);
+    assert.ok(!db._store.has("restaurantes_publicos/rest_v1"));
+
+    // Cria espelho público e atualiza versão do cardápio
+    await executarSincronizarPerfilPublicoRestaurante(
+      db,
+      "rest_v1",
+      { nome: "Restaurante Teste", slug: "rest-v1", configuracoes: { tema: "light" } },
+      "2026-11-17T00:01:00.000Z"
+    );
+    const rOk = await executarSincronizarVersaoCardapioPublico(db, "rest_v1", "2026-11-17T00:05:00.000Z");
+    assert.strictEqual(rOk.atualizado, true);
+    assert.strictEqual(db._store.get("restaurantes_publicos/rest_v1").cardapioAtualizadoEm, "2026-11-17T00:05:00.000Z");
+
+    // Evento fora de ordem (mais antigo) não sobrescreve
+    const rAntigo = await executarSincronizarVersaoCardapioPublico(db, "rest_v1", "2026-11-17T00:03:00.000Z");
+    assert.strictEqual(rAntigo.ignorado, true);
+    assert.strictEqual(db._store.get("restaurantes_publicos/rest_v1").cardapioAtualizadoEm, "2026-11-17T00:05:00.000Z");
+
+    // Atualizar o perfil do restaurante preserva cardapioAtualizadoEm
+    await executarSincronizarPerfilPublicoRestaurante(
+      db,
+      "rest_v1",
+      { nome: "Restaurante Renomeado", slug: "rest-v1", configuracoes: { tema: "dark" } },
+      "2026-11-17T00:06:00.000Z"
+    );
+    assert.strictEqual(db._store.get("restaurantes_publicos/rest_v1").nome, "Restaurante Renomeado");
+    assert.strictEqual(db._store.get("restaurantes_publicos/rest_v1").cardapioAtualizadoEm, "2026-11-17T00:05:00.000Z");
   });
 
   console.log("\n=================================================");

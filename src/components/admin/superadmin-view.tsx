@@ -10,6 +10,8 @@ import {
   escutarLicencas,
   escutarArquivoMorto,
   escutarRestaurantes,
+  buscarRestaurantePorTermoSuperadmin,
+  obterTotaisSuperadmin,
   alterarStatusLicenca,
   alterarStatusRestaurante,
   alterarPlanoRestaurante,
@@ -99,6 +101,24 @@ export function SuperAdminView() {
   const [licencas, setLicencas] = useState<Licenca[]>([]);
   const [arquivoMorto, setArquivoMorto] = useState<LicencaArquivada[]>([]);
   const [restaurantes, setRestaurantes] = useState<Restaurante[]>([]);
+  const [restaurantesBuscaRemota, setRestaurantesBuscaRemota] = useState<Restaurante[]>([]);
+  const [limiteRestaurantes, setLimiteRestaurantes] = useState<number>(50);
+  const [limiteLicencas, setLimiteLicencas] = useState<number>(50);
+  const [limiteArquivoMorto, setLimiteArquivoMorto] = useState<number>(50);
+  const [temMaisRestaurantes, setTemMaisRestaurantes] = useState(false);
+  const [temMaisLicencas, setTemMaisLicencas] = useState(false);
+  const [temMaisArquivoMorto, setTemMaisArquivoMorto] = useState(false);
+  const [totaisServidor, setTotaisServidor] = useState<{
+    lojasTotal: number | null;
+    lojasSuspensas: number | null;
+    arquivoMortoTotal: number | null;
+    concessoesTotal: number | null;
+  }>({
+    lojasTotal: null,
+    lojasSuspensas: null,
+    arquivoMortoTotal: null,
+    concessoesTotal: null,
+  });
   const [patrocinadores, setPatrocinadores] = useState<PatrocinadorB2B[]>([]);
   const [chamadosSuporte, setChamadosSuporte] = useState<
     Array<{
@@ -176,29 +196,36 @@ export function SuperAdminView() {
     };
   }, []);
 
-  useEffect(() => {
-    const emailCheck = usuarioAuth?.email?.toLowerCase() || "";
-    const devE2eBypass =
-      process.env.NODE_ENV !== "production" &&
-      typeof window !== "undefined" &&
-      window.location.search.includes("e2e=true");
-    const autorizado = Boolean(
-      devE2eBypass ||
-        (usuarioAuth &&
-          !usuarioAuth.isAnonymous &&
-          (EMAILS_SUPERADMIN_AUTORIZADOS.includes(emailCheck) || claimSuperAdmin))
-    );
-    if (!autorizado) return;
+  const emailCheckAuth = usuarioAuth?.email?.toLowerCase() || "";
+  const devE2eBypass =
+    process.env.NODE_ENV !== "production" &&
+    typeof window !== "undefined" &&
+    window.location.search.includes("e2e=true");
+  const autorizadoDadosSuperAdmin = Boolean(
+    devE2eBypass ||
+      (usuarioAuth &&
+        !usuarioAuth.isAnonymous &&
+        (EMAILS_SUPERADMIN_AUTORIZADOS.includes(emailCheckAuth) || claimSuperAdmin))
+  );
 
-    const unsubLicencas = escutarLicencas((dados) => {
-      setLicencas(dados);
-    });
-    const unsubArquivo = escutarArquivoMorto((dados) => {
-      setArquivoMorto(dados);
-    });
-    const unsubRestaurantes = escutarRestaurantes((dados) => {
-      setRestaurantes(dados);
-    });
+  useEffect(() => {
+    if (!autorizadoDadosSuperAdmin) return;
+    return escutarLicencas(setLicencas, limiteLicencas, setTemMaisLicencas);
+  }, [autorizadoDadosSuperAdmin, limiteLicencas]);
+
+  useEffect(() => {
+    if (!autorizadoDadosSuperAdmin) return;
+    return escutarArquivoMorto(setArquivoMorto, limiteArquivoMorto, setTemMaisArquivoMorto);
+  }, [autorizadoDadosSuperAdmin, limiteArquivoMorto]);
+
+  useEffect(() => {
+    if (!autorizadoDadosSuperAdmin) return;
+    return escutarRestaurantes(setRestaurantes, limiteRestaurantes, setTemMaisRestaurantes);
+  }, [autorizadoDadosSuperAdmin, limiteRestaurantes]);
+
+  useEffect(() => {
+    if (!autorizadoDadosSuperAdmin) return;
+
     const unsubPatrocinadores = escutarTodosPatrocinadores((dados) => {
       setPatrocinadores(dados);
     });
@@ -230,14 +257,33 @@ export function SuperAdminView() {
         setChamadosSuporte([]);
       }
     );
+
+    let ativo = true;
+    void obterTotaisSuperadmin().then((totais) => {
+      if (ativo) setTotaisServidor(totais);
+    });
+
     return () => {
-      unsubLicencas();
-      unsubArquivo();
-      unsubRestaurantes();
+      ativo = false;
       unsubPatrocinadores();
       unsubChamados();
     };
-  }, [usuarioAuth, claimSuperAdmin]);
+  }, [autorizadoDadosSuperAdmin]);
+
+  useEffect(() => {
+    const termoLimpo = filtro.trim();
+    if (!autorizadoDadosSuperAdmin || termoLimpo.length < 3) return;
+    let ativo = true;
+    const timer = setTimeout(() => {
+      void buscarRestaurantePorTermoSuperadmin(termoLimpo).then((encontrados) => {
+        if (ativo) setRestaurantesBuscaRemota(encontrados);
+      });
+    }, 350);
+    return () => {
+      ativo = false;
+      clearTimeout(timer);
+    };
+  }, [autorizadoDadosSuperAdmin, filtro]);
 
   const handleLoginOperador = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -617,7 +663,16 @@ export function SuperAdminView() {
     return matchTermo && isLicencaVencida(lic);
   });
 
-  const restaurantesFiltrados = restaurantes.filter((rest) => {
+  const restaurantesCombinados = (() => {
+    const extras = filtro.trim().length >= 3 ? restaurantesBuscaRemota : [];
+    if (extras.length === 0) return restaurantes;
+    const mapa = new Map<string, Restaurante>();
+    restaurantes.forEach((r) => mapa.set(r.id, r));
+    extras.forEach((r) => mapa.set(r.id, r));
+    return Array.from(mapa.values());
+  })();
+
+  const restaurantesFiltrados = restaurantesCombinados.filter((rest) => {
     const termo = filtro.toLowerCase();
     return (
       rest.nome.toLowerCase().includes(termo) ||
@@ -627,10 +682,15 @@ export function SuperAdminView() {
     );
   });
 
-  const totalRestaurantesAtivos = restaurantes.filter((r) => !r.suspenso && !r.configuracoes?.suspenso).length;
-  const totalRestaurantesSuspensos = restaurantes.filter((r) => r.suspenso || r.configuracoes?.suspenso).length;
+  const suspensosLocal = restaurantes.filter((r) => r.suspenso || r.configuracoes?.suspenso).length;
+  const totalRestaurantesSuspensos = totaisServidor.lojasSuspensas ?? suspensosLocal;
+  const totalRestaurantesAtivos =
+    totaisServidor.lojasTotal !== null && totaisServidor.lojasSuspensas !== null
+      ? Math.max(0, totaisServidor.lojasTotal - totaisServidor.lojasSuspensas)
+      : restaurantes.filter((r) => !r.suspenso && !r.configuracoes?.suspenso).length;
   const totalTokensDisponiveis = licencas.filter((l) => l.status === "disponivel" && !isLicencaVencida(l)).length;
   const totalTokensVencidos = licencas.filter((l) => isLicencaVencida(l)).length;
+  const totalArquivoMortoExibido = totaisServidor.arquivoMortoTotal ?? arquivoMorto.length;
 
   const emailAtual = usuarioAuth?.email?.toLowerCase() || "";
   const ehSuperAdmin = Boolean(
@@ -931,7 +991,7 @@ export function SuperAdminView() {
               <Archive className="w-3 h-3 text-purple-600 shrink-0" />
               Arquivo
             </span>
-            <span className="text-lg sm:text-xl font-black text-purple-600 mt-0.5">{arquivoMorto.length}</span>
+            <span className="text-lg sm:text-xl font-black text-purple-600 mt-0.5">{totalArquivoMortoExibido}</span>
           </div>
           <div
             onClick={() => setAbaAtiva("patrocinadores")}
@@ -1044,8 +1104,8 @@ export function SuperAdminView() {
             }`}
         >
           <Archive className="w-4 h-4 shrink-0" />
-          <span className="sm:hidden">Arquivo ({arquivoMorto.length})</span>
-          <span className="hidden sm:inline">Arquivo Morto / JSONs ({arquivoMorto.length})</span>
+          <span className="sm:hidden">Arquivo ({totalArquivoMortoExibido})</span>
+          <span className="hidden sm:inline">Arquivo Morto / JSONs ({totalArquivoMortoExibido})</span>
         </button>
         <button
           onClick={() => setAbaAtiva("patrocinadores")}
@@ -1265,6 +1325,18 @@ export function SuperAdminView() {
                   </div>
                 );
               })}
+            </div>
+          )}
+          {temMaisRestaurantes && (
+            <div className="flex justify-center pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setLimiteRestaurantes((prev) => prev + 50)}
+                className="h-10 px-5 rounded-xl text-xs font-bold"
+              >
+                Carregar mais estabelecimentos (+50)
+              </Button>
             </div>
           )}
         </div>
@@ -1776,6 +1848,18 @@ export function SuperAdminView() {
                 })}
               </div>
             )}
+            {temMaisLicencas && (
+              <div className="flex justify-center pt-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setLimiteLicencas((prev) => prev + 50)}
+                  className="h-10 px-5 rounded-xl text-xs font-bold"
+                >
+                  Carregar mais concessões (+50)
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       ) : abaAtiva === "vencidas" ? (
@@ -1903,6 +1987,18 @@ export function SuperAdminView() {
               })}
             </div>
           )}
+          {temMaisLicencas && (
+            <div className="flex justify-center pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setLimiteLicencas((prev) => prev + 50)}
+                className="h-10 px-5 rounded-xl text-xs font-bold"
+              >
+                Carregar mais licenças (+50)
+              </Button>
+            </div>
+          )}
         </div>
       ) : abaAtiva === "arquivo_morto" ? (
         /* ABA ARQUIVO MORTO / REGISTROS EM JSON */
@@ -2027,6 +2123,18 @@ export function SuperAdminView() {
                   </div>
                 );
               })}
+            </div>
+          )}
+          {temMaisArquivoMorto && (
+            <div className="flex justify-center pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setLimiteArquivoMorto((prev) => prev + 50)}
+                className="h-10 px-5 rounded-xl text-xs font-bold"
+              >
+                Carregar mais registros do Arquivo Morto (+50)
+              </Button>
             </div>
           )}
         </div>

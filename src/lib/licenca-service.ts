@@ -7,9 +7,12 @@ import {
   doc,
   getDoc,
   getDocs,
+  getCountFromServer,
   updateDoc,
   query,
+  where,
   orderBy,
+  limit,
   onSnapshot,
   serverTimestamp,
   runTransaction,
@@ -235,10 +238,12 @@ export function formatarLicencasClipboard(licencas: Licenca[], baseUrl?: string)
 }
 
 /**
- * Escuta todas as concessões/licenças em tempo real para o Painel SuperAdmin
+ * Escuta as concessões/licenças mais recentes em tempo real com paginação controlada (SuperAdmin)
  */
 export function escutarLicencas(
-  onAtualizacao: (licencas: Licenca[]) => void
+  onAtualizacao: (licencas: Licenca[]) => void,
+  limite = 50,
+  onHasMore?: (temMais: boolean) => void
 ): Unsubscribe {
   // Dispara imediatamente os dados locais para resposta visual instantânea
   const locais = obterLicencasLocais();
@@ -247,12 +252,13 @@ export function escutarLicencas(
   }
 
   const colRef = collection(db, "concessoes");
-  const q = query(colRef, orderBy("criadaEm", "desc"));
+  const q = query(colRef, orderBy("criadaEm", "desc"), limit(limite));
 
   try {
     return onSnapshot(
       q,
       (snapshot) => {
+        onHasMore?.(snapshot.size >= limite);
         const listaFirestore: Licenca[] = [];
         snapshot.forEach((d) => {
           listaFirestore.push({
@@ -276,6 +282,7 @@ export function escutarLicencas(
       },
       (err) => {
         console.warn("Listener do Firestore indisponível para concessoes (usando local):", err);
+        onHasMore?.(false);
         onAtualizacao(obterLicencasLocais());
       }
     );
@@ -341,10 +348,12 @@ export async function ativarLicencaEInstanciaAtomica(params: {
 }
 
 /**
- * Escuta os registros do Arquivo Morto de Licenças em tempo real
+ * Escuta os registros recentes do Arquivo Morto de Licenças com paginação controlada
  */
 export function escutarArquivoMorto(
-  onAtualizacao: (arquivadas: import("@/types").LicencaArquivada[]) => void
+  onAtualizacao: (arquivadas: import("@/types").LicencaArquivada[]) => void,
+  limite = 50,
+  onHasMore?: (temMais: boolean) => void
 ): Unsubscribe {
   const locais = obterArquivoMortoLocais();
   if (locais.length > 0) {
@@ -352,12 +361,13 @@ export function escutarArquivoMorto(
   }
 
   const colRef = collection(db, "arquivo_morto_licencas");
-  const q = query(colRef, orderBy("arquivadoEm", "desc"));
+  const q = query(colRef, orderBy("arquivadoEm", "desc"), limit(limite));
 
   try {
     return onSnapshot(
       q,
       (snapshot) => {
+        onHasMore?.(snapshot.size >= limite);
         const listaFirestore: import("@/types").LicencaArquivada[] = [];
         snapshot.forEach((d) => {
           listaFirestore.push({
@@ -378,6 +388,7 @@ export function escutarArquivoMorto(
       },
       (err) => {
         console.warn("Listener do Firestore indisponível para arquivo_morto_licencas (usando local):", err);
+        onHasMore?.(false);
         onAtualizacao(obterArquivoMortoLocais());
       }
     );
@@ -443,16 +454,19 @@ export async function alterarStatusLicenca(
 }
 
 /**
- * Escuta todos os restaurantes ativos do sistema em tempo real (SuperAdmin)
+ * Escuta estabelecimentos do sistema com limite paginado (SuperAdmin)
  */
 export function escutarRestaurantes(
-  onAtualizacao: (restaurantes: Restaurante[]) => void
+  onAtualizacao: (restaurantes: Restaurante[]) => void,
+  limite = 50,
+  onHasMore?: (temMais: boolean) => void
 ): Unsubscribe {
-  const colRef = collection(db, "restaurantes");
+  const q = query(collection(db, "restaurantes"), limit(limite));
   try {
     return onSnapshot(
-      colRef,
+      q,
       (snapshot) => {
+        onHasMore?.(snapshot.size >= limite);
         const lista: Restaurante[] = [];
         snapshot.forEach((d) => {
           lista.push({
@@ -464,11 +478,65 @@ export function escutarRestaurantes(
       },
       (err) => {
         console.warn("Listener de restaurantes indisponível:", err);
+        onHasMore?.(false);
       }
     );
   } catch {
     return () => {};
   }
+}
+
+export async function buscarRestaurantePorTermoSuperadmin(
+  termo: string
+): Promise<Restaurante[]> {
+  const limpo = termo.trim();
+  if (limpo.length < 2) return [];
+  const resultados = new Map<string, Restaurante>();
+
+  try {
+    const [porSlugSnap, porIdSnap] = await Promise.all([
+      getDocs(
+        query(
+          collection(db, "restaurantes"),
+          where("slug", "==", limpo.toLowerCase()),
+          limit(10)
+        )
+      ),
+      getDoc(doc(db, "restaurantes", limpo)),
+    ]);
+
+    porSlugSnap.forEach((d) => {
+      resultados.set(d.id, { ...(d.data() as Restaurante), id: d.id });
+    });
+    if (porIdSnap.exists()) {
+      resultados.set(porIdSnap.id, { ...(porIdSnap.data() as Restaurante), id: porIdSnap.id });
+    }
+  } catch {
+    // Fallback silencioso para filtro local já carregado
+  }
+
+  return Array.from(resultados.values());
+}
+
+export async function obterTotaisSuperadmin(): Promise<{
+  lojasTotal: number | null;
+  lojasSuspensas: number | null;
+  arquivoMortoTotal: number | null;
+  concessoesTotal: number | null;
+}> {
+  const [resTotal, resSusp, resArquivo, resConcessoes] = await Promise.allSettled([
+    getCountFromServer(collection(db, "restaurantes")),
+    getCountFromServer(query(collection(db, "restaurantes"), where("suspenso", "==", true))),
+    getCountFromServer(collection(db, "arquivo_morto_licencas")),
+    getCountFromServer(collection(db, "concessoes")),
+  ]);
+
+  return {
+    lojasTotal: resTotal.status === "fulfilled" ? resTotal.value.data().count : null,
+    lojasSuspensas: resSusp.status === "fulfilled" ? resSusp.value.data().count : null,
+    arquivoMortoTotal: resArquivo.status === "fulfilled" ? resArquivo.value.data().count : null,
+    concessoesTotal: resConcessoes.status === "fulfilled" ? resConcessoes.value.data().count : null,
+  };
 }
 
 /**

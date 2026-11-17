@@ -4987,11 +4987,35 @@ async function executarSincronizarPerfilPublicoRestaurante(firestoreDb, restaura
       if (publicSnap.exists) t.delete(publicRef);
       return { sucesso: true, removido: true };
     }
+    const versaoCardapioAtual = publicSnap.data()?.cardapioAtualizadoEm;
     t.set(publicRef, {
       ...montarPerfilPublicoRestaurante(restauranteId, data),
+      ...(versaoCardapioAtual ? { cardapioAtualizadoEm: versaoCardapioAtual } : {}),
       sourceUpdatedAt: versaoOrigem,
     }, { merge: false });
     return { sucesso: true, removido: false };
+  });
+}
+
+async function executarSincronizarVersaoCardapioPublico(firestoreDb, restauranteId, sourceUpdatedAt) {
+  const idLimpo = String(restauranteId || '').trim();
+  if (!idLimpo) {
+    return { sucesso: true, ignorado: true, motivo: 'restaurante_invalido' };
+  }
+  const publicRef = firestoreDb.collection('restaurantes_publicos').doc(idLimpo);
+  const versaoCardapio = String(sourceUpdatedAt || new Date().toISOString());
+
+  return firestoreDb.runTransaction(async (t) => {
+    const publicSnap = await t.get(publicRef);
+    if (!publicSnap.exists) {
+      return { sucesso: true, ignorado: true, motivo: 'perfil_publico_ausente' };
+    }
+    const versaoAtual = String(publicSnap.data()?.cardapioAtualizadoEm || '');
+    if (versaoAtual && versaoAtual >= versaoCardapio) {
+      return { sucesso: true, ignorado: true, motivo: 'evento_obsoleto' };
+    }
+    t.set(publicRef, { cardapioAtualizadoEm: versaoCardapio }, { merge: true });
+    return { sucesso: true, atualizado: true, cardapioAtualizadoEm: versaoCardapio };
   });
 }
 
@@ -5014,6 +5038,24 @@ exports.sincronizarPerfilPublicoRestaurante = onDocumentWritten({
   );
 });
 
+exports.sincronizarVersaoCardapioPublico = onDocumentWritten({
+  document: 'restaurantes/{restauranteId}/cardapio/{itemId}',
+  database: 'mayamenu-bd',
+  region: 'us-central1',
+  retry: true,
+}, async (event) => {
+  const after = event.data?.after;
+  const restauranteId = event.params.restauranteId;
+  const sourceUpdatedAt = after?.exists && after.updateTime
+    ? after.updateTime.toDate().toISOString()
+    : event.time;
+  return executarSincronizarVersaoCardapioPublico(
+    getDb(),
+    restauranteId,
+    sourceUpdatedAt
+  );
+});
+
 exports._internal = {
   normalizarMesaIdentificador,
   validarLimiteMesaLicenciado,
@@ -5022,6 +5064,7 @@ exports._internal = {
   executarGerenciarQrAcessoSetor,
   executarLoginComQrSetor,
   executarEnviarContatoEspecialista,
+  executarSincronizarVersaoCardapioPublico,
   getMesaTokenSecret,
   verificarMesaToken,
   validarModificadoresServidor,
