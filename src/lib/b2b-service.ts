@@ -25,16 +25,13 @@ import type {
 } from "@/types/b2b";
 import { httpsCallable } from "firebase/functions";
 import { browserSessionPersistence, setPersistence, signInWithCustomToken, signOut } from "firebase/auth";
+import {
+  CHAVE_B2B_SEGURA_REGEX,
+  gerarChaveAcessoB2BSegura,
+  isChaveB2BValidaFormato,
+} from "@/lib/b2b-keys";
 
-function gerarTokenB2BSeguro(tamanho: number): string {
-  const alfabeto = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  const bytes = new Uint8Array(tamanho);
-  if (!globalThis.crypto?.getRandomValues) {
-    throw new Error("Gerador criptográfico seguro indisponível; operação B2B cancelada.");
-  }
-  globalThis.crypto.getRandomValues(bytes);
-  return Array.from(bytes, (byte) => alfabeto[byte & 31]).join("");
-}
+export { CHAVE_B2B_SEGURA_REGEX, isChaveB2BValidaFormato };
 
 /**
  * Busca um patrocinador através da sua chave B2B única (Token do Contrato)
@@ -44,6 +41,13 @@ export async function buscarPatrocinadorPorChave(
 ): Promise<PatrocinadorB2B | null> {
   const chaveLimpa = chaveAcesso.trim().toUpperCase();
   if (!chaveLimpa) return null;
+
+  if (!isChaveB2BValidaFormato(chaveLimpa)) {
+    throw new Error(
+      "Formato de chave inválido ou legado. Credenciais B2B atuais exigem SPN- seguido de 26 caracteres. Se estiver usando uma chave antiga (ex.: SPN-MARCA-XXXX), solicite a reemissão no painel SuperAdmin."
+    );
+  }
+
   try {
     const autenticarFn = httpsCallable(functions, "autenticarPatrocinadorBackend");
     const resposta = await autenticarFn({ chave: chaveLimpa });
@@ -53,9 +57,16 @@ export async function buscarPatrocinadorPorChave(
     await setPersistence(b2bAuth, browserSessionPersistence);
     await signInWithCustomToken(b2bAuth, dados.customToken);
     return dados.patrocinador;
-  } catch (err) {
+  } catch (err: any) {
     console.warn("Falha ao autenticar patrocinador no backend:", err);
     await signOut(b2bAuth).catch(() => undefined);
+    const code = typeof err?.code === "string" ? err.code : "";
+    if (code.includes("resource-exhausted") && err?.message) {
+      throw new Error(String(err.message).replace(/^functions\/[a-z-]+:\s*/i, ""));
+    }
+    if (code.includes("unavailable") || code.includes("network-request-failed")) {
+      throw new Error("Serviço de autenticação B2B temporariamente indisponível. Tente novamente em instantes.");
+    }
     return null;
   }
 }
@@ -120,7 +131,7 @@ export async function salvarPatrocinador(
   const id = dados.id || `spn-${slug}`;
   const chaveAcesso =
     dados.chaveAcessoB2B ||
-    `SPN-${gerarTokenB2BSeguro(26)}`;
+    gerarChaveAcessoB2BSegura();
 
   const docRef = doc(db, "patrocinadores", id);
   const payload = {
@@ -464,6 +475,27 @@ export async function alternarStatusPatrocinador(
     authVersion: increment(1),
     atualizadoEm: serverTimestamp(),
   });
+}
+
+/**
+ * Reemite (rotaciona) a chave de acesso B2B de um patrocinador existente no formato seguro
+ * SPN- + 26 caracteres (~130 bits de entropia) e invalida sessões anteriores via authVersion.
+ */
+export async function reemitirChavePatrocinador(
+  patrocinadorId: string
+): Promise<string> {
+  const idLimpo = patrocinadorId.trim();
+  if (!idLimpo) {
+    throw new Error("Identificador do patrocinador inválido para reemissão da chave.");
+  }
+  const novaChave = gerarChaveAcessoB2BSegura();
+  const docRef = doc(db, "patrocinadores", idLimpo);
+  await updateDoc(docRef, {
+    chaveAcessoB2B: novaChave,
+    authVersion: increment(1),
+    atualizadoEm: serverTimestamp(),
+  });
+  return novaChave;
 }
 
 

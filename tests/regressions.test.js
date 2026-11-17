@@ -5,6 +5,7 @@
 
 const assert = require("assert");
 const crypto = require("crypto");
+const esbuild = require("esbuild");
 const fs = require("fs");
 const path = require("path");
 
@@ -33,6 +34,7 @@ const {
   executarLiberarMesa,
   executarSincronizarPerfilPublicoRestaurante,
   executarSincronizarVersaoCardapioPublico,
+  executarAutenticarPatrocinador,
 } = _internal;
 
 const TEST_MESA_SECRET = "segredo-super-forte-de-teste-mayamenu-32bytes-ok";
@@ -893,6 +895,32 @@ async function main() {
     );
     assert.strictEqual(db._store.get("restaurantes_publicos/rest_v1").nome, "Restaurante Renomeado");
     assert.strictEqual(db._store.get("restaurantes_publicos/rest_v1").cardapioAtualizadoEm, "2026-11-17T00:05:00.000Z");
+  });
+
+  await runTest("B2B Chaves: formato legado SPN-MAYAMENU-9KAD é rejeitado e nova chave gerada tem 26 caracteres", async () => {
+    const b2bKeysSrc = fs.readFileSync(
+      path.join(__dirname, "..", "src", "lib", "b2b-keys.ts"),
+      "utf8"
+    );
+    const compiled = esbuild.transformSync(b2bKeysSrc, {
+      loader: "ts",
+      format: "cjs",
+      target: "node20",
+    });
+    const mod = { exports: {} };
+    new Function("exports", "module", "require", compiled.code)(mod.exports, mod, require);
+    const { isChaveB2BValidaFormato, gerarChaveAcessoB2BSegura } = mod.exports;
+
+    assert.strictEqual(isChaveB2BValidaFormato("SPN-MAYAMENU-9KAD"), false);
+    const novaChave = gerarChaveAcessoB2BSegura();
+    assert.strictEqual(isChaveB2BValidaFormato(novaChave), true);
+    assert.match(novaChave, /^SPN-[A-HJ-NP-Z2-9]{26}$/);
+
+    const db = createFakeFirestore();
+    await assert.rejects(
+      () => executarAutenticarPatrocinador(db, { chave: "SPN-MAYAMENU-9KAD" }, { headers: {} }),
+      /inválida ou desatualizada/i
+    );
   });
 
   console.log("\n=================================================");

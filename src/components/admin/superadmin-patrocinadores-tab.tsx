@@ -23,6 +23,7 @@ import {
   TrendingUp,
   Tag,
   CheckCircle2,
+  RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,6 +50,8 @@ import type { PatrocinadorB2B } from "@/types/b2b";
 import {
   cadastrarPatrocinadorSuperadmin,
   alternarStatusPatrocinador,
+  reemitirChavePatrocinador,
+  isChaveB2BValidaFormato,
   vincularRestauranteManualSuperadmin,
   escutarLotesLicencas,
 } from "@/lib/b2b-service";
@@ -84,11 +87,16 @@ export function SuperadminPatrocinadoresTab({
   const [totalCotas, setTotalCotas] = useState("50");
   const [validadeMeses, setValidadeMeses] = useState("6");
 
-  // Modal de sucesso pós-criação
+  // Modal de sucesso pós-criação e reemissão de chave
   const [patrocinadorRecemCriado, setPatrocinadorRecemCriado] = useState<{
     nome: string;
     chaveAcessoB2B: string;
     codigoVoucherInicial: string;
+  } | null>(null);
+  const [reemitindoId, setReemitindoId] = useState<string | null>(null);
+  const [chaveReemitidaModal, setChaveReemitidaModal] = useState<{
+    nome: string;
+    chaveAcessoB2B: string;
   } | null>(null);
 
   // Estados para Vinculação Manual de Restaurante Existente a Lote de Patrocínio
@@ -276,6 +284,29 @@ export function SuperadminPatrocinadoresTab({
     }
   };
 
+  const handleReemitirChave = async (patrocinador: PatrocinadorB2B) => {
+    if (!ehSuperAdmin) {
+      onNotificarErro("Apenas Operadores autenticados podem reemitir chaves B2B.");
+      return;
+    }
+
+    setReemitindoId(patrocinador.id);
+    try {
+      const novaChave = await reemitirChavePatrocinador(patrocinador.id);
+      setChaveReemitidaModal({
+        nome: patrocinador.nomeFantasia,
+        chaveAcessoB2B: novaChave,
+      });
+      onNotificarSucesso(
+        `Nova chave B2B emitida para ${patrocinador.nomeFantasia}! Credenciais anteriores foram revogadas.`
+      );
+    } catch (err: any) {
+      onNotificarErro(err?.message || "Falha ao reemitir chave B2B.");
+    } finally {
+      setReemitindoId(null);
+    }
+  };
+
   return (
     <div className="space-y-5 sm:space-y-6">
       {/* CABEÇALHO DA ABA B2B */}
@@ -378,6 +409,8 @@ export function SuperadminPatrocinadoresTab({
           {patrocinadoresFiltrados.map((pat) => {
             // A chave é credencial secreta: nunca colocá-la na URL, histórico ou referrer.
             const linkPortal = "/parceiros";
+            const chaveAtual = (pat.chaveAcessoB2B || "").trim();
+            const chaveValida = isChaveB2BValidaFormato(chaveAtual);
 
             return (
               <div
@@ -404,42 +437,63 @@ export function SuperadminPatrocinadoresTab({
                     </div>
                   </div>
 
-                  <Badge
-                    className={
-                      pat.ativo
-                        ? "bg-emerald-50 text-emerald-800 border-emerald-200 text-[11px] font-bold uppercase shrink-0"
-                        : "bg-rose-50 text-rose-800 border-rose-200 text-[11px] font-bold uppercase shrink-0"
-                    }
-                  >
-                    {pat.ativo ? "Ativo" : "Suspenso"}
-                  </Badge>
+                  <div className="flex flex-col items-end gap-1.5 shrink-0">
+                    <Badge
+                      className={
+                        pat.ativo
+                          ? "bg-emerald-50 text-emerald-800 border-emerald-200 text-[11px] font-bold uppercase shrink-0"
+                          : "bg-rose-50 text-rose-800 border-rose-200 text-[11px] font-bold uppercase shrink-0"
+                      }
+                    >
+                      {pat.ativo ? "Ativo" : "Suspenso"}
+                    </Badge>
+                    {!chaveValida && (
+                      <Badge className="bg-amber-50 text-amber-800 border-amber-300 text-[10px] font-bold uppercase shrink-0">
+                        Chave Legada
+                      </Badge>
+                    )}
+                  </div>
                 </div>
 
                 {/* CORPO DO CARD COM DETALHES DE TOKEN E CONTATO */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-2xl bg-muted/40 border border-border/80 text-xs">
-                  <div className="space-y-1 min-w-0">
+                  <div className="space-y-1.5 min-w-0">
                     <span className="text-[11px] uppercase font-bold tracking-wider text-muted-foreground block">
                       Chave B2B (Token de Contrato)
                     </span>
                     <div className="flex items-center gap-1.5 min-w-0">
-                      <span className="font-mono font-bold text-foreground bg-background px-2.5 py-1 rounded-lg border border-border text-xs break-all">
-                        {pat.chaveAcessoB2B || pat.id}
-                      </span>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleCopiar(pat.chaveAcessoB2B || pat.id, pat.id)}
-                        className="h-8 px-2 text-xs rounded-lg text-muted-foreground hover:text-foreground shrink-0"
-                        title="Copiar Chave do Patrocinador"
+                      <span
+                        className={`font-mono font-bold px-2.5 py-1 rounded-lg border text-xs break-all ${
+                          chaveValida
+                            ? "text-foreground bg-background border-border"
+                            : "text-amber-800 bg-amber-50 border-amber-300"
+                        }`}
                       >
-                        {copiadoId === pat.id ? (
-                          <Check className="w-3.5 h-3.5 text-emerald-600" />
-                        ) : (
-                          <Copy className="w-3.5 h-3.5" />
-                        )}
-                      </Button>
+                        {chaveAtual || "Não emitida"}
+                      </span>
+                      {chaveAtual && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleCopiar(chaveAtual, pat.id)}
+                          className="h-8 px-2 text-xs rounded-lg text-muted-foreground hover:text-foreground shrink-0"
+                          title="Copiar Chave do Patrocinador"
+                        >
+                          {copiadoId === pat.id ? (
+                            <Check className="w-3.5 h-3.5 text-emerald-600" />
+                          ) : (
+                            <Copy className="w-3.5 h-3.5" />
+                          )}
+                        </Button>
+                      )}
                     </div>
+                    {!chaveValida && (
+                      <p className="text-[11px] text-amber-800 leading-snug">
+                        Chave antiga/curta bloqueada no login B2B. Clique em{" "}
+                        <strong>Reemitir Chave</strong> para atualizar.
+                      </p>
+                    )}
                   </div>
 
                   <div className="space-y-1 min-w-0">
@@ -473,7 +527,56 @@ export function SuperadminPatrocinadoresTab({
                     </Button>
                   </Link>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          type="button"
+                          variant={chaveValida ? "outline" : "default"}
+                          size="sm"
+                          disabled={reemitindoId === pat.id}
+                          className={`h-8 px-3 rounded-xl text-xs font-bold flex items-center gap-1.5 ${
+                            chaveValida
+                              ? "border-border bg-background hover:bg-muted text-foreground"
+                              : "bg-amber-600 hover:bg-amber-500 text-white shadow-xs"
+                          }`}
+                        >
+                          <RefreshCw
+                            className={`w-3.5 h-3.5 shrink-0 ${
+                              reemitindoId === pat.id ? "animate-spin" : ""
+                            }`}
+                          />
+                          <span>
+                            {reemitindoId === pat.id
+                              ? "Reemitindo..."
+                              : chaveValida
+                              ? "Rotacionar Chave"
+                              : "Reemitir Chave"}
+                          </span>
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent className="max-w-md bg-card border-border text-foreground rounded-3xl p-6 shadow-2xl">
+                        <AlertDialogHeader className="space-y-2">
+                          <AlertDialogTitle className="text-base font-black flex items-center gap-2">
+                            <RefreshCw className="w-5 h-5 text-amber-600" />
+                            Reemitir Chave B2B de {pat.nomeFantasia}?
+                          </AlertDialogTitle>
+                          <AlertDialogDescription className="text-xs text-muted-foreground leading-relaxed">
+                            Uma nova chave segura no formato <strong>SPN-</strong> + 26 caracteres será gravada para este patrocinador. A credencial anterior (<strong>{chaveAtual || "antiga"}</strong>) será invalidada imediatamente e eventuais sessões abertas serão desconectadas.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter className="pt-2">
+                          <AlertDialogCancel className="rounded-xl text-xs">Cancelar</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => handleReemitirChave(pat)}
+                            className="rounded-xl text-xs font-bold text-white bg-amber-600 hover:bg-amber-500"
+                          >
+                            Gerar Nova Chave B2B
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
                         <Button
@@ -706,8 +809,8 @@ export function SuperadminPatrocinadoresTab({
                 <span className="text-[10px] uppercase font-bold text-muted-foreground block">
                   Chave de Acesso B2B (Token de Contrato)
                 </span>
-                <div className="flex items-center justify-between mt-1 bg-background p-2 rounded-xl border border-border">
-                  <span className="font-mono font-bold text-foreground text-sm">
+                <div className="flex items-center justify-between gap-2 mt-1 bg-background p-2 rounded-xl border border-border">
+                  <span className="font-mono font-bold text-foreground text-xs sm:text-sm break-all min-w-0">
                     {patrocinadorRecemCriado.chaveAcessoB2B}
                   </span>
                   <Button
@@ -771,6 +874,75 @@ export function SuperadminPatrocinadoresTab({
             >
               Concluir e Voltar ao Painel
             </Button>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* MODAL: NOVA CHAVE B2B REEMITIDA */}
+      {chaveReemitidaModal && (
+        <Dialog
+          open={!!chaveReemitidaModal}
+          onOpenChange={() => setChaveReemitidaModal(null)}
+        >
+          <DialogContent className="w-[95vw] max-w-md max-h-[90vh] overflow-y-auto bg-card border-border text-foreground rounded-3xl p-4 sm:p-6 shadow-2xl space-y-4">
+            <DialogHeader className="space-y-2 text-center">
+              <div className="w-12 h-12 mx-auto rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600">
+                <RefreshCw className="w-6 h-6" />
+              </div>
+              <DialogTitle className="text-lg font-black text-foreground">
+                Nova Chave B2B Emitida
+              </DialogTitle>
+              <DialogDescription className="text-xs text-muted-foreground leading-relaxed">
+                Copie e envie a nova credencial abaixo para{" "}
+                <strong className="text-foreground">{chaveReemitidaModal.nome}</strong>. A chave anterior foi revogada.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-2 bg-muted/40 p-4 rounded-2xl border border-border text-xs">
+              <span className="text-[10px] uppercase font-bold text-muted-foreground block">
+                Nova Chave de Acesso B2B (Token de Contrato)
+              </span>
+              <div className="flex items-center justify-between gap-2 bg-background p-2.5 rounded-xl border border-border">
+                <span className="font-mono font-bold text-foreground text-xs sm:text-sm break-all min-w-0">
+                  {chaveReemitidaModal.chaveAcessoB2B}
+                </span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() =>
+                    handleCopiar(chaveReemitidaModal.chaveAcessoB2B, "chave-reemitida")
+                  }
+                  className="h-8 px-2 text-xs shrink-0"
+                >
+                  {copiadoId === "chave-reemitida" ? (
+                    <Check className="w-4 h-4 text-emerald-600" />
+                  ) : (
+                    <Copy className="w-4 h-4" />
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Link href="/parceiros" target="_blank" className="flex-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full h-10 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5"
+                >
+                  <ExternalLink className="w-3.5 h-3.5 text-rose-600" />
+                  Abrir Portal B2B
+                </Button>
+              </Link>
+              <Button
+                type="button"
+                onClick={() => setChaveReemitidaModal(null)}
+                className="flex-1 h-10 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs uppercase tracking-wider"
+              >
+                Concluir
+              </Button>
+            </div>
           </DialogContent>
         </Dialog>
       )}
