@@ -85,6 +85,7 @@ import {
   BookOpen,
   Building2,
   Handshake,
+  Home,
 } from "lucide-react";
 import { SuperadminPatrocinadoresTab } from "./superadmin-patrocinadores-tab";
 import { SuperadminDiagnostico } from "./superadmin-diagnostico";
@@ -259,7 +260,13 @@ export function SuperAdminView() {
   const handleLogoutOperador = async () => {
     try {
       sincronizarCookieSessao(null);
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("mayamenu_mock_auth");
+      }
+      setClaimSuperAdmin(false);
+      setChamadosSuporte([]);
       await signOut(auth);
+      setUsuarioAuth(null);
       setAlertaSucesso("Sessão administrativa encerrada.");
     } catch (err) {
       console.error("Erro ao desconectar:", err);
@@ -703,14 +710,24 @@ export function SuperAdminView() {
               </Button>
             </form>
 
-            <div className="pt-2 text-center border-t border-neutral-100">
+            <div className="pt-3 flex flex-wrap items-center justify-center gap-2 border-t border-neutral-100">
               <Link href="/admin">
                 <Button
                   type="button"
                   variant="ghost"
-                  className="text-xs sm:text-sm text-neutral-500 hover:text-neutral-900 h-9"
+                  className="text-xs sm:text-sm text-neutral-600 hover:text-neutral-950 h-9"
                 >
-                  Ir para Login de Restaurantes
+                  Login de Restaurantes
+                </Button>
+              </Link>
+              <Link href="/">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="text-xs sm:text-sm text-neutral-600 hover:text-neutral-950 h-9 flex items-center gap-1.5"
+                >
+                  <Home className="w-3.5 h-3.5" />
+                  <span>Voltar ao Início</span>
                 </Button>
               </Link>
             </div>
@@ -794,7 +811,7 @@ export function SuperAdminView() {
               Central de Concessões, Emissão de Licenças e Controle de Estabelecimentos
             </p>
 
-            {/* IDENTIFICAÇÃO DO OPERADOR / LOGIN RÁPIDO */}
+            {/* IDENTIFICAÇÃO DO OPERADOR / AÇÕES DE SAÍDA E NAVEGAÇÃO */}
             <div className="flex flex-wrap items-center gap-2 mt-3">
               {ehSuperAdmin ? (
                 <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl text-emerald-800 text-xs font-semibold max-w-full min-w-0">
@@ -802,13 +819,6 @@ export function SuperAdminView() {
                   <span className="truncate max-w-[180px] sm:max-w-xs">
                     {usuarioAuth?.email}
                   </span>
-                  <button
-                    type="button"
-                    onClick={handleLogoutOperador}
-                    className="ml-1 px-1.5 py-0.5 rounded hover:bg-emerald-100 text-emerald-900 underline text-xs font-bold shrink-0"
-                  >
-                    Sair
-                  </button>
                 </div>
               ) : (
                 <div className="flex flex-wrap items-center gap-2">
@@ -820,7 +830,7 @@ export function SuperAdminView() {
                     size="sm"
                     variant="outline"
                     onClick={() => setModalLoginAberto(true)}
-                    className="h-8 text-xs rounded-xl border-amber-300 text-amber-800 hover:bg-amber-100 flex items-center gap-1"
+                    className="h-9 sm:h-8 text-xs rounded-xl border-amber-300 text-amber-800 hover:bg-amber-100 flex items-center gap-1"
                   >
                     <LogIn className="w-3.5 h-3.5" />
                     Identificar Operador
@@ -833,7 +843,7 @@ export function SuperAdminView() {
                   type="button"
                   size="sm"
                   variant="outline"
-                  className="h-8 text-xs rounded-xl border-border bg-card text-foreground hover:bg-muted hover:text-rose-600 flex items-center gap-1.5 shadow-xs transition-colors"
+                  className="h-9 sm:h-8 text-xs rounded-xl border-border bg-card text-foreground hover:bg-muted hover:text-rose-600 flex items-center gap-1.5 shadow-xs transition-colors"
                   title="Abrir Manual Executivo & Operações"
                 >
                   <BookOpen className="w-3.5 h-3.5 text-rose-600 shrink-0" />
@@ -844,6 +854,33 @@ export function SuperAdminView() {
                   </span>
                 </Button>
               </Link>
+
+              <Link href="/">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-9 sm:h-8 px-3 text-xs rounded-xl border-border bg-card text-foreground hover:bg-muted flex items-center gap-1.5 shadow-xs transition-colors font-semibold"
+                  title="Voltar para a página inicial do MAYaMenu"
+                >
+                  <Home className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                  <span>Início</span>
+                </Button>
+              </Link>
+
+              {usuarioAuth && !usuarioAuth.isAnonymous && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={handleLogoutOperador}
+                  className="h-9 sm:h-8 px-3 text-xs rounded-xl border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold flex items-center gap-1.5 shadow-xs transition-colors"
+                  title="Encerrar sessão SuperAdmin"
+                >
+                  <LogOut className="w-3.5 h-3.5 shrink-0" />
+                  <span>Sair</span>
+                </Button>
+              )}
             </div>
           </div>
         </div>
