@@ -277,27 +277,27 @@ export function SuperadminPatrocinadoresTab({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5 sm:space-y-6">
       {/* CABEÇALHO DA ABA B2B */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-xl font-black tracking-tight flex items-center gap-2 text-foreground">
-            <Building2 className="w-5 h-5 text-rose-600" />
-            Patrocinadores Corporativos & Trade Marketing B2B ({patrocinadores.length})
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div className="space-y-0.5">
+          <h2 className="text-lg sm:text-xl font-black tracking-tight flex items-center gap-2 text-foreground">
+            <Building2 className="w-5 h-5 text-rose-600 shrink-0" />
+            <span>Patrocinadores Corporativos &amp; B2B ({patrocinadores.length})</span>
           </h2>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
             Gerencie marcas da indústria, chaves de contrato B2B, cotas em lote de restaurantes e isolamento de sell-out.
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2.5 sm:gap-3 w-full lg:w-auto">
           <div className="relative w-full sm:w-64">
             <Search className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
             <Input
               value={filtro}
               onChange={(e) => setFiltro(e.target.value)}
               placeholder="Buscar por marca, CNPJ ou chave..."
-              className="bg-card border-border text-foreground pl-9 rounded-xl h-9 text-xs shadow-xs focus-visible:ring-1 focus-visible:ring-rose-500"
+              className="bg-card border-border text-foreground pl-9 rounded-xl h-10 sm:h-9 text-sm shadow-xs focus-visible:ring-1 focus-visible:ring-rose-500"
             />
           </div>
 
@@ -305,60 +305,60 @@ export function SuperadminPatrocinadoresTab({
             type="button"
             variant="outline"
             onClick={handleAbrirModalVincular}
-            className="h-9 px-3 rounded-xl text-xs font-bold border-rose-200 text-rose-700 bg-rose-50/50 hover:bg-rose-100 flex items-center gap-1.5 shadow-xs"
+            className="h-10 sm:h-9 px-3 rounded-xl text-xs font-bold border-rose-200 text-rose-700 bg-rose-50/50 hover:bg-rose-100 flex items-center justify-center gap-1.5 shadow-xs"
           >
-            <Store className="w-4 h-4 text-rose-600" />
+            <Store className="w-4 h-4 text-rose-600 shrink-0" />
             <span>Vincular Restaurante a Lote</span>
           </Button>
 
           <Button
             type="button"
             onClick={() => setModalNovoAberto(true)}
-            className="h-9 px-4 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white flex items-center gap-1.5 shadow-md shadow-rose-600/20"
+            className="h-10 sm:h-9 px-4 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white flex items-center justify-center gap-1.5 shadow-md shadow-rose-600/20"
           >
-            <Plus className="w-4 h-4" />
+            <Plus className="w-4 h-4 shrink-0" />
             <span>Cadastrar Patrocinador</span>
           </Button>
         </div>
       </div>
 
       {/* CARDS DE RESUMO DE PRIVACIDADE E SEGURANÇA */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="p-4 rounded-2xl bg-card border border-border shadow-xs space-y-1">
-          <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground flex items-center gap-1">
-            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
+        <div className="p-4 rounded-2xl bg-card border border-border shadow-xs space-y-1.5">
+          <span className="text-[11px] uppercase font-bold tracking-wider text-muted-foreground flex items-center gap-1.5">
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
             Isolamento de Tenants
           </span>
-          <p className="text-xs text-foreground font-semibold">
+          <p className="text-sm sm:text-xs text-foreground font-semibold">
             Privacidade Estrita Entre Marcas
           </p>
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-xs text-muted-foreground leading-relaxed">
             Cada patrocinador só visualiza seus próprios lotes e o sell-out dos seus próprios itens cadastrados.
           </p>
         </div>
 
-        <div className="p-4 rounded-2xl bg-card border border-border shadow-xs space-y-1">
-          <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground flex items-center gap-1">
-            <Tag className="w-3.5 h-3.5 text-amber-600" />
-            Uso Único & Burn-After-Reading
+        <div className="p-4 rounded-2xl bg-card border border-border shadow-xs space-y-1.5">
+          <span className="text-[11px] uppercase font-bold tracking-wider text-muted-foreground flex items-center gap-1.5">
+            <Tag className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+            Uso Único &amp; Burn-After-Reading
           </span>
-          <p className="text-xs text-foreground font-semibold">
+          <p className="text-sm sm:text-xs text-foreground font-semibold">
             Trava Atômica de Cotas
           </p>
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-xs text-muted-foreground leading-relaxed">
             Vouchers e licenças atrelam-se irreversivelmente ao restaurante ativado, impedindo clonagem ou reutilização.
           </p>
         </div>
 
-        <div className="p-4 rounded-2xl bg-card border border-border shadow-xs space-y-1">
-          <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground flex items-center gap-1">
-            <TrendingUp className="w-3.5 h-3.5 text-rose-600" />
+        <div className="p-4 rounded-2xl bg-card border border-border shadow-xs space-y-1.5">
+          <span className="text-[11px] uppercase font-bold tracking-wider text-muted-foreground flex items-center gap-1.5">
+            <TrendingUp className="w-3.5 h-3.5 text-rose-600 shrink-0" />
             Proteção do Dono do Bar
           </span>
-          <p className="text-xs text-foreground font-semibold">
+          <p className="text-sm sm:text-xs text-foreground font-semibold">
             Sigilo de Receita Global
           </p>
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-xs text-muted-foreground leading-relaxed">
             A indústria nunca tem acesso ao faturamento global do restaurante, apenas às unidades vendidas da sua marca.
           </p>
         </div>
@@ -366,10 +366,10 @@ export function SuperadminPatrocinadoresTab({
 
       {/* LISTA / GRID DE PATROCINADORES */}
       {patrocinadoresFiltrados.length === 0 ? (
-        <div className="p-16 text-center bg-card border border-border rounded-3xl space-y-3 shadow-xs">
+        <div className="p-10 sm:p-16 text-center bg-card border border-border rounded-3xl space-y-3 shadow-xs">
           <Building2 className="w-12 h-12 text-muted-foreground/60 mx-auto" />
-          <h3 className="text-sm font-bold text-foreground">Nenhum patrocinador encontrado</h3>
-          <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+          <h3 className="text-base sm:text-sm font-bold text-foreground">Nenhum patrocinador encontrado</h3>
+          <p className="text-xs sm:text-sm text-muted-foreground max-w-sm mx-auto leading-relaxed">
             {filtro ? "Tente buscar por outro termo ou limpe a busca." : "Cadastre sua primeira marca parceira para emitir lotes corporativos."}
           </p>
         </div>
@@ -382,24 +382,24 @@ export function SuperadminPatrocinadoresTab({
             return (
               <div
                 key={pat.id}
-                className={`p-5 rounded-3xl bg-card border transition-all shadow-xs flex flex-col justify-between gap-4 ${
+                className={`p-4 sm:p-5 rounded-3xl bg-card border transition-all shadow-xs flex flex-col justify-between gap-4 ${
                   pat.ativo ? "border-border hover:border-rose-300" : "border-rose-200 bg-rose-50/20 opacity-80"
                 }`}
               >
                 {/* TOPO DO CARD */}
                 <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-start gap-3.5">
-                    <div className="w-12 h-12 rounded-2xl bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-600 font-black text-lg shrink-0">
+                  <div className="flex items-start gap-3 min-w-0 flex-1">
+                    <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-600 font-black text-base sm:text-lg shrink-0">
                       {pat.nomeFantasia.slice(0, 2).toUpperCase()}
                     </div>
-                    <div className="space-y-0.5">
+                    <div className="space-y-0.5 min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <h3 className="text-base font-black text-foreground">
+                        <h3 className="text-base font-black text-foreground break-words">
                           {pat.nomeFantasia}
                         </h3>
                       </div>
-                      <p className="text-xs text-muted-foreground">
-                        {pat.razaoSocial} • <span className="font-mono">{pat.cnpj}</span>
+                      <p className="text-xs text-muted-foreground break-words">
+                        {pat.razaoSocial} • <span className="font-mono break-all">{pat.cnpj}</span>
                       </p>
                     </div>
                   </div>
@@ -407,22 +407,22 @@ export function SuperadminPatrocinadoresTab({
                   <Badge
                     className={
                       pat.ativo
-                        ? "bg-emerald-50 text-emerald-800 border-emerald-200 text-[10px] font-bold uppercase"
-                        : "bg-rose-50 text-rose-800 border-rose-200 text-[10px] font-bold uppercase"
+                        ? "bg-emerald-50 text-emerald-800 border-emerald-200 text-[11px] font-bold uppercase shrink-0"
+                        : "bg-rose-50 text-rose-800 border-rose-200 text-[11px] font-bold uppercase shrink-0"
                     }
                   >
-                    {pat.ativo ? "Contrato Ativo" : "Suspenso"}
+                    {pat.ativo ? "Ativo" : "Suspenso"}
                   </Badge>
                 </div>
 
                 {/* CORPO DO CARD COM DETALHES DE TOKEN E CONTATO */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-2xl bg-muted/40 border border-border/80 text-xs">
-                  <div className="space-y-1">
-                    <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground block">
+                  <div className="space-y-1 min-w-0">
+                    <span className="text-[11px] uppercase font-bold tracking-wider text-muted-foreground block">
                       Chave B2B (Token de Contrato)
                     </span>
-                    <div className="flex items-center gap-1.5">
-                      <span className="font-mono font-bold text-foreground bg-background px-2 py-1 rounded-lg border border-border text-[11px]">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="font-mono font-bold text-foreground bg-background px-2.5 py-1 rounded-lg border border-border text-xs break-all">
                         {pat.chaveAcessoB2B || pat.id}
                       </span>
                       <Button
@@ -430,7 +430,7 @@ export function SuperadminPatrocinadoresTab({
                         variant="ghost"
                         size="sm"
                         onClick={() => handleCopiar(pat.chaveAcessoB2B || pat.id, pat.id)}
-                        className="h-7 px-2 text-xs rounded-lg text-muted-foreground hover:text-foreground"
+                        className="h-8 px-2 text-xs rounded-lg text-muted-foreground hover:text-foreground shrink-0"
                         title="Copiar Chave do Patrocinador"
                       >
                         {copiadoId === pat.id ? (
@@ -442,18 +442,18 @@ export function SuperadminPatrocinadoresTab({
                     </div>
                   </div>
 
-                  <div className="space-y-1">
-                    <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground block">
+                  <div className="space-y-1 min-w-0">
+                    <span className="text-[11px] uppercase font-bold tracking-wider text-muted-foreground block">
                       Responsável de Trade Marketing
                     </span>
-                    <div className="space-y-0.5 text-[11px] text-muted-foreground">
-                      <p className="font-semibold text-foreground flex items-center gap-1">
-                        <User className="w-3 h-3 text-rose-600" />
-                        {pat.contatoResponsavel?.nome || "Não informado"}
+                    <div className="space-y-0.5 text-xs text-muted-foreground min-w-0">
+                      <p className="font-semibold text-foreground flex items-center gap-1.5 break-words">
+                        <User className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                        <span>{pat.contatoResponsavel?.nome || "Não informado"}</span>
                       </p>
-                      <p className="flex items-center gap-1">
-                        <Mail className="w-3 h-3 text-muted-foreground" />
-                        {pat.contatoResponsavel?.email || "contato@marca.com.br"}
+                      <p className="flex items-center gap-1.5 break-all">
+                        <Mail className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                        <span>{pat.contatoResponsavel?.email || "contato@marca.com.br"}</span>
                       </p>
                     </div>
                   </div>
@@ -524,13 +524,13 @@ export function SuperadminPatrocinadoresTab({
 
       {/* MODAL: CADASTRAR NOVO PATROCINADOR B2B */}
       <Dialog open={modalNovoAberto} onOpenChange={setModalNovoAberto}>
-        <DialogContent className="max-w-lg bg-card border-border text-foreground rounded-3xl p-6 shadow-2xl">
+        <DialogContent className="w-[95vw] max-w-lg max-h-[90vh] overflow-y-auto bg-card border-border text-foreground rounded-3xl p-4 sm:p-6 shadow-2xl">
           <DialogHeader className="space-y-2 mb-4">
-            <DialogTitle className="text-lg font-black flex items-center gap-2 text-foreground">
-              <Building2 className="w-5 h-5 text-rose-600" />
+            <DialogTitle className="text-base sm:text-lg font-black flex items-center gap-2 text-foreground">
+              <Building2 className="w-5 h-5 text-rose-600 shrink-0" />
               <span>Cadastrar Novo Patrocinador B2B</span>
             </DialogTitle>
-            <DialogDescription className="text-xs text-muted-foreground">
+            <DialogDescription className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
               Insira os dados da indústria/marca contratante. O sistema gerará a chave B2B e o primeiro lote de licenças automaticamente.
             </DialogDescription>
           </DialogHeader>
@@ -687,7 +687,7 @@ export function SuperadminPatrocinadoresTab({
           open={!!patrocinadorRecemCriado}
           onOpenChange={() => setPatrocinadorRecemCriado(null)}
         >
-          <DialogContent className="max-w-md bg-card border-border text-foreground rounded-3xl p-6 shadow-2xl space-y-4">
+          <DialogContent className="w-[95vw] max-w-md max-h-[90vh] overflow-y-auto bg-card border-border text-foreground rounded-3xl p-4 sm:p-6 shadow-2xl space-y-4">
             <DialogHeader className="space-y-2 text-center">
               <div className="w-12 h-12 mx-auto rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600">
                 <CheckCircle2 className="w-6 h-6" />
@@ -777,7 +777,7 @@ export function SuperadminPatrocinadoresTab({
 
       {/* MODAL: VINCULAR RESTAURANTE EXISTENTE A UM LOTE (SUPERADMIN) */}
       <Dialog open={modalVincularAberto} onOpenChange={setModalVincularAberto}>
-        <DialogContent className="max-w-md bg-card border-border text-foreground rounded-3xl p-6 shadow-2xl">
+        <DialogContent className="w-[95vw] max-w-md max-h-[90vh] overflow-y-auto bg-card border-border text-foreground rounded-3xl p-4 sm:p-6 shadow-2xl">
           <DialogHeader className="space-y-2 mb-2">
             <DialogTitle className="text-lg font-black flex items-center gap-2 text-foreground">
               <Store className="w-5 h-5 text-rose-600" />

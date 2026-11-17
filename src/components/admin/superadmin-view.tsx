@@ -166,6 +166,7 @@ export function SuperAdminView() {
         }
       } else {
         setClaimSuperAdmin(false);
+        setChamadosSuporte([]);
         sincronizarCookieSessao(null);
       }
     });
@@ -186,10 +187,7 @@ export function SuperAdminView() {
           !usuarioAuth.isAnonymous &&
           (EMAILS_SUPERADMIN_AUTORIZADOS.includes(emailCheck) || claimSuperAdmin))
     );
-    if (!autorizado) {
-      setChamadosSuporte([]);
-      return;
-    }
+    if (!autorizado) return;
 
     const unsubLicencas = escutarLicencas((dados) => {
       setLicencas(dados);
@@ -646,24 +644,24 @@ export function SuperAdminView() {
     // Se o usuário não estiver logado, exibe diretamente a tela de login de Operador
     if (!usuarioAuth || usuarioAuth.isAnonymous) {
       return (
-        <div className="min-h-screen bg-neutral-50 flex items-center justify-center p-4 selection:bg-rose-600 selection:text-white">
-          <div className="max-w-md w-full p-8 bg-white border border-neutral-200/80 rounded-3xl shadow-xl text-neutral-900 space-y-6">
+        <div className="min-h-screen bg-neutral-50 flex items-center justify-center p-3.5 sm:p-4 selection:bg-rose-600 selection:text-white">
+          <div className="max-w-md w-full p-5 sm:p-8 bg-white border border-neutral-200/80 rounded-3xl shadow-xl text-neutral-900 space-y-5 sm:space-y-6">
             <div className="text-center space-y-2">
-              <div className="w-14 h-14 mx-auto rounded-2xl bg-rose-50 border border-rose-100 text-rose-600 flex items-center justify-center shadow-xs">
-                <ShieldCheck className="w-8 h-8" />
+              <div className="w-12 h-12 sm:w-14 sm:h-14 mx-auto rounded-2xl bg-rose-50 border border-rose-100 text-rose-600 flex items-center justify-center shadow-xs">
+                <ShieldCheck className="w-7 h-7 sm:w-8 sm:h-8" />
               </div>
-              <h2 className="text-2xl font-black text-neutral-950 tracking-tight">
+              <h2 className="text-xl sm:text-2xl font-black text-neutral-950 tracking-tight">
                 MAYaRAnas • SuperAdmin
               </h2>
-              <p className="text-xs text-neutral-500">
+              <p className="text-sm sm:text-xs text-neutral-500 leading-relaxed">
                 Identifique-se com sua conta de operador para acessar a Gerência Geral.
               </p>
             </div>
 
             {erroAuth && (
-              <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-xs flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 shrink-0" />
-                <span>{erroAuth}</span>
+              <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-xs sm:text-sm flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span className="min-w-0 break-words">{erroAuth}</span>
               </div>
             )}
 
@@ -678,7 +676,7 @@ export function SuperAdminView() {
                   onChange={(e) => setLoginEmail(e.target.value)}
                   placeholder="admin@mayamenu.com ou marcus1fialho@gmail.com"
                   required
-                  className="bg-neutral-50 border-neutral-200 text-neutral-900 rounded-xl h-11 text-xs focus:bg-white"
+                  className="bg-neutral-50 border-neutral-200 text-neutral-900 rounded-xl h-11 text-base sm:text-sm focus:bg-white"
                 />
               </div>
 
@@ -692,14 +690,14 @@ export function SuperAdminView() {
                   onChange={(e) => setLoginSenha(e.target.value)}
                   placeholder="••••••••"
                   required
-                  className="bg-neutral-50 border-neutral-200 text-neutral-900 rounded-xl h-11 text-xs focus:bg-white"
+                  className="bg-neutral-50 border-neutral-200 text-neutral-900 rounded-xl h-11 text-base sm:text-sm focus:bg-white"
                 />
               </div>
 
               <Button
                 type="submit"
                 disabled={autenticando}
-                className="w-full bg-rose-600 hover:bg-rose-500 text-white font-bold h-11 rounded-xl text-xs uppercase tracking-wider shadow-md shadow-rose-600/20"
+                className="w-full bg-rose-600 hover:bg-rose-500 text-white font-bold h-11 rounded-xl text-sm sm:text-xs uppercase tracking-wider shadow-md shadow-rose-600/20"
               >
                 {autenticando ? "Autenticando..." : "Entrar como Operador"}
               </Button>
@@ -710,7 +708,7 @@ export function SuperAdminView() {
                 <Button
                   type="button"
                   variant="ghost"
-                  className="text-xs text-neutral-500 hover:text-neutral-900 h-8"
+                  className="text-xs sm:text-sm text-neutral-500 hover:text-neutral-900 h-9"
                 >
                   Ir para Login de Restaurantes
                 </Button>
@@ -723,31 +721,31 @@ export function SuperAdminView() {
 
     // Se estiver logado com uma conta que não possui permissão de SuperAdmin
     return (
-      <div className="min-h-screen bg-neutral-50 flex items-center justify-center p-4 selection:bg-rose-600 selection:text-white">
-        <div className="max-w-md w-full p-8 bg-white border border-rose-200/80 rounded-3xl shadow-xl shadow-rose-900/5 text-center space-y-6 animate-in fade-in zoom-in-95 duration-200">
-          <div className="w-16 h-16 mx-auto rounded-2xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center shadow-sm">
-            <Lock className="w-8 h-8" />
+      <div className="min-h-screen bg-neutral-50 flex items-center justify-center p-3.5 sm:p-4 selection:bg-rose-600 selection:text-white">
+        <div className="max-w-md w-full p-5 sm:p-8 bg-white border border-rose-200/80 rounded-3xl shadow-xl shadow-rose-900/5 text-center space-y-5 sm:space-y-6 animate-in fade-in zoom-in-95 duration-200">
+          <div className="w-14 h-14 sm:w-16 sm:h-16 mx-auto rounded-2xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center shadow-sm">
+            <Lock className="w-7 h-7 sm:w-8 sm:h-8" />
           </div>
 
           <div>
-            <h2 className="text-2xl font-black text-neutral-950 tracking-tight">
+            <h2 className="text-xl sm:text-2xl font-black text-neutral-950 tracking-tight">
               Acesso Restrito
             </h2>
-            <p className="text-sm text-neutral-600 mt-2 leading-relaxed">
+            <p className="text-sm text-neutral-600 mt-2 leading-relaxed break-words">
               Sua conta atual (
-              <strong className="text-neutral-900 font-semibold">
+              <strong className="text-neutral-900 font-semibold break-all">
                 {usuarioAuth?.email || "Desconhecida"}
               </strong>
               ) não possui privilégios de Operador SuperAdmin.
             </p>
           </div>
 
-          <div className="p-4 rounded-2xl bg-neutral-50 border border-neutral-200 text-left text-xs text-neutral-600 space-y-1.5">
+          <div className="p-4 rounded-2xl bg-neutral-50 border border-neutral-200 text-left text-xs sm:text-sm text-neutral-600 space-y-1.5">
             <div className="flex items-center gap-1.5 font-bold text-neutral-800">
-              <ShieldCheck className="w-4 h-4 text-emerald-600" />
+              <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
               <span>Controle de Acesso MAYaRAnas</span>
             </div>
-            <p>
+            <p className="leading-relaxed">
               Para acessar o painel de Gerência Geral, entre com um dos e-mails autorizados (ex: admin@mayamenu.com ou marcus1fialho@gmail.com).
             </p>
           </div>
@@ -756,9 +754,9 @@ export function SuperAdminView() {
             <Button
               type="button"
               onClick={handleLogoutOperador}
-              className="w-full bg-rose-600 hover:bg-rose-700 text-white font-bold h-11 rounded-2xl shadow-md transition-colors"
+              className="w-full bg-rose-600 hover:bg-rose-700 text-white font-bold h-11 rounded-2xl text-sm shadow-md transition-colors"
             >
-              <LogOut className="w-4 h-4 mr-2" />
+              <LogOut className="w-4 h-4 mr-2 shrink-0" />
               Sair e Entrar com Conta de Operador
             </Button>
 
@@ -766,7 +764,7 @@ export function SuperAdminView() {
               <Button
                 type="button"
                 variant="ghost"
-                className="w-full text-xs text-neutral-500 hover:text-neutral-900 h-9 rounded-xl"
+                className="w-full text-xs sm:text-sm text-neutral-500 hover:text-neutral-900 h-10 rounded-xl"
               >
                 Voltar para o Painel do Restaurante
               </Button>
@@ -778,131 +776,135 @@ export function SuperAdminView() {
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground p-4 md:p-8 space-y-8">
+    <div className="min-h-screen bg-background text-foreground px-3.5 py-4 sm:p-6 md:p-8 max-w-7xl mx-auto space-y-5 sm:space-y-8 overflow-x-hidden">
       {/* HEADER DA GERÊNCIA */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border pb-6">
-        <div className="flex items-center justify-between w-full md:w-auto">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-rose-50 border border-rose-100 rounded-2xl text-rose-600 shadow-xs">
-              <ShieldCheck className="w-7 h-7" />
-            </div>
-            <div>
-              <h1 className="text-2xl md:text-3xl font-black tracking-tight text-foreground flex items-center gap-2">
-                MAYaRAnas <span className="opacity-60 font-normal">| Gerência Geral</span>
-              </h1>
-              <p className="text-xs text-muted-foreground">
-                Central de Concessões, Emissão de Licenças e Controle de Estabelecimentos
-              </p>
+      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 border-b border-border pb-5 sm:pb-6">
+        <div className="flex items-start gap-3 w-full xl:w-auto min-w-0">
+          <div className="p-2 sm:p-2.5 bg-rose-50 border border-rose-100 rounded-2xl text-rose-600 shadow-xs shrink-0 mt-0.5 sm:mt-0">
+            <ShieldCheck className="w-6 h-6 sm:w-7 sm:h-7" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tight text-foreground flex flex-wrap items-baseline gap-x-2 gap-y-0.5 leading-tight">
+              <span>MAYaRAnas</span>
+              <span className="text-base sm:text-xl md:text-2xl opacity-60 font-normal">
+                | Gerência Geral
+              </span>
+            </h1>
+            <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed mt-0.5">
+              Central de Concessões, Emissão de Licenças e Controle de Estabelecimentos
+            </p>
 
-              {/* IDENTIFICAÇÃO DO OPERADOR / LOGIN RÁPIDO */}
-              <div className="flex items-center gap-2 mt-2">
-                {ehSuperAdmin ? (
-                  <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-xl text-emerald-800 text-xs font-semibold">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>Operador: {usuarioAuth?.email}</span>
-                    <button
-                      type="button"
-                      onClick={handleLogoutOperador}
-                      className="ml-2 hover:text-emerald-950 underline text-[10px]"
-                    >
-                      Sair
-                    </button>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <Badge className="bg-amber-50 text-amber-800 border border-amber-200 text-[11px] font-bold">
-                      Sessão Não Autenticada
-                    </Badge>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setModalLoginAberto(true)}
-                      className="h-7 text-[11px] rounded-lg border-amber-300 text-amber-800 hover:bg-amber-100 flex items-center gap-1"
-                    >
-                      <LogIn className="w-3 h-3" />
-                      Identificar Operador
-                    </Button>
-                  </div>
-                )}
-
-                <Link href="/superadmin/ajuda" target="_blank">
+            {/* IDENTIFICAÇÃO DO OPERADOR / LOGIN RÁPIDO */}
+            <div className="flex flex-wrap items-center gap-2 mt-3">
+              {ehSuperAdmin ? (
+                <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl text-emerald-800 text-xs font-semibold max-w-full min-w-0">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  <span className="truncate max-w-[180px] sm:max-w-xs">
+                    {usuarioAuth?.email}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleLogoutOperador}
+                    className="ml-1 px-1.5 py-0.5 rounded hover:bg-emerald-100 text-emerald-900 underline text-xs font-bold shrink-0"
+                  >
+                    Sair
+                  </button>
+                </div>
+              ) : (
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge className="bg-amber-50 text-amber-800 border border-amber-200 text-xs font-bold">
+                    Sessão Não Autenticada
+                  </Badge>
                   <Button
                     type="button"
                     size="sm"
                     variant="outline"
-                    className="h-7 text-[11px] rounded-lg border-border bg-card text-foreground hover:bg-muted hover:text-rose-600 flex items-center gap-1.5 shadow-xs transition-colors"
-                    title="Abrir Manual Executivo & Operações"
+                    onClick={() => setModalLoginAberto(true)}
+                    className="h-8 text-xs rounded-xl border-amber-300 text-amber-800 hover:bg-amber-100 flex items-center gap-1"
                   >
-                    <BookOpen className="w-3.5 h-3.5 text-rose-600" />
-                    <span>Manual SuperAdmin</span>
-                    <span className="px-1 py-0.2 rounded text-[8px] font-black uppercase tracking-wider bg-rose-100 text-rose-700 border border-rose-200">
-                      NOVO
-                    </span>
+                    <LogIn className="w-3.5 h-3.5" />
+                    Identificar Operador
                   </Button>
-                </Link>
-              </div>
+                </div>
+              )}
+
+              <Link href="/superadmin/ajuda" target="_blank">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-8 text-xs rounded-xl border-border bg-card text-foreground hover:bg-muted hover:text-rose-600 flex items-center gap-1.5 shadow-xs transition-colors"
+                  title="Abrir Manual Executivo & Operações"
+                >
+                  <BookOpen className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                  <span>Manual</span>
+                  <span className="hidden sm:inline">SuperAdmin</span>
+                  <span className="px-1.5 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-rose-100 text-rose-700 border border-rose-200">
+                    NOVO
+                  </span>
+                </Button>
+              </Link>
             </div>
           </div>
         </div>
 
         {/* METRICAS RÁPIDAS */}
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 xl:flex xl:flex-wrap items-stretch gap-2 sm:gap-2.5 w-full xl:w-auto shrink-0">
           <div
             onClick={() => setAbaAtiva("restaurantes")}
-            className="px-4 py-2 bg-card border border-border rounded-2xl text-center cursor-pointer hover:border-primary/50 transition-colors shadow-xs"
+            className="px-3 py-2.5 sm:px-3.5 bg-card border border-border rounded-2xl text-center cursor-pointer hover:border-primary/50 transition-colors shadow-xs flex flex-col justify-center"
           >
-            <span className="block text-xs uppercase tracking-wider text-muted-foreground font-bold flex items-center justify-center gap-1">
-              <Store className="w-3 h-3 text-emerald-600" />
+            <span className="text-[11px] sm:text-xs uppercase tracking-wider text-muted-foreground font-bold flex items-center justify-center gap-1">
+              <Store className="w-3 h-3 text-emerald-600 shrink-0" />
               Operação
             </span>
-            <span className="text-xl font-black text-emerald-600">{totalRestaurantesAtivos}</span>
+            <span className="text-lg sm:text-xl font-black text-emerald-600 mt-0.5">{totalRestaurantesAtivos}</span>
           </div>
           <div
             onClick={() => setAbaAtiva("ativas")}
-            className="px-4 py-2 bg-card border border-border rounded-2xl text-center cursor-pointer hover:border-primary/50 transition-colors shadow-xs"
+            className="px-3 py-2.5 sm:px-3.5 bg-card border border-border rounded-2xl text-center cursor-pointer hover:border-primary/50 transition-colors shadow-xs flex flex-col justify-center"
           >
-            <span className="block text-xs uppercase tracking-wider text-muted-foreground font-bold flex items-center justify-center gap-1">
-              <KeyRound className="w-3 h-3 text-amber-600" />
+            <span className="text-[11px] sm:text-xs uppercase tracking-wider text-muted-foreground font-bold flex items-center justify-center gap-1">
+              <KeyRound className="w-3 h-3 text-amber-600 shrink-0" />
               Disponíveis
             </span>
-            <span className="text-xl font-black text-amber-600">{totalTokensDisponiveis}</span>
+            <span className="text-lg sm:text-xl font-black text-amber-600 mt-0.5">{totalTokensDisponiveis}</span>
           </div>
           <div
             onClick={() => setAbaAtiva("vencidas")}
-            className="px-4 py-2 bg-card border border-border rounded-2xl text-center cursor-pointer hover:border-primary/50 transition-colors shadow-xs"
+            className="px-3 py-2.5 sm:px-3.5 bg-card border border-border rounded-2xl text-center cursor-pointer hover:border-primary/50 transition-colors shadow-xs flex flex-col justify-center"
           >
-            <span className="block text-xs uppercase tracking-wider text-muted-foreground font-bold flex items-center justify-center gap-1">
-              <ClockAlert className="w-3 h-3 text-orange-600" />
+            <span className="text-[11px] sm:text-xs uppercase tracking-wider text-muted-foreground font-bold flex items-center justify-center gap-1">
+              <ClockAlert className="w-3 h-3 text-orange-600 shrink-0" />
               Vencidas
             </span>
-            <span className="text-xl font-black text-orange-600">{totalTokensVencidos}</span>
+            <span className="text-lg sm:text-xl font-black text-orange-600 mt-0.5">{totalTokensVencidos}</span>
           </div>
-          <div className="px-4 py-2 bg-card border border-border rounded-2xl text-center shadow-xs">
-            <span className="block text-xs uppercase tracking-wider text-muted-foreground font-bold">
+          <div className="px-3 py-2.5 sm:px-3.5 bg-card border border-border rounded-2xl text-center shadow-xs flex flex-col justify-center">
+            <span className="text-[11px] sm:text-xs uppercase tracking-wider text-muted-foreground font-bold">
               Suspensos
             </span>
-            <span className="text-xl font-black text-rose-600">{totalRestaurantesSuspensos}</span>
+            <span className="text-lg sm:text-xl font-black text-rose-600 mt-0.5">{totalRestaurantesSuspensos}</span>
           </div>
           <div
             onClick={() => setAbaAtiva("arquivo_morto")}
-            className="px-4 py-2 bg-card border border-border rounded-2xl text-center cursor-pointer hover:border-primary/50 transition-colors shadow-xs"
+            className="px-3 py-2.5 sm:px-3.5 bg-card border border-border rounded-2xl text-center cursor-pointer hover:border-primary/50 transition-colors shadow-xs flex flex-col justify-center"
           >
-            <span className="block text-xs uppercase tracking-wider text-muted-foreground font-bold flex items-center justify-center gap-1">
-              <Archive className="w-3 h-3 text-purple-600" />
-              Arquivo Morto
+            <span className="text-[11px] sm:text-xs uppercase tracking-wider text-muted-foreground font-bold flex items-center justify-center gap-1">
+              <Archive className="w-3 h-3 text-purple-600 shrink-0" />
+              Arquivo
             </span>
-            <span className="text-xl font-black text-purple-600">{arquivoMorto.length}</span>
+            <span className="text-lg sm:text-xl font-black text-purple-600 mt-0.5">{arquivoMorto.length}</span>
           </div>
           <div
             onClick={() => setAbaAtiva("patrocinadores")}
-            className="px-4 py-2 bg-card border border-border rounded-2xl text-center cursor-pointer hover:border-rose-400 transition-colors shadow-xs"
+            className="px-3 py-2.5 sm:px-3.5 bg-card border border-border rounded-2xl text-center cursor-pointer hover:border-rose-400 transition-colors shadow-xs flex flex-col justify-center"
           >
-            <span className="block text-xs uppercase tracking-wider text-muted-foreground font-bold flex items-center justify-center gap-1">
-              <Building2 className="w-3 h-3 text-rose-600" />
-              Patrocinadores B2B
+            <span className="text-[11px] sm:text-xs uppercase tracking-wider text-muted-foreground font-bold flex items-center justify-center gap-1">
+              <Building2 className="w-3 h-3 text-rose-600 shrink-0" />
+              B2B
             </span>
-            <span className="text-xl font-black text-rose-600">{patrocinadores.length}</span>
+            <span className="text-lg sm:text-xl font-black text-rose-600 mt-0.5">{patrocinadores.length}</span>
           </div>
         </div>
       </div>
@@ -963,79 +965,84 @@ export function SuperAdminView() {
       )}
 
       {/* SELETOR DE ABAS */}
-      <div className="flex flex-wrap items-center gap-2 border-b border-border pb-3">
+      <div className="flex items-center gap-2 overflow-x-auto no-scrollbar sm:flex-wrap border-b border-border pb-3">
         <button
           onClick={() => setAbaAtiva("restaurantes")}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${abaAtiva === "restaurantes"
+          className={`shrink-0 whitespace-nowrap flex items-center gap-2 px-3.5 sm:px-4 py-2.5 sm:py-2 rounded-xl text-xs sm:text-sm font-bold transition-all ${abaAtiva === "restaurantes"
             ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/30"
             : "bg-card text-muted-foreground hover:text-foreground border border-border"
             }`}
         >
-          <Store className="w-4 h-4" />
-          Estabelecimentos em Operação ({restaurantesFiltrados.length})
+          <Store className="w-4 h-4 shrink-0" />
+          <span className="sm:hidden">Lojas ({restaurantesFiltrados.length})</span>
+          <span className="hidden sm:inline">Estabelecimentos em Operação ({restaurantesFiltrados.length})</span>
         </button>
         <button
           onClick={() => setAbaAtiva("ativas")}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${abaAtiva === "ativas"
+          className={`shrink-0 whitespace-nowrap flex items-center gap-2 px-3.5 sm:px-4 py-2.5 sm:py-2 rounded-xl text-xs sm:text-sm font-bold transition-all ${abaAtiva === "ativas"
             ? "bg-rose-600 text-white shadow-md shadow-rose-600/30"
             : "bg-card text-muted-foreground hover:text-foreground border border-border"
             }`}
         >
-          <KeyRound className="w-4 h-4" />
-          Emissão & Convites Disponíveis ({licencasFiltradas.length})
+          <KeyRound className="w-4 h-4 shrink-0" />
+          <span className="sm:hidden">Licenças ({licencasFiltradas.length})</span>
+          <span className="hidden sm:inline">Emissão & Convites Disponíveis ({licencasFiltradas.length})</span>
         </button>
         <button
           onClick={() => setAbaAtiva("vencidas")}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${abaAtiva === "vencidas"
+          className={`shrink-0 whitespace-nowrap flex items-center gap-2 px-3.5 sm:px-4 py-2.5 sm:py-2 rounded-xl text-xs sm:text-sm font-bold transition-all ${abaAtiva === "vencidas"
             ? "bg-orange-600 text-white shadow-md shadow-orange-600/30"
             : "bg-card text-muted-foreground hover:text-foreground border border-border"
             }`}
         >
-          <ClockAlert className="w-4 h-4" />
-          Licenças Vencidas ({licencasVencidas.length})
+          <ClockAlert className="w-4 h-4 shrink-0" />
+          <span className="sm:hidden">Vencidas ({licencasVencidas.length})</span>
+          <span className="hidden sm:inline">Licenças Vencidas ({licencasVencidas.length})</span>
         </button>
         <button
           onClick={() => setAbaAtiva("arquivo_morto")}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${abaAtiva === "arquivo_morto"
+          className={`shrink-0 whitespace-nowrap flex items-center gap-2 px-3.5 sm:px-4 py-2.5 sm:py-2 rounded-xl text-xs sm:text-sm font-bold transition-all ${abaAtiva === "arquivo_morto"
             ? "bg-purple-600 text-white shadow-md shadow-purple-600/30"
             : "bg-card text-muted-foreground hover:text-foreground border border-border"
             }`}
         >
-          <Archive className="w-4 h-4" />
-          Arquivo Morto / JSONs ({arquivoMorto.length})
+          <Archive className="w-4 h-4 shrink-0" />
+          <span className="sm:hidden">Arquivo ({arquivoMorto.length})</span>
+          <span className="hidden sm:inline">Arquivo Morto / JSONs ({arquivoMorto.length})</span>
         </button>
         <button
           onClick={() => setAbaAtiva("patrocinadores")}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${abaAtiva === "patrocinadores"
+          className={`shrink-0 whitespace-nowrap flex items-center gap-2 px-3.5 sm:px-4 py-2.5 sm:py-2 rounded-xl text-xs sm:text-sm font-bold transition-all ${abaAtiva === "patrocinadores"
             ? "bg-rose-600 text-white shadow-md shadow-rose-600/30"
             : "bg-card text-muted-foreground hover:text-foreground border border-border"
             }`}
         >
-          <Building2 className="w-4 h-4" />
-          Patrocinadores B2B ({patrocinadores.length})
+          <Building2 className="w-4 h-4 shrink-0" />
+          <span className="sm:hidden">B2B ({patrocinadores.length})</span>
+          <span className="hidden sm:inline">Patrocinadores B2B ({patrocinadores.length})</span>
         </button>
         <button
           onClick={() => setAbaAtiva("chamados")}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${abaAtiva === "chamados"
+          className={`shrink-0 whitespace-nowrap flex items-center gap-2 px-3.5 sm:px-4 py-2.5 sm:py-2 rounded-xl text-xs sm:text-sm font-bold transition-all ${abaAtiva === "chamados"
             ? "bg-amber-500 text-neutral-950 shadow-md shadow-amber-500/25"
             : "bg-card text-muted-foreground hover:text-foreground border border-border"
             }`}
         >
-          <MessageCircle className="w-4 h-4" />
+          <MessageCircle className="w-4 h-4 shrink-0" />
           Chamados ({chamadosSuporte.filter((c) => c.status === "pendente").length})
         </button>
       </div>
 
       {abaAtiva === "restaurantes" ? (
         /* ABA ESTABELECIMENTOS EM OPERAÇÃO (MUNDO 2: GESTÃO CONTÍNUA DE PLANOS) */
-        <div className="space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <h2 className="text-xl font-black tracking-tight flex items-center gap-2">
-                <Store className="w-5 h-5 text-emerald-600" />
-                Estabelecimentos em Operação ({restaurantesFiltrados.length})
+        <div className="space-y-5 sm:space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+            <div className="space-y-0.5">
+              <h2 className="text-lg sm:text-xl font-black tracking-tight flex items-center gap-2">
+                <Store className="w-5 h-5 text-emerald-600 shrink-0" />
+                <span>Estabelecimentos em Operação ({restaurantesFiltrados.length})</span>
               </h2>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
                 Gerencie versões de planos (Free, Pro, Enterprise) e status de operação dos restaurantes ativos em tempo real.
               </p>
             </div>
@@ -1046,21 +1053,21 @@ export function SuperAdminView() {
                 value={filtro}
                 onChange={(e) => setFiltro(e.target.value)}
                 placeholder="Buscar restaurante, slug ou plano..."
-                className="bg-card border-border text-foreground pl-9 rounded-xl h-9 text-xs shadow-xs focus-visible:ring-1 focus-visible:ring-primary"
+                className="bg-card border-border text-foreground pl-9 rounded-xl h-10 sm:h-9 text-sm shadow-xs focus-visible:ring-1 focus-visible:ring-primary"
               />
             </div>
           </div>
 
           {restaurantesFiltrados.length === 0 ? (
-            <div className="p-16 text-center bg-card border border-border rounded-3xl space-y-3 shadow-xs">
+            <div className="p-10 sm:p-16 text-center bg-card border border-border rounded-3xl space-y-3 shadow-xs">
               <Store className="w-12 h-12 text-muted-foreground/60 mx-auto" />
-              <h3 className="text-sm font-bold text-foreground">Nenhum estabelecimento encontrado</h3>
-              <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+              <h3 className="text-base sm:text-sm font-bold text-foreground">Nenhum estabelecimento encontrado</h3>
+              <p className="text-xs sm:text-sm text-muted-foreground max-w-sm mx-auto leading-relaxed">
                 Assim que um cliente ativar seu link de concessão, o restaurante aparecerá automaticamente aqui.
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
               {restaurantesFiltrados.map((rest) => {
                 const planoAtual = rest.plano || rest.licenca?.plano || "free";
                 const isSuspenso = !!(rest.suspenso || rest.configuracoes?.suspenso);
@@ -1070,7 +1077,7 @@ export function SuperAdminView() {
                 return (
                   <div
                     key={rest.id}
-                    className={`p-5 bg-card border rounded-3xl space-y-4 shadow-xs transition-all ${isItemPending ? "ring-2 ring-primary/50 opacity-90 scale-[0.99]" : ""
+                    className={`p-4 sm:p-5 bg-card border rounded-3xl space-y-4 shadow-xs transition-all ${isItemPending ? "ring-2 ring-primary/50 opacity-90 scale-[0.99]" : ""
                       } ${isSuspenso
                         ? "border-rose-200 bg-rose-50/40"
                         : "border-border hover:border-primary/40"
@@ -1078,8 +1085,8 @@ export function SuperAdminView() {
                   >
                     {/* TOPO: NOME E STATUS */}
                     <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <h3 className="text-base font-black text-foreground flex items-center gap-2">
+                      <div className="min-w-0 flex-1">
+                        <h3 className="text-base sm:text-lg font-black text-foreground break-words">
                           {rest.nome}
                         </h3>
                         {rest.slug && (
@@ -1087,19 +1094,19 @@ export function SuperAdminView() {
                             href={`/r/${rest.slug}`}
                             target="_blank"
                             rel="noreferrer"
-                            className="text-xs font-mono text-emerald-700 hover:underline inline-block mt-0.5"
+                            className="text-xs font-mono text-emerald-700 hover:underline inline-block mt-0.5 break-all"
                           >
                             /r/{rest.slug}
                           </a>
                         )}
                       </div>
 
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5 shrink-0">
                         {isItemPending && (
                           <Loader2 className="w-3.5 h-3.5 animate-spin text-primary shrink-0" />
                         )}
                         <Badge
-                          className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full ${isSuspenso
+                          className={`text-[11px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full ${isSuspenso
                             ? "bg-rose-50 text-rose-800 border border-rose-200"
                             : planoAtual === "enterprise"
                               ? "bg-amber-50 text-amber-800 border border-amber-200"
@@ -1114,34 +1121,34 @@ export function SuperAdminView() {
                     </div>
 
                     {/* DADOS DE CAPACIDADE / LIMITES */}
-                    <div className="grid grid-cols-2 gap-2 text-xs bg-muted/40 p-3 rounded-2xl border border-border">
+                    <div className="grid grid-cols-2 gap-2.5 text-xs bg-muted/40 p-3 rounded-2xl border border-border">
                       <div>
-                        <span className="text-muted-foreground block text-[10px] uppercase font-bold">
+                        <span className="text-muted-foreground block text-[11px] uppercase font-bold">
                           Capacidade Mesas
                         </span>
-                        <span className="text-foreground font-bold">
+                        <span className="text-sm text-foreground font-bold">
                           {limites.maxMesas >= 999 ? "Ilimitadas" : `${limites.maxMesas} mesas`}
                         </span>
                       </div>
                       <div>
-                        <span className="text-muted-foreground block text-[10px] uppercase font-bold">
+                        <span className="text-muted-foreground block text-[11px] uppercase font-bold">
                           Limite Cardápio
                         </span>
-                        <span className="text-foreground font-bold">
+                        <span className="text-sm text-foreground font-bold">
                           {limites.maxPratos >= 999 ? "Ilimitados" : `${limites.maxPratos} itens`}
                         </span>
                       </div>
                     </div>
 
                     {/* RODAPÉ DO CARD: SEGMENTED CONTROL + SUSPENDER */}
-                    <div className="pt-2 border-t border-border flex flex-wrap items-center justify-between gap-2">
+                    <div className="pt-2 border-t border-border flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                       {/* 1. SEGMENTED CONTROL DE MIGRAÇÃO DE PLANO */}
-                      <div className="flex bg-muted rounded-lg p-1 border border-border shadow-inner">
+                      <div className="grid grid-cols-3 sm:flex bg-muted rounded-xl p-1 border border-border shadow-inner w-full sm:w-auto">
                         <button
                           type="button"
                           disabled={isItemPending}
                           onClick={() => handleAlterarPlano(rest.id, "free", rest.licenca?.id)}
-                          className={`px-2.5 py-1 text-[10px] sm:text-xs font-bold rounded-md transition-all disabled:opacity-50 ${planoAtual === "free"
+                          className={`px-2.5 py-1.5 sm:py-1 text-xs font-bold rounded-lg transition-all disabled:opacity-50 ${planoAtual === "free"
                             ? "bg-card text-foreground shadow-xs"
                             : "text-muted-foreground hover:text-foreground"
                             }`}
@@ -1153,7 +1160,7 @@ export function SuperAdminView() {
                           type="button"
                           disabled={isItemPending}
                           onClick={() => handleAlterarPlano(rest.id, "pro", rest.licenca?.id)}
-                          className={`px-2.5 py-1 text-[10px] sm:text-xs font-bold rounded-md transition-all disabled:opacity-50 ${planoAtual === "pro"
+                          className={`px-2.5 py-1.5 sm:py-1 text-xs font-bold rounded-lg transition-all disabled:opacity-50 ${planoAtual === "pro"
                             ? "bg-violet-600 text-white shadow-xs"
                             : "text-muted-foreground hover:text-violet-600"
                             }`}
@@ -1165,7 +1172,7 @@ export function SuperAdminView() {
                           type="button"
                           disabled={isItemPending}
                           onClick={() => handleAlterarPlano(rest.id, "enterprise", rest.licenca?.id)}
-                          className={`px-2.5 py-1 text-[10px] sm:text-xs font-bold rounded-md transition-all disabled:opacity-50 ${planoAtual === "enterprise"
+                          className={`px-2 py-1.5 sm:py-1 text-xs font-bold rounded-lg transition-all disabled:opacity-50 ${planoAtual === "enterprise"
                             ? "bg-amber-500 text-white shadow-xs"
                             : "text-muted-foreground hover:text-amber-600"
                             }`}
@@ -1180,7 +1187,7 @@ export function SuperAdminView() {
                           type="button"
                           disabled={isItemPending}
                           onClick={() => handleAlterarSuspensaoRestaurante(rest.id, false)}
-                          className="px-3 py-1.5 text-[10px] sm:text-xs font-bold text-emerald-700 hover:bg-emerald-50 rounded-lg border border-emerald-200 flex items-center gap-1 transition-colors disabled:opacity-50"
+                          className="w-full sm:w-auto justify-center px-3 py-2 sm:py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-50 rounded-xl border border-emerald-200 flex items-center gap-1.5 transition-colors disabled:opacity-50"
                         >
                           <RotateCcw className="w-3.5 h-3.5" />
                           Reativar
@@ -1190,13 +1197,13 @@ export function SuperAdminView() {
                           <AlertDialogTrigger asChild>
                             <button
                               type="button"
-                              className="px-2.5 py-1 text-[10px] sm:text-xs font-bold text-rose-600 hover:bg-rose-50 hover:text-rose-700 rounded-lg transition-colors border border-transparent hover:border-rose-200 flex items-center gap-1"
+                              className="w-full sm:w-auto justify-center px-3 py-2 sm:py-1.5 text-xs font-bold text-rose-600 hover:bg-rose-50 hover:text-rose-700 rounded-xl transition-colors border border-rose-200/70 sm:border-transparent hover:border-rose-200 flex items-center gap-1.5"
                             >
                               <Ban className="w-3.5 h-3.5" />
                               Suspender
                             </button>
                           </AlertDialogTrigger>
-                          <AlertDialogContent className="bg-card border border-border text-foreground rounded-3xl max-w-sm shadow-xl">
+                          <AlertDialogContent className="bg-card border border-border text-foreground rounded-3xl w-[92vw] max-w-sm shadow-xl">
                             <AlertDialogHeader>
                               <AlertDialogTitle className="text-rose-600 font-black">Suspender Estabelecimento?</AlertDialogTitle>
                               <AlertDialogDescription className="text-muted-foreground text-xs leading-relaxed">
@@ -1280,7 +1287,7 @@ export function SuperAdminView() {
                   </button>
                 </div>
               </CardHeader>
-              <CardContent className="p-6 space-y-4">
+              <CardContent className="p-4 sm:p-6 space-y-4">
                 <form
                   onSubmit={modoEmissao === "lote" ? handleCriarLoteLicencas : handleCriarLicenca}
                   className="space-y-4"
@@ -1290,7 +1297,7 @@ export function SuperAdminView() {
                     <div className="space-y-1.5 bg-rose-50/60 p-3 rounded-2xl border border-rose-200">
                       <label className="text-xs font-bold uppercase tracking-wider text-rose-700 flex items-center justify-between">
                         <span>Quantidade no Lote</span>
-                        <span className="text-[10px] text-muted-foreground font-mono">1 a 100</span>
+                        <span className="text-xs text-muted-foreground font-mono">1 a 100</span>
                       </label>
                       <div className="grid grid-cols-4 gap-2">
                         {["5", "10", "25", "50"].map((q) => (
@@ -1298,7 +1305,7 @@ export function SuperAdminView() {
                             key={q}
                             type="button"
                             onClick={() => setQuantidadeLote(q)}
-                            className={`py-1.5 rounded-xl text-xs font-black border transition-all ${quantidadeLote === q
+                            className={`py-2 sm:py-1.5 rounded-xl text-xs font-black border transition-all ${quantidadeLote === q
                               ? "bg-rose-600 border-rose-500 text-white shadow-xs"
                               : "bg-card border-border text-muted-foreground hover:text-foreground"
                               }`}
@@ -1333,7 +1340,7 @@ export function SuperAdminView() {
                         );
                       })}
                     </div>
-                    <div className="text-[11px] text-muted-foreground bg-muted/40 p-2.5 rounded-xl border border-border mt-2">
+                    <div className="text-xs text-muted-foreground bg-muted/40 p-2.5 rounded-xl border border-border mt-2">
                       Padrão {planoSelecionado.toUpperCase()}:{" "}
                       <span className="text-foreground font-bold">
                         {LIMITES_POR_PLANO[planoSelecionado].maxPratos} pratos
@@ -1346,25 +1353,25 @@ export function SuperAdminView() {
 
                     {/* PRESETS RÁPIDOS */}
                     <div className="flex flex-wrap items-center gap-1.5 pt-2">
-                      <span className="text-[10px] uppercase font-bold text-muted-foreground mr-1">Atalhos:</span>
+                      <span className="text-xs uppercase font-bold text-muted-foreground mr-1">Atalhos:</span>
                       <button
                         type="button"
                         onClick={() => aplicarPreset("free", "48")}
-                        className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-muted hover:bg-muted/80 text-foreground border border-border transition-colors"
+                        className="px-2.5 py-1 rounded-lg text-xs font-bold bg-muted hover:bg-muted/80 text-foreground border border-border transition-colors"
                       >
                         Free 48h
                       </button>
                       <button
                         type="button"
                         onClick={() => aplicarPreset("pro", "168")}
-                        className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-violet-50 text-violet-700 border border-violet-200 hover:bg-violet-100 transition-colors"
+                        className="px-2.5 py-1 rounded-lg text-xs font-bold bg-violet-50 text-violet-700 border border-violet-200 hover:bg-violet-100 transition-colors"
                       >
                         Pro 7d
                       </button>
                       <button
                         type="button"
                         onClick={() => aplicarPreset("enterprise", "720")}
-                        className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition-colors"
+                        className="px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition-colors"
                       >
                         Enterprise 30d
                       </button>
@@ -1384,22 +1391,22 @@ export function SuperAdminView() {
                       placeholder={
                         modoEmissao === "lote"
                           ? "Ex: Campanha Abrasel / Evento Gastronômico"
-                          : "Ex: Marcus Barreto (WhatsApp / Restaurante X)"
+                          : "Ex: Marcus Barreto (Restaurante X)"
                       }
-                      className="bg-card border-border text-foreground rounded-xl h-10 text-xs"
+                      className="bg-card border-border text-foreground rounded-xl h-10 text-base sm:text-sm"
                     />
                   </div>
 
                   {/* VALIDADE / EXPIRAÇÃO DO CONVITE EFÊMERO */}
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
+                    <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex flex-wrap items-center justify-between gap-1">
                       <span>Validade do Link de Ativação</span>
-                      <span className="text-[10px] text-rose-600 font-mono font-bold">Burn-After-Reading</span>
+                      <span className="text-[11px] text-rose-600 font-mono font-bold">Burn-After-Reading</span>
                     </label>
                     <select
                       value={validadeHoras}
                       onChange={(e) => setValidadeHoras(e.target.value)}
-                      className="w-full bg-card border border-border text-foreground rounded-xl h-10 px-3 text-xs outline-none focus:border-rose-500 shadow-xs transition-colors"
+                      className="w-full bg-card border border-border text-foreground rounded-xl h-10 px-3 text-base sm:text-sm outline-none focus:border-rose-500 shadow-xs transition-colors"
                     >
                       <option value="24">Válido por 24 horas</option>
                       <option value="48">Válido por 48 horas (Padrão)</option>
@@ -1418,34 +1425,34 @@ export function SuperAdminView() {
                       value={notas}
                       onChange={(e) => setNotas(e.target.value)}
                       placeholder="Ex: Demonstração 30 dias / Parceria"
-                      className="bg-card border-border text-foreground rounded-xl h-10 text-xs shadow-xs focus-visible:ring-1 focus-visible:ring-primary"
+                      className="bg-card border-border text-foreground rounded-xl h-10 text-base sm:text-sm shadow-xs focus-visible:ring-1 focus-visible:ring-primary"
                     />
                   </div>
 
                   {/* LIMITES PERSONALIZADOS */}
                   <div className="grid grid-cols-2 gap-3 pt-1">
                     <div className="space-y-1">
-                      <label className="text-[10px] uppercase font-bold text-muted-foreground">
-                        Limite de Pratos
+                      <label className="text-xs uppercase font-bold text-muted-foreground">
+                        Limite Pratos
                       </label>
                       <Input
                         type="number"
                         value={maxPratosCustom}
                         onChange={(e) => setMaxPratosCustom(e.target.value)}
                         placeholder={String(LIMITES_POR_PLANO[planoSelecionado].maxPratos)}
-                        className="bg-card border-border text-foreground rounded-xl h-9 text-xs shadow-xs focus-visible:ring-1 focus-visible:ring-primary"
+                        className="bg-card border-border text-foreground rounded-xl h-10 sm:h-9 text-base sm:text-sm shadow-xs focus-visible:ring-1 focus-visible:ring-primary"
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[10px] uppercase font-bold text-muted-foreground">
-                        Limite de Mesas
+                      <label className="text-xs uppercase font-bold text-muted-foreground">
+                        Limite Mesas
                       </label>
                       <Input
                         type="number"
                         value={maxMesasCustom}
                         onChange={(e) => setMaxMesasCustom(e.target.value)}
                         placeholder={String(LIMITES_POR_PLANO[planoSelecionado].maxMesas)}
-                        className="bg-card border-border text-foreground rounded-xl h-9 text-xs shadow-xs focus-visible:ring-1 focus-visible:ring-primary"
+                        className="bg-card border-border text-foreground rounded-xl h-10 sm:h-9 text-base sm:text-sm shadow-xs focus-visible:ring-1 focus-visible:ring-primary"
                       />
                     </div>
                   </div>
@@ -1453,7 +1460,7 @@ export function SuperAdminView() {
                   <Button
                     type="submit"
                     disabled={criando}
-                    className="w-full bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-2xl h-11 text-xs uppercase tracking-wider shadow-lg shadow-rose-600/30 transition-all flex items-center justify-center gap-2"
+                    className="w-full bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-2xl h-11 text-sm sm:text-xs uppercase tracking-wider shadow-lg shadow-rose-600/30 transition-all flex items-center justify-center gap-2"
                   >
                     {criando ? (
                       <>
@@ -1477,34 +1484,31 @@ export function SuperAdminView() {
           {/* LISTAGEM DE LICENÇAS E CONCESSÕES */}
           <div className="lg:col-span-2 space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <h2 className="text-lg font-black tracking-tight flex items-center gap-2">
-                <Store className="w-5 h-5 text-muted-foreground" />
-                Concessões Registradas ({licencasFiltradas.length})
+              <h2 className="text-lg sm:text-xl font-black tracking-tight flex items-center gap-2">
+                <Store className="w-5 h-5 text-muted-foreground shrink-0" />
+                <span>Concessões Registradas ({licencasFiltradas.length})</span>
               </h2>
 
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
                 {/* BOTÃO EXPORTAR CSV */}
                 <Button
                   type="button"
                   size="sm"
                   variant="outline"
                   onClick={() => handleBaixarCSV(licencasFiltradas)}
-                  className="h-9 px-3 rounded-xl border-border bg-card hover:bg-muted text-xs font-bold flex items-center gap-1.5 shadow-xs"
+                  className="h-10 sm:h-9 px-3 rounded-xl border-border bg-card hover:bg-muted text-xs font-bold flex items-center gap-1.5 shadow-xs shrink-0"
                 >
                   <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
-                  <span className="hidden sm:inline">Exportar</span> CSV
-                  <span className="px-1 py-0.2 rounded text-[8px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-200">
-                    NOVO
-                  </span>
+                  <span>Exportar CSV</span>
                 </Button>
 
-                <div className="relative w-48 sm:w-60">
+                <div className="relative flex-1 min-w-[160px] sm:w-60 sm:flex-none">
                   <Search className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
                   <Input
                     value={filtro}
                     onChange={(e) => setFiltro(e.target.value)}
                     placeholder="Buscar código, nome..."
-                    className="bg-card border-border text-foreground pl-9 rounded-xl h-9 text-xs"
+                    className="bg-card border-border text-foreground pl-9 rounded-xl h-10 sm:h-9 text-sm"
                   />
                 </div>
               </div>
@@ -1990,59 +1994,63 @@ export function SuperAdminView() {
           )}
         </div>
       ) : abaAtiva === "chamados" ? (
-        <div className="space-y-4">
-          <div>
-            <h2 className="text-xl font-black tracking-tight flex items-center gap-2">
-              <MessageCircle className="w-5 h-5 text-amber-500" />
-              Chamados &amp; Contatos de Especialista ({chamadosSuporte.length})
+        <div className="space-y-4 sm:space-y-5">
+          <div className="space-y-0.5">
+            <h2 className="text-lg sm:text-xl font-black tracking-tight flex items-center gap-2">
+              <MessageCircle className="w-5 h-5 text-amber-500 shrink-0" />
+              <span>Chamados &amp; Contatos de Especialista ({chamadosSuporte.length})</span>
             </h2>
-            <p className="text-xs text-muted-foreground mt-0.5">
+            <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
               Mensagens enviadas pelo Assistente MAYaMenu sem depender de WhatsApp.
             </p>
           </div>
 
           {chamadosSuporte.length === 0 ? (
-            <div className="p-10 rounded-3xl border border-dashed border-border text-center text-xs text-muted-foreground">
+            <div className="p-8 sm:p-10 rounded-3xl border border-dashed border-border text-center text-sm text-muted-foreground">
               Nenhum chamado registrado até o momento.
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:gap-4">
               {chamadosSuporte.map((ch) => (
                 <div
                   key={ch.id}
-                  className="p-4 rounded-2xl bg-card border border-border flex flex-col sm:flex-row sm:items-start justify-between gap-3"
+                  className="p-4 sm:p-5 rounded-2xl sm:rounded-3xl bg-card border border-border flex flex-col lg:flex-row lg:items-start justify-between gap-4 shadow-xs"
                 >
-                  <div className="space-y-1.5 min-w-0">
+                  <div className="space-y-2 min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge
                         className={
                           ch.status === "pendente"
-                            ? "bg-amber-500/15 text-amber-700 border-amber-500/30 text-[10px] font-black"
-                            : "bg-emerald-500/15 text-emerald-700 border-emerald-500/30 text-[10px] font-black"
+                            ? "bg-amber-500/15 text-amber-700 border-amber-500/30 text-[11px] font-black"
+                            : "bg-emerald-500/15 text-emerald-700 border-emerald-500/30 text-[11px] font-black"
                         }
                       >
                         {ch.status === "pendente" ? "Pendente" : "Respondido"}
                       </Badge>
-                      <span className="text-sm font-black text-foreground">{ch.nome}</span>
-                      <span className="text-xs text-muted-foreground">&lt;{ch.email}&gt;</span>
+                      <span className="text-sm sm:text-base font-black text-foreground break-words">
+                        {ch.nome}
+                      </span>
+                      <span className="text-xs text-muted-foreground break-all">
+                        &lt;{ch.email}&gt;
+                      </span>
                       {ch.restauranteNome && (
-                        <Badge variant="outline" className="text-[10px]">
+                        <Badge variant="outline" className="text-[11px] font-semibold">
                           {ch.restauranteNome}
                         </Badge>
                       )}
                     </div>
-                    <p className="text-xs text-foreground whitespace-pre-wrap leading-relaxed">
+                    <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed break-words">
                       {ch.mensagem}
                     </p>
-                    <p className="text-[10px] text-muted-foreground">
+                    <p className="text-xs text-muted-foreground break-words">
                       Assunto: {ch.assunto} • Origem: {ch.origem || "-"} • {new Date(ch.criadoEm).toLocaleString("pt-BR")}
                     </p>
                   </div>
 
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="grid grid-cols-1 sm:flex items-center gap-2 shrink-0 w-full lg:w-auto">
                     <a
                       href={`mailto:${encodeURIComponent(ch.email)}?subject=${encodeURIComponent("Retorno MAYaMenu - " + ch.assunto)}`}
-                      className="px-3 py-1.5 rounded-xl border border-border bg-muted hover:bg-muted/80 text-xs font-bold"
+                      className="inline-flex items-center justify-center min-h-10 sm:min-h-9 px-3.5 py-2 rounded-xl border border-border bg-muted hover:bg-muted/80 text-xs font-bold text-center transition-colors"
                     >
                       Responder por E-mail
                     </a>
@@ -2051,7 +2059,7 @@ export function SuperAdminView() {
                         type="button"
                         size="sm"
                         onClick={() => updateDoc(doc(db, "chamados_suporte", ch.id), { status: "respondido" })}
-                        className="h-8 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold"
+                        className="h-10 sm:h-9 px-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold"
                       >
                         Marcar Respondido
                       </Button>
@@ -2155,22 +2163,22 @@ export function SuperAdminView() {
 
       {/* MODAL FÁBRICA DE LICENÇAS - RESULTADO DO LOTE */}
       <Dialog open={modalLoteAberto} onOpenChange={setModalLoteAberto}>
-        <DialogContent className="max-w-4xl bg-card border-border text-foreground rounded-3xl p-6 shadow-2xl max-h-[90vh] flex flex-col overflow-hidden">
+        <DialogContent className="w-[95vw] max-w-4xl bg-card border-border text-foreground rounded-3xl p-4 sm:p-6 shadow-2xl max-h-[90vh] flex flex-col overflow-hidden">
           <DialogHeader className="space-y-1 mb-2">
-            <div className="flex items-center justify-between">
-              <DialogTitle className="text-lg font-black flex items-center gap-2">
-                <Boxes className="w-5 h-5 text-amber-500" />
-                <span>Fábrica de Licenças — Lote Gerado ({loteRecemCriado.length} Concessões)</span>
+            <div className="flex items-center justify-between gap-2">
+              <DialogTitle className="text-base sm:text-lg font-black flex items-center gap-2">
+                <Boxes className="w-5 h-5 text-amber-500 shrink-0" />
+                <span>Fábrica de Licenças — Lote Gerado ({loteRecemCriado.length})</span>
               </DialogTitle>
             </div>
-            <DialogDescription className="text-xs text-muted-foreground">
+            <DialogDescription className="text-xs sm:text-sm text-muted-foreground">
               Concessões criadas com sucesso de forma atômica no Firestore e sincronizadas em cache local.
             </DialogDescription>
           </DialogHeader>
 
           {/* BARRA DE AÇÕES DO LOTE */}
-          <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-muted/40 rounded-2xl border border-border my-2">
-            <div className="flex items-center gap-2">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 bg-muted/40 rounded-2xl border border-border my-2">
+            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
               <Badge variant="outline" className="bg-amber-50 text-amber-800 border-amber-200 text-xs font-bold uppercase">
                 Plano {planoSelecionado}
               </Badge>
@@ -2188,13 +2196,13 @@ export function SuperAdminView() {
               )}
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="grid grid-cols-1 sm:flex items-center gap-2 w-full sm:w-auto">
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
                 onClick={() => handleBaixarCSV(loteRecemCriado)}
-                className="h-9 px-3 text-xs font-bold rounded-xl border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 shadow-xs"
+                className="h-10 sm:h-9 px-3 text-xs font-bold rounded-xl border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 shadow-xs"
               >
                 <FileDown className="w-4 h-4 mr-1.5" />
                 Baixar Planilha (.csv)
@@ -2203,12 +2211,12 @@ export function SuperAdminView() {
                 type="button"
                 size="sm"
                 onClick={() => handleCopiarLoteClipboard(loteRecemCriado)}
-                className="h-9 px-3 text-xs font-bold rounded-xl bg-rose-600 hover:bg-rose-700 text-white shadow-xs"
+                className="h-10 sm:h-9 px-3 text-xs font-bold rounded-xl bg-rose-600 hover:bg-rose-700 text-white shadow-xs"
               >
                 {copiadoLoteTexto ? (
                   <>
                     <Check className="w-4 h-4 mr-1.5 text-white" />
-                    Copiado para Área de Transferência!
+                    Copiado!
                   </>
                 ) : (
                   <>
@@ -2230,35 +2238,35 @@ export function SuperAdminView() {
                   key={lic.id}
                   className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl bg-card border border-border hover:border-amber-400 transition-colors gap-3 shadow-xs"
                 >
-                  <div className="flex items-center gap-3">
-                    <span className="text-xs font-mono font-bold text-muted-foreground w-6">
+                  <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
+                    <span className="text-xs font-mono font-bold text-muted-foreground w-6 shrink-0 pt-0.5 sm:pt-0">
                       #{String(index + 1).padStart(2, "0")}
                     </span>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono font-black text-sm tracking-wide text-foreground">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-mono font-black text-sm tracking-wide text-foreground break-all">
                           {lic.id}
                         </span>
-                        <Badge variant="outline" className="text-[10px] uppercase font-bold py-0 h-4 border-amber-300 bg-amber-50 text-amber-800">
+                        <Badge variant="outline" className="text-[11px] uppercase font-bold py-0 h-5 border-amber-300 bg-amber-50 text-amber-800">
                           {lic.plano}
                         </Badge>
                       </div>
-                      <div className="text-[11px] text-muted-foreground truncate max-w-sm">
+                      <div className="text-xs text-muted-foreground break-all mt-0.5">
                         {lic.responsavel ? (
                           <span className="font-medium text-foreground/80">{lic.responsavel} — </span>
                         ) : null}
-                        <span className="font-mono text-[10px]">{urlAtivacao}</span>
+                        <span className="font-mono text-[11px]">{urlAtivacao}</span>
                       </div>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-1.5 self-end sm:self-auto">
+                  <div className="grid grid-cols-3 sm:flex items-center gap-1.5 w-full sm:w-auto shrink-0">
                     <Button
                       type="button"
                       variant="ghost"
                       size="sm"
                       onClick={() => handleCopiar(lic.id)}
-                      className="h-8 px-2.5 text-xs rounded-lg text-muted-foreground hover:text-foreground"
+                      className="h-9 sm:h-8 px-2 text-xs rounded-lg text-muted-foreground hover:text-foreground"
                       title="Copiar Código"
                     >
                       {copiadoId === lic.id ? (
@@ -2273,7 +2281,7 @@ export function SuperAdminView() {
                       variant="ghost"
                       size="sm"
                       onClick={() => handleCopiarLink(lic.id)}
-                      className="h-8 px-2.5 text-xs rounded-lg text-muted-foreground hover:text-foreground"
+                      className="h-9 sm:h-8 px-2 text-xs rounded-lg text-muted-foreground hover:text-foreground"
                       title="Copiar Link de Ativação"
                     >
                       {copiadoLinkId === lic.id ? (
@@ -2288,7 +2296,7 @@ export function SuperAdminView() {
                       variant="outline"
                       size="sm"
                       onClick={() => handleCompartilharWhatsApp(lic)}
-                      className="h-8 px-2.5 text-xs rounded-lg text-emerald-700 border-emerald-200 bg-emerald-50 hover:bg-emerald-100 shadow-xs"
+                      className="h-9 sm:h-8 px-2 text-xs rounded-lg text-emerald-700 border-emerald-200 bg-emerald-50 hover:bg-emerald-100 shadow-xs"
                       title="Enviar via WhatsApp"
                     >
                       <MessageCircle className="w-3.5 h-3.5 mr-1 text-emerald-600" />
@@ -2300,7 +2308,7 @@ export function SuperAdminView() {
             })}
           </div>
 
-          <div className="flex items-center justify-between pt-3 border-t border-border mt-2">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-3 border-t border-border mt-2">
             <span className="text-xs text-muted-foreground">
               Total: <strong className="text-foreground">{loteRecemCriado.length}</strong> concessões prontas para entrega
             </span>
@@ -2308,7 +2316,7 @@ export function SuperAdminView() {
               type="button"
               variant="outline"
               onClick={() => setModalLoteAberto(false)}
-              className="rounded-xl text-xs px-5 h-9 font-bold"
+              className="rounded-xl text-xs px-5 h-10 sm:h-9 font-bold w-full sm:w-auto"
             >
               Concluir e Fechar
             </Button>
@@ -2318,21 +2326,21 @@ export function SuperAdminView() {
 
       {/* MODAL DE LOGIN RÁPIDO DO OPERADOR */}
       <Dialog open={modalLoginAberto} onOpenChange={setModalLoginAberto}>
-        <DialogContent className="max-w-md bg-card border-border text-foreground rounded-3xl p-6 shadow-2xl">
+        <DialogContent className="w-[95vw] max-w-md bg-card border-border text-foreground rounded-3xl p-5 sm:p-6 shadow-2xl">
           <DialogHeader className="space-y-2 mb-4">
-            <DialogTitle className="text-lg font-black flex items-center gap-2">
-              <Lock className="w-5 h-5 text-rose-500" />
+            <DialogTitle className="text-base sm:text-lg font-black flex items-center gap-2">
+              <Lock className="w-5 h-5 text-rose-500 shrink-0" />
               <span>Identificação de Operador SuperAdmin</span>
             </DialogTitle>
-            <DialogDescription className="text-xs text-muted-foreground">
+            <DialogDescription className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
               Insira as credenciais administrativas para habilitar permissão de gravação no Firestore (migração de planos e suspensões).
             </DialogDescription>
           </DialogHeader>
 
           {erroAuth && (
-            <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-xs flex items-center gap-2 mb-4">
-              <AlertTriangle className="w-4 h-4 flex-shrink-0" />
-              <span>{erroAuth}</span>
+            <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-xs sm:text-sm flex items-start gap-2 mb-4">
+              <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+              <span className="min-w-0 break-words">{erroAuth}</span>
             </div>
           )}
 
@@ -2345,9 +2353,9 @@ export function SuperAdminView() {
                 type="email"
                 value={loginEmail}
                 onChange={(e) => setLoginEmail(e.target.value)}
-                placeholder="admin@mayamenu.com ou teste@teste.com"
+                placeholder="admin@mayamenu.com ou marcus1fialho@gmail.com"
                 required
-                className="bg-background border-border text-foreground rounded-xl h-10 text-xs"
+                className="bg-background border-border text-foreground rounded-xl h-11 text-base sm:text-sm"
               />
             </div>
 
@@ -2361,7 +2369,7 @@ export function SuperAdminView() {
                 onChange={(e) => setLoginSenha(e.target.value)}
                 placeholder="••••••••"
                 required
-                className="bg-background border-border text-foreground rounded-xl h-10 text-xs"
+                className="bg-background border-border text-foreground rounded-xl h-11 text-base sm:text-sm"
               />
             </div>
 
@@ -2370,14 +2378,14 @@ export function SuperAdminView() {
                 type="button"
                 variant="ghost"
                 onClick={() => setModalLoginAberto(false)}
-                className="text-xs text-muted-foreground hover:text-foreground rounded-xl"
+                className="text-xs sm:text-sm text-muted-foreground hover:text-foreground rounded-xl h-10"
               >
                 Cancelar
               </Button>
               <Button
                 type="submit"
                 disabled={autenticando}
-                className="bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl text-xs h-10 px-5"
+                className="bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl text-xs sm:text-sm h-10 px-5"
               >
                 {autenticando ? "Autenticando..." : "Entrar como Operador"}
               </Button>

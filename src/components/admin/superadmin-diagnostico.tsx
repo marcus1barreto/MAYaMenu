@@ -107,16 +107,16 @@ export function SuperadminDiagnostico() {
   const inconsistentes = mesas ? mesas.filter((m) => m.inconsistente).length : 0;
 
   return (
-    <div className="bg-card border border-border rounded-2xl p-5 space-y-4">
+    <div className="bg-card border border-border rounded-2xl p-4 sm:p-5 space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <Activity className="w-4 h-4 text-rose-600" />
-          <h3 className="font-bold text-sm text-foreground">
+        <div className="flex items-center gap-2 min-w-0">
+          <Activity className="w-4 h-4 text-rose-600 shrink-0" />
+          <h3 className="font-bold text-sm sm:text-base text-foreground">
             Diagnóstico &amp; Saneamento por Estabelecimento
           </h3>
         </div>
         {mesas && (
-          <Badge variant="outline" className="text-[11px]">
+          <Badge variant="outline" className="text-xs">
             Ledger: {totalLedger} movimentação(ões)
           </Badge>
         )}
@@ -127,14 +127,14 @@ export function SuperadminDiagnostico() {
           value={restauranteId}
           onChange={(e) => setRestauranteId(e.target.value)}
           placeholder="Cole o restauranteId (ex: 6psLTpboW6ZqhPkErGsn3beDPB62)"
-          className="h-9 text-xs font-mono"
+          className="h-10 sm:h-9 text-base sm:text-sm font-mono"
         />
         <Button
           type="button"
           size="sm"
           onClick={diagnosticar}
           disabled={carregando || !restauranteId.trim()}
-          className="h-9 px-4 text-xs font-bold shrink-0"
+          className="h-10 sm:h-9 px-4 text-xs font-bold shrink-0"
         >
           {carregando ? "Diagnosticando..." : "Diagnosticar"}
         </Button>
