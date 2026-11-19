@@ -10,15 +10,28 @@
 import type { PlanoTipo, LimitesPlano, Restaurante } from "@/types";
 import { LIMITES_POR_PLANO } from "@/lib/licenca-service";
 
-type RestauranteComLicenca = Pick<Restaurante, "plano" | "maxMesas" | "maxPratos" | "maxItensMenu" | "licenca" | "assinatura">;
+type RestauranteComLicenca = Pick<
+  Restaurante,
+  "plano" | "maxMesas" | "maxPratos" | "maxItensMenu" | "licenca" | "assinatura" | "patrocinio"
+>;
 
 /** Plano efetivo do restaurante ('free' quando não houver nenhum registrado). */
 export function getPlanoRestaurante(restaurante?: RestauranteComLicenca | null): PlanoTipo {
-  return (
-    restaurante?.assinatura?.planoId?.includes("enterprise") ? "enterprise" :
-    restaurante?.assinatura?.planoId?.includes("pro") ? "pro" :
-    restaurante?.licenca?.plano ?? restaurante?.plano ?? "free"
-  );
+  const planoId = restaurante?.assinatura?.planoId?.toLowerCase();
+  const assinaturaInativa =
+    restaurante?.assinatura?.status === "cancelada" ||
+    restaurante?.assinatura?.status === "suspensa";
+
+  if (planoId && !assinaturaInativa) {
+    if (planoId.includes("enterprise")) return "enterprise";
+    if (planoId.includes("pro") || planoId.includes("patrocinado")) return "pro";
+  }
+
+  if (restaurante?.patrocinio?.ativo === true) {
+    return "pro";
+  }
+
+  return restaurante?.plano ?? restaurante?.licenca?.plano ?? "free";
 }
 
 /** Limites efetivos (mesas e itens de menu) do restaurante. */

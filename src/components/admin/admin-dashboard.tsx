@@ -1450,7 +1450,7 @@ export function AdminDashboard({
                       PRO 🚀
                     </Badge>
                   </span>
-                  {!moduloAtivo("mod.analytics_historico") && (
+                  {!moduloAtivo("mod.analytics_historico") && getPlanoRestaurante(restaurante) === "free" && (
                     <span className="pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity absolute left-1/2 -translate-x-1/2 top-full mt-1 z-50 whitespace-nowrap rounded-lg bg-neutral-900 px-2.5 py-1 text-[10px] font-bold text-white shadow-lg">
                       Disponível na versão Pro
                     </span>

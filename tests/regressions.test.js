@@ -923,6 +923,65 @@ async function main() {
     );
   });
 
+  await runTest("Plano Patrocinado B2B: getPlanoRestaurante libera PRO mesmo com licenca original free", async () => {
+    const limitesSrc = fs.readFileSync(
+      path.join(__dirname, "..", "src", "lib", "licenca-limites.ts"),
+      "utf8"
+    );
+    const compiled = esbuild.transformSync(limitesSrc, {
+      loader: "ts",
+      format: "cjs",
+      target: "node20",
+    });
+    const mod = { exports: {} };
+    const customRequire = (spec) => {
+      if (spec === "@/lib/licenca-service") {
+        return {
+          LIMITES_POR_PLANO: {
+            free: { maxPratos: 15, maxMesas: 5 },
+            pro: { maxPratos: 60, maxMesas: 30 },
+            enterprise: { maxPratos: 999, maxMesas: 999 },
+          },
+        };
+      }
+      return require(spec);
+    };
+    new Function("exports", "module", "require", compiled.code)(mod.exports, mod, customRequire);
+    const { getPlanoRestaurante } = mod.exports;
+
+    // Caso real reportado: restaurante criado no Free recebe patrocínio B2B (plan_b2b_patrocinado_v1)
+    assert.strictEqual(
+      getPlanoRestaurante({
+        plano: "pro",
+        licenca: { plano: "free", limites: { maxPratos: 15, maxMesas: 5 } },
+        assinatura: { planoId: "plan_b2b_patrocinado_v1", status: "ativa" },
+        patrocinio: { ativo: true },
+      }),
+      "pro"
+    );
+
+    // Assinatura cancelada/suspensa sem patrocínio ativo volta para free
+    assert.strictEqual(
+      getPlanoRestaurante({
+        plano: "free",
+        licenca: { plano: "free" },
+        assinatura: { planoId: "plan_b2b_patrocinado_v1", status: "cancelada" },
+        patrocinio: { ativo: false },
+      }),
+      "free"
+    );
+
+    // Free puro continua free e Enterprise continua enterprise
+    assert.strictEqual(getPlanoRestaurante({ plano: "free", licenca: { plano: "free" } }), "free");
+    assert.strictEqual(
+      getPlanoRestaurante({
+        plano: "enterprise",
+        assinatura: { planoId: "plan_enterprise_v1", status: "ativa" },
+      }),
+      "enterprise"
+    );
+  });
+
   console.log("\n=================================================");
   console.log(`Relatório Final de Regressões: ${passed} Passaram | ${failed} Falharam`);
   console.log("=================================================");
